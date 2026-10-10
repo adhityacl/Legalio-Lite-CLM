@@ -29,7 +29,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
           aria-label={t('pagination.rows_per_page', 'Rows per page')}
           value={rowsPerPage}
           onChange={e => onRowsPerPageChange(Number(e.target.value))}
-          controlProps={{ className: 'w-20' }}
+          className="w-20"
         >
           {rowsPerPageOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
         </NativeSelect>

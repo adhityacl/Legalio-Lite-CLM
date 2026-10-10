@@ -60,17 +60,17 @@ export function OrganizationOnboarding() {
   };
 
   return (
-    <main className="flex min-h-dvh w-full items-center justify-center bg-(--background) px-4 py-8 text-(--foreground)">
-      <section aria-labelledby="onboarding-title" className="w-full max-w-xl rounded-2xl border border-(--border) bg-(--card) p-6 shadow-sm sm:p-8">
+    <main className="flex min-h-dvh w-full items-center justify-center bg-(--moduix-color-background) px-4 py-8 text-(--moduix-color-foreground)">
+      <section aria-labelledby="onboarding-title" className="w-full max-w-xl rounded-2xl border border-(--moduix-color-border) bg-(--moduix-color-card) p-6 shadow-sm sm:p-8">
         {(stage === 'profile' || stage === 'region') && (
           <ol aria-label={t('onboarding.progress', 'Organization setup progress')} className="mb-6 grid grid-cols-2 gap-3 text-sm">
             {[['profile', t('tb.section_profile', 'Organization profile')], ['region', t('tb.section_region', 'Region and formatting')]].map(([step, label], index) => (
-              <li key={step} aria-current={stage === step ? 'step' : undefined} className={`border-t-2 pt-2 ${stage === step ? 'border-(--primary) font-semibold' : 'border-(--border) text-(--muted-foreground)'}`}>{index + 1}. {label}</li>
+              <li key={step} aria-current={stage === step ? 'step' : undefined} className={`border-t-2 pt-2 ${stage === step ? 'border-(--moduix-color-primary) font-semibold' : 'border-(--moduix-color-border) text-(--moduix-color-muted-foreground)'}`}>{index + 1}. {label}</li>
             ))}
           </ol>
         )}
         <h1 id="onboarding-title" ref={heading} tabIndex={-1} className="text-2xl font-semibold tracking-tight focus:outline-none">{title}</h1>
-        <p className="mt-2 text-sm leading-6 text-(--muted-foreground)">
+        <p className="mt-2 text-sm leading-6 text-(--moduix-color-muted-foreground)">
           {stage === 'choose' ? t('onboarding.description', 'Join your team with an invite code, or create an organization to get started.')
             : stage === 'join' ? t('onboarding.join_description', 'Enter the invite code shared by your organization administrator. Codes expire after 24 hours.')
             : stage === 'profile' ? t('onboarding.profile_description', 'Tell us about your organization. You will be its first administrator.')
@@ -81,8 +81,8 @@ export function OrganizationOnboarding() {
             {([{ next: 'join', Icon: Users, label: t('onboarding.join', 'Join organization'), description: t('onboarding.join_hint', 'I have an invite code') },
               { next: 'profile', Icon: Building2, label: t('onboarding.create', 'Create organization'), description: t('onboarding.create_hint', 'Start a new workspace') }] as const).map(({ next, Icon, label, description }) => (
               <Button variant="outline" key={next} type="button" aria-label={label} onClick={() => navigate(next)} className="text-left">
-                <Icon aria-hidden="true" className="mb-4 h-6 w-6 text-(--muted-foreground)" />
-                <span className="block font-semibold">{label}</span><span className="mt-1 block text-sm text-(--muted-foreground)">{description}</span>
+                <Icon aria-hidden="true" className="mb-4 h-6 w-6 text-(--moduix-color-muted-foreground)" />
+                <span className="block font-semibold">{label}</span><span className="mt-1 block text-sm text-(--moduix-color-muted-foreground)">{description}</span>
               </Button>
             ))}
           </div>
@@ -128,7 +128,7 @@ export function OrganizationOnboarding() {
             </div>
           </form>
         )}
-        <div className="mt-6 border-t border-(--border) pt-4"><Button type="button" variant="ghost" disabled={busy} onClick={() => void logout()}>{t('app.kembali_ke_login', 'Back to login')}</Button></div>
+        <div className="mt-6 border-t border-(--moduix-color-border) pt-4"><Button type="button" variant="ghost" disabled={busy} onClick={() => void logout()}>{t('app.kembali_ke_login', 'Back to login')}</Button></div>
       </section>
     </main>
   );

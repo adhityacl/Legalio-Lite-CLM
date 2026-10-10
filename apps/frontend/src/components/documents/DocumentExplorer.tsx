@@ -265,7 +265,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               id="document-status-filter"
               value={filters.status}
               onChange={(e) => updateFilter('status', e.target.value)}
-              className="min-w-[130px] flex-1 cursor-pointer"
+              className="w-full" controlProps={{ className: "min-w-[130px] flex-1" }}
             >
               <option value="">{t('documents.filter.status_active', 'Semua status aktif')}</option>
               {DOCUMENT_STATUSES.map((s) => (
@@ -283,7 +283,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               id="document-type-filter"
               value={filters.type}
               onChange={(e) => updateFilter('type', e.target.value)}
-              className="min-w-[130px] flex-1 cursor-pointer"
+              className="w-full" controlProps={{ className: "min-w-[130px] flex-1" }}
             >
               <option value="">{t('documents.filter.type_all', 'All Document Types')}</option>
               {DOCUMENT_TYPES.map((type) => (
@@ -300,7 +300,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               id="document-creator-filter"
               value={filters.created_by}
               onChange={(e) => updateFilter('created_by', e.target.value)}
-              className="min-w-[130px] flex-1 cursor-pointer"
+              className="w-full" controlProps={{ className: "min-w-[130px] flex-1" }}
             >
               <option value="">{t('documents.filter.created_by_all', 'All Creators')}</option>
               {(data?.creators ?? []).map((creator) => (

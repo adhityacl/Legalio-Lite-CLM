@@ -394,7 +394,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                 <AlphabeticalSelect id="IOModal-field-1"
                   value={partnerId}
                   onChange={(e) => handlePartnerChange(e.target.value)}
-                  className="w-full cursor-pointer"
+                  className="w-full" controlProps={{ className: "w-full" }}
                 >
                   <option value="">{t('io.pilih_partner_vendor', '-- Pilih Partner / Vendor --')}</option>
                   {partners.map((p) => (
@@ -412,7 +412,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                 <AlphabeticalSelect id="IOModal-field-2"
                   value={contractId}
                   onChange={(e) => handleContractChange(e.target.value)}
-                  className="w-full cursor-pointer"
+                  className="w-full" controlProps={{ className: "w-full" }}
                 >
                   <option value="">{t('form.io.standalone_opt', '-- IO Standalone (Tanpa Kontrak Induk) --')}</option>
                   {availableContracts.map((c) => (
@@ -482,7 +482,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                 <AlphabeticalSelect id="IOModal-field-6"
                   value={pricingModelSelect}
                   onChange={(e) => setPricingModelSelect(e.target.value)}
-                  className="w-full cursor-pointer"
+                  className="w-full" controlProps={{ className: "w-full" }}
                 >
                   {PRICING_MODELS.map((model) => <option key={model} value={model}>{model}</option>)}
                   {isInitialCustom && !STANDARD_PRICING_MODELS.includes(initialPricingModel) && (
@@ -512,7 +512,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                 <AlphabeticalSelect id="IOModal-field-7"
                   value={chargingType}
                   onChange={(e) => setChargingType(e.target.value as ChargingType)}
-                  className="w-full cursor-pointer"
+                  className="w-full" controlProps={{ className: "w-full" }}
                 >
                   <option value="Prepaid">{t('io.prepaid_bayar_di_awal', 'Prepaid (Bayar di Awal)')}</option>
                   <option value="Postpaid">{t('io.postpaid_bayar_di_akhir_periode', 'Postpaid (Bayar di Akhir Periode)')}</option>
@@ -553,7 +553,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                 <AlphabeticalSelect id="IOModal-field-10"
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full"
+                  className="w-full" controlProps={{ className: "w-full" }}
                 >
                   {SUPPORTED_CURRENCIES.map((c) => (
                     <option key={c.code} value={c.code}>

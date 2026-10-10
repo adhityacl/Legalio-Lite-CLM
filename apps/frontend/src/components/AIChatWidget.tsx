@@ -269,7 +269,7 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
                           h2: ({ node, ...props }) => <h2 className="text-xs font-bold mb-1 mt-2 text-foreground " {...props} />,
                           h3: ({ node, ...props }) => <h3 className="text-xs font-bold mb-1 mt-1.5 text-foreground " {...props} />,
                           table: ({ node, ...props }) => (
-                            <TableScrollArea>
+                            <TableScrollArea className="rounded-none border-0">
                               <Table className="min-w-full" {...props} />
                             </TableScrollArea>
                           ),

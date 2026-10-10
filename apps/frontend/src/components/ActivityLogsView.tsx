@@ -171,7 +171,7 @@ export const ActivityLogsView: React.FC = () => {
               setFilterModule(e.target.value);
               setCurrentPage(1);
             }}
-            className="flex-1 min-w-[140px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[140px]" }}
           >
             <option value="ALL">{t('logs.all_modules', 'Semua Modul')}</option>
             {moduleOptions.map((mod) => (
@@ -188,7 +188,7 @@ export const ActivityLogsView: React.FC = () => {
               setSelectedAction(e.target.value);
               setCurrentPage(1);
             }}
-            className="flex-1 min-w-[140px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[140px]" }}
           >
             <option value="ALL">{t('logs.all_actions', 'Semua Jenis Aksi')}</option>
             <option value="LOGIN">{t('logs.login', 'LOGIN')}</option>
@@ -209,7 +209,7 @@ export const ActivityLogsView: React.FC = () => {
               setSelectedTimeRange(e.target.value);
               setCurrentPage(1);
             }}
-            className="flex-1 min-w-[140px]"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[140px]" }}
           >
             <option value="ALL">{t('notifications.all_time_periods', 'Semua Periode Waktu')}</option>
             <option value="TODAY">{t('notifications.time_today', 'Hari Ini (24 Jam Terakhir)')}</option>
@@ -240,7 +240,7 @@ export const ActivityLogsView: React.FC = () => {
 
       {/* Table */}
       <Card className="overflow-hidden">
-        <TableScrollArea>
+        <TableScrollArea className="rounded-none border-0">
           <Table className="w-full text-left">
             <TableHeader>
               <TableRow>

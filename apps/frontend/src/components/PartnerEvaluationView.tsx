@@ -627,7 +627,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               setSelectedYear(e.target.value);
               setCurrentPage(1);
             }}
-            className="flex-1 min-w-[130px]"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="2026">{t('eval.year_prefix', 'Tahun')} 2026</option>
             <option value="2025">{t('eval.year_prefix', 'Tahun')} 2025</option>
@@ -643,7 +643,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               setSelectedEvaluationFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="flex-1 min-w-[130px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('eval.all_decisions', 'Semua Keputusan')}</option>
             <option value="Recommended">{t('eval.decision_recommended', 'Lanjutkan Kerjasama')}</option>
@@ -660,7 +660,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               setSelectedObligationTarget(e.target.value);
               setCurrentPage(1);
             }}
-            className="flex-1 min-w-[130px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('eval.all_obligation_targets', 'Semua Target Kewajiban')}</option>
             <option value="Sangat baik">{t('eval.opt_sangat_baik', 'Sangat baik')}</option>
@@ -692,7 +692,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
       <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_year'), value: selectedYear, active: selectedYear !== String(new Date().getFullYear()) }, { label: t('ui.filter_decision'), value: selectedEvaluationFilter, active: selectedEvaluationFilter !== 'ALL' }, { label: t('ui.filter_target'), value: selectedObligationTarget, active: selectedObligationTarget !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedYear(String(new Date().getFullYear())); setSelectedEvaluationFilter('ALL'); setSelectedObligationTarget('ALL'); }} />
         <p className="mobile-table-hint px-4 py-2 text-xs text-muted-foreground md:hidden">{t('ui.scroll_table')}</p>
-        <TableScrollArea className="data-table-scroll" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
+        <TableScrollArea className="data-table-scroll rounded-none border-0" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
           <Table className="app-data-table w-full text-left">
             <TableHeader>
               <TableRow>
@@ -963,7 +963,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                             partner_id: found ? found.partner_id : '',
                           });
                         }}
-                        className="w-full"
+                        className="w-full" controlProps={{ className: "w-full" }}
                       >
                         <option value="" disabled>
                           {t('eval.select_partner_ph')}

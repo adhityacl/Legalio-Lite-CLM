@@ -18,12 +18,12 @@ export function MonthCell({ date, today, events, loading, onMonthClick, onEventC
   const locale = getActiveFormattingLocale();
   const month = new Intl.DateTimeFormat(locale, { month: 'long' }).format(date);
   const label = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(date);
-  return <section aria-label={label} data-current-month={current || undefined} className={cn('min-w-0 bg-[var(--card)]', current && 'bg-status-info-soft/50 ')}>
+  return <section aria-label={label} data-current-month={current || undefined} className={cn('min-w-0 bg-[var(--moduix-color-card)]', current && 'bg-status-info-soft/50 ')}>
  <Button type="button" variant="ghost" className={cn('w-full justify-start', current && ' ')}
  aria-label={t('calendar.open_month', undefined, { month: label })} onClick={() => onMonthClick(date)}>{month}</Button>
  <div className="flex min-h-40 flex-col p-2">
       {loading ? <div className="space-y-4 p-2" aria-hidden="true">{[0, 1, 2].map(row => <Skeleton key={row} className="h-5 w-full" />)}</div>
-        : events.length === 0 ? <p className="flex min-h-36 items-center justify-center text-sm text-[var(--muted-foreground)]">{t('calendar.no_events')}</p>
+        : events.length === 0 ? <p className="flex min-h-36 items-center justify-center text-sm text-[var(--moduix-color-muted-foreground)]">{t('calendar.no_events')}</p>
           : <>
             {events.slice(0, 4).map(event => <EventItem key={event.id} event={event} onEventClick={onEventClick} />)}
             {events.length > 4 && <Button type="button" variant="link" className="justify-start" onClick={() => onMonthClick(date)} aria-label={t('calendar.more_in_month', undefined, { count: events.length - 4, month: label })}>{t('calendar.more', undefined, { count: events.length - 4 })}</Button>}
@@ -33,7 +33,7 @@ export function MonthCell({ date, today, events, loading, onMonthClick, onEventC
 }
 
 export function YearView({ date, today, byMonth, ...props }: Omit<MonthCellProps, 'events'> & { byMonth: Map<string, CalendarEvent[]> }) {
-  return <div data-testid="calendar-year-grid" className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--border)] sm:grid-cols-2 lg:grid-cols-4">
+  return <div data-testid="calendar-year-grid" className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-[var(--moduix-color-border)] bg-[var(--moduix-color-border)] sm:grid-cols-2 lg:grid-cols-4">
     {Array.from({ length: 12 }, (_, month) => {
       const start = new Date(date.getFullYear(), month, 1);
       return <MonthCell key={month} date={start} today={today} events={byMonth.get(calendarDateKey(start).slice(0, 7)) || []} {...props} />;

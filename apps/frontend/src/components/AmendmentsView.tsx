@@ -85,7 +85,7 @@ export const AmendmentsView: React.FC<AmendmentsViewProps> = ({
           <AlphabeticalSelect
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as any)}
-            className="flex-1 min-w-[140px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[140px]" }}
           >
             <option value="ALL">{t('amendments.filter_all')}</option>
             <option value="Contract">{t('amendments.filter_contract')}</option>

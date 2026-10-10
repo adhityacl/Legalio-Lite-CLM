@@ -217,7 +217,7 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
         ) : loading ? (
           <div className="space-y-2 p-4" aria-busy="true"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
         ) : filter === 'pending' ? (
-          <TableScrollArea>
+          <TableScrollArea className="rounded-none border-0">
             <Table>
               <TableHeader><TableRow>
                 <TableColumnHeader>{t('tb.col_email', 'Email')}</TableColumnHeader><TableColumnHeader>{t('tb.col_role', 'Role')}</TableColumnHeader>
@@ -246,7 +246,7 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
             </Table>
           </TableScrollArea>
         ) : (
-          <TableScrollArea>
+          <TableScrollArea className="rounded-none border-0">
             <Table>
               <TableHeader><TableRow>
                 <TableColumnHeader>{t('tb.col_name', 'Name')}</TableColumnHeader><TableColumnHeader>{t('tb.col_email', 'Email')}</TableColumnHeader><TableColumnHeader>{t('tb.col_role', 'Role')}</TableColumnHeader>

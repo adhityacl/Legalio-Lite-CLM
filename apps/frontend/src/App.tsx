@@ -541,14 +541,14 @@ const MainApp: React.FC = () => {
 
   if (gate.kind === 'no-org') {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-(--background) text-(--foreground)">
+      <div className="flex min-h-dvh items-center justify-center bg-(--moduix-color-background) text-(--moduix-color-foreground)">
         {selectionStatus === 'choose' ? (
           <StateScreen standalone title={t('tb.choose_organization', 'Choose an organization')} message={t('tb.choose_organization_desc', 'You belong to several organizations. Choose the one to work in for this tab.')}>
             <ul className="w-full space-y-2">
               {organizations.map((org) => (
                 <li key={org.organizationId}>
                   <button type="button" onClick={() => void switchTenant(org.organizationId)}
-                    className="flex min-h-10 w-full cursor-pointer items-center justify-between rounded-lg border border-border bg-card px-4 text-left text-sm font-semibold hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 ">
+                    className="flex min-h-10 w-full cursor-pointer items-center justify-between rounded-lg border border-border bg-card px-4 text-left text-sm font-semibold hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--moduix-color-ring)/40 ">
                     {org.organizationName}
                   </button>
                 </li>

@@ -461,7 +461,7 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
               </p>
             </div>
           </div>
-          <TableScrollArea>
+          <TableScrollArea className="rounded-none border-0">
             <Table className="w-full text-left">
               <TableHeader>
                 <TableRow>
@@ -529,7 +529,7 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
                   {section.label} ({section.items.length})
                 </span>
               </div>
-              <TableScrollArea>
+              <TableScrollArea className="rounded-none border-0">
                 <Table className="w-full text-left">
                   <TableHeader>
                     <TableRow>

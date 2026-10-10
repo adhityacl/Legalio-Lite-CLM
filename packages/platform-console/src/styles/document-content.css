@@ -1,0 +1,300 @@
+/* Rich document content (Tiptap editor, previews, print). Product-owned styling on moduix tokens. */
+/* Visual Fillable Field Slots (WYSIWYG Interactive Fields matching User Screenshot) */
+.fillable-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  margin: 1px 2px;
+  border-radius: var(--moduix-radius-sm);
+  border: var(--moduix-border-width-sm) solid var(--legalio-info-border);
+  background-color: var(--legalio-info-soft);
+  color: var(--legalio-info);
+  font-family: inherit;
+  font-size: 0.9em;
+  font-weight: 500;
+  vertical-align: baseline;
+  transition: border-color var(--moduix-duration-fast) var(--moduix-ease-in-out);
+  user-select: text;
+  box-shadow: var(--moduix-shadow-sm);
+}
+
+.fillable-slot:hover {
+  border-color: var(--moduix-color-ring);
+  background-color: var(--moduix-color-accent);
+}
+
+.fillable-slot:focus-within {
+  border-color: var(--moduix-color-ring);
+  background-color: var(--moduix-color-card);
+  outline: var(--moduix-focus-ring-width) solid var(--moduix-color-ring);
+  outline-offset: var(--moduix-focus-ring-offset);
+  box-shadow: none;
+}
+
+.fillable-slot .slot-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--moduix-radius-sm);
+  background-color: var(--moduix-color-primary);
+  color: var(--moduix-color-primary-foreground);
+  font-size: var(--moduix-text-xs);
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.fillable-slot .slot-value {
+  outline: none;
+  min-width: 32px;
+  display: inline-block;
+  cursor: text;
+}
+
+.fillable-slot.slot-empty {
+  border-style: dashed;
+  border-color: var(--moduix-color-input);
+  background-color: var(--moduix-color-muted);
+  color: var(--moduix-color-muted-foreground);
+}
+
+.fillable-slot.slot-empty .slot-icon-badge {
+  background-color: var(--moduix-color-muted-foreground);
+}
+
+
+
+
+
+
+/* Pulsing highlight when Highlight Fillable Fields is Active */
+.highlight-fillable-mode .fillable-slot {
+  /* Static highlight keeps long editing sessions calm. */
+  box-shadow: none;
+  border-color: var(--moduix-color-warning);
+}
+
+.highlight-fillable-mode .fillable-slot.slot-empty {
+  background-color: var(--legalio-warning-soft);
+  border-color: var(--legalio-warning-border);
+  color: var(--moduix-color-warning);
+}
+
+.highlight-fillable-mode .fillable-slot.slot-empty .slot-icon-badge {
+  background-color: var(--moduix-color-warning);
+  color: var(--legalio-warning-soft);
+}
+
+
+
+
+/* Print mode styles: clean appearance without editor boxes */
+@media print {
+  .legal-page { height: auto !important; overflow: visible !important; padding: 0 !important; background: white !important; }
+  .legal-page nav { display: none !important; }
+  .legal-page article { max-width: none !important; }
+  .fillable-slot {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    color: inherit !important;
+  }
+  .fillable-slot .slot-icon-badge {
+    display: none !important;
+  }
+  .comment-anchor {
+    background: transparent !important;
+    border: none !important;
+    text-decoration: none !important;
+  }
+  .comment-anchor::after {
+    content: none !important;
+  }
+}
+
+/* Comment & suggestion anchors (redlining). Strike-through / underline carry the meaning, not color alone. */
+.comment-anchor {
+  background-color: var(--legalio-warning-soft);
+  border-bottom: var(--moduix-border-width-sm) solid var(--moduix-color-warning);
+  cursor: pointer;
+}
+.comment-anchor[data-comment-kind='suggestion'] {
+  background-color: var(--legalio-danger-soft);
+  border-bottom: none;
+  text-decoration: line-through;
+  text-decoration-color: var(--moduix-color-destructive);
+  text-decoration-thickness: 2px;
+}
+/* inline-block stops the parent's line-through from striking the proposed text too. */
+.comment-anchor[data-comment-kind='suggestion']::after {
+  content: attr(data-suggestion);
+  display: inline-block;
+  margin-left: 2px;
+  padding: 0 2px;
+  background-color: var(--legalio-success-soft);
+  color: var(--moduix-color-success);
+  text-decoration: underline;
+}
+
+.diff-added {
+  background-color: var(--legalio-success-soft);
+  color: var(--moduix-color-success);
+  text-decoration: underline;
+}
+.diff-removed {
+  background-color: var(--legalio-danger-soft);
+  color: var(--moduix-color-destructive);
+  text-decoration: line-through;
+}
+
+/* Ensure contenteditable lists show proper bullets and numbers */
+[contenteditable] ul {
+  list-style-type: disc !important;
+  padding-left: 2rem !important;
+  margin: 0.75rem 0 !important;
+}
+[contenteditable] ol {
+  list-style-type: decimal !important;
+  padding-left: 2.2rem !important;
+  margin: 0.75rem 0 !important;
+}
+[contenteditable] li {
+  margin: 0.25rem 0 !important;
+}
+
+/* Tiptap table styling: without this, inserted tables have no borders/padding
+   and render as an invisible block (empty cells collapse to near-zero height). */
+.ProseMirror .tableWrapper {
+  margin: 1.25rem 0;
+  overflow-x: auto;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  margin: 0;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.ProseMirror table td,
+.ProseMirror table th {
+  border: var(--moduix-border-width-sm) solid var(--moduix-color-border);
+  box-sizing: border-box;
+  min-width: 1em;
+  padding: 8px 12px;
+  position: relative;
+  vertical-align: top;
+}
+
+.ProseMirror table th {
+  background-color: var(--moduix-color-muted);
+  color: var(--moduix-color-foreground);
+  font-weight: bold;
+  text-align: left;
+}
+
+.ProseMirror table p {
+  margin: 0;
+}
+
+.ProseMirror table .selectedCell:after {
+  background: var(--moduix-color-accent);
+  opacity: 0.5;
+  content: '';
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+.ProseMirror table .column-resize-handle {
+  background-color: var(--moduix-color-primary);
+  bottom: -2px;
+  pointer-events: none;
+  position: absolute;
+  right: -2px;
+  top: 0;
+  width: 4px;
+}
+
+.ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
+
+
+/* Block-type styling for the contract editor. Tailwind's preflight resets
+   h1-h6/blockquote/pre/code to plain inherited text, so toggling a heading,
+   quote or code block from the toolbar was changing the underlying HTML but
+   looked like nothing happened. */
+.ProseMirror h1 {
+  font-size: 1.875rem !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  margin: 1.5rem 0 0.75rem !important;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  line-height: 1.3 !important;
+  margin: 1.25rem 0 0.5rem !important;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+  margin: 1rem 0 0.5rem !important;
+}
+
+.ProseMirror p {
+  margin: 0 0 0.75rem !important;
+}
+
+.ProseMirror blockquote {
+  border-left: var(--moduix-focus-ring-width) solid var(--moduix-color-border) !important;
+  padding-left: 1rem !important;
+  margin: 1rem 0 !important;
+  color: var(--moduix-color-muted-foreground) !important;
+  font-style: italic !important;
+}
+
+
+.ProseMirror pre {
+  background: var(--moduix-color-muted) !important;
+  color: var(--moduix-color-foreground) !important;
+  font-family: var(--moduix-font-mono) !important;
+  padding: 0.75rem 1rem !important;
+  border-radius: var(--moduix-radius-md) !important;
+  overflow-x: auto !important;
+  margin: 1rem 0 !important;
+  white-space: pre-wrap !important;
+}
+
+.ProseMirror pre code {
+  background: none !important;
+  color: inherit !important;
+  padding: 0 !important;
+  font-size: 0.85em !important;
+}
+
+.ProseMirror code {
+  background: var(--moduix-color-muted) !important;
+  padding: 0.15em 0.4em !important;
+  border-radius: var(--moduix-radius-sm) !important;
+  font-family: var(--moduix-font-mono) !important;
+  font-size: 0.85em !important;
+}
+
+
+.ProseMirror hr {
+  border: none !important;
+  border-top: var(--moduix-border-width-sm) solid var(--moduix-color-border) !important;
+  margin: 1.5rem 0 !important;
+}

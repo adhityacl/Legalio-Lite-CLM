@@ -18,18 +18,18 @@ export function MonthView({ date, today, byDay, loading, weekStartsOn, onEventCl
   const days = getMonthDays(date, weekStartsOn);
   const weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' });
   const fullDate = new Intl.DateTimeFormat(locale, { dateStyle: 'full' });
-  return <div data-testid="calendar-month-grid" className="overflow-hidden rounded-xl border border-[var(--border)]">
-    <div className="grid grid-cols-7 border-b border-[var(--border)] bg-[var(--muted)]">
+  return <div data-testid="calendar-month-grid" className="overflow-hidden rounded-xl border border-[var(--moduix-color-border)]">
+    <div className="grid grid-cols-7 border-b border-[var(--moduix-color-border)] bg-[var(--moduix-color-muted)]">
       {days.slice(0, 7).map(day => <div key={day.getDay()} className="px-1 py-3 text-center text-xs font-semibold">{weekday.format(day)}</div>)}
     </div>
-    <div className="grid grid-cols-7 gap-px bg-[var(--border)]">
+    <div className="grid grid-cols-7 gap-px bg-[var(--moduix-color-border)]">
       {days.map(day => {
         const key = calendarDateKey(day);
         const events = byDay.get(key) || [];
         const current = isSameDay(day, today);
         const outside = !isSameMonth(day, date);
-        return <section key={key} aria-label={fullDate.format(day)} data-date={key} className={cn('min-h-44 min-w-0 bg-[var(--card)] p-0.5 sm:p-2', outside && 'bg-[var(--muted)]')}>
- <time dateTime={key} aria-current={current ? 'date' : undefined} className={cn('mb-1 flex size-7 items-center justify-center rounded-full text-xs', outside && 'text-[var(--muted-foreground)]', current && 'bg-status-info text-white')}>{day.getDate()}</time>
+        return <section key={key} aria-label={fullDate.format(day)} data-date={key} className={cn('min-h-44 min-w-0 bg-[var(--moduix-color-card)] p-0.5 sm:p-2', outside && 'bg-[var(--moduix-color-muted)]')}>
+ <time dateTime={key} aria-current={current ? 'date' : undefined} className={cn('mb-1 flex size-7 items-center justify-center rounded-full text-xs', outside && 'text-[var(--moduix-color-muted-foreground)]', current && 'bg-status-info text-white')}>{day.getDate()}</time>
  {loading ? <Skeleton className="h-5 w-full" /> : <>
             <div className={cn('space-y-1', outside && 'opacity-60')}>
  {events.slice(0, 3).map(event => <EventItem key={event.id} event={event} chip onEventClick={onEventClick} />)}

@@ -468,7 +468,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setSelectedPartnerStatus(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="flex-1 min-w-[130px] appearance-none pr-8"
+                className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
               >
                 <option value="ALL">{t('partners.all_status')}</option>
                 <option value="Active">{t('partners.active')}</option>
@@ -483,7 +483,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setSelectedDDStatus(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="flex-1 min-w-[130px] appearance-none pr-8"
+                className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
               >
                 <option value="ALL">{t('partners.all_dd_status')}</option>
                 <option value="Complete">{t('partners.dd_complete')}</option>
@@ -499,7 +499,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setSelectedBadanHukum(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="flex-1 min-w-[130px] appearance-none pr-8"
+                className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
               >
                 <option value="ALL">{t('partners.all_legal_entity')}</option>
                 <option value="DOMESTIC">{t('partners.domestic', 'Domestic')}</option>
@@ -538,7 +538,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
           <Card className="overflow-hidden">
               <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_dd'), value: selectedDDStatus, active: selectedDDStatus !== 'ALL' }, { label: t('ui.filter_country'), value: selectedBadanHukum, active: selectedBadanHukum !== 'ALL' }, { label: t('ui.filter_status'), value: selectedPartnerStatus, active: selectedPartnerStatus !== 'ALL' }, { label: t('ui.filter_department'), value: selectedDepartment, active: selectedDepartment !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedDDStatus('ALL'); setSelectedBadanHukum('ALL'); setSelectedPartnerStatus('ALL'); setSelectedDepartment('ALL'); }} />
         <p className="mobile-table-hint px-4 py-2 text-xs text-muted-foreground md:hidden">{t('ui.scroll_table')}</p>
-        <TableScrollArea className="data-table-scroll" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
+        <TableScrollArea className="data-table-scroll rounded-none border-0" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
                 <Table className="app-data-table w-full text-left">
                   <TableHeader>
                     <TableRow>

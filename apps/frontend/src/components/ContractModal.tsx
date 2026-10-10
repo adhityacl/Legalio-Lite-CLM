@@ -541,7 +541,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                   <AlphabeticalSelect id="contract-field-1"
                     value={jenisDokumen}
                     onChange={(e) => setJenisDokumen(e.target.value as JenisDokumenContract)}
-                    className="w-full cursor-pointer"
+                    className="w-full" controlProps={{ className: "w-full" }}
                   >
                     <option value="Master Agreement">
                       {t('form.contract.master_agreement_opt', 'Master Agreement (Kontrak Induk Utama)')}
@@ -562,7 +562,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                       setPartnerId(e.target.value);
                       setParentContractId('');
                     }}
-                    className="w-full cursor-pointer"
+                    className="w-full" controlProps={{ className: "w-full" }}
                   >
                     {partners.map((p) => (
                       <option key={p.partner_id} value={p.partner_id}>
@@ -590,7 +590,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                         required={jenisDokumen === 'Agreement Addendum'}
                         value={parentContractId}
                         onChange={(e) => setParentContractId(e.target.value)}
-                        className="w-full cursor-pointer"
+                        className="w-full" controlProps={{ className: "w-full" }}
                       >
                         <option value="">{t('form.contract.select_master_placeholder', '-- Pilih Master Agreement Induk --')}</option>
                         {availableMasterContracts.map((m) => (
@@ -785,7 +785,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 <AlphabeticalSelect id="contract-field-10"
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full"
+                  className="w-full" controlProps={{ className: "w-full" }}
                 >
                   {SUPPORTED_CURRENCIES.map((c) => (
                     <option key={c.code} value={c.code}>
@@ -843,7 +843,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 <AlphabeticalSelect id="contract-field-13"
                   value={noticeTypeRequired}
                   onChange={(e) => setNoticeTypeRequired(e.target.value as any)}
-                  className="w-full cursor-pointer"
+                  className="w-full" controlProps={{ className: "w-full" }}
                 >
                   <option value="Termination">{t('contracts.notice_of_termination', 'Notice of Termination')}</option>
                   <option value="Extension">{t('contracts.notice_of_extension', 'Notice of Extension')}</option>
@@ -865,7 +865,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
               <AlphabeticalSelect id="contract-field-14"
                 value={status === 'Terminated' ? 'Terminated' : 'Active'}
                 onChange={(e) => { setStatus(e.target.value as ContractStatus); if (e.target.value === 'Terminated') setAutoRenewal(false); }}
-                className="w-full cursor-pointer"
+                className="w-full" controlProps={{ className: "w-full" }}
               >
                 <option value="Active">{t('form.contract.status_normal', 'Normal (Sesuai tanggal berlaku)')}</option>
                 <option value="Terminated">{t('form.contract.status_terminated', 'Dihentikan (Penghentian Perjanjian)')}</option>

@@ -80,7 +80,7 @@ export function SQLiteBackupsPanel() {
     {error && <Alert status="error"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>}
     {message && <Alert status="success" role="status"><AlertIndicator /><AlertContent><AlertDescription>{message}{restoring && <Button asChild variant="link" className="ml-2"><a href="/sys?tab=admin-system-backups">{t('backup.reopen', 'Open console again')}</a></Button>}</AlertDescription></AlertContent></Alert>}
     <Card className="overflow-hidden">
-      <TableScrollArea>
+      <TableScrollArea className="rounded-none border-0">
         <Table>
           <TableHeader><TableRow>{['date', 'type', 'size', 'status', 'actions'].map(key => <TableColumnHeader key={key}>{t(`backup.${key}`)}</TableColumnHeader>)}</TableRow></TableHeader>
           <TableBody>

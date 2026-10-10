@@ -402,7 +402,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                           setPicInternal(val);
                         }
                       }}
-                      className="w-full cursor-pointer"
+                      className="w-full" controlProps={{ className: "w-full" }}
                     >
                       <option value="" disabled>{t('partners.pilih_department', '-- Pilih Department --')}</option>
                       {ENTERPRISE_DEPARTMENTS.map((dept) => (

@@ -71,7 +71,7 @@ export const AdminApiKeysTab: React.FC<AdminApiKeysTabProps> = ({
 
       {/* Keys Table */}
       <Card className="overflow-hidden">
-        <TableScrollArea>
+        <TableScrollArea className="rounded-none border-0">
           <Table className="w-full text-left">
             <TableHeader>
               <TableRow className="uppercase">

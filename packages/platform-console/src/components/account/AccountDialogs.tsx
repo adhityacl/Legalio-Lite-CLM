@@ -38,7 +38,7 @@ export const PreferencesDialog: React.FC<{ onClose: () => void }> = ({ onClose }
           <div className="grid grid-cols-2 gap-2">
             {([['light', t('tb.theme_light', 'Light'), Sun], ['dark', t('tb.theme_dark', 'Dark'), Moon]] as const).map(([value, label, Icon]) => (
               <button key={value} type="button" aria-pressed={theme === value} onClick={() => setTheme(value)}
-                className={`flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 ${theme === value ? 'border-primary bg-primary/10 text-accent-foreground ' : 'border-border text-foreground '}`}>
+                className={`flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--moduix-color-ring)/40 ${theme === value ? 'border-primary bg-primary/10 text-accent-foreground ' : 'border-border text-foreground '}`}>
                 <Icon className="h-4 w-4" aria-hidden="true" />{label}
               </button>
             ))}
@@ -49,7 +49,7 @@ export const PreferencesDialog: React.FC<{ onClose: () => void }> = ({ onClose }
           <div className="grid gap-2">
             {LANGUAGE_OPTIONS.map((option) => (
               <button key={option.code} type="button" lang={option.htmlLang} aria-pressed={language === option.code} onClick={() => setLanguage(option.code)}
-                className={`flex min-h-10 cursor-pointer items-center justify-between rounded-md border px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 ${language === option.code ? 'border-primary bg-primary/10 text-accent-foreground ' : 'border-border text-foreground '}`}>
+                className={`flex min-h-10 cursor-pointer items-center justify-between rounded-md border px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--moduix-color-ring)/40 ${language === option.code ? 'border-primary bg-primary/10 text-accent-foreground ' : 'border-border text-foreground '}`}>
                 {option.nativeName}{language === option.code && <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
               </button>
             ))}

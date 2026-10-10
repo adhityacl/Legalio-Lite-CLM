@@ -216,7 +216,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
             <AlphabeticalSelect id="adminmodals-field-3"
               value={role}
               onChange={(e) => handleRoleChange(e.target.value)}
-              className="w-full"
+              className="w-full" controlProps={{ className: "w-full" }}
             >
               {allowedRoles.includes('superuser') && <option value="superuser">{t('admin.superuser', 'Superuser')}</option>}
               {allowedRoles.includes('admin') && <option value="admin">{t('admin.admin', 'Admin')}</option>}
@@ -242,7 +242,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
               onChange={(e) => setOrganizationId(e.target.value)}
               disabled={role === 'superuser'}
               required={role !== 'superuser' && role !== 'admin'}
-              className="w-full disabled:opacity-60"
+              className="w-full disabled:opacity-60" controlProps={{ className: "w-full" }}
             >
               {role === 'superuser' ? (
                 <option value="">{t('admin.all_tenants', 'Semua Tenant / Organisasi (Akses Global)')}</option>
@@ -276,7 +276,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
               value={role === 'superuser' || role === 'admin' ? '' : department}
               onChange={(e) => setDepartment(e.target.value)}
               disabled={role === 'superuser' || role === 'admin'}
-              className="w-full disabled:opacity-60"
+              className="w-full disabled:opacity-60" controlProps={{ className: "w-full" }}
             >
               {role === 'superuser' || role === 'admin' ? (
                 <option value="">{t('admin.all_departments', 'Semua Departemen (Akses Global)')}</option>
@@ -462,7 +462,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             <AlphabeticalSelect id="adminmodals-field-8"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="w-full"
+              className="w-full" controlProps={{ className: "w-full" }}
             >
               {allowedRoles.includes('superuser') && <option value="superuser">{t('admin.superuser', 'Superuser')}</option>}
               {allowedRoles.includes('admin') && <option value="admin">{t('admin.admin', 'Admin')}</option>}
@@ -488,7 +488,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               onChange={(e) => setOrganizationId(e.target.value)}
               disabled={role === 'superuser'}
               required={role !== 'superuser' && role !== 'admin'}
-              className="w-full disabled:opacity-60"
+              className="w-full disabled:opacity-60" controlProps={{ className: "w-full" }}
             >
               {role === 'superuser' ? (
                 <option value="">{t('admin.all_tenants', 'Semua Tenant / Organisasi (Akses Global)')}</option>
@@ -522,7 +522,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               value={role === 'superuser' || role === 'admin' ? '' : department}
               onChange={(e) => setDepartment(e.target.value)}
               disabled={role === 'superuser' || role === 'admin'}
-              className="w-full disabled:opacity-60"
+              className="w-full disabled:opacity-60" controlProps={{ className: "w-full" }}
             >
               {role === 'superuser' || role === 'admin' ? (
                 <option value="">{t('admin.all_departments', 'Semua Departemen (Akses Global)')}</option>
@@ -786,7 +786,7 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
               <AlphabeticalSelect id="adminmodals-field-13"
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full"
+                className="w-full" controlProps={{ className: "w-full" }}
               >
                 {SUPPORTED_CURRENCIES.map((c) => (
                   <option key={c.code} value={c.code}>{c.code} — {currencyLabel(c.code, language)}</option>
@@ -805,7 +805,7 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
                   const pack = countries.find((c) => c.code === e.target.value);
                   if (pack) setCurrency(pack.defaultCurrency);
                 }}
-                className="w-full"
+                className="w-full" controlProps={{ className: "w-full" }}
               >
                 {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
               </AlphabeticalSelect>
@@ -818,7 +818,7 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
                 id="create-org-industry"
                 value={industry}
                 onChange={(e) => setIndustry(e.target.value)}
-                className="w-full"
+                className="w-full" controlProps={{ className: "w-full" }}
               >
                 {industries.map((i) => <option key={i.key} value={i.key}>{i.name.en}</option>)}
               </AlphabeticalSelect>
@@ -1582,7 +1582,7 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({
                 required
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value)}
-                className="w-full"
+                className="w-full" controlProps={{ className: "w-full" }}
               >
                 <option value="">{t('admin.select_user_ph', 'Pilih pengguna...')}</option>
                 {availableUsers.map((u) => (
@@ -1696,7 +1696,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
             <AlphabeticalSelect id="adminmodals-field-23"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="w-full"
+              className="w-full" controlProps={{ className: "w-full" }}
             >
               <option value="superuser">{t('admin.superuser_system_level', 'Superuser (System Level)')}</option>
               <option value="admin">{t('admin.admin_global_level', 'Admin (Global Level)')}</option>
@@ -1713,7 +1713,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
             <AlphabeticalSelect id="adminmodals-field-24"
               value={teamId}
               onChange={(e) => setTeamId(e.target.value)}
-              className="w-full"
+              className="w-full" controlProps={{ className: "w-full" }}
             >
               <option value="">{t('admin.no_specific_team', 'Tanpa tim khusus')}</option>
               {teams.map((t) => (

@@ -24,11 +24,11 @@ export function EventItem({ event, chip = false, onEventClick }: {
  const done = event.type === 'task' && event.status === 'done';
  const label = [t(EVENT_TYPE_CONFIG[event.type].labelKey), new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(date),
  event.title, done ? t('calendar.done') : '', event.projected ? t('calendar.projected') : ''].filter(Boolean).join(' · ');
- const className = cn('min-h-10 w-full min-w-0 justify-start gap-2 rounded-md px-2 py-1 text-xs font-normal text-[var(--foreground)]',
- chip ? EVENT_TYPE_CONFIG[event.type].chip : 'hover:bg-[var(--muted)]');
+ const className = cn('min-h-10 w-full min-w-0 justify-start gap-2 rounded-md px-2 py-1 text-xs font-normal text-[var(--moduix-color-foreground)]',
+ chip ? EVENT_TYPE_CONFIG[event.type].chip : 'hover:bg-[var(--moduix-color-muted)]');
  const content = <>
  <EventIndicator type={event.type} done={done} />
- {!chip && <time dateTime={calendarDateKey(date)} className="shrink-0 text-[var(--muted-foreground)]">{new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(date)}</time>}
+ {!chip && <time dateTime={calendarDateKey(date)} className="shrink-0 text-[var(--moduix-color-muted-foreground)]">{new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(date)}</time>}
     <span className={cn('truncate', done && 'line-through', chip && 'hidden sm:inline')}>{event.title}</span>
  {chip && <span className="truncate sm:hidden" aria-hidden="true">{date.getDate()}</span>}
   </>;

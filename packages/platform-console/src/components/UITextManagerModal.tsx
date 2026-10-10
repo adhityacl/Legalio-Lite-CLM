@@ -273,7 +273,7 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
               setSelectedModule(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full"
+            className="w-full" controlProps={{ className: "w-full" }}
           >
             <option value="ALL">{t('ui_text.all_modules', 'Semua modul ({n})', { n: allKeys.length })}</option>
             {modules.map((mod) => (

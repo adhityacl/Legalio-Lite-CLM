@@ -400,7 +400,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
             aria-label={t('ui.filter_type')}
               value={selectedJenisDokumen}
             onChange={(e) => setSelectedJenisDokumen(e.target.value)}
-            className="flex-1 min-w-[130px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('contracts.all_types')}</option>
             <option value="Master Agreement">{t('contracts.master_agreement', 'Master Agreement')}</option>
@@ -411,7 +411,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
             aria-label={t('ui.filter_category')}
               value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="flex-1 min-w-[130px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('contracts.all_categories')}</option>
             {allCategories.map((cat) => (
@@ -425,7 +425,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
             aria-label={t('ui.filter_status')}
               value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="flex-1 min-w-[130px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('contracts.all_status')}</option>
             <option value="Active">{t('contracts.active')}</option>
@@ -464,7 +464,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
       <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_type'), value: selectedJenisDokumen, active: selectedJenisDokumen !== 'ALL' }, { label: t('ui.filter_category'), value: selectedCategory, active: selectedCategory !== 'ALL' }, { label: t('ui.filter_status'), value: selectedStatus, active: selectedStatus !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedJenisDokumen('ALL'); setSelectedCategory('ALL'); setSelectedStatus('ALL'); }} />
         <p className="mobile-table-hint px-4 py-2 text-xs text-muted-foreground md:hidden">{t('ui.scroll_table')}</p>
-        <TableScrollArea className="data-table-scroll" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
+        <TableScrollArea className="data-table-scroll rounded-none border-0" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
           <Table className="app-data-table w-full text-left">
             <TableHeader>
               <TableRow>

@@ -755,7 +755,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               setSelectedYear(e.target.value);
               setCurrentPage(1);
             }}
-            className="flex-1 min-w-[130px]"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('dashboard.all_years', 'Semua Tahun')}</option>
             {availableYears.map(year => (
@@ -771,7 +771,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               setSelectedVendorFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="flex-1 min-w-[130px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('spending.all_vendors', 'Semua Partner')}</option>
             {Array.from(new Set(spendings.map(s => s.vendor_name).filter(Boolean))).sort().map(vendor => (
@@ -787,7 +787,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               setSelectedMonthFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="flex-1 min-w-[130px]"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('spending.semua_bulan', 'Semua Bulan')}</option>
             <option value="01">{t('spending.januari_01', 'Januari (01)')}</option>
@@ -831,7 +831,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
       <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_year'), value: selectedYear, active: selectedYear !== 'ALL' }, { label: t('ui.filter_partner'), value: selectedVendorFilter, active: selectedVendorFilter !== 'ALL' }, { label: t('ui.filter_month'), value: selectedMonthFilter, active: selectedMonthFilter !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedYear('ALL'); setSelectedVendorFilter('ALL'); setSelectedMonthFilter('ALL'); }} />
         <p className="mobile-table-hint px-4 py-2 text-xs text-muted-foreground md:hidden">{t('ui.scroll_table')}</p>
-        <TableScrollArea className="data-table-scroll" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
+        <TableScrollArea className="data-table-scroll rounded-none border-0" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
           <Table className="app-data-table w-full text-left">
             <TableHeader>
               <TableRow>

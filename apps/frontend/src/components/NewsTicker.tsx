@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Megaphone } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getAuthHeaders } from '../lib/apiFetch';
+import { Card } from '@legalio/ui-components/card';
+import { Badge } from '@legalio/ui-components/badge';
+import { Marquee, MarqueeContent, MarqueeItem, MarqueeViewport } from '@legalio/ui-components/marquee';
 
 type TickerStatus = 'loading' | 'ready' | 'empty' | 'error';
 
@@ -53,38 +56,17 @@ export const NewsTicker: React.FC = () => {
   const label = t('dashboard.news_ticker_label', 'Info Regulasi Terkini');
 
   return (
-    <div
-      className="relative bg-card border border-border rounded-2xl mb-3 flex flex-wrap sm:flex-nowrap items-stretch overflow-hidden"
-      role="region"
-      aria-label={label}
-    >
-      <div className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 px-4 py-3 bg-status-success-soft text-status-success text-xs sm:text-sm font-bold whitespace-nowrap">
-        <Megaphone className="w-4 h-4 shrink-0" />
-        <span>{label}</span>
-      </div>
-
+    <Card role="region" aria-label={label} className="flex-row flex-wrap items-stretch overflow-hidden sm:flex-nowrap">
+      <Badge tone="success" className="m-3 shrink-0 self-center"><Megaphone aria-hidden="true" />{label}</Badge>
       {/* Screen readers get the plain list; the moving copy is decorative. */}
-      <ul className="sr-only">
-        {items.map((item) => <li key={item}>{item}</li>)}
-      </ul>
-
-      <div className="news-ticker flex-1 min-w-0 overflow-hidden flex items-center py-3" aria-hidden="true">
-        <div
-          className="news-ticker-track flex w-max shrink-0 items-center"
-          style={{ animationDuration: `${Math.max(30, Math.round(items.join('').length * 0.12))}s` }}
-        >
-          {[0, 1].map((copy) => (
-            <div key={copy} className="flex shrink-0 items-center">
-              {items.map((item) => (
-                <span key={item} className="flex items-center whitespace-nowrap text-sm text-foreground">
-                  {item}
-                  <span className="mx-6 size-1.5 shrink-0 rounded-full bg-status-success/70" />
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+      <ul className="sr-only">{items.map(item => <li key={item}>{item}</li>)}</ul>
+      <Marquee aria-hidden="true" pauseOnInteraction autoFill spacing="2.5rem" speed={40} className="min-w-0 flex-1 self-center py-3">
+        <MarqueeViewport>
+          <MarqueeContent>
+            {items.map(item => <MarqueeItem key={item} className="text-sm whitespace-nowrap text-foreground">{item}</MarqueeItem>)}
+          </MarqueeContent>
+        </MarqueeViewport>
+      </Marquee>
+    </Card>
   );
 };

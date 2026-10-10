@@ -409,7 +409,7 @@ export const IOView: React.FC<IOViewProps> = ({
             aria-label={t('ui.filter_status')}
               value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="flex-1 min-w-[130px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('io.all_status', 'Semua Status')}</option>
             <option value="Berjalan">{t('io.status_berjalan', 'Berjalan')}</option>
@@ -423,7 +423,7 @@ export const IOView: React.FC<IOViewProps> = ({
             aria-label={t('ui.filter_pricing')}
               value={selectedPricingModel}
             onChange={(e) => setSelectedPricingModel(e.target.value)}
-            className="flex-1 min-w-[130px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('io.all_pricing_models', 'Semua Model Pricing')}</option>
             {pricingFilterOptions.map((model) => <option key={model} value={model}>{model}</option>)}
@@ -434,7 +434,7 @@ export const IOView: React.FC<IOViewProps> = ({
             aria-label={t('ui.filter_charging')}
               value={selectedChargingType}
             onChange={(e) => setSelectedChargingType(e.target.value)}
-            className="flex-1 min-w-[130px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('io.all_charging_types', 'Semua Skema Pembayaran')}</option>
             <option value="Prepaid">{t('io.prepaid', 'Prepaid')}</option>
@@ -486,7 +486,7 @@ export const IOView: React.FC<IOViewProps> = ({
       <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_status'), value: selectedStatus, active: selectedStatus !== 'ALL' }, { label: t('ui.filter_pricing'), value: selectedPricingModel, active: selectedPricingModel !== 'ALL' }, { label: t('ui.filter_charging'), value: selectedChargingType, active: selectedChargingType !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedStatus('ALL'); setSelectedPricingModel('ALL'); setSelectedChargingType('ALL'); }} />
         <p className="mobile-table-hint px-4 py-2 text-xs text-muted-foreground md:hidden">{t('ui.scroll_table')}</p>
-        <TableScrollArea className="data-table-scroll" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
+        <TableScrollArea className="data-table-scroll rounded-none border-0" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
           <Table className="app-data-table w-full text-left">
             <TableHeader>
               <TableRow>

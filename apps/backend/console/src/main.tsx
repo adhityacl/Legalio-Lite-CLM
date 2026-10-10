@@ -14,8 +14,6 @@ import { ErrorBoundary } from '@legalio/platform-console/components/ErrorBoundar
 import { installApiFetchInterceptor } from '@legalio/platform-console/lib/apiFetch';
 import { SystemConsole } from './SystemConsole';
 import './index.css';
-import '@legalio/platform-console/styles/shadcn-tokens.css';
-import '@legalio/platform-console/styles/organization-theme.css';
 
 installApiFetchInterceptor();
 const client = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000 } } });

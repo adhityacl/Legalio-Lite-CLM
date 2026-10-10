@@ -170,7 +170,7 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
             aria-expanded={open[id]}
             aria-controls={`org-section-${id}`}
             onClick={() => setOpen((prev) => ({ ...prev, [id]: !prev[id] }))}
-            className="flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 rounded-md px-5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40"
+            className="flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 rounded-md px-5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--moduix-color-ring)/40"
           >
             <span className="flex items-center gap-3">
               <span className="text-accent-foreground" aria-hidden="true">{icon}</span>

@@ -84,7 +84,7 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
 
       {/* Sessions Table */}
       <Card className="overflow-hidden">
-        <TableScrollArea>
+        <TableScrollArea className="rounded-none border-0">
           <Table className="w-full text-left">
             <TableHeader>
               <TableRow>

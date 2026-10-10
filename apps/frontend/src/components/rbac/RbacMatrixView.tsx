@@ -139,7 +139,7 @@ export default function RbacMatrixView() {
 
       <section aria-label={t('rbac.tabel_matriks', 'Tabel matriks')} className="mt-6">
         <Card className="overflow-hidden">
-          <TableScrollArea>
+          <TableScrollArea className="rounded-none border-0">
             <Table interactive>
               <TableHeader>
                 <TableRow>

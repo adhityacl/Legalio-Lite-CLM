@@ -1,3 +1,0 @@
-/* Compatibility entry point; tokens now belong to the shared UI package. */
-@import "@legalio/ui-components/styles/tokens.css";
-@import "@legalio/ui-components/styles/components.css";

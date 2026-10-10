@@ -2003,7 +2003,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                                 id={`${panelIdPrefix}-field-${field.key}`}
                             value={currentVal}
                                 onChange={(e) => handleFieldValueChange(field.key, e.target.value)}
-                                className="w-full"
+                                className="w-full" controlProps={{ className: "w-full" }}
                               >
                                 <option value="">{t('contract_creator.field.select_placeholder', '-- Pilih --')}</option>
                                 {(field.options || []).map((opt: string) => (
@@ -2077,7 +2077,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                             const p = partners.find((item) => item.partner_id === id);
                             if (p) handleApplyPartner(p);
                           }}
-                          className="w-full"
+                          className="w-full" controlProps={{ className: "w-full" }}
                         >
                           <option value="">{t('contract_creator.partners.select_placeholder', 'Select Partner')}</option>
                           {partners.map((p) => (
@@ -2177,7 +2177,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                             id={`${panelIdPrefix}-custom-type`}
                             value={newFieldType}
                             onChange={(e: any) => setNewFieldType(e.target.value)}
-                            className="w-full"
+                            className="w-full" controlProps={{ className: "w-full" }}
                           >
                             <option value="text">{t('contract_creator.custom_field_builder.type_text', 'Teks biasa')}</option>
                             <option value="date">{t('contract_creator.custom_field_builder.type_date', 'Tanggal')}</option>
@@ -2372,7 +2372,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                           id={`${panelIdPrefix}-template-type`}
                           value={aiTemplateDocType}
                           onChange={(e) => setAiTemplateDocType(e.target.value as 'contract' | 'agreement' | 'so')}
-                          className="w-full"
+                          className="w-full" controlProps={{ className: "w-full" }}
                         >
                           <option value="contract">{t('contract_creator.ai_template.type_contract', 'Kontrak')}</option>
                           <option value="agreement">{t('contract_creator.ai_template.type_agreement', 'Perjanjian (Agreement)')}</option>

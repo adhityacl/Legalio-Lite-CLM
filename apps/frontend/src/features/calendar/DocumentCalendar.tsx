@@ -42,11 +42,11 @@ export function DocumentCalendar({ events, loading, error, onRetry, initialView 
     return next;
   });
   const onMonthClick = (month: Date) => { setDate(month); setView('month'); };
-  return <section aria-label={t('calendar.title')} className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-3 text-[var(--foreground)] shadow-xs sm:p-5">
+  return <section aria-label={t('calendar.title')} className="space-y-4 rounded-2xl border border-[var(--moduix-color-border)] bg-[var(--moduix-color-card)] p-3 text-[var(--moduix-color-foreground)] shadow-xs sm:p-5">
     <CalendarToolbar date={date} view={view} onViewChange={setView} onNavigate={offset => setDate(previous => view === 'year' ? addYears(previous, offset) : addMonths(previous, offset))}
       onToday={() => setDate(startOfMonth(today))} />
-    {error && <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--destructive)]/30 bg-[var(--muted)] p-3 text-sm">
-      <AlertCircle aria-hidden="true" className="size-5 text-[var(--destructive)]" />
+    {error && <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--moduix-color-destructive)]/30 bg-[var(--moduix-color-muted)] p-3 text-sm">
+      <AlertCircle aria-hidden="true" className="size-5 text-[var(--moduix-color-destructive)]" />
       <span className="flex-1">{t('calendar.load_error')}</span>
       {onRetry && <Button type="button" variant="outline" disabled={loading} onClick={onRetry}>{t('calendar.retry')}</Button>}
     </div>}

@@ -13,10 +13,10 @@ interface EmptyContentProps {
   icon?: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>;
 }
 
-const EmptyState: React.FC<EmptyContentProps> = ({ message, action, icon: Icon = Inbox }) => {
+const EmptyState: React.FC<EmptyContentProps & { framed?: boolean }> = ({ message, action, icon: Icon = Inbox, framed = true }) => {
   const { t } = useLanguage();
   return (
-    <Empty>
+    <Empty className={framed ? undefined : 'border-0 bg-transparent'}>
       <EmptyIcon><Icon aria-hidden="true" /></EmptyIcon>
       <EmptyContent>
         <EmptyDescription>{message || t('common.no_data', 'Belum ada data untuk ditampilkan')}</EmptyDescription>
@@ -31,7 +31,7 @@ export const TableEmptyState: React.FC<EmptyContentProps & { colSpan: number }> 
   // in the visible area when a wide table scrolls sideways.
   <TableEmpty colSpan={colSpan}>
     <div className="sticky left-0 w-full max-w-[min(100cqw,calc(100vw-2rem))]">
-      <EmptyState {...content} />
+      <EmptyState {...content} framed={false} />
     </div>
   </TableEmpty>
 );

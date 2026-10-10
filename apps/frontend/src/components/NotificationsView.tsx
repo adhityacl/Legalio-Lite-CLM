@@ -272,7 +272,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               setFilterStatus(e.target.value);
               setCurrentPage(1);
             }}
-            className="flex-1 min-w-[130px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('notifications.all_status', 'Semua Status')} ({notifications.length})</option>
             <option value="UNREAD">{t('notifications.status_unread', 'Belum Dibaca')} ({unreadCount})</option>
@@ -286,7 +286,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               setFilterType(e.target.value);
               setCurrentPage(1);
             }}
-            className="flex-1 min-w-[130px] appearance-none pr-8"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('notifications.all_types', 'Semua Jenis Notifikasi')}</option>
             {typeOptions.map((opt) => (
@@ -301,7 +301,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               setFilterTimeRange(e.target.value);
               setCurrentPage(1);
             }}
-            className="flex-1 min-w-[130px]"
+            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
           >
             <option value="ALL">{t('notifications.all_time_periods', 'Semua Periode Waktu')}</option>
             <option value="TODAY">{t('notifications.time_today', 'Hari Ini (24 Jam Terakhir)')}</option>
@@ -379,7 +379,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
       {/* 3. Main Standard Table Card */}
       <Card className="border-border/80 overflow-hidden">
-        <TableScrollArea>
+        <TableScrollArea className="rounded-none border-0">
           <Table className="w-full text-left">
             {/* Table Header */}
             <TableHeader>

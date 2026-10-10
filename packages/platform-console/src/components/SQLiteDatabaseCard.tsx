@@ -309,7 +309,7 @@ export const SQLiteDatabaseCard: React.FC = () => {
               value={selectedTable}
               onChange={(e) => setSelectedTable(e.target.value)}
               disabled={tables.length === 0}
-              className="w-full sm:w-72 min-w-0 max-w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full disabled:cursor-not-allowed disabled:opacity-50" controlProps={{ className: "sm:w-72 min-w-0 max-w-full w-full" }}
             >
               {tables.length === 0 && (
                 <option value="">

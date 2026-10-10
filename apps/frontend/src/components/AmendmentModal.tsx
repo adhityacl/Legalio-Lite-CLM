@@ -230,7 +230,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                     setParentType(val);
                     setParentId(val === 'Contract' ? contracts[0]?.contract_id || '' : ios[0]?.io_id || '');
                   }}
-                  className="w-full cursor-pointer"
+                  className="w-full" controlProps={{ className: "w-full" }}
                 >
                   <option value="Contract">{t('amendments.kontrak_utama_master_contract', 'Kontrak Utama (Master Contract)')}</option>
                   <option value="IO">{t('import.type_io', 'Insertion Order (IO)')}</option>
@@ -242,7 +242,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                 <AlphabeticalSelect
                   value={parentId}
                   onChange={(e) => setParentId(e.target.value)}
-                  className="w-full cursor-pointer"
+                  className="w-full" controlProps={{ className: "w-full" }}
                 >
                   {parentType === 'Contract'
                     ? contracts.map((c) => (

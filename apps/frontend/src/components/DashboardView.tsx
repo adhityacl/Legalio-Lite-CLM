@@ -258,7 +258,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         </CardHeader>
 
-        <TableScrollArea role="region" tabIndex={0} aria-label={t('dashboard.expiring_table_title')}>
+        <TableScrollArea className="rounded-none border-0" role="region" tabIndex={0} aria-label={t('dashboard.expiring_table_title')}>
           <Table className="dashboard-data-table dashboard-document-table w-full min-w-[760px] text-left">
             <TableHeader>
               <TableRow>
@@ -356,7 +356,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         </CardHeader>
 
-        <TableScrollArea role="region" tabIndex={0} aria-label={t('dashboard.pending_review_table_title')}>
+        <TableScrollArea className="rounded-none border-0" role="region" tabIndex={0} aria-label={t('dashboard.pending_review_table_title')}>
           <Table className="dashboard-data-table w-full min-w-[760px] text-left">
             <TableHeader>
               <TableRow>
@@ -458,7 +458,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               aria-label={t('ui.filter_year')}
               value={spendingFilterYear}
               onChange={(e) => setSpendingFilterYear(e.target.value)}
-              className="shrink-0 sm:w-auto"
+              className="w-full" controlProps={{ className: "shrink-0 sm:w-auto" }}
             >
               <option value="ALL">{t('dashboard.all_years', 'Semua Tahun')}</option>
               {availableSpendingYears.map((y) => (
@@ -473,7 +473,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               aria-label={t('ui.filter_category')}
               value={spendingCategoryFilter}
               onChange={(e) => setSpendingCategoryFilter(e.target.value)}
-              className="min-w-0 flex-1 sm:w-48 sm:flex-none cursor-pointer truncate"
+              className="w-full truncate" controlProps={{ className: "min-w-0 flex-1 sm:w-48 sm:flex-none" }}
             >
               <option value="ALL">{t('dashboard.all_categories', 'Semua Kategori')}</option>
               {categoryOptions.map((cat) => (
@@ -514,29 +514,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stackedData} title={t('dashboard.spending_title')} desc={t('dashboard.spending_title')} margin={{ top: 10, right: isCompactChart ? 2 : 8, left: 0, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="var(--chart-grid)" strokeDasharray="3 3" />
+                <CartesianGrid vertical={false} stroke="var(--moduix-color-border)" strokeDasharray="3 3" />
                 <XAxis
                   dataKey="month"
                   tickFormatter={formatChartMonth}
                   interval={0}
-                  stroke="var(--chart-label)"
+                  stroke="var(--moduix-color-muted-foreground)"
                   fontSize={isCompactChart ? 10 : 12}
                   tickLine={false}
-                  axisLine={{ stroke: 'var(--chart-grid)' }}
+                  axisLine={{ stroke: 'var(--moduix-color-border)' }}
                   padding={{ left: 0, right: 0 }}
                 />
                 <YAxis
-                  stroke="var(--chart-label)"
+                  stroke="var(--moduix-color-muted-foreground)"
                   fontSize={isCompactChart ? 10 : 12}
                   tickLine={false}
-                  axisLine={{ stroke: 'var(--chart-grid)' }}
+                  axisLine={{ stroke: 'var(--moduix-color-border)' }}
                   width={isCompactChart ? 64 : 85}
                   tick={({ y, payload }: any) => {
                     const val = payload?.value;
                     const label = formatView(Number(val) || 0, true);
 
                     return (
-                      <text x={0} y={y} dy={4} fill="var(--chart-label)" fontSize={isCompactChart ? 10 : 12} fontWeight={500} textAnchor="start">
+                      <text x={0} y={y} dy={4} fill="var(--moduix-color-muted-foreground)" fontSize={isCompactChart ? 10 : 12} fontWeight={500} textAnchor="start">
                         {label}
                       </text>
                     );
@@ -579,7 +579,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 />
                 <Legend
                   wrapperStyle={{ paddingTop: '12px', fontSize: '13px' }}
-                  formatter={value => <span style={{ color: 'var(--chart-label)' }}>{value}</span>}
+                  formatter={value => <span style={{ color: 'var(--moduix-color-muted-foreground)' }}>{value}</span>}
                 />
                 {stackKeys.map((key) => (
                   <Bar
