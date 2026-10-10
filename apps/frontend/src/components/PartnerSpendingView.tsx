@@ -94,7 +94,7 @@ import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-comp
 const spendingLabelClass = 'block text-sm font-semibold text-foreground  mb-1.5';
 const spendingButtonClass = 'ui-button ui-button-md border border-border  bg-card  font-semibold hover:bg-muted  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:cursor-not-allowed';
 const spendingUploadClass = 'ds-upload min-w-0 text-center';
-const spendingFileInputClass = 'w-[220px] max-w-full min-w-0 text-sm text-muted-foreground  file:mr-2 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl';
+const spendingFileInputClass = 'w-[220px] max-w-full min-w-0 text-sm text-muted-foreground  file:mr-2 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-accent file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl';
 
 // Re-export formatMonthTagDisplay for backwards compatibility with any external consumers
 export { formatMonthTagDisplay };
@@ -1027,8 +1027,8 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                     <section aria-labelledby="spending-partner-heading" className="min-w-0">
                       <h3 id="spending-partner-heading" className="font-semibold text-base mb-3">{t('spending.partner_details', 'Partner Details')}</h3>
                       <Card className="p-4 sm:p-5 space-y-3">
-                        <div>
-                          <label htmlFor="spending-partner" className={spendingLabelClass}>{t('spending.partner_name', 'Partner Name')} <span className="text-status-danger">*</span></label>
+                        <Field>
+                          <FieldLabel htmlFor="spending-partner">{t('spending.partner_name', 'Partner Name')} <span className="text-status-danger">*</span></FieldLabel>
                           <AlphabeticalSelect id="spending-partner" required value={formVendorId || formVendorName} onChange={e => {
                             const partner = partners.find(p => p.partner_id === e.target.value);
                             handleVendorSelect(partner?.nama_partner || e.target.value, partner?.partner_id);
@@ -1037,14 +1037,14 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                             {partners.map(p => <option key={p.partner_id} value={p.partner_id}>{p.nama_partner} ({p.partner_id})</option>)}
                             {formVendorName && !partners.some(p => p.partner_id === formVendorId || p.nama_partner === formVendorName) && <option value={formVendorId || formVendorName}>{formVendorName}</option>}
                           </AlphabeticalSelect>
-                        </div>
+                        </Field>
                         <Field>
-                          <FieldLabel htmlFor="spending-invoice-number" className={spendingLabelClass}>{t('spending.invoice_no_label', 'Invoice Number')} <span className="text-status-danger">*</span></FieldLabel>
+                          <FieldLabel htmlFor="spending-invoice-number">{t('spending.invoice_no_label', 'Invoice Number')} <span className="text-status-danger">*</span></FieldLabel>
                           <Input id="spending-invoice-number" required value={formInvoiceNumber} onChange={e => setFormInvoiceNumber(e.target.value)} placeholder={t('spending.invoice_no_ph', 'Contoh: INV-2026-0801')} />
                           {formInvoiceNumber.trim() && spendings.some(s => s.invoice_number.toLowerCase() === formInvoiceNumber.trim().toLowerCase() && s.id !== editingSpending?.id) && <p className="text-xs text-status-warning mt-1 flex gap-1"><Lightbulb className="size-3.5 shrink-0" aria-hidden="true" />{t('spending.nomor_invoice_ini_sudah_dicatat_sebelumnya', 'Nomor invoice ini sudah dicatat sebelumnya. Diizinkan menginput nomor invoice sama untuk bulan/amount berbeda.')}</p>}
                         </Field>
                         <Field>
-                          <FieldLabel htmlFor="spending-invoice-title" className={spendingLabelClass}>{t('spending.invoice_title_label', 'Invoice Title')}</FieldLabel>
+                          <FieldLabel htmlFor="spending-invoice-title">{t('spending.invoice_title_label', 'Invoice Title')}</FieldLabel>
                           <Input id="spending-invoice-title" value={formInvoiceTitle} onChange={e => setFormInvoiceTitle(e.target.value)} placeholder={t('spending.invoice_title_ph', 'e.g. Q4 Social Media Retainer')} />
                         </Field>
                       </Card>
@@ -1053,15 +1053,15 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                       <h3 id="spending-bank-heading" className="font-semibold text-base mb-3">{t('spending.bank_panel_title', 'Bank Account Information')}</h3>
                       <Card className="p-4 sm:p-5 space-y-3">
                         <Field>
-                          <FieldLabel htmlFor="spending-bank-name" className={spendingLabelClass}>{t('spending.bank_name_label', 'Bank Name')}</FieldLabel>
+                          <FieldLabel htmlFor="spending-bank-name">{t('spending.bank_name_label', 'Bank Name')}</FieldLabel>
                           <Input id="spending-bank-name" value={formBankName} onChange={e => { bankEdited.current.name = true; setFormBankName(e.target.value); }} />
                         </Field>
                         <Field>
-                          <FieldLabel htmlFor="spending-account-number" className={spendingLabelClass}>{t('spending.bank_account_no_label', 'Account Number')}</FieldLabel>
+                          <FieldLabel htmlFor="spending-account-number">{t('spending.bank_account_no_label', 'Account Number')}</FieldLabel>
                           <Input id="spending-account-number" value={formBankAccountNumber} onChange={e => { bankEdited.current.number = true; setFormBankAccountNumber(e.target.value); }} />
                         </Field>
                         <Field>
-                          <FieldLabel htmlFor="spending-account-holder" className={spendingLabelClass}>{t('spending.bank_account_holder_label', 'Account Holder')}</FieldLabel>
+                          <FieldLabel htmlFor="spending-account-holder">{t('spending.bank_account_holder_label', 'Account Holder')}</FieldLabel>
                           <Input id="spending-account-holder" value={formBankAccountHolder} onChange={e => { bankEdited.current.holder = true; setFormBankAccountHolder(e.target.value); }} />
                         </Field>
                       </Card>
@@ -1069,15 +1069,15 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <Field className="min-w-0">
-                      <FieldLabel htmlFor="spending-invoice-date" className={spendingLabelClass}>{t('spending.invoice_date_label', 'Invoice Date')}</FieldLabel>
+                      <FieldLabel htmlFor="spending-invoice-date">{t('spending.invoice_date_label', 'Invoice Date')}</FieldLabel>
                       <DateInput id="spending-invoice-date" value={formInvoiceDate} onChange={setFormInvoiceDate} focusColor="emerald" />
                     </Field>
-                    <div className="min-w-0">
-                      <label htmlFor="spending-currency" className={spendingLabelClass}>{t('spending.currency_label', 'Currency')}</label>
+                    <Field className="min-w-0">
+                      <FieldLabel htmlFor="spending-currency">{t('spending.currency_label', 'Currency')}</FieldLabel>
                       <AlphabeticalSelect id="spending-currency" value={formCurrency} onChange={e => setFormCurrency(e.target.value)}>
                         {SUPPORTED_CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code} — {currencyLabel(c.code, language)}</option>)}
                       </AlphabeticalSelect>
-                    </div>
+                    </Field>
                     <div className="min-w-0">
                       <label htmlFor="spending-total" className={spendingLabelClass}>{t('spending.total_amount_label', 'Total Amount')} <span className="text-status-danger">*</span></label>
                       <Input id="spending-total" required type="number" min="0" step="any" value={formTotalAmount} onChange={e => setFormTotalAmount(e.target.value === '' ? '' : Number(e.target.value))} className={`text-right`} />
@@ -1118,7 +1118,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                     </div>
                   </section>
                   <Field>
-                    <FieldLabel htmlFor="spending-description" className={spendingLabelClass}>{t('spending.invoice_desc_label', 'Invoice Description')}</FieldLabel>
+                    <FieldLabel htmlFor="spending-description">{t('spending.invoice_desc_label', 'Invoice Description')}</FieldLabel>
                     <Textarea id="spending-description" rows={4} value={formInvoiceDesc} onChange={e => setFormInvoiceDesc(e.target.value)} placeholder={t('spending.invoice_desc_ph', 'Keterangan lengkap pengeluaran / rincian invoice...')} className={`resize-y`} />
                   </Field>
                   <section aria-labelledby="spending-documents-heading">

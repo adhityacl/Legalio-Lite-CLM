@@ -209,10 +209,10 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
             />
           </Field>
 
-          <div>
-            <label htmlFor="adminmodals-field-3" className="block text-xs font-medium text-foreground mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-3">
               {t('admin.role_label', 'Role Hak Akses Aplikasi *')}
-            </label>
+            </FieldLabel>
             <AlphabeticalSelect id="adminmodals-field-3"
               value={role}
               onChange={(e) => handleRoleChange(e.target.value)}
@@ -224,7 +224,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
               {allowedRoles.includes('editor') && <option value="editor">{t('admin.editor', 'Editor')}</option>}
               {allowedRoles.includes('viewer') && <option value="viewer">{t('admin.viewer', 'Viewer')}</option>}
             </AlphabeticalSelect>
-          </div>
+          </Field>
 
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -268,10 +268,10 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
             </AlphabeticalSelect>
           </div>
 
-          <div>
-            <label htmlFor="adminmodals-field-4" className="block text-xs font-medium text-foreground mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-4">
               {t('admin.tab_teams', 'Departemen')}
-            </label>
+            </FieldLabel>
             <AlphabeticalSelect id="adminmodals-field-4"
               value={role === 'superuser' || role === 'admin' ? '' : department}
               onChange={(e) => setDepartment(e.target.value)}
@@ -288,7 +288,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
                 ))
               )}
             </AlphabeticalSelect>
-          </div>
+          </Field>
 
           <Field>
             <FieldLabel htmlFor="adminmodals-field-5">
@@ -455,10 +455,10 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             </Field>
           </Card>
 
-          <div>
-            <label htmlFor="adminmodals-field-8" className="block text-xs font-medium text-foreground mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-8">
               {t('admin.select_new_role', 'Pilih Peran Baru (Role)')}
-            </label>
+            </FieldLabel>
             <AlphabeticalSelect id="adminmodals-field-8"
               value={role}
               onChange={(e) => setRole(e.target.value)}
@@ -470,7 +470,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               {allowedRoles.includes('editor') && <option value="editor">{t('admin.editor', 'Editor')}</option>}
               {allowedRoles.includes('viewer') && <option value="viewer">{t('admin.viewer', 'Viewer')}</option>}
             </AlphabeticalSelect>
-          </div>
+          </Field>
 
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -514,10 +514,10 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             </AlphabeticalSelect>
           </div>
 
-          <div>
-            <label htmlFor="adminmodals-field-9" className="block text-xs font-medium text-foreground mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-9">
               {t('admin.tab_teams', 'Departmens / Tim')}
-            </label>
+            </FieldLabel>
             <AlphabeticalSelect id="adminmodals-field-9"
               value={role === 'superuser' || role === 'admin' ? '' : department}
               onChange={(e) => setDepartment(e.target.value)}
@@ -534,7 +534,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                 ))
               )}
             </AlphabeticalSelect>
-          </div>
+          </Field>
 
           <div className="pt-2 flex items-center justify-end gap-2">
             <Button variant="ghost"
@@ -779,10 +779,10 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="adminmodals-field-13" className="block text-xs font-medium text-foreground mb-1">
+            <Field>
+              <FieldLabel htmlFor="adminmodals-field-13">
                 {t('admin.org_currency_label', 'Mata Uang Utama')}
-              </label>
+              </FieldLabel>
               <AlphabeticalSelect id="adminmodals-field-13"
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
@@ -792,11 +792,11 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
                   <option key={c.code} value={c.code}>{c.code} — {currencyLabel(c.code, language)}</option>
                 ))}
               </AlphabeticalSelect>
-            </div>
-            <div>
-              <label htmlFor="create-org-country" className="block text-xs font-semibold text-foreground mb-1">
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="create-org-country">
                 {t('settings.region.country', 'Country / jurisdiction pack')}
-              </label>
+              </FieldLabel>
               <AlphabeticalSelect
                 id="create-org-country"
                 value={countryCode}
@@ -809,11 +809,11 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
               >
                 {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
               </AlphabeticalSelect>
-            </div>
-            <div>
-              <label htmlFor="create-org-industry" className="block text-xs font-semibold text-foreground mb-1">
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="create-org-industry">
                 {t('settings.region.industry', 'Industry pack')}
-              </label>
+              </FieldLabel>
               <AlphabeticalSelect
                 id="create-org-industry"
                 value={industry}
@@ -822,7 +822,7 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
               >
                 {industries.map((i) => <option key={i.key} value={i.key}>{i.name.en}</option>)}
               </AlphabeticalSelect>
-            </div>
+            </Field>
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-2">
@@ -1689,10 +1689,10 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
             />
           </Field>
 
-          <div>
-            <label htmlFor="adminmodals-field-23" className="block text-xs font-medium text-foreground mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-23">
               {t('admin.inv_col_role', 'Peran Diminta')}
-            </label>
+            </FieldLabel>
             <AlphabeticalSelect id="adminmodals-field-23"
               value={role}
               onChange={(e) => setRole(e.target.value)}
@@ -1704,12 +1704,12 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
               <option value="editor">{t('admin.editor_group_draft_upload', 'Editor (Group Draft & Upload)')}</option>
               <option value="viewer">{t('admin.viewer_read_only_final', 'Viewer (Read-Only Final)')}</option>
             </AlphabeticalSelect>
-          </div>
+          </Field>
 
-          <div>
-            <label htmlFor="adminmodals-field-24" className="block text-xs font-medium text-foreground mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-24">
               {t('admin.team_optional_label', 'Divisi / Tim (Opsional)')}
-            </label>
+            </FieldLabel>
             <AlphabeticalSelect id="adminmodals-field-24"
               value={teamId}
               onChange={(e) => setTeamId(e.target.value)}
@@ -1722,7 +1722,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
                 </option>
               ))}
             </AlphabeticalSelect>
-          </div>
+          </Field>
 
           <div className="pt-2 flex items-center justify-end gap-2">
             <Button variant="ghost"

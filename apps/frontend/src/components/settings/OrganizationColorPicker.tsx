@@ -43,7 +43,7 @@ export function OrganizationColorPicker({ id, value, onChange, disabled }: {
                 const selected = chosen?.name === item.name;
                 return (
                   <button key={item.name} type="button" aria-pressed={selected} onClick={() => setDraft(item.light[8].toUpperCase())}
-                    className={`rounded-lg border p-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${selected ? 'border-primary bg-primary' : 'border-border hover:border-border '}`}>
+                    className={`rounded-lg border p-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${selected ? 'border-primary bg-accent' : 'border-border hover:border-border '}`}>
                     <span className="mb-2 flex items-center justify-between text-sm font-medium"><span>{item.label}</span>{selected && <Check className="h-4 w-4 text-accent-foreground" aria-hidden="true" />}</span>
                     <span className="flex h-6 overflow-hidden rounded-md" aria-hidden="true">{item[theme].map((color, index) => <span key={index} className="flex-1" style={{ backgroundColor: color }} />)}</span>
                   </button>

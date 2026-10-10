@@ -29,7 +29,6 @@ function timezoneOptions(extra: string[]): string[] {
   return Array.from(new Set([...extra, 'UTC', ...all])).sort();
 }
 
-const labelClass = 'mb-1.5 block text-sm font-medium text-foreground ';
 const hintClass = 'mt-1.5 text-xs leading-relaxed text-muted-foreground ';
 const sectionClass = 'min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm  ';
 /**
@@ -168,44 +167,44 @@ export const OrganizationRegionSettings: React.FC = () => {
         <div className={sectionClass}>
           <h3 className={sectionHeadingClass}>{t('settings.region.profile', 'Profile')}</h3>
           <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label htmlFor={ids.country} className={labelClass}>{t('settings.region.country', 'Country / jurisdiction pack')}</label>
+            <Field>
+              <FieldLabel htmlFor={ids.country}>{t('settings.region.country', 'Country / jurisdiction pack')}</FieldLabel>
               <AlphabeticalSelect id={ids.country} value={draft.countryCode} onChange={(e) => onCountryChange(e.target.value)}>
                 {countries.map((c) => <option key={c.code} value={c.code}>{localizeName(c.name, language)}</option>)}
               </AlphabeticalSelect>
-            </div>
-            <div>
-              <label htmlFor={ids.industry} className={labelClass}>{t('settings.region.industry', 'Industry pack')}</label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={ids.industry}>{t('settings.region.industry', 'Industry pack')}</FieldLabel>
               <AlphabeticalSelect id={ids.industry} value={draft.industry} onChange={(e) => onIndustryChange(e.target.value)}>
                 {industries.map((i) => <option key={i.key} value={i.key}>{localize(i.name, language)}</option>)}
               </AlphabeticalSelect>
-            </div>
-            <div>
-              <label htmlFor={ids.language} className={labelClass}>{t('settings.region.language', 'Default language for e-mails and AI answers')}</label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={ids.language}>{t('settings.region.language', 'Default language for e-mails and AI answers')}</FieldLabel>
               <AlphabeticalSelect id={ids.language} value={draft.language} onChange={(e) => update('language', e.target.value as 'EN' | 'ID' | 'ZH')}>
                 <option value="EN">{t('settings.english', 'English')}</option>
                 <option value="ID">{t('settings.bahasa_indonesia', 'Bahasa Indonesia')}</option>
                 <option value="ZH">{t('settings.chinese', '中文')}</option>
               </AlphabeticalSelect>
-            </div>
-            <div>
-              <label htmlFor={ids.timezone} className={labelClass}>{t('settings.region.timezone', 'Time zone')}</label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={ids.timezone}>{t('settings.region.timezone', 'Time zone')}</FieldLabel>
               <Input id={ids.timezone} list={ids.tzList} value={draft.timezone} onChange={(e) => update('timezone', e.target.value)} aria-describedby={`${ids.timezone}-hint`} />
               <AlphabeticalDatalist id={ids.tzList}>{tzOptions.map((tz) => <option key={tz} value={tz} />)}</AlphabeticalDatalist>
-              <p id={`${ids.timezone}-hint`} className={hintClass}>{t('settings.region.timezone_hint', 'IANA name, e.g. Asia/Singapore. Deadlines are calculated in this time zone.')}</p>
-            </div>
-            <div>
-              <label htmlFor={ids.currency} className={labelClass}>{t('settings.region.default_currency', 'Default currency')}</label>
+              <FieldHelperText id={`${ids.timezone}-hint`}>{t('settings.region.timezone_hint', 'IANA name, e.g. Asia/Singapore. Deadlines are calculated in this time zone.')}</FieldHelperText>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={ids.currency}>{t('settings.region.default_currency', 'Default currency')}</FieldLabel>
               <AlphabeticalSelect id={ids.currency} value={draft.defaultCurrency} onChange={(e) => update('defaultCurrency', e.target.value)}>
                 {SUPPORTED_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} — {currencyLabel(c.code, language)}</option>)}
               </AlphabeticalSelect>
-            </div>
-            <div>
-              <label htmlFor={ids.reporting} className={labelClass}>{t('settings.region.reporting_currency', 'Reporting currency')}</label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={ids.reporting}>{t('settings.region.reporting_currency', 'Reporting currency')}</FieldLabel>
               <AlphabeticalSelect id={ids.reporting} value={draft.reportingCurrency} onChange={(e) => update('reportingCurrency', e.target.value)}>
                 {SUPPORTED_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} — {currencyLabel(c.code, language)}</option>)}
               </AlphabeticalSelect>
-            </div>
+            </Field>
           </div>
         </div>
       </fieldset>
@@ -216,11 +215,11 @@ export const OrganizationRegionSettings: React.FC = () => {
           <h3 className={sectionHeadingClass}>{t('settings.region.lifecycle', 'Lifecycle & reminders')}</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <Field>
-              <FieldLabel htmlFor={ids.expiry} className={labelClass}>{t('settings.region.expiry_days', 'Mark as "expiring soon" when this many days remain')}</FieldLabel>
+              <FieldLabel htmlFor={ids.expiry}>{t('settings.region.expiry_days', 'Mark as "expiring soon" when this many days remain')}</FieldLabel>
               <Input id={ids.expiry} type="number" min={1} max={730} value={draft.expiryWarningDays} onChange={(e) => update('expiryWarningDays', Number(e.target.value) || 1)} />
             </Field>
             <Field>
-              <FieldLabel htmlFor={ids.reminders} className={labelClass}>{t('settings.region.reminders', 'Send reminders this many days before expiry')}</FieldLabel>
+              <FieldLabel htmlFor={ids.reminders}>{t('settings.region.reminders', 'Send reminders this many days before expiry')}</FieldLabel>
               <Input
                 id={ids.reminders}
                 value={remindersText}
@@ -229,7 +228,7 @@ export const OrganizationRegionSettings: React.FC = () => {
                 aria-invalid={!remindersValid}
                 aria-describedby={ids.remindersHint}
               />
-              <FieldHelperText id={ids.remindersHint} className={hintClass}>{t('settings.region.reminders_hint', 'Comma separated, e.g. 90, 60, 30, 14')}</FieldHelperText>
+              <FieldHelperText id={ids.remindersHint}>{t('settings.region.reminders_hint', 'Comma separated, e.g. 90, 60, 30, 14')}</FieldHelperText>
             </Field>
           </div>
         </div>
@@ -241,14 +240,14 @@ export const OrganizationRegionSettings: React.FC = () => {
           <h3 className={sectionHeadingClass}>{t('settings.region.legal_defaults', 'Contract defaults')}</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <Field>
-              <FieldLabel htmlFor={ids.law} className={labelClass}>{t('settings.region.governing_law', 'Governing law')}</FieldLabel>
+              <FieldLabel htmlFor={ids.law}>{t('settings.region.governing_law', 'Governing law')}</FieldLabel>
               <Input id={ids.law} value={draft.governingLaw || ''} placeholder={packLaw} onChange={(e) => update('governingLaw', e.target.value || undefined)} aria-describedby={`${ids.law}-hint`} />
-              <FieldHelperText id={`${ids.law}-hint`} className={hintClass}>{t('settings.region.pack_default', 'Pack default: {value}', { value: packLaw })}</FieldHelperText>
+              <FieldHelperText id={`${ids.law}-hint`}>{t('settings.region.pack_default', 'Pack default: {value}', { value: packLaw })}</FieldHelperText>
             </Field>
             <Field>
-              <FieldLabel htmlFor={ids.venue} className={labelClass}>{t('settings.region.dispute_venue', 'Dispute resolution forum')}</FieldLabel>
+              <FieldLabel htmlFor={ids.venue}>{t('settings.region.dispute_venue', 'Dispute resolution forum')}</FieldLabel>
               <Input id={ids.venue} value={draft.disputeVenue || ''} placeholder={packVenue} onChange={(e) => update('disputeVenue', e.target.value || undefined)} aria-describedby={`${ids.venue}-hint`} />
-              <FieldHelperText id={`${ids.venue}-hint`} className={hintClass}>{t('settings.region.pack_default', 'Pack default: {value}', { value: packVenue })}</FieldHelperText>
+              <FieldHelperText id={`${ids.venue}-hint`}>{t('settings.region.pack_default', 'Pack default: {value}', { value: packVenue })}</FieldHelperText>
             </Field>
           </div>
         </div>

@@ -41,8 +41,8 @@ function alphabeticalOptions(children: React.ReactNode, locale: string): React.R
   });
 }
 
-/** A native select: layout, keyboard behavior, refs and controlled values stay intact. */
-export const AlphabeticalSelect = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
+/** moduix NativeSelect whose visible options are sorted for the active language. */
+export const AlphabeticalSelect = React.forwardRef<HTMLSelectElement, React.ComponentPropsWithoutRef<typeof NativeSelect>>(
   ({ children, ...props }, ref) => {
     const { language } = useLanguage();
     const locale = language === 'ZH' ? 'zh-CN' : language === 'ID' ? 'id' : 'en';

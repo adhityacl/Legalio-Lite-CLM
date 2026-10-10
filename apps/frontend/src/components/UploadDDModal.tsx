@@ -204,7 +204,7 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-card/50 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="size-10 rounded-md bg-primary border border-primary/30 flex items-center justify-center shrink-0 text-accent-foreground">
+            <div className="size-10 rounded-md bg-accent border border-primary/30 flex items-center justify-center shrink-0 text-accent-foreground">
               <Upload className="w-5 h-5" />
             </div>
             <div className="min-w-0">
@@ -315,7 +315,7 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
               {selectedFile ? (
                 <Card className="flex items-center justify-between gap-3 p-2.5">
                   <div className="flex items-center gap-2.5 min-w-0 text-left">
-                    <div className="w-8 h-8 rounded-lg bg-primary text-accent-foreground flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-accent text-accent-foreground flex items-center justify-center shrink-0">
                       <FileText className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">

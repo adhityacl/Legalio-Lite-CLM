@@ -24,7 +24,6 @@ export interface ResetWorkspaceDialogProps {
   onDone: (message: string, defaultOrgId: string) => void;
 }
 
-const labelClass = 'mb-1.5 block text-sm font-medium text-foreground ';
 
 /**
  * Superuser "reset & set up" flow: wipe business data, then either create
@@ -125,7 +124,7 @@ export const ResetWorkspaceDialog: React.FC<ResetWorkspaceDialogProps> = ({ open
             {mode === 'empty' && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field className="sm:col-span-2">
-                  <FieldLabel htmlFor={ids.name} className={labelClass}>{t('settings.reset.org_name', 'Organization name')}</FieldLabel>
+                  <FieldLabel htmlFor={ids.name}>{t('settings.reset.org_name', 'Organization name')}</FieldLabel>
                   <Input
                     id={ids.name}
                     value={name}
@@ -135,25 +134,25 @@ export const ResetWorkspaceDialog: React.FC<ResetWorkspaceDialogProps> = ({ open
                     aria-describedby={status.kind === 'error' ? ids.error : undefined}
                   />
                 </Field>
-                <div>
-                  <label htmlFor={ids.country} className={labelClass}>{t('settings.region.country', 'Country / jurisdiction pack')}</label>
+                <Field>
+                  <FieldLabel htmlFor={ids.country}>{t('settings.region.country', 'Country / jurisdiction pack')}</FieldLabel>
                   <AlphabeticalSelect id={ids.country} value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
                     {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
                   </AlphabeticalSelect>
-                </div>
-                <div>
-                  <label htmlFor={ids.industry} className={labelClass}>{t('settings.region.industry', 'Industry pack')}</label>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={ids.industry}>{t('settings.region.industry', 'Industry pack')}</FieldLabel>
                   <AlphabeticalSelect id={ids.industry} value={industry} onChange={(e) => setIndustry(e.target.value)}>
                     {industries.map((i) => <option key={i.key} value={i.key}>{localize(i.name, language)}</option>)}
                   </AlphabeticalSelect>
-                </div>
+                </Field>
               </div>
             )}
 
             <p className="text-sm text-muted-foreground">{t('settings.reset.keeps_accounts', 'Login accounts, AI and e-mail provider settings are kept.')}</p>
 
             <Field>
-              <FieldLabel htmlFor={ids.confirm} className={labelClass}>{t('settings.reset.confirm_hint', 'Type RESET NOW to confirm.')}</FieldLabel>
+              <FieldLabel htmlFor={ids.confirm}>{t('settings.reset.confirm_hint', 'Type RESET NOW to confirm.')}</FieldLabel>
               <Input
                 id={ids.confirm}
                 className={``}

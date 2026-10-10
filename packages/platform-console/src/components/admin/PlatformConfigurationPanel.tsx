@@ -1013,7 +1013,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                         {/* Master Storage Header */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border ">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="size-10 rounded-md flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs bg-primary">
+                            <div className="size-10 rounded-md flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs bg-primary text-primary-foreground">
                               <Folder className="w-4 h-4 text-white" />
                             </div>
                             <div className="min-w-0 space-y-0.5">

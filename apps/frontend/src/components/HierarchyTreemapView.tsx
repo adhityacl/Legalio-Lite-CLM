@@ -115,6 +115,8 @@ import {
   Settings2,
   Download,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   CheckSquare,
   Square,
   SlidersHorizontal,
@@ -124,10 +126,13 @@ import {
 
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { Button } from '@legalio/ui-components/button';
-import { TableCell, Table, TableHeader, TableRow, TableColumnHeader, TableBody } from '@legalio/ui-components/table';
+import { Table, TableBody, TableCell, TableColumnHeader, TableHeader, TableRow, TableScrollArea } from '@legalio/ui-components/table';
 import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
+import { Empty, EmptyActions, EmptyContent, EmptyDescription, EmptyIcon, EmptyTitle } from '@legalio/ui-components/empty';
+import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuItemGroup, MenuItemGroupLabel, MenuItemIndicator, MenuItemText, MenuPositioner, MenuSeparator, MenuTrigger, MenuViewport } from '@legalio/ui-components/menu';
 interface HierarchyTreemapViewProps {
   partners: Partner[];
   contracts: Contract[];
@@ -234,46 +239,14 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
         </div>
       </Card>
 
-      {/* Control Toolbar & View Mode Switcher */}
-      <Card className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-        {/* View Switchers - Solid Green Pill Buttons for Selected State matching reference */}
-        <div role="tablist" aria-label={t('hierarchy.title')} className="mobile-page-actions flex flex-wrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto"
-          onKeyDown={event => {
-            const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-            const index = tabs.indexOf(document.activeElement as HTMLButtonElement);
-            const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
-            if (next >= 0) { event.preventDefault(); tabs[next].focus(); tabs[next].click(); }
-          }}>
-          <button
-            type="button" role="tab" id="structure-tree-tab" aria-selected={viewMode === 'treemap'} aria-controls="structure-panel" tabIndex={viewMode === 'treemap' ? 0 : -1}
-            onClick={() => setViewMode('treemap')}
-            className={`h-(--form-control-height) min-h-10 px-4 rounded-md transition-all flex items-center justify-center gap-2 cursor-pointer text-sm font-semibold shadow-xs ${
- viewMode === 'treemap'
- ? 'bg-primary text-white border border-transparent shadow-md'
- : 'bg-card border border-border text-foreground hover:bg-card '
- }`}
-          >
-            <GitFork className={`w-4 h-4 ${viewMode === 'treemap' ? 'text-white' : 'text-muted-foreground '}`} />
-            <span>{t('hierarchy.tree_view', 'Tampilan Pohon')}</span>
-          </button>
-          <button
-            type="button" role="tab" id="structure-audit-tab" aria-selected={viewMode === 'audit'} aria-controls="structure-panel" tabIndex={viewMode === 'audit' ? 0 : -1}
-            onClick={() => setViewMode('audit')}
-            className={`h-(--form-control-height) min-h-10 px-4 rounded-md transition-all flex items-center justify-center gap-2 cursor-pointer text-sm font-semibold shadow-xs ${
- viewMode === 'audit'
- ? 'bg-primary text-white border border-transparent shadow-md'
- : 'bg-card border border-border text-foreground hover:bg-card '
- }`}
-          >
-            <FileSpreadsheet className={`w-4 h-4 ${viewMode === 'audit' ? 'text-white' : 'text-muted-foreground '}`} />
-            <span>{t('hierarchy.audit_view', 'Tampilan Tabel')}</span>
-          </button>
-          <button type="button" role="tab" id="structure-calendar-tab" aria-selected={viewMode === 'calendar'} aria-controls="structure-panel" tabIndex={viewMode === 'calendar' ? 0 : -1}
-            onClick={() => setViewMode('calendar')}
-            className={`h-(--form-control-height) min-h-10 px-4 rounded-md transition-colors flex items-center justify-center gap-2 cursor-pointer text-sm font-semibold shadow-xs ${viewMode === 'calendar' ? 'bg-primary text-white border border-transparent shadow-md' : 'bg-card border border-border text-foreground hover:bg-card '}`}>
-            <CalendarDays aria-hidden="true" className="size-4" /><span>{t('hierarchy.calendar_view')}</span>
-          </button>
-        </div>
+      {/* Control toolbar and view switcher */}
+      <Tabs value={viewMode} onValueChange={details => setViewMode(details.value as typeof viewMode)} className="flex flex-col gap-6">
+      <Card className="flex-row flex-wrap items-center justify-between gap-4 p-4">
+        <TabsList aria-label={t('hierarchy.title')} className="w-full sm:w-auto">
+          <TabsTrigger value="treemap"><GitFork aria-hidden="true" />{t('hierarchy.tree_view', 'Tampilan Pohon')}</TabsTrigger>
+          <TabsTrigger value="audit"><FileSpreadsheet aria-hidden="true" />{t('hierarchy.audit_view', 'Tampilan Tabel')}</TabsTrigger>
+          <TabsTrigger value="calendar"><CalendarDays aria-hidden="true" />{t('hierarchy.calendar_view')}</TabsTrigger>
+        </TabsList>
 
         {/* Search Input */}
         {viewMode !== 'calendar' && <InputGroup className="relative w-full sm:w-72">
@@ -287,7 +260,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
         </InputGroup>}
       </Card>
 
-      <div id="structure-panel" role="tabpanel" aria-labelledby={`structure-${viewMode === 'treemap' ? 'tree' : viewMode}-tab`}>
+      <TabsContent value={viewMode} className="mt-0">
       {viewMode === 'calendar' && <WorkspaceDocumentCalendar contracts={contracts} ios={ios} partners={partners}
         loading={loading} error={error} onRetry={onRetry} onOpenDocument={onOpenCalendarDocument} />}
 
@@ -329,14 +302,10 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                         )}
                       </Button>
 
-                      <div className="size-10 rounded-md bg-primary text-white flex items-center justify-center font-extrabold text-xs shadow-xs shrink-0">
-                        L1
-                      </div>
+                      <Badge tone="info" className="font-mono">L1</Badge>
 
                       <div>
-                        <h3 className="text-base font-extrabold text-foreground flex items-center gap-2">
-                          <span>{partner.nama_partner}</span>
-                        </h3>
+                        <Heading as="h3" size="sm" weight="bold">{partner.nama_partner}</Heading>
                       </div>
                     </div>
 
@@ -370,11 +339,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                             return (
                               <Card
                                 key={idx}
-                                className={` p-2.5 flex items-center justify-between transition-all ${
- doc.status === 'Available'
- ? 'bg-primary text-accent-foreground '
- : 'text-foreground '
- }`}
+                                size="sm" className={`flex-row items-center justify-between p-2.5 ${doc.status === 'Available' ? 'border-status-success-border bg-status-success-soft' : ''}`}
                               >
                                 <div className="truncate pr-1">
                                   <span className="font-bold block truncate text-foreground" title={displayName}>{displayName}</span>
@@ -403,22 +368,13 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                   {isPartnerExpanded && (
                     <div className="p-4 sm:p-6 space-y-4">
                       {partnerContracts.length === 0 ? (
-                        <Card className="p-6 text-center">
-                          <FileText className="w-8 h-8 text-primary-foreground mx-auto mb-2" />
-                          <p className="text-xs font-semibold text-muted-foreground">
-                            {t('hierarchy.no_master_contract_for_partner', 'Belum ada Kontrak Induk terdaftar untuk Partner')} ({partner.nama_partner})
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {t('hierarchy.commercial_contract_hint', 'Setiap kerjasama komersial membutuhkan kontrak induk sebelum rincian IO.')}
-                          </p>
-                          <Button variant="ghost" size="sm"
+                        <Empty><EmptyIcon><FileText aria-hidden="true" /></EmptyIcon><EmptyContent><EmptyTitle>{t('hierarchy.no_master_contract_for_partner', 'Belum ada Kontrak Induk terdaftar untuk Partner')} ({partner.nama_partner})</EmptyTitle><EmptyDescription>{t('hierarchy.commercial_contract_hint', 'Setiap kerjasama komersial membutuhkan kontrak induk sebelum rincian IO.')}</EmptyDescription></EmptyContent><EmptyActions><Button variant="ghost" size="sm"
                             onClick={() => onOpenAddContract(partner.partner_id)}
                             className="mt-3"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             <span>{t('hierarchy.create_new_master_contract', 'Buat Kontrak Induk Baru')}</span>
-                          </Button>
-                        </Card>
+                          </Button></EmptyActions></Empty>
                       ) : (
                         partnerContracts.map((contract) => {
                           const contractIOs = ios.filter((i) => i.contract_id === contract.contract_id);
@@ -441,14 +397,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                               <Card className="p-4 transition-all">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                                   <div className="flex items-center gap-2.5">
-                                    <Button size="sm"
-                                      onClick={() => toggleContract(contract.contract_id)}
-                                      className={` ${
- isContractAddendum
- ? ' '
- : ''
- }`}
-                                    >
+                                    <Button variant="ghost" size="icon-sm" aria-expanded={isContractExpanded} aria-label={`${isContractExpanded ? t('nav.tutup_submenu', 'Tutup Submenu') : t('nav.buka_submenu', 'Buka Submenu')}: ${contract.nomor_kontrak}`} onClick={() => toggleContract(contract.contract_id)}>
                                       {isContractExpanded ? (
                                         <ChevronDown className={`w-4 h-4 ${isContractAddendum ? 'text-status-special ' : 'text-accent-foreground'}`} />
                                       ) : (
@@ -456,58 +405,25 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                                       )}
                                     </Button>
 
-                                    <div
-                                      className={`w-7 h-7 rounded-lg text-white flex items-center justify-center font-bold text-xs shrink-0 ${
- isContractAddendum ? 'bg-status-special' : 'bg-primary'
- }`}
-                                    >
-                                      L2
-                                    </div>
+                                    <Badge tone={isContractAddendum ? 'special' : 'info'} className="font-mono">L2</Badge>
 
                                     <div>
                                       <div className="flex items-center gap-2 flex-wrap">
                                         {isContractAddendum ? (
-                                          <span className="text-xs font-bold uppercase tracking-wider bg-status-special-soft text-status-special border border-status-special-border px-1.5 py-0.5 rounded-sm">
-                                            {t('hierarchy.agreement_addendum_badge', 'AGREEMENT ADDENDUM')}
-                                          </span>
+                                          <Badge tone="special">{t('hierarchy.agreement_addendum_badge', 'AGREEMENT ADDENDUM')}</Badge>
                                         ) : (
-                                          <span className="text-xs font-bold uppercase tracking-wider bg-primary text-accent-foreground border border-primary/30 px-1.5 py-0.5 rounded-sm">
-                                            {t('hierarchy.master_agreement_badge', 'KONTRAK INDUK (MASTER AGREEMENT)')}
-                                          </span>
+                                          <Badge tone="info">{t('hierarchy.master_agreement_badge', 'KONTRAK INDUK (MASTER AGREEMENT)')}</Badge>
                                         )}
-                                        <span className="text-xs font-semibold text-foreground px-1.5 py-0.5 rounded-sm border border-border">
-                                          {contract.nomor_kontrak}
-                                        </span>
-                                        <span
-                                          className={`text-xs font-bold px-2 py-0.5 rounded-full ${
- contract.status === 'Active'
- ? 'bg-primary text-accent-foreground border border-primary/30'
- : contract.status === 'Expiring'
- ? 'bg-status-warning-soft text-status-warning'
- : 'bg-status-danger-soft text-status-danger'
- }`}
-                                        >
-                                          {t(`status.${(contract.status || '').toLowerCase().replace(' ', '_')}`, contract.status)}
-                                        </span>
+                                        <Badge className="font-mono">{contract.nomor_kontrak}</Badge>
+                                        <Badge tone={statusTone(contract.status)}>{t(`status.${(contract.status || '').toLowerCase().replace(' ', '_')}`, contract.status)}</Badge>
                                       </div>
-                                      <h4 className="text-sm font-bold text-foreground mt-1 flex items-center gap-2">
-                                        <span>{contract.judul_kontrak}</span>
-                                      </h4>
+                                      <Heading as="h4" size="xs" weight="semibold" className="mt-1">{contract.judul_kontrak}</Heading>
                                     </div>
                                   </div>
 
                                   <div className="flex items-center gap-2 self-end md:self-center">
                                     {contract.link_file_kontrak && (
-                                      <a
-                                        href={contract.link_file_kontrak}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-2.5 py-1 bg-card hover:bg-primary text-accent-foreground text-xs font-semibold rounded-lg border border-primary/30 hover:border-primary transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                                        title={t('hierarchy.download_contract_doc', 'Unduh Dokumen Kontrak')}
-                                      >
-                                        <FileDown className="w-3.5 h-3.5 text-accent-foreground" />
-                                        <span>{t('hierarchy.download_doc', 'Unduh Dokumen')}</span>
-                                      </a>
+                                      <Button asChild variant="outline" size="sm"><a href={contract.link_file_kontrak} target="_blank" rel="noopener noreferrer" title={t('hierarchy.download_contract_doc', 'Unduh Dokumen Kontrak')}><FileDown aria-hidden="true" />{t('hierarchy.download_doc', 'Unduh Dokumen')}</a></Button>
                                     )}
 
                                     {hasPermission('document.edit') && (
@@ -555,7 +471,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
 
                                 {/* Contract Internal Notes */}
                                 {contract.internal_notes && (
-                                  <div className="mt-2.5 pt-2 border-t border-border bg-background rounded-lg p-2.5 flex items-start gap-2 text-xs">
+                                  <Card variant="subtle" size="sm" className="mt-2.5 flex-row items-start gap-2 p-2.5 text-xs">
                                     <FileText className="w-3.5 h-3.5 text-accent-foreground mt-0.5 shrink-0" />
                                     <div className="flex-1 min-w-0">
                                       <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide block mb-0.5">
@@ -565,7 +481,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                                         {contract.internal_notes}
                                       </p>
                                     </div>
-                                  </div>
+                                  </Card>
                                 )}
                               </Card>
 
@@ -573,14 +489,11 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                               {isContractExpanded && (
                                 <div className="ml-3 sm:ml-6 space-y-2 border-l-2 border-primary pl-3">
                                   {contractIOs.length === 0 ? (
-                                    <div className="p-3 border border-border rounded-lg text-xs text-muted-foreground flex items-center justify-between">
-                                      <span>{t('hierarchy.no_io_connected', 'Belum ada Insertion Order terhubung ke Kontrak ini.')}</span>
-                                      <Button variant="link"
+                                    <Empty className="py-4"><EmptyContent><EmptyDescription>{t('hierarchy.no_io_connected', 'Belum ada Insertion Order terhubung ke Kontrak ini.')}</EmptyDescription></EmptyContent><EmptyActions><Button variant="link"
                                         onClick={() => onOpenAddIO(contract.contract_id, contract.partner_id)}
                                       >
                                         {t('hierarchy.add_new_io', 'Tambah IO Baru')}
-                                      </Button>
-                                    </div>
+                                      </Button></EmptyActions></Empty>
                                   ) : (
                                     contractIOs.map((io) => {
                                       const hasIOFile = Boolean(io.link_file_io || io.fileName);
@@ -593,39 +506,20 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                                         >
                                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                             <div className="flex items-center gap-2.5">
-                                              <div className="w-6 h-6 rounded-sm bg-primary text-white flex items-center justify-center font-bold text-xs shrink-0">
-                                                L3
-                                              </div>
+                                              <Badge tone="info" className="font-mono">L3</Badge>
                                               <div>
                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                  <span className="text-xs font-bold uppercase tracking-wider bg-primary text-accent-foreground border border-primary/30 px-1.5 py-0.5 rounded-sm">
-                                                    {t('hierarchy.insertion_order_badge', 'INSERTION ORDER (IO)')}
-                                                  </span>
-                                                  <span className="text-xs font-semibold text-foreground px-1.5 py-0.5 rounded-sm border border-border">
-                                                    {io.nomor_io}
-                                                  </span>
-                                                  <span className="text-xs font-semibold bg-muted px-1.5 py-0.5 rounded-sm border border-border text-muted-foreground">
-                                                    {io.kanal_media}
-                                                  </span>
+                                                  <Badge tone="info">{t('hierarchy.insertion_order_badge', 'INSERTION ORDER (IO)')}</Badge>
+                                                  <Badge className="font-mono">{io.nomor_io}</Badge>
+                                                  <Badge>{io.kanal_media}</Badge>
                                                 </div>
-                                                <h5 className="text-xs font-bold text-foreground mt-0.5">
-                                                  {io.judul_io}
-                                                </h5>
+                                                <Heading as="h5" size="xs" weight="semibold" className="mt-0.5">{io.judul_io}</Heading>
                                               </div>
                                             </div>
 
                                             <div className="flex items-center gap-2 text-xs self-end sm:self-center">
                                               {io.link_file_io && (
-                                                <a
-                                                  href={io.link_file_io}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
-                                                  className="px-2.5 py-1 bg-card hover:bg-primary text-accent-foreground text-xs font-semibold rounded-lg border border-primary/30 hover:border-primary transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                                                  title={t('hierarchy.download_io_doc', 'Unduh Dokumen Insertion Order')}
-                                                >
-                                                  <FileDown className="w-3.5 h-3.5 text-accent-foreground" />
-                                                  <span>{t('hierarchy.download_doc', 'Unduh Dokumen')}</span>
-                                                </a>
+                                                <Button asChild variant="outline" size="sm"><a href={io.link_file_io} target="_blank" rel="noopener noreferrer" title={t('hierarchy.download_io_doc', 'Unduh Dokumen Insertion Order')}><FileDown aria-hidden="true" />{t('hierarchy.download_doc', 'Unduh Dokumen')}</a></Button>
                                               )}
 
                                               {hasPermission('document.edit') && (
@@ -655,24 +549,20 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                                             <div>
                                               <span className="text-xs text-muted-foreground block">{t('hierarchy.pricing_model', 'Model Biaya (Pricing Model):')}</span>
                                               <div className="mt-0.5">
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-bold bg-primary text-accent-foreground border border-primary/20">
-                                                  {io.pricing_model || 'Fixed'}
-                                                </span>
+                                                <Badge tone="info">{io.pricing_model || 'Fixed'}</Badge>
                                               </div>
                                             </div>
                                             <div>
                                               <span className="text-xs text-muted-foreground block">{t('hierarchy.charging_type', 'Skema Penagihan (Charging Type):')}</span>
                                               <div className="mt-0.5">
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-semibold bg-muted text-foreground border border-border">
-                                                  {io.charging_type || io.skema_pembayaran || '-'}
-                                                </span>
+                                                <Badge>{io.charging_type || io.skema_pembayaran || '-'}</Badge>
                                               </div>
                                             </div>
                                           </div>
 
                                           {/* IO Notes / Deliverables */}
                                           {ioNoteContent && (
-                                            <Card className="mt-0.5 pt-2 bg-background p-2.5 flex items-start gap-2 text-xs">
+                                            <Card variant="subtle" size="sm" className="mt-0.5 flex-row items-start gap-2 p-2.5 text-xs">
                                               <FileText className="w-3.5 h-3.5 text-accent-foreground mt-0.5 shrink-0" />
                                               <div className="flex-1 min-w-0">
                                                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide block mb-0.5">
@@ -1170,53 +1060,45 @@ const exportToCSV = () => {
                 <Heading as="h3" size="sm" weight="semibold">{t('hierarchy.audit_table_title', 'Tabel Audit Lengkap')}</Heading>
               </div>
               <div className="mobile-page-actions flex flex-wrap items-center gap-3">
-                <Button variant="outline"
+                <Button variant={auditFlatMode ? 'secondary' : 'outline'} aria-pressed={auditFlatMode}
                   onClick={() => setAuditFlatMode(!auditFlatMode)}
-                  className={` ${
- auditFlatMode ? '' : ''
- }`}
                 >
                   <ArrowUpDown className="w-3.5 h-3.5" />
                   {auditFlatMode ? t('hierarchy.view_flat', 'Tampilan: Datar (Bisa di-Sort)') : t('hierarchy.view_grouped', 'Tampilan: Grouping Row')}
                 </Button>
-                <div className="relative">
-                  <Button variant="outline"
-                    onClick={() => setShowColPicker(!showColPicker)}
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5" />
-                    {t('hierarchy.custom_columns', 'Kustom Kolom')}
-                  </Button>
-                  {showColPicker && (
-                    <Card className="absolute right-0 top-full mt-2 w-64 z-50 overflow-hidden flex flex-col backdrop-blur-none ring-1 ring-black/5">
-                      <div className="p-2.5 bg-card border-b border-border flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-muted-foreground uppercase">{t('hierarchy.custom_columns_title', 'Kustomisasi Kolom')}</span>
-                          <Button variant="ghost" size="sm"
-                            onClick={() => setAuditVisibleCols(INITIAL_AUDIT_COLS)}
-                          >
-                            {t('hierarchy.reset', 'Reset')}
-                          </Button>
-                        </div>
-                        <Checkbox checked={Object.keys(INITIAL_AUDIT_COLS).every(k => auditVisibleCols[k])} onCheckedChange={(details) => {
-                              const isChecked = details.checked === true;
-                              const newState = {} as Record<string, boolean>;
-                              Object.keys(INITIAL_AUDIT_COLS).forEach(k => newState[k] = isChecked);
-                              setAuditVisibleCols(newState);
-                            }}><CheckboxControl /><CheckboxLabel><span className="text-xs font-bold text-foreground">{t('hierarchy.select_all', 'Pilih Semua / Kosongkan')}</span></CheckboxLabel><CheckboxHiddenInput /></Checkbox>
-                      </div>
-                      <div className="p-3 bg-card max-h-[300px] overflow-y-auto">
+                <Menu closeOnSelect={false} positioning={{ placement: 'bottom-end', gutter: 8 }} open={showColPicker} onOpenChange={details => setShowColPicker(details.open)}>
+                  <MenuTrigger asChild>
+                    <Button variant="outline"><SlidersHorizontal aria-hidden="true" />{t('hierarchy.custom_columns', 'Kustom Kolom')}</Button>
+                  </MenuTrigger>
+                  <MenuPositioner>
+                    <MenuContent className="w-64">
+                      <MenuViewport className="max-h-80">
+                        <MenuItemGroup>
+                          <MenuItemGroupLabel>{t('hierarchy.custom_columns_title', 'Kustomisasi Kolom')}</MenuItemGroupLabel>
+                          <MenuCheckboxItem value="__all" checked={Object.keys(INITIAL_AUDIT_COLS).every(k => auditVisibleCols[k])} onCheckedChange={checked => {
+                            const newState = {} as Record<string, boolean>;
+                            Object.keys(INITIAL_AUDIT_COLS).forEach(k => { newState[k] = checked; });
+                            setAuditVisibleCols(newState);
+                          }}>
+                            <MenuItemIndicator /><MenuItemText>{t('hierarchy.select_all', 'Pilih Semua / Kosongkan')}</MenuItemText>
+                          </MenuCheckboxItem>
+                          <MenuItem value="__reset" onSelect={() => setAuditVisibleCols(INITIAL_AUDIT_COLS)}>{t('hierarchy.reset', 'Reset')}</MenuItem>
+                        </MenuItemGroup>
                         {['Vendor', 'Evaluation', 'Spending', 'Contract', 'IO'].map(groupName => (
-                          <div key={groupName} className="mb-3 last:mb-0">
-                            <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 px-1 border-b border-border pb-1">{t(`audit_group_${groupName.toLowerCase()}`, groupName)}</div>
+                          <MenuItemGroup key={groupName}>
+                            <MenuSeparator />
+                            <MenuItemGroupLabel>{t(`audit_group_${groupName.toLowerCase()}`, groupName)}</MenuItemGroupLabel>
                             {columns.filter(c => c.group === groupName).map(col => (
-                              <Checkbox checked={!!auditVisibleCols[col.id]} onCheckedChange={(details) => setAuditVisibleCols(prev => ({...prev, [col.id]: details.checked === true}))}><CheckboxControl /><CheckboxLabel>{t(`audit_col_${col.id}`, col.label)}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
+                              <MenuCheckboxItem key={col.id} value={col.id} checked={!!auditVisibleCols[col.id]} onCheckedChange={checked => setAuditVisibleCols(prev => ({ ...prev, [col.id]: checked }))}>
+                                <MenuItemIndicator /><MenuItemText>{t(`audit_col_${col.id}`, col.label)}</MenuItemText>
+                              </MenuCheckboxItem>
                             ))}
-                          </div>
+                          </MenuItemGroup>
                         ))}
-                      </div>
-                    </Card>
-                  )}
-                </div>
+                      </MenuViewport>
+                    </MenuContent>
+                  </MenuPositioner>
+                </Menu>
                 {hasPermission('export.csv') && (
                   <Button
                     onClick={exportToCSV}
@@ -1228,10 +1110,9 @@ const exportToCSV = () => {
                 )}
               </div>
             </div>
-            <div className="@container p-0 overflow-auto flex-1">
+            <TableScrollArea className="@container flex-1 rounded-none border-0">
               <Table className="w-full text-left">
-
-<TableHeader className="sticky top-0 z-10">
+                <TableHeader className="sticky top-0 z-10">
                   <TableRow>
                     {columns.map((col, idx) => auditVisibleCols[col.id] && (
                       <TableColumnHeader
@@ -1270,27 +1151,17 @@ const exportToCSV = () => {
                           setDraggedColId(null);
                           setDraggedColIdx(null);
                         }}
-                        className={`whitespace-nowrap ${auditFlatMode ? ' ' : ''}`}
+                        className="whitespace-nowrap"
                       >
                         {auditFlatMode ? (
-                          <button
-                            type="button"
-                            onClick={() => handleSort(col.id)}
-                            className="w-full flex items-center justify-between gap-2 text-left hover:text-foreground transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none rounded-sm py-0.5"
-                            title={t('hierarchy.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label: t(`audit_col_${col.id}`, col.label) })}
-                          >
-                            <span>{t(`audit_col_${col.id}`, col.label)}</span>
-                            {auditSortConfig?.key === col.id ? (
-                              <span className="text-accent-foreground font-bold shrink-0">{auditSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                            ) : (
-                              <span className="text-muted-foreground text-xs shrink-0">↕</span>
-                            )}
-                          </button>
-                        ) : (
-                          <div className="flex items-center justify-between gap-2">
-                            <span>{t(`audit_col_${col.id}`, col.label)}</span>
-                          </div>
-                        )}
+                          <Button variant="ghost" size="sm" onClick={() => handleSort(col.id)}
+                            title={t('hierarchy.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label: t(`audit_col_${col.id}`, col.label) })}>
+                            {t(`audit_col_${col.id}`, col.label)}
+                            {auditSortConfig?.key === col.id
+                              ? (auditSortConfig.direction === 'asc' ? <ArrowUp aria-hidden="true" /> : <ArrowDown aria-hidden="true" />)
+                              : <ArrowUpDown aria-hidden="true" className="text-muted-foreground" />}
+                          </Button>
+                        ) : t(`audit_col_${col.id}`, col.label)}
                       </TableColumnHeader>
                     ))}
                   </TableRow>
@@ -1307,11 +1178,12 @@ const exportToCSV = () => {
                   )}
                 </TableBody>
               </Table>
-            </div>
+            </TableScrollArea>
           </div>
         );
       })()}
-      </div>
+      </TabsContent>
+      </Tabs>
     </div>
   );
 };

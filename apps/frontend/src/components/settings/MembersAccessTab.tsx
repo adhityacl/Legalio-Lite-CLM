@@ -359,12 +359,12 @@ const InviteDialog: React.FC<{
       <DialogHeader title={codeOnly ? t('onboarding.generate_code', 'Generate invite code') : t('tb.invite_member', 'Invite member')} onClose={onClose} />
       <form onSubmit={submit} noValidate className="flex flex-col gap-4 overflow-y-auto p-5">
         {!codeOnly && <Field>
-          <FieldLabel htmlFor={ids.email} className={labelClass}>{t('tb.col_email', 'Email')}</FieldLabel>
+          <FieldLabel htmlFor={ids.email}>{t('tb.col_email', 'Email')}</FieldLabel>
           <Input id={ids.email} type="email" autoComplete="off" value={email} aria-invalid={email.length > 0 && !emailValid} aria-describedby={email.length > 0 && !emailValid ? `${ids.email}-error` : undefined} onChange={(e) => setEmail(e.target.value)} />
           {email.length > 0 && !emailValid && <p id={`${ids.email}-error`} className="mt-1.5 text-xs text-status-danger">{t('tb.invalid_email', 'Enter a valid email address.')}</p>}
         </Field>}
         <Field>
-          <FieldLabel htmlFor={ids.role} className={labelClass}>{t('tb.col_role', 'Role')}</FieldLabel>
+          <FieldLabel htmlFor={ids.role}>{t('tb.col_role', 'Role')}</FieldLabel>
           <NativeSelect id={ids.role} value={role} onChange={(e) => setRole(e.target.value as TenantRole)}>
             {assignable.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
           </NativeSelect>
@@ -448,7 +448,7 @@ const EditMemberDialog: React.FC<{
       <DialogHeader title={t('tb.edit_access_for', 'Edit access for {name}', { name: member.name || member.email })} onClose={onClose} />
       <form onSubmit={submit} noValidate className="flex flex-col gap-4 overflow-y-auto p-5">
         <Field>
-          <FieldLabel htmlFor={roleId} className={labelClass}>{t('tb.col_role', 'Role')}</FieldLabel>
+          <FieldLabel htmlFor={roleId}>{t('tb.col_role', 'Role')}</FieldLabel>
           <NativeSelect id={roleId} value={role} disabled={!canRole} onChange={(e) => setRole(e.target.value as TenantRole)}>
             {roles.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
           </NativeSelect>
@@ -503,7 +503,7 @@ const DepartmentsDialog: React.FC<{ organizationId: string; departments: Departm
         {hasPermission('department.create') && (
           <form className="flex items-end gap-2" onSubmit={async (e) => { e.preventDefault(); if (name.trim() && (await act(() => orgApi(orgPath(organizationId, '/departments'), { method: 'POST', body: { name: name.trim() } })))) setName(''); }}>
             <Field className="min-w-0 flex-1">
-              <FieldLabel htmlFor={newId} className={labelClass}>{t('tb.new_department', 'New department')}</FieldLabel>
+              <FieldLabel htmlFor={newId}>{t('tb.new_department', 'New department')}</FieldLabel>
               <Input id={newId} maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
             <Button type="submit" disabled={busy || !name.trim()}><Plus className="h-4 w-4" aria-hidden="true" />{t('tb.add', 'Add')}</Button>

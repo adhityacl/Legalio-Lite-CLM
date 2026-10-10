@@ -8,6 +8,7 @@ import { localizeName } from '@legalio/shared/policy';
 
 import { Input } from '@legalio/ui-components/input';
 import { Button } from '@legalio/ui-components/button';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
 export interface PartnerJurisdictionFieldsProps {
   country: string;
   entityType: string;
@@ -55,17 +56,17 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor={countryId} className={labelClass}>{t('form.partner.country', 'Country of incorporation')}</label>
+        <Field>
+          <FieldLabel htmlFor={countryId}>{t('form.partner.country', 'Country of incorporation')}</FieldLabel>
           <AlphabeticalSelect id={countryId} className={`cursor-pointer`} value={country} onChange={(e) => onCountryChange(e.target.value)}>
             <option value="">{t('form.partner.country_unknown', 'Unknown / not stated')}</option>
             {countries.filter((c) => c.code !== 'INTL').map((c) => (
               <option key={c.code} value={c.code}>{localizeName(c.name, language)}</option>
             ))}
           </AlphabeticalSelect>
-        </div>
-        <div>
-          <label htmlFor={entityId} className={labelClass}>{t('form.partner.entity_type', 'Legal form')}</label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={entityId}>{t('form.partner.entity_type', 'Legal form')}</FieldLabel>
           <Input
             id={entityId}
             list={formsListId}
@@ -76,7 +77,7 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
           <AlphabeticalDatalist id={formsListId}>
             {(pack?.legalForms || []).map((form) => <option key={form} value={form} />)}
           </AlphabeticalDatalist>
-        </div>
+        </Field>
       </div>
 
       <fieldset>

@@ -551,7 +551,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary text-accent-foreground border border-primary/30 rounded-lg text-sm font-semibold shadow-2xs"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-accent text-accent-foreground border border-primary/30 rounded-lg text-sm font-semibold shadow-2xs"
                   >
                     <span>{tag}</span>
                     <Button variant="ghost"
@@ -629,7 +629,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                     type="file"
                     accept=".pdf,.doc,.docx"
                     onChange={handleFileChange}
-                    className="w-[220px] text-sm text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-primary file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
+                    className="w-[220px] text-sm text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-accent file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
                   />
                 </div>
               </div>

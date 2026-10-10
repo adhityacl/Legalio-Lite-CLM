@@ -264,8 +264,8 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
       items: report?.succeeded ?? [],
       count: report?.succeeded.length ?? 0,
       rowClass: 'text-accent-foreground ',
-      headerBg: 'bg-primary ',
-      pillBg: 'bg-primary border-primary/30',
+      headerBg: 'bg-accent ',
+      pillBg: 'bg-accent border-primary/30',
       icon: <CheckCircle2 className="w-4 h-4 text-accent-foreground" />,
       pillIcon: <CheckCircle2 className="w-6 h-6 text-accent-foreground mb-1" />,
     },
@@ -384,7 +384,7 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
         <Card className="p-6 flex flex-col justify-between">
           <div className="flex flex-1 flex-col gap-4">
             <div className="flex items-center gap-3">
-              <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-primary border border-primary/30">
+              <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-accent border border-primary/30">
                 <Upload className="w-5 h-5 text-accent-foreground" />
               </div>
               <div>
@@ -411,7 +411,7 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
             )}
 
             {parsedRows && parsedRows.length > 0 && !parseError && (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-primary border border-primary/30 text-xs text-accent-foreground font-bold">
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-accent border border-primary/30 text-xs text-accent-foreground font-bold">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>{parsedRows.length} {t('import.preview_rows', 'baris data ditemukan')}</span>
               </div>
@@ -499,7 +499,7 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
       {report && (
         <Card className="overflow-hidden">
           <div className="p-6 border-b border-border flex items-center gap-3">
-            <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-primary border border-primary/30">
+            <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-accent border border-primary/30">
               <FileSpreadsheet className="w-5 h-5 text-accent-foreground" />
             </div>
             <div>

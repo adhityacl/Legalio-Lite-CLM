@@ -221,8 +221,8 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
           <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1 text-foreground">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-bold text-foreground mb-1.5 text-xs">{t('amendments.tipe_induk_perjanjian', 'Tipe Induk Perjanjian *')}</label>
+              <Field>
+                <FieldLabel>{t('amendments.tipe_induk_perjanjian', 'Tipe Induk Perjanjian *')}</FieldLabel>
                 <AlphabeticalSelect
                   value={parentType}
                   onChange={(e) => {
@@ -235,10 +235,10 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                   <option value="Contract">{t('amendments.kontrak_utama_master_contract', 'Kontrak Utama (Master Contract)')}</option>
                   <option value="IO">{t('import.type_io', 'Insertion Order (IO)')}</option>
                 </AlphabeticalSelect>
-              </div>
+              </Field>
 
-              <div>
-                <label className="block font-bold text-foreground mb-1.5 text-xs">{t('amendments.pilih_perjanjian_induk', 'Pilih Perjanjian Induk *')}</label>
+              <Field>
+                <FieldLabel>{t('amendments.pilih_perjanjian_induk', 'Pilih Perjanjian Induk *')}</FieldLabel>
                 <AlphabeticalSelect
                   value={parentId}
                   onChange={(e) => setParentId(e.target.value)}
@@ -256,7 +256,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                         </option>
                       ))}
                 </AlphabeticalSelect>
-              </div>
+              </Field>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -291,7 +291,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                       onClick={() => handleFieldToggle(f)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer select-none transition-all ${
  selectedFields.includes(f)
- ? 'bg-primary text-accent-foreground border-primary/40 font-bold'
+ ? 'bg-accent text-accent-foreground border-primary/40 font-bold'
  : 'bg-background text-muted-foreground border-border hover:border-border '
  }`}
                     >
@@ -338,7 +338,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                     type="file"
                     accept=".pdf"
                     onChange={handleFileChange}
-                    className="w-[220px] text-xs text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-primary file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
+                    className="w-[220px] text-xs text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
                   />
                 </div>
               </div>

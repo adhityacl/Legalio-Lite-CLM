@@ -441,7 +441,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <Card className="min-w-0 p-4 sm:p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-primary text-accent-foreground border border-primary/30">
+            <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-accent text-accent-foreground border border-primary/30">
               <DollarSign className="w-5 h-5 text-accent-foreground" />
             </div>
             <div>

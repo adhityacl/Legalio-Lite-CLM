@@ -387,10 +387,10 @@ export const IOModal: React.FC<IOModalProps> = ({
           <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-sm flex-1 text-foreground">
             {/* Row 1: Partner & Induk Kontrak */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="IOModal-field-1" className="block font-bold text-foreground mb-1.5 text-sm">
+              <Field>
+                <FieldLabel htmlFor="IOModal-field-1">
                   {t('form.io.partner_media', 'Partner / Media Vendor *')}
-                </label>
+                </FieldLabel>
                 <AlphabeticalSelect id="IOModal-field-1"
                   value={partnerId}
                   onChange={(e) => handlePartnerChange(e.target.value)}
@@ -403,12 +403,12 @@ export const IOModal: React.FC<IOModalProps> = ({
                     </option>
                   ))}
                 </AlphabeticalSelect>
-              </div>
+              </Field>
 
-              <div>
-                <label htmlFor="IOModal-field-2" className="block font-bold text-foreground mb-1.5 text-sm">
+              <Field>
+                <FieldLabel htmlFor="IOModal-field-2">
                   {t('form.io.select_master', 'Pilih Induk Kontrak (Opsional)')}
-                </label>
+                </FieldLabel>
                 <AlphabeticalSelect id="IOModal-field-2"
                   value={contractId}
                   onChange={(e) => handleContractChange(e.target.value)}
@@ -421,7 +421,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                     </option>
                   ))}
                 </AlphabeticalSelect>
-              </div>
+              </Field>
             </div>
 
             {/* Row 2: Nomor IO & Kanal Media */}
@@ -475,10 +475,10 @@ export const IOModal: React.FC<IOModalProps> = ({
 
             {/* Row 4: Pricing Model & Charging Type */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="IOModal-field-6" className="block font-bold text-foreground mb-1.5 text-sm">
+              <Field>
+                <FieldLabel htmlFor="IOModal-field-6">
                   {t('form.io.pricing_model', 'Pricing Model *')}
-                </label>
+                </FieldLabel>
                 <AlphabeticalSelect id="IOModal-field-6"
                   value={pricingModelSelect}
                   onChange={(e) => setPricingModelSelect(e.target.value)}
@@ -503,12 +503,12 @@ export const IOModal: React.FC<IOModalProps> = ({
                     />
                   </div>
                 )}
-              </div>
+              </Field>
 
-              <div>
-                <label htmlFor="IOModal-field-7" className="block font-bold text-foreground mb-1.5 text-sm">
+              <Field>
+                <FieldLabel htmlFor="IOModal-field-7">
                   {t('form.io.charging_type', 'Skema Penagihan (Charging Type) *')}
-                </label>
+                </FieldLabel>
                 <AlphabeticalSelect id="IOModal-field-7"
                   value={chargingType}
                   onChange={(e) => setChargingType(e.target.value as ChargingType)}
@@ -518,7 +518,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                   <option value="Postpaid">{t('io.postpaid_bayar_di_akhir_periode', 'Postpaid (Bayar di Akhir Periode)')}</option>
                   <option value="Milestone-based">{t('io.milestone_based_sesuai_tahapan_target', 'Milestone-based (Sesuai Tahapan Target)')}</option>
                 </AlphabeticalSelect>
-              </div>
+              </Field>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -546,10 +546,10 @@ export const IOModal: React.FC<IOModalProps> = ({
                 />
               </Field>
 
-              <div>
-                <label htmlFor="IOModal-field-10" className="block font-bold text-foreground mb-1.5 text-sm">
+              <Field>
+                <FieldLabel htmlFor="IOModal-field-10">
                   {t('form.io.currency', 'Mata Uang')}
-                </label>
+                </FieldLabel>
                 <AlphabeticalSelect id="IOModal-field-10"
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
@@ -561,7 +561,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                     </option>
                   ))}
                 </AlphabeticalSelect>
-              </div>
+              </Field>
 
               <Field>
                 <FieldLabel htmlFor="IOModal-field-11">
@@ -636,7 +636,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                     type="file"
                     accept=".pdf"
                     onChange={handleFileChange}
-                    className="w-[220px] text-sm text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-primary file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
+                    className="w-[220px] text-sm text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-accent file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
                   />
                 </div>
               </div>

@@ -29,7 +29,6 @@ export interface PlatformUser {
   membershipCount: number;
 }
 
-const labelClass = 'mb-1.5 block text-sm font-medium text-foreground ';
 
 /**
  * Global account directory (System Admin only, PRD §4.5.1). Account
@@ -160,10 +159,10 @@ const AccountDialog: React.FC<{
         setError(null);
         try { await onSubmit({ name: name.trim(), email: email.trim(), platformRole, ...(withPassword && password ? { password } : {}) }); } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
       }}>
-        <Field><FieldLabel htmlFor={ids.name} className={labelClass}>{t('tb.col_name', 'Name')}</FieldLabel><Input id={ids.name} value={name} onChange={(e) => setName(e.target.value)} /></Field>
-        <Field><FieldLabel htmlFor={ids.email} className={labelClass}>{t('tb.col_email', 'Email')}</FieldLabel><Input id={ids.email} type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+        <Field><FieldLabel htmlFor={ids.name}>{t('tb.col_name', 'Name')}</FieldLabel><Input id={ids.name} value={name} onChange={(e) => setName(e.target.value)} /></Field>
+        <Field><FieldLabel htmlFor={ids.email}>{t('tb.col_email', 'Email')}</FieldLabel><Input id={ids.email} type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <Field>
-          <FieldLabel htmlFor={ids.role} className={labelClass}>{t('tb.col_platform_role', 'Platform role')}</FieldLabel>
+          <FieldLabel htmlFor={ids.role}>{t('tb.col_platform_role', 'Platform role')}</FieldLabel>
           <NativeSelect id={ids.role} value={platformRole} onChange={(e) => setRole(e.target.value as 'user' | 'superuser')}>
             <option value="user">{t('tb.platform_user', 'User')}</option>
             <option value="superuser">{t('tb.platform_administrator', 'Platform administrator')}</option>
@@ -171,7 +170,7 @@ const AccountDialog: React.FC<{
         </Field>
         {withPassword && (
           <Field>
-            <FieldLabel htmlFor={ids.password} className={labelClass}>{t('tb.initial_password', 'Initial password (optional)')}</FieldLabel>
+            <FieldLabel htmlFor={ids.password}>{t('tb.initial_password', 'Initial password (optional)')}</FieldLabel>
             <Input id={ids.password} type="password" autoComplete="new-password" value={password} aria-invalid={password.length > 0 && password.length < 8} aria-describedby={`${ids.password}-hint`} onChange={(e) => setPassword(e.target.value)} />
             <FieldHelperText id={`${ids.password}-hint`}>{t('tb.password_hint', 'At least 8 characters.')}</FieldHelperText>
           </Field>
@@ -199,7 +198,7 @@ const PasswordDialog: React.FC<{ user: PlatformUser; onClose: () => void; onSubm
         try { await onSubmit(password); } catch (err) { setError((err as Error).message); }
       }}>
         <Field>
-          <FieldLabel htmlFor={id} className={labelClass}>{t('tb.new_password', 'New password')}</FieldLabel>
+          <FieldLabel htmlFor={id}>{t('tb.new_password', 'New password')}</FieldLabel>
           <Input id={id} type="password" autoComplete="new-password" value={password} aria-invalid={password.length > 0 && password.length < 8} aria-describedby={`${id}-hint`} onChange={(e) => setPassword(e.target.value)} />
           <FieldHelperText id={`${id}-hint`}>{t('tb.password_hint', 'At least 8 characters.')}</FieldHelperText>
         </Field>

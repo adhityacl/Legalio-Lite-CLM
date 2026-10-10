@@ -534,10 +534,10 @@ export const ContractModal: React.FC<ContractModalProps> = ({
             {/* Document Type Selection & Parent Contract Selector */}
             <Card className="p-4 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="contract-field-1" className="block font-bold text-foreground mb-1.5 text-sm">
+                <Field>
+                  <FieldLabel htmlFor="contract-field-1">
                     {t('form.contract.jenis_dokumen', 'Jenis Dokumen Perjanjian *')}
-                  </label>
+                  </FieldLabel>
                   <AlphabeticalSelect id="contract-field-1"
                     value={jenisDokumen}
                     onChange={(e) => setJenisDokumen(e.target.value as JenisDokumenContract)}
@@ -550,12 +550,12 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                       {t('form.contract.agreement_addendum_opt', 'Agreement Addendum (Perubahan / Adendum)')}
                     </option>
                   </AlphabeticalSelect>
-                </div>
+                </Field>
 
-                <div>
-                  <label htmlFor="contract-field-2" className="block font-bold text-foreground mb-1.5 text-sm">
+                <Field>
+                  <FieldLabel htmlFor="contract-field-2">
                     {t('form.contract.partner_vendor', 'Partner *')}
-                  </label>
+                  </FieldLabel>
                   <AlphabeticalSelect id="contract-field-2"
                     value={partnerId}
                     onChange={(e) => {
@@ -570,7 +570,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                       </option>
                     ))}
                   </AlphabeticalSelect>
-                </div>
+                </Field>
               </div>
 
               {/* Referensi Master Agreement Field - Active when Agreement Addendum is chosen */}
@@ -624,7 +624,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                               onClick={() => handleFieldToggle(f)}
                               className={`inline-flex items-center px-4 min-h-10 rounded-md text-sm font-semibold border cursor-pointer select-none transition-colors ${
  isSelected
- ? 'bg-primary text-accent-foreground border-primary/50 font-semibold'
+ ? 'bg-accent text-accent-foreground border-primary/50 font-semibold'
  : 'bg-card text-muted-foreground border-border hover:bg-card '
  }`}
                             >
@@ -732,7 +732,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 {kategoriTags.map((tag) => (
                   <span
                     key={tag}
-                    className="bg-primary text-accent-foreground border border-primary/30 px-3 py-1 rounded-lg text-sm font-semibold flex items-center gap-1.5"
+                    className="bg-accent text-accent-foreground border border-primary/30 px-3 py-1 rounded-lg text-sm font-semibold flex items-center gap-1.5"
                   >
                     <span>{tag}</span>
                     <Button size="sm"
@@ -778,10 +778,10 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 />
               </div>
 
-              <div>
-                <label htmlFor="contract-field-10" className="block font-bold text-foreground mb-1.5 text-sm">
+              <Field>
+                <FieldLabel htmlFor="contract-field-10">
                   {t('form.contract.currency', 'Mata Uang')}
-                </label>
+                </FieldLabel>
                 <AlphabeticalSelect id="contract-field-10"
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
@@ -793,7 +793,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                     </option>
                   ))}
                 </AlphabeticalSelect>
-              </div>
+              </Field>
 
               <Field>
                 <FieldLabel htmlFor="contract-field-11">
@@ -836,10 +836,10 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 />
               </Field>
 
-              <div>
-                <label htmlFor="contract-field-13" className="block font-bold text-foreground mb-1.5 text-sm">
+              <Field>
+                <FieldLabel htmlFor="contract-field-13">
                   {t('form.contract.notice_type', 'Notice Type Required *')}
-                </label>
+                </FieldLabel>
                 <AlphabeticalSelect id="contract-field-13"
                   value={noticeTypeRequired}
                   onChange={(e) => setNoticeTypeRequired(e.target.value as any)}
@@ -850,7 +850,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                   <option value="Both">{t('contracts.keduanya_termination_extension', 'Keduanya (Termination & Extension)')}</option>
                   <option value="None">{t('common.none', 'None')}</option>
                 </AlphabeticalSelect>
-              </div>
+              </Field>
               <div className="flex items-center pt-4 sm:pt-6">
                 <Checkbox checked={autoRenewal} disabled={status === 'Terminated'} onCheckedChange={(details) => handleAutoRenewalChange(details.checked === true)}><CheckboxControl /><CheckboxLabel><span className="font-bold text-foreground text-sm">
                     {t('form.contract.auto_renewal', 'Auto Renewal')}
@@ -926,7 +926,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                     type="file"
                     accept=".pdf,.doc,.docx"
                     onChange={handleFileChange}
-                    className="w-[220px] max-w-full text-sm text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-primary file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
+                    className="w-[220px] max-w-full text-sm text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-accent file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
                   />
                 </div>
               </div>

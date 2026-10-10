@@ -926,7 +926,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               {/* BAGIAN 1: Informasi Dasar */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-border">
-                  <span className="w-6 h-6 rounded-full bg-primary text-accent-foreground border border-primary/30 font-black text-xs flex items-center justify-center shrink-0">
+                  <span className="w-6 h-6 rounded-full bg-accent text-accent-foreground border border-primary/30 font-black text-xs flex items-center justify-center shrink-0">
                     1
                   </span>
                   <Heading as="h3" size="sm" weight="semibold">{t('eval.section1')}</Heading>
@@ -987,7 +987,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-border">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-primary text-accent-foreground border border-primary/30 font-black text-xs flex items-center justify-center shrink-0">
+                    <span className="w-6 h-6 rounded-full bg-accent text-accent-foreground border border-primary/30 font-black text-xs flex items-center justify-center shrink-0">
                       2
                     </span>
                     <Heading as="h3" size="sm" weight="semibold">{t('eval.section2')}</Heading>
@@ -1009,7 +1009,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                         key={opt.value}
                         className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
  formData.obligation_target === opt.value
- ? 'bg-primary border-primary text-foreground font-bold shadow-2xs'
+ ? 'bg-accent border-primary text-foreground font-bold shadow-2xs'
  : 'bg-background border-border text-foreground hover:bg-muted '
  }`}
                       >
@@ -1029,7 +1029,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                           />
                           <span className="text-xs">{opt.label}</span>
                         </div>
-                        <span className="text-xs font-bold text-accent-foreground bg-primary border border-primary/30 px-2 py-0.5 rounded-md">
+                        <span className="text-xs font-bold text-accent-foreground bg-accent border border-primary/30 px-2 py-0.5 rounded-md">
                           {opt.points}
                         </span>
                       </label>
@@ -1052,7 +1052,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                         key={opt.value}
                         className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
  formData.incident_frequency === opt.value
- ? 'bg-primary border-primary text-foreground font-bold shadow-2xs'
+ ? 'bg-accent border-primary text-foreground font-bold shadow-2xs'
  : 'bg-background border-border text-foreground hover:bg-muted '
  }`}
                       >
@@ -1072,7 +1072,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                           />
                           <span className="text-xs">{opt.label}</span>
                         </div>
-                        <span className="text-xs font-bold text-accent-foreground bg-primary border border-primary/30 px-2 py-0.5 rounded-md">
+                        <span className="text-xs font-bold text-accent-foreground bg-accent border border-primary/30 px-2 py-0.5 rounded-md">
                           {opt.points}
                         </span>
                       </label>
@@ -1095,7 +1095,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                         key={opt.value}
                         className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
  formData.communication === opt.value
- ? 'bg-primary border-primary text-foreground font-bold shadow-2xs'
+ ? 'bg-accent border-primary text-foreground font-bold shadow-2xs'
  : 'bg-background border-border text-foreground hover:bg-muted '
  }`}
                       >
@@ -1115,7 +1115,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                           />
                           <span className="text-xs">{opt.label}</span>
                         </div>
-                        <span className="text-xs font-bold text-accent-foreground bg-primary border border-primary/30 px-2 py-0.5 rounded-md">
+                        <span className="text-xs font-bold text-accent-foreground bg-accent border border-primary/30 px-2 py-0.5 rounded-md">
                           {opt.points}
                         </span>
                       </label>
@@ -1138,7 +1138,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                         key={opt.value}
                         className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
  formData.pricing === opt.value
- ? 'bg-primary border-primary text-foreground font-bold shadow-2xs'
+ ? 'bg-accent border-primary text-foreground font-bold shadow-2xs'
  : 'bg-background border-border text-foreground hover:bg-muted '
  }`}
                       >
@@ -1158,7 +1158,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                           />
                           <span className="text-xs">{opt.label}</span>
                         </div>
-                        <span className="text-xs font-bold text-accent-foreground bg-primary border border-primary/30 px-2 py-0.5 rounded-md">
+                        <span className="text-xs font-bold text-accent-foreground bg-accent border border-primary/30 px-2 py-0.5 rounded-md">
                           {opt.points}
                         </span>
                       </label>
@@ -1170,7 +1170,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               {/* BAGIAN 3: Evaluasi Akhir & Catatan */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-border">
-                  <span className="w-6 h-6 rounded-full bg-primary text-accent-foreground border border-primary/30 font-black text-xs flex items-center justify-center shrink-0">
+                  <span className="w-6 h-6 rounded-full bg-accent text-accent-foreground border border-primary/30 font-black text-xs flex items-center justify-center shrink-0">
                     3
                   </span>
                   <Heading as="h3" size="sm" weight="semibold">
@@ -1179,7 +1179,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                 </div>
 
                 {/* Live Score Calculation Display */}
-                <div className="p-4 bg-primary border border-primary/30 rounded-2xl space-y-3">
+                <div className="p-4 bg-accent border border-primary/30 rounded-2xl space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Calculator className="w-4 h-4 text-accent-foreground" />
@@ -1233,7 +1233,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                         value: 'Recommended',
                         label: t('eval.status_rec'),
                         desc: t('eval.opt_rec_desc'),
-                        activeClass: 'bg-primary border-primary text-foreground ',
+                        activeClass: 'bg-accent border-primary text-foreground ',
                       },
                       {
                         value: 'Recommended with notes',
@@ -1361,7 +1361,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                 </div>
               </Card>
 
-              <div className="p-3 bg-primary rounded-xl border border-primary/30 flex items-center justify-between">
+              <div className="p-3 bg-accent rounded-xl border border-primary/30 flex items-center justify-between">
                 <div>
                   <span className="text-xs text-accent-foreground font-bold uppercase block">
                     {t('eval.col_calculated_score')}
@@ -1414,7 +1414,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                 </span>
                 <div className="font-bold">
                   {viewingDetailItem.final_evaluation === 'Recommended' && (
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-primary text-accent-foreground border border-primary/30 inline-flex items-center gap-1.5">
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-accent text-accent-foreground border border-primary/30 inline-flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5 text-accent-foreground" />
                       <span>{t('eval.status_rec')}</span>
                     </span>

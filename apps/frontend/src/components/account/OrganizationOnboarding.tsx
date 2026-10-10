@@ -100,16 +100,16 @@ export function OrganizationOnboarding() {
                 ))
               ) : (
                 <>
-                  <div><label htmlFor="onboarding-country" className="mb-2 block text-sm font-medium">{t('onboarding.country', 'Country')}</label>
+                  <Field><FieldLabel htmlFor="onboarding-country">{t('onboarding.country', 'Country')}</FieldLabel>
                     <AlphabeticalSelect id="onboarding-country" value={region.countryCode} onChange={(e) => setRegion({ ...region, countryCode: e.target.value })} required>
                       <option value="">{t('onboarding.select_country', 'Select a country')}</option>
                       {listCountryPacks().map((country) => <option key={country.code} value={country.code}>{localizeName(country.name, language)}</option>)}
-                    </AlphabeticalSelect></div>
-                  <div><label htmlFor="onboarding-industry" className="mb-2 block text-sm font-medium">{t('onboarding.industry', 'Industry')}</label>
+                    </AlphabeticalSelect></Field>
+                  <Field><FieldLabel htmlFor="onboarding-industry">{t('onboarding.industry', 'Industry')}</FieldLabel>
                     <AlphabeticalSelect id="onboarding-industry" value={region.industry} onChange={(e) => setRegion({ ...region, industry: e.target.value })} required>
                       <option value="">{t('onboarding.select_industry', 'Select an industry')}</option>
                       {listIndustryPacks().map((industry) => <option key={industry.key} value={industry.key}>{localize(industry.name, language)}</option>)}
-                    </AlphabeticalSelect></div>
+                    </AlphabeticalSelect></Field>
                   <Field><FieldLabel htmlFor="onboarding-language">{t('onboarding.language', 'Language')}</FieldLabel>
                     <NativeSelect id="onboarding-language" value={region.language} onChange={(e) => setRegion({ ...region, language: e.target.value as typeof language })} required>
                       {LANGUAGE_OPTIONS.map((option) => <option key={option.code} value={option.code}>{option.nativeName}</option>)}

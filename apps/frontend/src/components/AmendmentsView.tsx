@@ -108,7 +108,7 @@ export const AmendmentsView: React.FC<AmendmentsViewProps> = ({
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border">
                 <div className="flex items-center gap-2">
-                  <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent size-8 bg-primary text-accent-foreground">
+                  <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent size-8 bg-accent text-accent-foreground">
                     <GitCommit className="w-4 h-4" />
                   </div>
                   <div>
