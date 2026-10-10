@@ -5,19 +5,22 @@
   "name": "@legalio/ui-components",
   "exports": {
     "./utils": "./src/utils.ts",
-    "./*": "./src/*.tsx"
+    "./*": "./src/*.tsx",
+    "./styles/*.css": "./src/styles/*.css"
   },
   "scripts": {
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "clsx": "^2.1.1",
-    "tailwind-merge": "^3.6.0",
-    "class-variance-authority": "^0.7.1",
-    "radix-ui": "^1.6.7",
+    "@ark-ui/react": "^5.39.3",
+    "@moduix/react-tailwind": "^3.0.0",
     "@radix-ui/react-separator": "^1.1.15",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "lucide-react": "^0.546.0",
-    "react-day-picker": "^10.0.1"
+    "radix-ui": "^1.6.7",
+    "react-day-picker": "^10.0.1",
+    "tailwind-merge": "^3.6.0"
   },
   "peerDependencies": {
     "react": "^19.0.0",

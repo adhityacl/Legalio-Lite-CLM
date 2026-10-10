@@ -248,12 +248,12 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
       <th
         scope="col"
         aria-sort={isSorted ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300 text-left select-none align-middle"
+        className="p-4 text-xs font-bold text-ink text-left select-none align-middle"
        data-numeric={field === 'value'}>
         <button
           type="button"
           onClick={() => handleSort(field)}
-          className="flex items-center gap-1.5 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded py-0.5"
+          className="flex items-center gap-1.5 hover:text-ink dark:hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded-sm py-0.5"
           title={t('contracts.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}
         >
           <span>{label}</span>
@@ -264,7 +264,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               <ArrowDown className="w-3.5 h-3.5 text-accent-text shrink-0" />
             )
           ) : (
-            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <ArrowUpDown className="w-3.5 h-3.5 text-ink-soft shrink-0" />
           )}
         </button>
       </th>
@@ -339,11 +339,11 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
   };
 
   return (
-    <div className="space-y-4 animate-in fade-in-50 duration-200">
+    <div className="ds-page animate-in fade-in-50 duration-200">
       {/* Header Bar */}
-      <div className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="ds-page-bar">
         <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+          <h2 className="ds-page-heading">
             <span>{t('contracts.title')}</span>
           </h2>
         </div>
@@ -353,7 +353,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
             <button
               onClick={handleExportCSV}
               disabled={filteredContracts.length === 0}
-              className="ui-button ui-button-lg cursor-pointer shadow-sm border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-50 text-slate-600 font-bold flex items-center transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
+              className="ui-button ui-button-lg cursor-pointer flex items-center disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none ds-button ds-button-lg ds-button-outline"
               title={t('contracts.export_csv', 'Ekspor CSV')}
             >
               <Download className="w-4 h-4" />
@@ -364,7 +364,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
           {canCreateContract(user) && (
             <button
               onClick={onAddContract}
-              className="ui-button ui-button-lg cursor-pointer shadow-sm bg-accent-strong hover:bg-accent-strong-hover text-white font-bold flex items-center transition-all"
+              className="ui-button ui-button-lg cursor-pointer flex items-center ds-button ds-button-lg ds-button-default"
             >
               <Plus className="w-4 h-4 text-white" />
               <span>{t('ui.add_contract')}</span>
@@ -375,11 +375,11 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
       {/* Search and Filters */}
       {/* Search & Filters Bar - Justified Responsive Grid/Flex */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-4 sm:p-5 mb-6">
+      <div className="ds-panel p-4 sm:p-5 mb-6">
         <div className="contracts-mobile-filters flex flex-wrap items-center gap-2.5 w-full">
           {/* Search Input */}
           <div className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <Search className="w-4 h-4 text-ink-soft absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder={t('contracts.search_placeholder')}
@@ -389,7 +389,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="h-9 w-full pl-9 pr-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-accent font-medium transition-colors"
+              className="ds-input w-full pl-9 pr-3"
             />
           </div>
           {/* Jenis Dokumen Filter */}
@@ -397,7 +397,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
             aria-label={t('ui.filter_type')}
               value={selectedJenisDokumen}
             onChange={(e) => setSelectedJenisDokumen(e.target.value)}
-            className="min-h-11 sm:min-h-9 h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[130px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
           >
             <option value="ALL">{t('contracts.all_types')}</option>
             <option value="Master Agreement">{t('contracts.master_agreement', 'Master Agreement')}</option>
@@ -408,7 +408,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
             aria-label={t('ui.filter_category')}
               value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="min-h-11 sm:min-h-9 h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[130px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
           >
             <option value="ALL">{t('contracts.all_categories')}</option>
             {allCategories.map((cat) => (
@@ -422,7 +422,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
             aria-label={t('ui.filter_status')}
               value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="min-h-11 sm:min-h-9 h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[130px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
           >
             <option value="ALL">{t('contracts.all_status')}</option>
             <option value="Active">{t('contracts.active')}</option>
@@ -433,7 +433,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
           {/* Column Toggle */}
           <TableViewMenu title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
-            <div className="px-3.5 py-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 border-b border-slate-100 dark:border-slate-800">
+            <div className="px-3.5 py-1.5 text-xs font-bold text-ink-soft uppercase tracking-wider mb-1 border-b border-hairline">
               {t('io.toggle_columns', 'Toggle Kolom')}
             </div>
             {Object.keys(visibleColumns).map((col) => {
@@ -450,12 +450,12 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               else if (col === 'file') label = t('contracts.col_document', 'File Dokumen');
 
               return (
-                <label key={col} className="flex items-center gap-2.5 px-3.5 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300 select-none">
+                <label key={col} className="flex items-center gap-2.5 px-3.5 py-1.5 hover:bg-surface dark:hover:bg-surface-2/50 cursor-pointer text-xs font-medium text-ink select-none">
                   <input
                     type="checkbox"
                     checked={visibleColumns[col]}
                     onChange={() => toggleColumnVisibility(col)}
-                    className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                    className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                   />
                   <span className="capitalize">{label.replace(/_/g, ' ')}</span>
                 </label>
@@ -466,13 +466,13 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
     </div>
 
       {/* Contracts Data Table */}
-      <div className="ds-table-surface bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+      <div className="ds-table-surface bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_type'), value: selectedJenisDokumen, active: selectedJenisDokumen !== 'ALL' }, { label: t('ui.filter_category'), value: selectedCategory, active: selectedCategory !== 'ALL' }, { label: t('ui.filter_status'), value: selectedStatus, active: selectedStatus !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedJenisDokumen('ALL'); setSelectedCategory('ALL'); setSelectedStatus('ALL'); }} />
-        <p className="mobile-table-hint px-4 py-2 text-xs text-slate-600 dark:text-slate-300 md:hidden">{t('ui.scroll_table')}</p>
-        <div className="data-table-scroll overflow-x-auto bg-white dark:bg-slate-900" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
-          <table className="ds-table app-data-table w-full text-left border-collapse text-xs bg-white dark:bg-slate-900">
-            <thead className="bg-slate-50 dark:bg-slate-800/50">
-              <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 h-12">
+        <p className="mobile-table-hint px-4 py-2 text-xs text-ink-soft md:hidden">{t('ui.scroll_table')}</p>
+        <div className="data-table-scroll overflow-x-auto bg-surface" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
+          <table className="ds-table app-data-table w-full text-left border-collapse text-xs bg-surface">
+            <thead className="bg-surface dark:bg-surface-2/50">
+              <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
                 <th scope="col" className="pl-6 pr-2 py-4 w-12 text-left align-middle">
                   <div className="flex items-center justify-start">
                     <input
@@ -480,36 +480,36 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                       onChange={handleSelectAll}
                       checked={selectedRows.length > 0 && selectedRows.length === currentContracts.length}
                       aria-label={t('contracts.select_all', 'Pilih semua kontrak')}
-                      className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                      className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                     />
                   </div>
                 </th>
                 {visibleColumns.jenis_dokumen && renderSortHeader(t('contracts.col_doc_type', 'Jenis'), 'doc_type')}
                 {visibleColumns.nomor_kontrak && renderSortHeader(t('contracts.col_no', 'Agreement No.'), 'no')}
                 {visibleColumns.judul_kontrak && (
-                  <th scope="col" className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300 text-left align-middle">{t('contracts.col_title', 'Judul')}</th>
+                  <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('contracts.col_title', 'Judul')}</th>
                 )}
                 {visibleColumns.partner && renderSortHeader(t('contracts.col_partner', 'Partner'), 'partner')}
                 {visibleColumns.kategori && (
-                  <th scope="col" className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300 text-left align-middle">{t('contracts.col_category', 'Kategori')}</th>
+                  <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('contracts.col_category', 'Kategori')}</th>
                 )}
                 {visibleColumns.nilai && renderSortHeader(t('contracts.col_value', 'Nilai'), 'value')}
                 {visibleColumns.tanggal_mulai && (
-                  <th scope="col" className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300 text-left align-middle">{t('contracts.col_start_date', 'Tanggal Mulai')}</th>
+                  <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('contracts.col_start_date', 'Tanggal Mulai')}</th>
                 )}
                 {visibleColumns.tanggal_selesai && (
-                  <th scope="col" className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300 text-left align-middle">{t('contracts.col_end_date', 'Tanggal Selesai')}</th>
+                  <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('contracts.col_end_date', 'Tanggal Selesai')}</th>
                 )}
                 {visibleColumns.status && renderSortHeader(t('contracts.col_status', 'Status'), 'status')}
                 {visibleColumns.file && (
-                  <th scope="col" className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300 text-left align-middle">{t('contracts.col_document', 'File')}</th>
+                  <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('contracts.col_document', 'File')}</th>
                 )}
-                <th data-actions="true" scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                <th data-actions="true" scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
                   <div className="flex items-center justify-end">{t('contracts.col_action', 'Aksi')}</div>
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-hairline dark:divide-slate-800">
+            <tbody className="divide-y divide-hairline">
               {currentContracts.length === 0 ? (
                 <TableEmptyState colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} />
               ) : (
@@ -521,7 +521,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                   const ctrIOs = ios.filter((i) => i.contract_id === ctr.contract_id);
 
                   return (
-                    <tr key={ctr.contract_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={ctr.contract_id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
                       <td className="pl-6 pr-2 py-4 text-left align-middle">
                         <div className="flex items-center justify-start">
                           <input
@@ -529,14 +529,14 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                             checked={selectedRows.includes(ctr.contract_id)}
                             onChange={() => handleSelectRow(ctr.contract_id)}
                             aria-label={t('contracts.pilih_kontrak', 'Pilih kontrak {nomor_kontrak}', { nomor_kontrak: ctr.nomor_kontrak })}
-                            className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                            className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                           />
                         </div>
                       </td>
 
                       {/* Jenis Dokumen */}
                       {visibleColumns.jenis_dokumen && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left">
+                        <td className="py-4 px-4 text-xs font-normal text-ink text-left">
                           {isAddendum ? (
                             <span className={`text-xs font-normal px-3 py-0.5 rounded-full border shadow-2xs whitespace-nowrap ${getStatusBadgeClass('Addendum')}`}>
                               {t('contracts.agreement_addendum', 'Agreement Addendum')}
@@ -550,25 +550,25 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                       )}
                       {/* Nomor Kontrak */}
                       {visibleColumns.nomor_kontrak && (
-                        <td className="py-4 px-4 text-xs font-semibold text-slate-900 dark:text-slate-100 text-left">
+                        <td className="py-4 px-4 text-xs font-semibold text-ink text-left">
                           {ctr.nomor_kontrak}
                         </td>
                       )}
                       {/* Judul Kontrak */}
                       {visibleColumns.judul_kontrak && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left max-w-[200px]">
+                        <td className="py-4 px-4 text-xs font-normal text-ink text-left max-w-[200px]">
                           <span className="line-clamp-2" title={ctr.judul_kontrak}>{ctr.judul_kontrak}</span>
                         </td>
                       )}
 
                       {/* 2. Partner */}
                       {visibleColumns.partner && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left">{ctr.partner_nama}</td>
+                        <td className="py-4 px-4 text-xs font-normal text-ink text-left">{ctr.partner_nama}</td>
                       )}
 
                       {/* Kategori */}
                       {visibleColumns.kategori && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left">
+                        <td className="py-4 px-4 text-xs font-normal text-ink text-left">
                           <div className="flex flex-wrap gap-1">
                             {(ctr.kategori_kerjasama || []).map((cat) => (
                               <span
@@ -583,27 +583,27 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                       )}
                       {/* Nilai */}
                       {visibleColumns.nilai && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 text-right whitespace-nowrap tabular-nums">
+                        <td className="py-4 px-4 text-xs font-normal text-ink text-right whitespace-nowrap tabular-nums">
                           {formatMoney(ctr.nilai_kontrak, ctr.currency)}
                         </td>
                       )}
 
                       {/* Tanggal Mulai */}
                       {visibleColumns.tanggal_mulai && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left whitespace-nowrap">
+                        <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
                           {formatBusinessDate(ctr.tanggal_mulai)}
                         </td>
                       )}
                       {/* Tanggal Selesai */}
                       {visibleColumns.tanggal_selesai && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left whitespace-nowrap">
+                        <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
                           {formatBusinessDate(ctr.tanggal_berakhir)}
                         </td>
                       )}
 
                       {/* Status */}
                       {visibleColumns.status && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left whitespace-nowrap">
+                        <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
                           <span
                             className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center justify-center whitespace-nowrap shadow-2xs ${getStatusBadge(
                               ctr.status
@@ -615,7 +615,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                       )}
                       {/* File */}
                       {visibleColumns.file && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left">
+                        <td className="py-4 px-4 text-xs font-normal text-ink text-left">
                           {ctr.link_file_kontrak ? (
                             <a
                               href={ctr.link_file_kontrak}
@@ -626,7 +626,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                               <FileDown className="w-3.5 h-3.5" /> {t('contracts.pdf', 'PDF')}
                             </a>
                           ) : (
-                            <span className="text-slate-300">-</span>
+                            <span className="text-on-solid">-</span>
                           )}
                         </td>
                       )}
@@ -692,22 +692,22 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
       {/* Contract Timeline Detail Modal */}
       {detailContract && (
-        <ModalFrame onClose={() => setDetailContract(null)} className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full max-h-[92dvh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
+        <ModalFrame onClose={() => setDetailContract(null)} className="max-w-4xl w-full max-h-[92dvh] flex flex-col overflow-hidden transition-colors">
 
             {/* Header */}
-            <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between shrink-0 bg-white dark:bg-slate-900">
+            <div className="ds-section-header">
               <div>
-                <ModalTitle className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <ModalTitle className="ds-modal-title flex items-center gap-2">
                   <FileText className="w-5 h-5 text-accent-text" />
                   <span>{detailContract.nomor_kontrak}</span>
                 </ModalTitle>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{detailContract.judul_kontrak}</p>
+                <p className="text-xs text-ink-soft mt-0.5">{detailContract.judul_kontrak}</p>
               </div>
 
               <button aria-label={t('common.close', 'Tutup')}
                 type="button"
                 onClick={() => setDetailContract(null)}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink size-8 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -715,57 +715,57 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
             <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1">
               <ContractEndingSummary contract={detailContract} />
-              <div className="grid grid-cols-2 gap-3 p-3.5 bg-[#F7F8FA] dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="ds-panel grid grid-cols-2 gap-3 p-3.5 bg-canvas ds-grid">
                 <div>
-                  <span className="text-slate-500 dark:text-slate-400 block">{t('contracts.jenis_dokumen', 'Jenis Dokumen:')}</span>
-                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                  <span className="text-ink-soft block">{t('contracts.jenis_dokumen', 'Jenis Dokumen:')}</span>
+                  <span className="font-bold text-ink">
                     {detailContract.jenis_dokumen || t('contracts.master_agreement', 'Master Agreement')}
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-500 dark:text-slate-400 block">{t('contracts.partner', 'Partner:')}</span>
-                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                  <span className="text-ink-soft block">{t('contracts.partner', 'Partner:')}</span>
+                  <span className="font-bold text-ink">
                     {detailContract.partner_nama || partnersById.get(detailContract.partner_id)?.nama_partner || '-'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-500 dark:text-slate-400 block">{t('hierarchy.commercial_value', 'Nilai Komersial:')}</span>
-                  <span className="font-bold text-accent-text ">
+                  <span className="text-ink-soft block">{t('hierarchy.commercial_value', 'Nilai Komersial:')}</span>
+                  <span className="font-bold text-accent-text">
                     {formatMoney(detailContract.nilai_kontrak, detailContract.currency)}
                     {(detailContract.currency || 'USD') !== 'USD' && (
-                      <span className="text-slate-500 dark:text-slate-400 text-xs font-mono ml-1.5 font-normal">
+                      <span className="text-ink-soft text-xs font-mono ml-1.5 font-normal">
                         (≈ {formatMoney(detailContract.nilai_kontrak_usd, 'USD')})
                       </span>
                     )}
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-500 dark:text-slate-400 block">{t('contracts.kewajiban_notice_period', 'Kewajiban Notice Period:')}</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  <span className="text-ink-soft block">{t('contracts.kewajiban_notice_period', 'Kewajiban Notice Period:')}</span>
+                  <span className="font-semibold text-ink">
                     {detailContract.notice_period_hari || 0} {t('contracts.hari', 'Hari (')}{detailContract.notice_type_required || '-'})
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-500 dark:text-slate-400 block">{t('contracts.status_perpanjangan_auto', 'Status Perpanjangan Auto:')}</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  <span className="text-ink-soft block">{t('contracts.status_perpanjangan_auto', 'Status Perpanjangan Auto:')}</span>
+                  <span className="font-semibold text-ink">
                     {detailContract.auto_renewal ? t('contracts.ya_auto_renewal', 'Ya (Auto Renewal)') : t('contracts.tidak_manual_notice', 'Tidak (Manual Notice)')}
                   </span>
                 </div>
                 {detailContract.jenis_dokumen === 'Agreement Addendum' && detailContract.parent_contract_nomor && (
                   <div>
-                    <span className="text-slate-500 dark:text-slate-400 block">{t('contracts.master_agreement_induk', 'Master Agreement Induk:')}</span>
-                    <span className="font-bold text-indigo-700 dark:text-indigo-400 font-mono">
+                    <span className="text-ink-soft block">{t('contracts.master_agreement_induk', 'Master Agreement Induk:')}</span>
+                    <span className="font-bold text-status-special font-mono">
                       {detailContract.parent_contract_nomor}
                     </span>
                   </div>
                 )}
                 {detailContract.internal_notes && (
-                  <div className="col-span-1 md:col-span-2 bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                    <span className="text-slate-600 dark:text-slate-300 font-bold text-xs block mb-1.5 flex items-center gap-1.5">
+                  <div className="ds-panel col-span-1 md:col-span-2 p-3.5">
+                    <span className="text-ink-soft font-bold text-xs block mb-1.5 flex items-center gap-1.5">
                       <FileText className="w-3.5 h-3.5 text-accent-text" />
                       {t('contracts.rangkuman_internal_notes_kontrak', 'Rangkuman / Internal Notes Kontrak:')}
                     </span>
-                    <p className="text-slate-800 dark:text-slate-200 text-xs leading-relaxed whitespace-pre-line font-normal">
+                    <p className="text-ink text-xs leading-relaxed whitespace-pre-line font-normal">
                       {detailContract.internal_notes}
                     </p>
                   </div>
@@ -775,14 +775,14 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               {/* Child Agreement Addendums */}
               {detailContract.jenis_dokumen !== 'Agreement Addendum' && (
                 <div>
-                  <h4 className="font-bold text-purple-700 dark:text-purple-400 mb-2.5 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                    <Link2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <h4 className="font-bold text-status-special mb-2.5 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <Link2 className="w-4 h-4 text-status-special" />
                     <span>{t('contract.addendum_list', 'Daftar Agreement Addendum Turunan')}</span>
                   </h4>
                   {contracts.filter(
                     (c) => c.jenis_dokumen === 'Agreement Addendum' && c.parent_contract_id === detailContract.contract_id
                   ).length === 0 ? (
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 dark:text-slate-500 text-center text-xs">
+                    <div className="ds-panel p-3 text-ink-soft text-center text-xs">
                       {t('contracts.belum_ada_agreement_addendum_turunan_untuk', 'Belum ada Agreement Addendum turunan untuk kontrak induk ini.')}
                     </div>
                   ) : (
@@ -794,19 +794,19 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                         .map((add) => (
                           <div
                             key={add.contract_id}
-                            className="p-3 bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/50 rounded-xl flex items-center justify-between gap-3 hover:border-purple-300 dark:hover:border-purple-700/80 transition-colors"
+                            className="p-3 bg-status-special-soft/70 dark:bg-status-special-soft/30 border border-status-special-border dark:border-status-special-border/50 rounded-xl flex items-center justify-between gap-3 hover:border-status-special-border dark:hover:border-status-special-border/80 transition-colors"
                           >
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-purple-950 dark:text-purple-200 block font-mono text-xs tracking-tight">{add.nomor_kontrak}</span>
+                                <span className="font-bold text-status-special block font-mono text-xs tracking-tight">{add.nomor_kontrak}</span>
                                 {add.status && (
-                                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/50">
+                                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-status-special-soft dark:bg-status-special-soft/50 text-status-special border border-status-special-border dark:border-status-special-border/50">
                                     {add.status}
                                   </span>
                                 )}
                               </div>
-                              <span className="text-slate-700 dark:text-slate-300 text-xs block mt-0.5 truncate">{add.judul_kontrak}</span>
-                              <span className="text-slate-500 dark:text-slate-400 text-xs block mt-0.5">
+                              <span className="text-ink text-xs block mt-0.5 truncate">{add.judul_kontrak}</span>
+                              <span className="text-ink-soft text-xs block mt-0.5">
                                 {t('contracts.validity', 'Validity:')}{' '}
                                 {formatBusinessDate(add.tanggal_mulai)}{' '}
                                 -{' '}
@@ -818,7 +818,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                                 href={add.link_file_kontrak}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700/60 hover:bg-purple-100 dark:hover:bg-purple-800/60 font-semibold text-xs transition-colors shrink-0 shadow-2xs"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface dark:bg-status-special-soft/40 text-status-special border border-status-special-border dark:border-status-special-border/60 hover:bg-status-special-soft dark:hover:bg-status-special-soft/60 font-semibold text-xs transition-colors shrink-0 shadow-2xs"
                               >
                                 <FileDown className="w-3.5 h-3.5" />
                                 <span>{t('contracts.pdf', 'PDF')}</span>
@@ -833,19 +833,19 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
               {/* Addendum Timeline (Track-Change) */}
               <div>
-                <h4 className="font-bold text-indigo-700 dark:text-indigo-400 mb-2.5 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <GitCommit className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <h4 className="font-bold text-status-special mb-2.5 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  <GitCommit className="w-4 h-4 text-status-special" />
                   <span>{t('contracts.histori_perubahan_amendment_track_change', 'Histori Perubahan (Amendment Track-Change)')}</span>
                 </h4>
 
                 {contracts.filter(
                   (a) => a.jenis_dokumen === 'Agreement Addendum' && a.parent_contract_id === detailContract.contract_id
                 ).length === 0 ? (
-                  <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 dark:text-slate-500 text-center">
+                  <div className="ds-panel p-4 text-ink-soft text-center">
                     {t('contracts.belum_ada_addendum_amendment_tercatat_untuk', 'Belum ada addendum/amendment tercatat untuk kontrak ini.')}
                   </div>
                 ) : (
-                  <div className="space-y-3 relative border-l-2 border-indigo-200 dark:border-indigo-800/60 ml-3 pl-4 pt-1">
+                  <div className="space-y-3 relative border-l-2 border-status-special-border dark:border-status-special-border/60 ml-3 pl-4 pt-1">
                     {contracts
                       .filter((a) => a.jenis_dokumen === 'Agreement Addendum' && a.parent_contract_id === detailContract.contract_id)
                       .map((add) => {
@@ -856,25 +856,25 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                           : [];
 
                         return (
-                          <div key={add.contract_id} className="relative bg-slate-50 dark:bg-slate-800/70 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                            <span className="absolute -left-[23px] top-4 w-3 h-3 bg-indigo-600 dark:bg-indigo-500 rounded-full border-2 border-white dark:border-slate-900" />
+                          <div key={add.contract_id} className="ds-panel relative p-3.5">
+                            <span className="absolute -left-[23px] top-4 w-3 h-3 bg-status-special rounded-full border-2 border-white" />
                             <div className="flex items-center justify-between mb-1.5">
-                              <span className="font-bold text-indigo-900 dark:text-indigo-300 text-xs font-mono">{add.nomor_kontrak}</span>
-                              <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                              <span className="font-bold text-status-special text-xs font-mono">{add.nomor_kontrak}</span>
+                              <span className="text-xs text-ink-soft font-mono">
                                 {formatBusinessDate(add.tanggal_mulai)}
                               </span>
                             </div>
                             {fieldsChanged.length > 0 && (
                               <div className="flex flex-wrap gap-1 mb-2">
                                 {fieldsChanged.map((f) => (
-                                  <span key={f} className="bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 text-xs font-semibold px-2 py-0.5 rounded-md">
+                                  <span key={f} className="bg-status-warning-soft dark:bg-status-warning-soft/60 text-status-warning border border-status-warning-border dark:border-status-warning-border/50 text-xs font-semibold px-2 py-0.5 rounded-md">
                                     {f}
                                   </span>
                                 ))}
                               </div>
                             )}
                             {add.ringkasan_perubahan && (
-                              <p className="text-slate-700 dark:text-slate-200 text-xs leading-relaxed bg-white dark:bg-slate-900/90 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700/80 font-mono text-xs whitespace-pre-wrap">
+                              <p className="text-ink text-xs leading-relaxed bg-surface dark:bg-surface/90 p-2.5 rounded-lg border border-hairline dark:border-hairline/80 font-mono text-xs whitespace-pre-wrap">
                                 {add.ringkasan_perubahan}
                               </p>
                             )}
@@ -887,13 +887,13 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
               {/* Linked IOs */}
               <div>
-                <h4 className="font-bold text-emerald-700 dark:text-emerald-400 mb-2.5 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <h4 className="font-bold text-status-success mb-2.5 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-4 h-4 text-status-success" />
                   <span>{t('contracts.insertion_orders_io_turunan', 'Insertion Orders (IO) Turunan')}</span>
                 </h4>
 
                 {ios.filter((i) => i.contract_id === detailContract.contract_id).length === 0 ? (
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 dark:text-slate-500 text-center text-xs">
+                  <div className="ds-panel p-3 text-ink-soft text-center text-xs">
                     {t('contracts.tidak_ada_io_turunan_di_bawah', 'Tidak ada IO turunan di bawah kontrak ini.')}
                   </div>
                 ) : (
@@ -901,14 +901,14 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                     {ios
                       .filter((i) => i.contract_id === detailContract.contract_id)
                       .map((io) => (
-                        <div key={io.io_id} className="p-3 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between gap-3">
+                        <div key={io.io_id} className="ds-panel p-3 flex items-center justify-between gap-3">
                           <div>
-                            <div className="font-bold text-slate-900 dark:text-slate-100 text-xs font-mono">{io.nomor_io}</div>
-                            <div className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">{io.judul_io}</div>
+                            <div className="font-bold text-ink text-xs font-mono">{io.nomor_io}</div>
+                            <div className="text-xs text-ink-soft mt-0.5">{io.judul_io}</div>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="font-bold text-emerald-700 dark:text-emerald-400 text-xs">{formatMoney(Number(io.nilai_io) || 0, io.currency || io.mata_uang)}</div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{io.pricing_model || 'Fixed'} • {io.charging_type || '-'}</div>
+                            <div className="font-bold text-status-success text-xs">{formatMoney(Number(io.nilai_io) || 0, io.currency || io.mata_uang)}</div>
+                            <div className="text-xs text-ink-soft mt-0.5">{io.pricing_model || 'Fixed'} • {io.charging_type || '-'}</div>
                           </div>
                         </div>
                       ))}
@@ -917,10 +917,10 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               </div>
             </div>
 
-            <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex justify-end shrink-0">
+            <div className="p-4 sm:p-5 bg-surface dark:bg-surface/90 border-t border-hairline flex justify-end shrink-0">
               <button
                 onClick={() => setDetailContract(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-medium text-xs rounded-xl cursor-pointer transition-colors"
+                className="inline-flex items-center px-4 min-h-8 bg-ink hover:bg-ink dark:bg-surface-2 dark:hover:bg-surface-2 text-white font-semibold text-xs rounded-md cursor-pointer transition-colors"
               >
                 {t('io.detail_close', 'Tutup Detail')}
               </button>

@@ -76,19 +76,19 @@ export const NewDocumentDialog: React.FC<{
   const visible = templates.filter((tpl) => tpl.name.toLowerCase().includes(query.trim().toLowerCase()));
   const dateLocale = language === 'ID' ? 'id-ID' : language === 'ZH' ? 'zh-CN' : 'en-US';
   const cardClass =
-    'flex h-40 flex-col items-center justify-center gap-2 rounded-xl p-4 text-center text-sm font-semibold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong';
+    'ds-choice';
 
   return (
     <ModalFrame onClose={onClose} className="max-w-3xl">
       <div className="flex items-center justify-between gap-4 px-6 pt-5 pb-3">
-        <ModalTitle className="text-xl font-bold text-slate-900 dark:text-white">
+        <ModalTitle className="ds-modal-title flex items-center gap-2">
           {t('documents.new_dialog.title', 'Buat dokumen')}
         </ModalTitle>
         <button
           type="button"
           onClick={onClose}
           aria-label={t('common.close', 'Tutup')}
-          className="inline-flex size-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+          className="inline-flex size-10 items-center justify-center rounded-md text-ink-soft hover:bg-surface-2 dark:hover:bg-surface-2 cursor-pointer"
         >
           <X className="h-5 w-5" aria-hidden />
         </button>
@@ -96,26 +96,26 @@ export const NewDocumentDialog: React.FC<{
 
       <div className="overflow-y-auto px-6 pb-6 space-y-5">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" aria-hidden />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('documents.new_dialog.search', 'Cari template...')}
             aria-label={t('documents.new_dialog.search', 'Cari template...')}
-            className="h-11 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-10 pr-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            className="ds-input w-full pl-10 pr-3"
           />
         </div>
 
         <section aria-labelledby="new-doc-scratch">
-          <h3 id="new-doc-scratch" className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+          <h3 id="new-doc-scratch" className="mb-2 text-sm font-semibold text-ink">
             {t('documents.new_dialog.scratch', 'Mulai dari awal')}
           </h3>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <div className="ds-choice-grid">
             <button
               type="button"
               onClick={() => onSelect(null)}
-              className={`${cardClass} border-2 border-dashed border-slate-300 dark:border-slate-600 text-accent-text hover:border-accent hover:bg-accent-soft/40`}
+              className={`${cardClass} border-dashed text-accent-text hover:border-accent hover:bg-accent-soft/40`}
             >
               <Plus className="h-5 w-5" aria-hidden />
               {t('documents.new_dialog.blank', 'Dokumen kosong')}
@@ -124,23 +124,23 @@ export const NewDocumentDialog: React.FC<{
         </section>
 
         <section aria-labelledby="new-doc-templates">
-          <h3 id="new-doc-templates" className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+          <h3 id="new-doc-templates" className="mb-2 text-sm font-semibold text-ink">
             {t('documents.new_dialog.templates', 'Template')}
           </h3>
           {visible.length === 0 ? (
-            <p className="text-sm text-slate-500">{t('documents.new_dialog.no_match', 'Tidak ada template yang cocok.')}</p>
+            <p className="text-sm text-ink-soft">{t('documents.new_dialog.no_match', 'Tidak ada template yang cocok.')}</p>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="ds-choice-grid">
               {visible.map((tpl) => (
                 <button
                   key={tpl.id}
                   type="button"
                   onClick={() => onSelect(tpl.load())}
-                  className={`${cardClass} border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-100 hover:border-accent hover:bg-white dark:hover:bg-slate-800`}
+                  className={`${cardClass} border border-hairline bg-surface dark:bg-surface-2/60 text-ink hover:border-accent hover:bg-surface dark:hover:bg-surface-2`}
                 >
                   <FileText className="h-7 w-7 text-accent-text" aria-hidden />
                   <span className="line-clamp-2">{tpl.name}</span>
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <span className="text-xs font-medium text-ink-soft">
                     {tpl.builtIn
                       ? t('documents.new_dialog.built_in', 'Template bawaan')
                       : tpl.updatedAt
@@ -152,10 +152,10 @@ export const NewDocumentDialog: React.FC<{
             </div>
           )}
           {status === 'loading' && (
-            <p role="status" className="mt-3 text-xs text-slate-500">{t('common.loading', 'Loading…')}</p>
+            <p role="status" className="mt-3 text-xs text-ink-soft">{t('common.loading', 'Loading…')}</p>
           )}
           {status === 'error' && (
-            <p role="alert" className="mt-3 text-xs text-rose-600">
+            <p role="alert" className="ds-alert ds-status-danger border">
               {t('documents.new_dialog.load_failed', 'Template organisasi gagal dimuat. Template bawaan tetap tersedia.')}
             </p>
           )}

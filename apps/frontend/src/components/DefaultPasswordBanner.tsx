@@ -95,7 +95,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
   return (
     <div
       role={passwordActive ? 'alert' : 'status'}
-      className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-400/60 bg-amber-50 p-3 text-amber-900 dark:border-amber-500/50 dark:bg-amber-950/40 dark:text-amber-200"
+      className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-status-warning-border/60 bg-status-warning-soft p-3 text-status-warning dark:border-status-warning-border/50 dark:bg-status-warning-soft/40"
     >
       <ShieldAlert className="h-5 w-5 shrink-0" aria-hidden="true" />
       {passwordActive ? (
@@ -107,7 +107,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
         </p>
       ) : (
         <details className="min-w-28 flex-1 text-sm">
-          <summary className="min-h-11 cursor-pointer content-center font-semibold">
+          <summary className="min-h-10 cursor-pointer content-center font-semibold">
             {t('google_setup.summary', 'Penyiapan Google')}
           </summary>
           <p className="mt-2 leading-relaxed">{t(
@@ -125,23 +125,23 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
               </Button>
             </Dialog.Trigger>
             <Dialog.Portal>
-              <Dialog.Overlay className="fixed inset-0 z-1000 bg-slate-900/60" />
-              <Dialog.Content className="fixed left-1/2 top-1/2 z-1001 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+              <Dialog.Overlay className="fixed inset-0 z-1000 bg-ink/60" />
+              <Dialog.Content className="fixed left-1/2 top-1/2 z-1001 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-surface p-6 shadow-xl">
                 <div className="mb-4 flex items-start justify-between gap-4">
-                  <Dialog.Title className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                  <Dialog.Title className="ds-modal-title flex items-center gap-2">
                     {t('security.change_password', 'Change password')}
                   </Dialog.Title>
                   <Dialog.Close asChild>
                     <button
                       type="button"
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-md text-ink-soft hover:bg-surface-2 dark:hover:bg-surface-2"
                       aria-label={t('common.close', 'Close')}
                     >
                       <X className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </Dialog.Close>
                 </div>
-                <Dialog.Description className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+                <Dialog.Description className="mb-4 text-sm text-ink-soft">
                   {t('security.change_password_desc', 'Other sessions will be signed out after the change.')}
                 </Dialog.Description>
                 <form onSubmit={submit} noValidate aria-busy={state.kind === 'saving'} className="space-y-3">
@@ -165,7 +165,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
                     </div>
                   ))}
                   {hasError && (
-                    <p id={errorId} role="alert" className="text-sm text-rose-700 dark:text-rose-300">
+                    <p id={errorId} role="alert" className="ds-alert ds-status-danger border">
                       {state.message}
                     </p>
                   )}

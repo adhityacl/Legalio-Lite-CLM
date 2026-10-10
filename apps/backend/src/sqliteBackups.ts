@@ -150,6 +150,45 @@ export class SQLiteBackups {
     validate(directory);
     return path.join(directory, 'backup.tar.gz');
   }
+  async importArchive(archive: string) {
+    const id = crypto.randomUUID();
+    const directory = this.directory(id);
+    const payload = path.join(directory, 'payload');
+    await mkdir(payload, { recursive: true, mode: 0o700 });
+    fs.chmodSync(this.root, 0o700);
+    try {
+      // Validate every member before extraction: no traversal, links, devices or unexpected roots.
+      const options = { timeout: 30_000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, LC_ALL: 'C' } };
+      const { stdout: names } = await run('tar', ['-tzf', archive], options);
+      const { stdout: details } = await run('tar', ['-tvzf', archive], options);
+      const members = names.trimEnd().split('\n');
+      let expanded = 0;
+      const rows = details.trimEnd().split('\n');
+      if (rows.length !== members.length) throw invalid('Invalid archive members.');
+      for (let i = 0; i < members.length; i++) {
+        const name = members[i];
+        const parts = name.replace(/\/$/, '').split('/');
+        if (parts.some((part) => !part || part === '.' || part === '..' || part.includes('\\')) ||
+            !(name === 'auth.db' || name === 'manifest.json' || name === 'uploads/' || name.startsWith('uploads/')) ||
+            !['-', 'd'].includes(rows[i][0])) throw invalid('Backup contains an unsafe archive member.');
+        const size = Number(rows[i].split(/\s+/)[2]);
+        if (!Number.isSafeInteger(size) || size < 0) throw invalid('Invalid archive size.');
+        expanded += size;
+        if (expanded > 2 * 1024 ** 3) throw invalid('Expanded backup exceeds 2 GB.');
+      }
+      await run('tar', ['-xzf', archive, '-C', payload, '--no-same-owner', '--no-same-permissions'], options);
+      if (!fs.statSync(path.join(payload, 'uploads')).isDirectory()) throw invalid('Backup uploads directory is missing.');
+      validate(directory, schema(this.db));
+      fs.copyFileSync(archive, path.join(directory, 'backup.tar.gz'));
+      fs.chmodSync(path.join(directory, 'backup.tar.gz'), 0o600);
+      writeJson(path.join(directory, 'entry.json'), { id, createdAt: new Date().toISOString(), status: 'success', sizeBytes: fs.statSync(archive).size, purpose: 'manual' });
+      return id;
+    } catch (error) {
+      fs.rmSync(directory, { recursive: true, force: true });
+      if (error instanceof ApiError) throw error;
+      throw invalid('Invalid or unreadable backup archive.');
+    }
+  }
   async stageRestore(id: string, confirmation: string) {
     if (confirmation !== 'RESTORE') throw invalid('Type RESTORE to confirm.');
     this.archive(id);

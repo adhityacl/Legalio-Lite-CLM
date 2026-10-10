@@ -853,9 +853,9 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-200">
       {/* Header */}
-      <div className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="ds-page-bar">
         <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+          <h2 className="ds-page-heading">
             <span>{activeSectionLabel}</span>
           </h2>
         </div>
@@ -863,12 +863,12 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
       {/* Global Alerts for Settings */}
       {successMsg && (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-2xl text-xs font-medium flex items-center justify-between animate-in fade-in-50">
+        <div className="p-3 bg-status-success/10 border border-status-success-border/20 text-status-success rounded-2xl text-xs font-medium flex items-center justify-between animate-in fade-in-50">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>{successMsg}</span>
           </div>
-          <button onClick={() => setSuccessMsg(null)} className="p-1 hover:opacity-75">
+          <button onClick={() => setSuccessMsg(null)} className="inline-flex items-center justify-center size-8 hover:opacity-75">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -880,7 +880,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
-          <button onClick={() => setErrorMsg(null)} className="p-1 hover:opacity-75">
+          <button onClick={() => setErrorMsg(null)} className="inline-flex items-center justify-center size-8 hover:opacity-75">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -893,33 +893,33 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
           {activeSection === 'google' && (
             <div className="space-y-6">
               {/* Google OAuth Account Card */}
-              <Card className="border-none shadow-[0_4px_16px_rgba(0,0,0,0.04)] rounded-[20px] overflow-hidden">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-bold flex items-center justify-between">
+              <Card className="overflow-hidden">
+                <CardHeader className="">
+                  <CardTitle className="flex items-center justify-between">
                     <span>{t('settings.google_auth_title', 'Autentikasi Akun Google Workspace')}</span>
                     {isTokenActive ? (
                       <Badge className="text-xs bg-accent-soft text-accent-text border-transparent hover:bg-accent-soft">
                         {t('settings.oauth_active', 'OAuth Aktif')}
                       </Badge>
                     ) : (
-                      <Badge className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300 hover:bg-slate-200">
+                      <Badge className="text-xs bg-surface-2 text-ink hover:bg-surface-2">
                         {t('settings.oauth_inactive', 'Belum Terhubung')}
                       </Badge>
                     )}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4 text-xs">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-[#F5F6F6] dark:bg-slate-800/50 rounded-2xl border border-[#EBEBEB] dark:border-slate-700">
+                <CardContent className="space-y-4">
+                  <div className="ds-panel flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-accent/10 text-accent-text flex items-center justify-center font-bold text-sm shrink-0">
                         {googleUser?.name?.charAt(0) || 'G'}
                       </div>
                       <div>
-                        <p className="font-semibold text-ink dark:text-slate-100">
+                        <p className="font-semibold text-ink">
                           {googleUser ? googleUser.name : t('settings.no_google_connected', 'Belum Ada Akun Google Terhubung')}
                         </p>
                         {googleUser?.email && (
-                          <p className="text-ink-soft dark:text-slate-400 font-mono text-xs">
+                          <p className="text-ink-soft font-mono text-xs">
                             {googleUser.email}
                           </p>
                         )}
@@ -934,16 +934,16 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                             size="lg"
                             onClick={handleGoogleRefresh}
                             disabled={connectingAuth}
-                            className="font-bold bg-white dark:bg-slate-800 border border-[#EBEBEB] dark:border-slate-700 text-ink dark:text-slate-100 hover:bg-[#F5F6F6] dark:hover:bg-slate-700 cursor-pointer gap-1.5"
+                            className="cursor-pointer"
                           >
                             <RefreshCw className={cn('w-3.5 h-3.5', connectingAuth && 'animate-spin')} />
                             <span>{t('settings.refresh_session', 'Refresh Sesi')}</span>
                           </Button>
                           <Button
-                            variant="outline"
+                            variant="destructive-outline"
                             size="lg"
                             onClick={handleGoogleDisconnect}
-                            className="font-bold bg-white dark:bg-slate-800 border border-red-200 dark:border-rose-800 text-red-500 hover:bg-red-50 dark:hover:bg-rose-950/40 cursor-pointer gap-1.5"
+                            className="cursor-pointer"
                           >
                             <LogOut className="w-3.5 h-3.5" />
                             <span>{t('settings.disconnect', 'Putuskan')}</span>
@@ -954,7 +954,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           size="lg"
                           onClick={handleGoogleConnect}
                           disabled={connectingAuth}
-                          className="font-bold bg-accent-strong text-white hover:bg-accent-strong-hover cursor-pointer gap-1.5"
+                          className="cursor-pointer"
                         >
                           <Zap className="w-3.5 h-3.5" />
                           <span>{t('settings.connect_google_btn', 'Hubungkan Akun Google')}</span>
@@ -969,23 +969,23 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
               {/* Master Google Drive Storage Card (File Attachment Storage) */}
               {isAdmin && (
-                <Card id="card-master-drive-org-database" className="border-none shadow-[0_4px_16px_rgba(0,0,0,0.04)] rounded-[20px] overflow-hidden">
-                  <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <Card id="card-master-drive-org-database" className="overflow-hidden">
+                  <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="space-y-1">
-                      <CardTitle className="text-lg font-bold flex items-center gap-2">
+                      <CardTitle className="flex items-center gap-2">
                         <Folder className="w-5 h-5 text-accent-text" />
                         <span>{t('settings.penyimpanan_file_dokumen_google_drive', 'Penyimpanan File Dokumen (Google Drive)')}</span>
                       </CardTitle>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
                       {driveFolderId ? (
-                        <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold py-1 px-2.5 flex items-center gap-1.5 shadow-2xs">
+                        <Badge variant="success" className="bg-status-success-soft text-status-success dark:bg-status-success-soft/40 border border-status-success-border text-xs font-semibold py-1 px-2.5 flex items-center gap-1.5 shadow-2xs">
                           <span className="size-2 rounded-full bg-accent animate-pulse" />
                           <span>{t('settings.folder_drive_terhubung', 'Folder Drive Terhubung')}</span>
                         </Badge>
                       ) : (
-                        <Badge className="bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-semibold py-1 px-2.5 flex items-center gap-1.5 shadow-2xs">
-                          <AlertCircle className="size-3 text-amber-500" />
+                        <Badge variant="warning" className="bg-status-warning-soft text-status-warning dark:bg-status-warning-soft/40 border border-status-warning-border text-xs font-semibold py-1 px-2.5 flex items-center gap-1.5 shadow-2xs">
+                          <AlertCircle className="size-3 text-status-warning" />
                           <span>{t('settings.not_configured', 'Belum Dikonfigurasi')}</span>
                         </Badge>
                       )}
@@ -996,7 +996,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           variant="outline"
                           size="sm"
                           onClick={() => setShowEditConfirmModal(true)}
-                          className="h-7 px-3 rounded-full text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer gap-1.5 shrink-0 shadow-2xs"
+                          className="text-xs cursor-pointer shrink-0"
                         >
                           <Lock className="w-3 h-3 text-accent-text" />
                           <span>{t('settings.edit_config_btn', 'Ubah Konfigurasi')}</span>
@@ -1004,29 +1004,29 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-5 text-xs">
+                  <CardContent className="space-y-5">
                     <div className="space-y-3">
                       <div
                         id="master-storage-root-card"
-                        className="p-4 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200/90 dark:border-slate-700/80 shadow-2xs hover:border-emerald-300 dark:hover:border-emerald-700/60 transition-all space-y-3"
+                        className="ds-panel p-4 transition-all space-y-3"
                       >
                         {/* Master Storage Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-700/60">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-hairline dark:border-hairline/60">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs bg-accent-strong">
+                            <div className="size-10 rounded-md flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs bg-accent-strong">
                               <Folder className="w-4 h-4 text-white" />
                             </div>
                             <div className="min-w-0 space-y-0.5">
                               <div className="flex items-center gap-2">
-                                <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">
+                                <h4 className="font-bold text-sm text-ink truncate">
                                   {t('settings.root_folder_title', 'Root Folder')}
                                 </h4>
-                                <Badge className="text-xs font-semibold py-0.5 px-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                                <Badge className="text-xs font-semibold py-0.5 px-2 bg-surface-2 border border-hairline text-ink-soft">
                                   {t('settings.root_drive', 'Root Drive')}
                                 </Badge>
                               </div>
-                              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                                {t('settings.id', 'ID:')} <code className="font-mono text-xs text-slate-600 dark:text-slate-300">{driveFolderId || '-'}</code>
+                              <p className="text-xs text-ink-soft truncate">
+                                {t('settings.id', 'ID:')} <code className="font-mono text-xs text-ink-soft">{driveFolderId || '-'}</code>
                               </p>
                             </div>
                           </div>
@@ -1034,13 +1034,13 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
                         {/* Read-Only or Edit Mode */}
                         {!isEditUnlocked ? (
-                          <div className="p-3 bg-slate-50/80 dark:bg-slate-900/60 rounded-xl border border-slate-200/70 dark:border-slate-800 flex items-center justify-between gap-2.5">
+                          <div className="ds-panel p-3 flex items-center justify-between gap-2.5">
                             <div className="min-w-0 flex-1 space-y-1">
-                              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-ink flex items-center gap-1.5">
                                 <Folder className="w-3.5 h-3.5 text-accent-text shrink-0" />
                                 <span className="truncate">{t('settings.master_root_id_label', 'Master Google Drive Storage Root Folder ID')}</span>
                               </span>
-                              <p className="font-mono text-xs text-slate-600 dark:text-slate-300 truncate select-all">
+                              <p className="font-mono text-xs text-ink-soft truncate select-all">
                                 {driveFolderId || '-'}
                               </p>
                             </div>
@@ -1050,11 +1050,11 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                                   type="button"
                                   onClick={() => handleCopyLink(`https://drive.google.com/drive/folders/${driveFolderId}`, 'master-root')}
                                   title={t('common.copy_link', 'Salin Link')}
-                                  className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                  className="inline-flex items-center justify-center size-8 rounded-md text-ink-soft hover:text-ink dark:hover:text-ink hover:bg-surface-2/70 dark:hover:bg-surface-2 transition-colors cursor-pointer"
                                 >
                                   {copiedKey === 'master-root' ? <Check className="w-3.5 h-3.5 text-accent-text" /> : <Copy className="w-3.5 h-3.5" />}
                                 </button>
-                                <a href={`https://drive.google.com/drive/folders/${driveFolderId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors inline-flex items-center">
+                                <a href={`https://drive.google.com/drive/folders/${driveFolderId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg text-ink-soft hover:text-ink dark:hover:text-ink hover:bg-surface-2/70 dark:hover:bg-surface-2 transition-colors inline-flex items-center">
                                   <ExternalLink className="w-3.5 h-3.5" />
                                 </a>
                               </div>
@@ -1063,15 +1063,15 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                         ) : (
                           /* Edit Mode View */
                           <div className="space-y-4 pt-1 animate-in fade-in duration-200">
-                            <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium">
+                            <div className="ds-panel inline-flex items-center p-1 text-xs font-medium">
                               <button
                                 type="button"
                                 onClick={() => setSelectedOptionTab('picker')}
                                 className={cn(
-                                  'px-3.5 py-1.5 rounded-lg transition-all cursor-pointer font-medium text-xs flex items-center gap-2',
+                                  'px-3 min-h-8 rounded-md transition-all cursor-pointer font-semibold text-xs flex items-center gap-2',
                                   selectedOptionTab === 'picker'
-                                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
-                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                    ? 'bg-surface text-ink dark:text-white shadow-xs font-semibold'
+                                    : 'text-ink-soft hover:text-ink dark:hover:text-white'
                                 )}
                               >
                                 <Folder className="w-3.5 h-3.5 text-accent-text" />
@@ -1081,10 +1081,10 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                                 type="button"
                                 onClick={() => setSelectedOptionTab('manual')}
                                 className={cn(
-                                  'px-3.5 py-1.5 rounded-lg transition-all cursor-pointer font-medium text-xs flex items-center gap-2',
+                                  'px-3 min-h-8 rounded-md transition-all cursor-pointer font-semibold text-xs flex items-center gap-2',
                                   selectedOptionTab === 'manual'
-                                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
-                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                    ? 'bg-surface text-ink dark:text-white shadow-xs font-semibold'
+                                    : 'text-ink-soft hover:text-ink dark:hover:text-white'
                                 )}
                               >
                                 <Folder className="w-3.5 h-3.5 text-accent-text" />
@@ -1094,8 +1094,8 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
                             {selectedOptionTab === 'picker' && (
                               <form onSubmit={handleSaveOption2Picker} className="space-y-4">
-                                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
-                                  <label htmlFor="settingsview-field-1" className="block font-semibold text-slate-800 dark:text-slate-100">
+                                <div className="ds-panel p-3.5 space-y-2">
+                                  <label htmlFor="settingsview-field-1" className="block font-semibold text-ink">
                                     {t('settings.folder_google_drive_id', 'Folder Google Drive ID')}
                                   </label>
                                   <div className="flex items-center gap-2">
@@ -1104,7 +1104,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                                       readOnly
                                       value={driveFolderId || t('settings.no_folder_selected', 'Belum dipilih')}
                                       placeholder={t('settings.id_folder_drive', 'ID Folder Drive...')}
-                                      className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-[13px] text-slate-800 dark:text-slate-100 focus:outline-none font-mono"
+                                      className="ds-input flex-1"
                                     />
                                     <Button
                                       type="button"
@@ -1112,7 +1112,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                                       size="lg"
                                       onClick={() => handleOpenDrivePicker('folder')}
                                       disabled={!isTokenActive}
-                                      className="h-8 px-3.5 rounded-full text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer shrink-0 shadow-2xs"
+                                      className="text-xs cursor-pointer shrink-0"
                                     >
                                       {t('settings.pick_folder_btn', 'Pilih Folder')}
                                     </Button>
@@ -1128,7 +1128,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                                       setDriveFolderId(config.driveFolderId || '');
                                       setIsEditUnlocked(false);
                                     }}
-                                    className="h-9 px-4 rounded-full text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 hover:bg-slate-50 cursor-pointer"
+                                    className="text-xs cursor-pointer"
                                   >
                                     {t('settings.cancel_edit_btn', 'Batal')}
                                   </Button>
@@ -1136,7 +1136,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                                     type="submit"
                                     size="lg"
                                     disabled={saving || !driveFolderId}
-                                    className="font-bold bg-accent-strong text-white hover:bg-accent-strong-hover cursor-pointer gap-1.5 shadow-2xs"
+                                    className="cursor-pointer"
                                   >
                                     <Save className="w-3.5 h-3.5" />
                                     <span>{saving ? t('settings.saving_and_provisioning', 'Menyimpan...') : t('settings.save_config_btn', 'Simpan Konfigurasi')}</span>
@@ -1148,7 +1148,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                             {selectedOptionTab === 'manual' && (
                               <form onSubmit={handleSaveOption3Manual} className="space-y-4">
                                 <div>
-                                  <label htmlFor="settingsview-field-2" className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
+                                  <label htmlFor="settingsview-field-2" className="block text-ink-soft font-semibold mb-1">
                                     {t('settings.master_root_id_label', 'Folder ID Google Drive')}
                                   </label>
                                   <input id="settingsview-field-2"
@@ -1156,7 +1156,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                                     value={driveFolderId}
                                     onChange={(e) => setDriveFolderId(e.target.value)}
                                     placeholder={t('settings.contoh_1xifivgwddtyezl7ioqvd9d_nas7xcfyp', 'Contoh: 1xiFIvgWdDtYEzL7IoqVD9d-NaS7XcfYp')}
-                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-[13px] text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all font-mono"
+                                    className="ds-input w-full"
                                     required
                                   />
                                 </div>
@@ -1170,7 +1170,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                                       setDriveFolderId(config.driveFolderId || '');
                                       setIsEditUnlocked(false);
                                     }}
-                                    className="h-9 px-4 rounded-full text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 hover:bg-slate-50 cursor-pointer"
+                                    className="text-xs cursor-pointer"
                                   >
                                     {t('settings.cancel_edit_btn', 'Batal')}
                                   </Button>
@@ -1178,7 +1178,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                                     type="submit"
                                     size="lg"
                                     disabled={saving}
-                                    className="font-bold bg-accent-strong text-white hover:bg-accent-strong-hover cursor-pointer gap-1.5 shadow-2xs"
+                                    className="cursor-pointer"
                                   >
                                     <Save className="w-3.5 h-3.5" />
                                     <span>{saving ? t('settings.saving_and_provisioning', 'Menyimpan...') : t('settings.save_config_btn', 'Simpan Konfigurasi')}</span>
@@ -1200,12 +1200,12 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
               {/* Google Cloud Credentials */}
               {isSuperuser && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <div className="ds-panel flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    <h4 className="text-sm font-bold text-ink">
                       {t('google_setup.settings_title', 'Kredensial Google Cloud')}
                     </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    <p className="text-xs text-ink-soft mt-0.5">
                       {t(
                         'google_setup.settings_desc',
                         'Unggah file JSON Service Account dan OAuth Client dari Google Cloud Console. Menggantikan variabel GOOGLE_* di .env.',
@@ -1228,32 +1228,32 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
           {activeSection === 'ai' && (
             <div className="space-y-6">
               {/* CARD 1: GOOGLE GEMINI API KEY */}
-              <Card className="border-none shadow-[0_4px_16px_rgba(0,0,0,0.04)] rounded-[20px] overflow-hidden">
-                <CardHeader className="pb-3 flex flex-row items-start justify-between gap-4">
+              <Card className="overflow-hidden">
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <div className="space-y-1">
-                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2">
                       <Key className="w-5 h-5 text-accent-text" />
                       <span>{t('settings.gemini_api_key_title', 'Google Gemini API Key')}</span>
                     </CardTitle>
                   </div>
                   <div>
                     {geminiApiKey ? (
-                      <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold py-1 px-2.5 flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <Badge variant="success" className="bg-status-success-soft text-status-success dark:bg-status-success-soft/40 border border-status-success-border text-xs font-semibold py-1 px-2.5 flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-status-success animate-pulse" />
                         <span>{t('settings.api_key_active', 'API Key Aktif')}</span>
                       </Badge>
                     ) : (
-                      <Badge className="bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-semibold py-1 px-2.5 flex items-center gap-1.5">
-                        <AlertCircle className="size-3 text-amber-500" />
+                      <Badge variant="warning" className="bg-status-warning-soft text-status-warning dark:bg-status-warning-soft/40 border border-status-warning-border text-xs font-semibold py-1 px-2.5 flex items-center gap-1.5">
+                        <AlertCircle className="size-3 text-status-warning" />
                         <span>{t('settings.api_key_empty', 'Belum Diatur')}</span>
                       </Badge>
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4 text-xs">
+                <CardContent className="space-y-4">
                   <form onSubmit={handleSaveApiKey} className="space-y-3">
                     <div className="space-y-1.5">
-                      <label htmlFor="settingsview-field-3" className="font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                      <label htmlFor="settingsview-field-3" className="font-semibold text-ink flex items-center justify-between">
                         <span>{t('settings.gemini_api_key_label', 'Gemini API Key (AI Studio)')}</span>
                         <a
                           href="https://aistudio.google.com/app/apikey"
@@ -1271,12 +1271,12 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           value={geminiApiKey}
                           onChange={(e) => setGeminiApiKey(e.target.value)}
                           placeholder={t('settings.gemini_api_key_ph', 'Masukkan Google Gemini API Key (misal: AIzaSy...)')}
-                          className="w-full bg-[#F5F6F6] dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl pl-4 pr-10 py-2.5 text-xs text-ink dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-accent transition-colors"
+                          className="ds-input w-full pl-4 pr-10"
                         />
                         <button
                           type="button"
                           onClick={() => setShowApiKey(!showApiKey)}
-                          className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                          className="absolute right-3 text-ink-soft hover:text-ink-soft dark:hover:text-ink cursor-pointer"
                           title={showApiKey ? t('settings.sembunyikan', 'Sembunyikan') : t('settings.tampilkan', 'Tampilkan')}
                         >
                           {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -1290,14 +1290,14 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                         className={cn(
                           'p-3 rounded-xl border text-xs flex items-center gap-2 animate-in fade-in',
                           apiTestResult.success
-                            ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
-                            : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+                            ? 'bg-status-success-soft dark:bg-status-success-soft/30 border-status-success-border text-status-success '
+                            : 'bg-status-danger-soft dark:bg-status-danger-soft/30 border-status-danger-border text-status-danger '
                         )}
                       >
                         {apiTestResult.success ? (
-                          <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                          <CheckCircle2 className="size-4 text-status-success shrink-0" />
                         ) : (
-                          <AlertCircle className="size-4 text-rose-600 shrink-0" />
+                          <AlertCircle className="size-4 text-status-danger shrink-0" />
                         )}
                         <span>{apiTestResult.message}</span>
                       </div>
@@ -1307,7 +1307,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       <Button size="lg"
                         type="submit"
                         disabled={savingApiKey || !isAdmin}
-                        className="font-bold bg-accent-strong text-white hover:bg-accent-strong-hover cursor-pointer gap-1.5"
+                        className="cursor-pointer"
                       >
                         <Save className="w-3.5 h-3.5" />
                         <span>{savingApiKey ? t('eval.btn_saving', 'Menyimpan...') : t('settings.save_api_key_btn', 'Simpan API Key')}</span>
@@ -1318,9 +1318,9 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                         variant="outline"
                         onClick={handleTestApiKey}
                         disabled={testingApiKey || !geminiApiKey.trim()}
-                        className="font-bold border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer gap-1.5"
+                        className="cursor-pointer"
                       >
-                        <AiIcon className={cn('w-3.5 h-3.5 text-amber-500', testingApiKey && 'animate-spin')} />
+                        <AiIcon className={cn('w-3.5 h-3.5 text-status-warning', testingApiKey && 'animate-spin')} />
                         <span>{testingApiKey ? t('admin.test_connection_testing', 'Menguji Koneksi...') : t('settings.test_api_key_btn', 'Uji Koneksi API')}</span>
                       </Button>
                     </div>
@@ -1329,14 +1329,14 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
               </Card>
 
               {/* CARD 2: MODEL AI SELECTION */}
-              <Card className="border-none shadow-[0_4px_16px_rgba(0,0,0,0.04)] rounded-[20px] overflow-hidden">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <Card className="overflow-hidden">
+                <CardHeader className="">
+                  <CardTitle className="flex items-center gap-2">
                     <AiIcon className="w-5 h-5 text-accent-text" />
                     <span>{t('settings.ai_config_title', 'Pilihan Model Google Gemini')}</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4 text-xs">
+                <CardContent className="space-y-4">
                   <div className="space-y-3">
                     {[
                       {
@@ -1374,20 +1374,20 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                         key={model.id}
                         onClick={() => handleSaveAiModel(model.id)}
                         className={cn(
-                          'p-3.5 rounded-2xl border transition-all cursor-pointer flex items-start justify-between gap-3',
+                          'ds-panel p-3.5 transition-all cursor-pointer flex items-start justify-between gap-3',
                           aiModel === model.id
-                            ? 'border-accent bg-accent/5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border-none'
-                            : 'border-[#EBEBEB] dark:border-slate-700 bg-card hover:bg-[#F5F6F6] dark:bg-slate-800/50'
+                            ? 'bg-accent/5'
+                            : 'bg-card'
                         )}
                       >
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-ink dark:text-slate-100 text-xs">{model.title}</span>
-                            <Badge className="text-xs border border-[#EBEBEB] dark:border-slate-700 text-ink-soft dark:text-slate-400 bg-transparent hover:bg-[#F5F6F6] dark:bg-slate-800/50">
+                            <span className="font-semibold text-ink text-xs">{model.title}</span>
+                            <Badge className="text-xs border border-hairline text-ink-soft bg-transparent hover:bg-surface-2 dark:bg-surface-2/50">
                               {model.badge}
                             </Badge>
                           </div>
-                          <p className="text-ink-soft dark:text-slate-400 text-xs leading-relaxed">
+                          <p className="text-ink-soft text-xs leading-relaxed">
                             {model.desc}
                           </p>
                         </div>
@@ -1416,36 +1416,36 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
           {activeSection === 'notifications' && (
             <div className="space-y-6">
               {/* CARD 1: SMTP RELAY CONFIGURATION */}
-              <Card className="border-none shadow-[0_4px_16px_rgba(0,0,0,0.04)] rounded-[20px] overflow-hidden">
-                <CardHeader className="pb-3 flex flex-row items-start justify-between gap-4">
+              <Card className="overflow-hidden">
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <div className="space-y-1">
-                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2">
                       <Mail className="w-5 h-5 text-accent-text" />
                       <span>{t('settings.smtp_card_title', 'Konfigurasi SMTP Relay Server (Email Nyata)')}</span>
                     </CardTitle>
                   </div>
                   <div>
                     {smtpEnabled ? (
-                      <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold py-1 px-2.5 flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <Badge variant="success" className="bg-status-success-soft text-status-success dark:bg-status-success-soft/40 border border-status-success-border text-xs font-semibold py-1 px-2.5 flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-status-success animate-pulse" />
                         <span>{t('settings.smtp_aktif', 'SMTP Aktif')}</span>
                       </Badge>
                     ) : (
-                      <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700 text-xs font-semibold py-1 px-2.5">
+                      <Badge className="bg-surface-2 text-ink-soft border border-hairline text-xs font-semibold py-1 px-2.5">
                         <span>{t('status.nonaktif', 'Nonaktif')}</span>
                       </Badge>
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4 text-xs">
+                <CardContent className="space-y-4">
                   <form onSubmit={handleSaveSmtp} className="space-y-4">
                     {/* Toggle Enable SMTP */}
-                    <div className="p-3.5 bg-[#F5F6F6] dark:bg-slate-800/50 rounded-2xl border border-[#EBEBEB] dark:border-slate-700 flex items-center justify-between gap-3">
+                    <div className="ds-panel p-3.5 flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs">
+                        <p className="font-semibold text-ink text-xs">
                           {t('settings.smtp_enable_label', 'Aktifkan Pengiriman Email via SMTP Relay')}
                         </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        <p className="text-xs text-ink-soft mt-0.5">
                           {t('settings.jika_aktif_reminder_h_90_h', 'Jika aktif, reminder H-90, H-60, H-30, dan H-14 akan dikirimkan otomatis ke email nyata.')}
                         </p>
                       </div>
@@ -1455,18 +1455,18 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                         aria-checked={smtpEnabled}
                         aria-label={t('settings.smtp_enable_label', 'Aktifkan Pengiriman Email via SMTP Relay')}
                         onClick={() => setSmtpEnabled(!smtpEnabled)}
-                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg"
+                        className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md"
                       >
-                        <span aria-hidden="true" className={`relative block h-6 w-11 rounded-full ${smtpEnabled ? 'bg-accent-dark' : 'bg-slate-200 dark:bg-slate-700'}`}>
-                          <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-xs transition-transform ${smtpEnabled ? 'translate-x-5' : ''}`} />
+                        <span aria-hidden="true" className={`relative block h-6 w-10 rounded-full ${smtpEnabled ? 'bg-accent-dark' : 'bg-surface-2 '}`}>
+                          <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-surface shadow-xs transition-transform ${smtpEnabled ? 'translate-x-5' : ''}`} />
                         </span>
                       </button>
                     </div>
 
                     {/* SMTP Credentials Form */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ds-grid">
                       <div>
-                        <label htmlFor="settingsview-field-4" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        <label htmlFor="settingsview-field-4" className="block text-ink font-semibold mb-1">
                           {t('settings.smtp_host_label', 'SMTP Host / Server')}
                         </label>
                         <input id="settingsview-field-4"
@@ -1474,13 +1474,13 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           value={smtpHost}
                           onChange={(e) => setSmtpHost(e.target.value)}
                           placeholder={t('settings.misal_smtp_gmail_com_smtp_office365', 'misal: smtp.gmail.com / smtp.office365.com')}
-                          className="w-full bg-[#F5F6F6] dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-accent transition-colors"
+                          className="ds-input w-full"
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-2 ds-grid">
                         <div>
-                          <label htmlFor="settingsview-field-5" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                          <label htmlFor="settingsview-field-5" className="block text-ink font-semibold mb-1">
                             {t('settings.smtp_port_label', 'SMTP Port')}
                           </label>
                           <input id="settingsview-field-5"
@@ -1488,16 +1488,16 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                             value={smtpPort}
                             onChange={(e) => setSmtpPort(Number(e.target.value))}
                             placeholder="465 / 587"
-                            className="w-full bg-[#F5F6F6] dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-accent transition-colors"
+                            className="ds-input w-full"
                           />
                         </div>
                         <div className="flex flex-col justify-end">
-                          <label className="flex items-center gap-2 p-2.5 bg-[#F5F6F6] dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer text-slate-700 dark:text-slate-300 font-medium">
+                          <label className="flex items-center gap-2 p-2.5 bg-surface-2 dark:bg-surface-2/50 border border-hairline rounded-xl cursor-pointer text-ink font-medium">
                             <input
                               type="checkbox"
                               checked={smtpSecure}
                               onChange={(e) => setSmtpSecure(e.target.checked)}
-                              className="rounded text-accent-text focus:ring-accent"
+                              className="rounded-sm text-accent-text focus:ring-accent"
                             />
                             <span className="text-xs truncate">{t('settings.ssl_tls', 'SSL/TLS')}</span>
                           </label>
@@ -1505,7 +1505,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       </div>
 
                       <div>
-                        <label htmlFor="settingsview-field-6" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        <label htmlFor="settingsview-field-6" className="block text-ink font-semibold mb-1">
                           {t('settings.smtp_user_label', 'SMTP Username / Akun Email')}
                         </label>
                         <input id="settingsview-field-6"
@@ -1513,12 +1513,12 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           value={smtpUser}
                           onChange={(e) => setSmtpUser(e.target.value)}
                           placeholder={t('settings.misal_notif_perusahaan_com', 'misal: notif@perusahaan.com')}
-                          className="w-full bg-[#F5F6F6] dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-accent transition-colors"
+                          className="ds-input w-full"
                         />
                       </div>
 
                       <div>
-                        <label htmlFor="settingsview-field-7" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        <label htmlFor="settingsview-field-7" className="block text-ink font-semibold mb-1">
                           {t('settings.smtp_password_label', 'SMTP Password / Google App Password')}
                         </label>
                         <div className="relative flex items-center">
@@ -1527,13 +1527,13 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                             value={smtpPassword}
                             onChange={(e) => setSmtpPassword(e.target.value)}
                             placeholder={t('settings.password_atau_16_digit_app_password', 'Password atau 16-digit App Password')}
-                            className="w-full bg-[#F5F6F6] dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl pl-4 pr-10 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-accent transition-colors"
+                            className="ds-input w-full pl-4 pr-10"
                           />
                           <button
                             type="button"
                           onClick={() => setShowSmtpPassword(!showSmtpPassword)}
                             aria-label={showSmtpPassword ? t('settings.sembunyikan', 'Sembunyikan') : t('settings.tampilkan', 'Tampilkan')}
-                            className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                            className="absolute right-3 text-ink-soft hover:text-ink-soft dark:hover:text-ink cursor-pointer"
                           >
                             {showSmtpPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                           </button>
@@ -1541,7 +1541,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       </div>
 
                       <div>
-                        <label htmlFor="settingsview-field-8" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        <label htmlFor="settingsview-field-8" className="block text-ink font-semibold mb-1">
                           {t('settings.smtp_from_email_label', 'Alamat Email Pengirim (From Email)')}
                         </label>
                         <input id="settingsview-field-8"
@@ -1549,12 +1549,12 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           value={smtpFromEmail}
                           onChange={(e) => setSmtpFromEmail(e.target.value)}
                           placeholder={t('settings.misal_noreply_perusahaan_com_opsional', 'misal: noreply@perusahaan.com (opsional)')}
-                          className="w-full bg-[#F5F6F6] dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-accent transition-colors"
+                          className="ds-input w-full"
                         />
                       </div>
 
                       <div>
-                        <label htmlFor="settingsview-field-9" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        <label htmlFor="settingsview-field-9" className="block text-ink font-semibold mb-1">
                           {t('settings.smtp_from_name_label', 'Nama Pengirim (From Name)')}
                         </label>
                         <input id="settingsview-field-9"
@@ -1562,15 +1562,15 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           value={smtpFromName}
                           onChange={(e) => setSmtpFromName(e.target.value)}
                           placeholder={t('settings.misal_sistem_notifikasi_kontrak_io', 'misal: Sistem Notifikasi Kontrak & IO')}
-                          className="w-full bg-[#F5F6F6] dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-accent transition-colors"
+                          className="ds-input w-full"
                         />
                       </div>
                     </div>
 
                     {/* Test SMTP Connection Box */}
-                    <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700/60 space-y-3">
-                      <p className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-amber-500" />
+                    <div className="ds-panel p-4 space-y-3">
+                      <p className="font-bold text-ink text-xs flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-status-warning" />
                         <span>{t('settings.smtp_test_title', 'Uji Koneksi & Kirim Email Percobaan')}</span>
                       </p>
                       <div className="flex flex-col sm:flex-row gap-2">
@@ -1579,7 +1579,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           value={testSmtpRecipient}
                           onChange={(e) => setTestSmtpRecipient(e.target.value)}
                           placeholder={user?.email || t('settings.smtp_test_recipient_ph', 'Masukkan email tujuan uji coba...')}
-                          className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-accent"
+                          className="ds-input flex-1"
                         />
                         <Button
                           type="button"
@@ -1587,9 +1587,9 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           onClick={handleTestSmtp}
                           disabled={testingSmtp || !smtpHost || !smtpUser}
                           size="lg"
-                          className="font-bold border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 cursor-pointer gap-1.5 shrink-0"
+                          className="cursor-pointer shrink-0"
                         >
-                          <Sparkles className={cn('w-3.5 h-3.5 text-amber-500', testingSmtp && 'animate-spin')} />
+                          <Sparkles className={cn('w-3.5 h-3.5 text-status-warning', testingSmtp && 'animate-spin')} />
                           <span>{testingSmtp ? t('settings.smtp_testing_btn', 'Mengirim Email Uji Coba...') : t('settings.smtp_test_btn', 'Uji Koneksi SMTP')}</span>
                         </Button>
                       </div>
@@ -1599,14 +1599,14 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           className={cn(
                             'p-3 rounded-xl border text-xs flex items-center gap-2 animate-in fade-in',
                             smtpTestResult.success
-                              ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
-                              : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+                              ? 'bg-status-success-soft dark:bg-status-success-soft/30 border-status-success-border text-status-success '
+                              : 'bg-status-danger-soft dark:bg-status-danger-soft/30 border-status-danger-border text-status-danger '
                           )}
                         >
                           {smtpTestResult.success ? (
-                            <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                            <CheckCircle2 className="size-4 text-status-success shrink-0" />
                           ) : (
-                            <AlertCircle className="size-4 text-rose-600 shrink-0" />
+                            <AlertCircle className="size-4 text-status-danger shrink-0" />
                           )}
                           <span>{smtpTestResult.message}</span>
                         </div>
@@ -1617,7 +1617,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       <Button size="lg"
                         type="submit"
                         disabled={savingSmtp || !isAdmin}
-                        className="font-bold bg-accent-strong text-white hover:bg-accent-strong-hover cursor-pointer gap-1.5"
+                        className="cursor-pointer"
                       >
                         <Save className="w-3.5 h-3.5" />
                         <span>{savingSmtp ? t('settings.smtp_saving_btn', 'Menyimpan...') : t('settings.smtp_save_btn', 'Simpan Konfigurasi SMTP')}</span>
@@ -1632,30 +1632,30 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
           {/* GROUP 4: LANGUAGE & UI TEXT LOCALIZATION */}
           {activeSection === 'language' && (
-            <Card className="border-none shadow-[0_4px_16px_rgba(0,0,0,0.04)] rounded-[20px] overflow-hidden">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
+            <Card className="overflow-hidden">
+              <CardHeader className="">
+                <CardTitle className="flex items-center gap-2">
                   <Languages className="w-5 h-5 text-accent-text" />
                   <span>{t('settings.ui_customization_title', 'Kustomisasi Teks UI & Kamus Antarmuka')}</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 text-xs">
-                <p role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              <CardContent className="space-y-4">
+                <p role="note" className="rounded-xl border border-status-warning-border bg-status-warning-soft p-3 text-sm text-status-warning dark:bg-status-warning-soft/40">
                   {t('tb.texts_shared_note')}
                 </p>
                 {translationsBusy && <p role="status">{t('tb.texts_syncing')}</p>}
                 {translationsError && <p role="alert" className="text-destructive">{translationsError}</p>}
-                <div className="p-4 bg-[#F5F6F6] dark:bg-slate-800/50 rounded-2xl border border-[#EBEBEB] dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="ds-panel p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-ink dark:text-slate-100">{t('settings.ui_editor_card_title', 'Editor Teks Antarmuka Lengkap')}</p>
-                    <p className="text-ink-soft dark:text-slate-400 text-xs mt-0.5">
+                    <p className="font-semibold text-ink">{t('settings.ui_editor_card_title', 'Editor Teks Antarmuka Lengkap')}</p>
+                    <p className="text-ink-soft text-xs mt-0.5">
                       {t('settings.ui_editor_card_desc', 'Buka jendela dialog untuk mengubah setiap teks tombol, menu, tabel, atau pesan error.')}
                     </p>
                   </div>
                   <Button
                     size="lg"
                     onClick={() => setShowUITextModal(true)}
-                    className="h-9 px-4 rounded-full text-xs font-bold bg-accent-strong text-white hover:bg-accent-strong-hover cursor-pointer shrink-0"
+                    className="text-xs cursor-pointer shrink-0"
                   >
                     {t('settings.open_ui_editor_btn', 'Buka Editor Teks UI')}
                   </Button>
@@ -1667,9 +1667,9 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                     size="lg"
                     onClick={exportToCSV}
                     disabled={translationsBusy}
-                    className="font-bold bg-white dark:bg-slate-800 border border-[#EBEBEB] dark:border-slate-700 text-ink dark:text-slate-100 hover:bg-[#F5F6F6] dark:hover:bg-slate-700 cursor-pointer gap-1.5"
+                    className="cursor-pointer"
                   >
-                    <Download className="w-3.5 h-3.5 text-ink-soft dark:text-slate-400" />
+                    <Download className="w-3.5 h-3.5 text-ink-soft" />
                     <span>{t('settings.export_csv_dict', 'Ekspor Kamus CSV')}</span>
                   </Button>
 
@@ -1685,9 +1685,9 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                     size="lg"
                     onClick={() => textFileInputRef.current?.click()}
                     disabled={translationsBusy}
-                    className="h-9 px-4 rounded-full text-xs font-bold bg-white dark:bg-slate-800 border border-[#EBEBEB] dark:border-slate-700 text-ink dark:text-slate-100 hover:bg-[#F5F6F6] dark:hover:bg-slate-700 cursor-pointer gap-1.5"
+                    className="text-xs cursor-pointer"
                   >
-                    <Upload className="w-3.5 h-3.5 text-ink-soft dark:text-slate-400" />
+                    <Upload className="w-3.5 h-3.5 text-ink-soft" />
                     <span>{t('settings.import_csv_dict', 'Impor Kamus CSV')}</span>
                   </Button>
 
@@ -1710,7 +1710,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       }
                     }}
                     disabled={translationsBusy}
-                    className="h-8 text-xs text-destructive hover:bg-destructive/10 cursor-pointer gap-1.5 ml-auto"
+                    className="text-xs cursor-pointer ml-auto"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>{t('settings.reset_dict_btn', 'Reset ke Bawaan')}</span>
@@ -1724,20 +1724,20 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
           {activeSection === 'security' && (
             <div className="space-y-6">
               {/* Danger Zone: Reset Database */}
-              <Card className="border-none shadow-[0_4px_16px_rgba(0,0,0,0.04)] rounded-[20px] overflow-hidden">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-bold text-ink dark:text-slate-100 flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-rose-500" />
+              <Card className="overflow-hidden">
+                <CardHeader className="">
+                  <CardTitle className="flex items-center gap-2">
+                    <ShieldAlert className="w-5 h-5 text-status-danger" />
                     <span>{t('settings.danger_zone_title', 'Danger Zone: Reset Database Sistem')}</span>
                   </CardTitle>
-                  <CardDescription className="text-xs text-slate-500 dark:text-slate-400">
+                  <CardDescription className="">
                     {t('settings.danger_zone_desc', 'Mereset seluruh pengaturan sistem ke kondisi awal bawaan (Manage Admin Access, Organisasi, Departemen, AI, Notifikasi, Penyimpanan) serta menghapus seluruh data transaksi.')}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="text-xs">
-                  <div className="p-4 bg-[#F5F6F6] dark:bg-slate-800/50 rounded-2xl border border-[#EBEBEB] dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <CardContent className="">
+                  <div className="ds-panel p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-ink dark:text-slate-100">{t('settings.delete_all_transactions', 'Reset Seluruh Pengaturan & Data Transaksi')}</p>
+                      <p className="font-semibold text-ink">{t('settings.delete_all_transactions', 'Reset Seluruh Pengaturan & Data Transaksi')}</p>
                     </div>
 
                     <Button
@@ -1745,7 +1745,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       size="lg"
                       onClick={handleOpenResetModal}
                       disabled={resettingData || !isSuperuser}
-                      className="font-bold bg-red-500 text-white hover:bg-red-600 cursor-pointer shrink-0"
+                      className="cursor-pointer shrink-0"
                     >
                       {resettingData ? t('settings.resetting_db', 'Mereset Database...') : t('settings.reset_db_btn', 'Reset Database Sistem')}
                     </Button>
@@ -1771,33 +1771,33 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
       {/* Confirmation Modal for Editing Database Configuration */}
       {showEditConfirmModal && (
-        <ModalFrame onClose={() => setShowEditConfirmModal(false)} className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full shadow-2xl border border-[#EBEBEB] dark:border-slate-800 overflow-hidden">
+        <ModalFrame onClose={() => setShowEditConfirmModal(false)} className="max-w-sm w-full overflow-hidden">
 
-            <div className="p-5 border-b border-[#EBEBEB] dark:border-slate-800 flex items-center gap-3">
-              <div className="p-2 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-200 dark:border-amber-800 shrink-0">
+            <div className="p-5 border-b border-hairline flex items-center gap-3">
+              <div className="ds-icon-tile ds-icon-tile-sm bg-status-warning-soft dark:bg-status-warning-soft/40 text-status-warning border border-status-warning-border">
                 <AlertCircle className="w-5 h-5" />
               </div>
               <div>
-                <ModalTitle className="text-sm font-bold text-ink dark:text-slate-100">
+                <ModalTitle className="ds-modal-title flex items-center gap-2">
                   {t('settings.edit_confirm_title', 'Ubah Konfigurasi Database')}
                 </ModalTitle>
               </div>
             </div>
 
-            <div className="p-5 text-xs text-ink-soft dark:text-slate-400 leading-relaxed">
+            <div className="p-5 text-xs text-ink-soft leading-relaxed">
               {t(
                 'settings.edit_confirm_desc',
                 'Mengubah Spreadsheet ID atau Folder Storage akan mengalihkan sinkronisasi ke berkas baru. Pastikan ID sheet tujuan valid.'
               )}
             </div>
 
-            <div className="p-4 bg-[#F5F6F6] dark:bg-slate-800/40 border-t border-[#EBEBEB] dark:border-slate-800 flex items-center justify-end gap-2">
+            <div className="p-4 bg-surface-2 dark:bg-surface-2/40 border-t border-hairline flex items-center justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="lg"
                 onClick={() => setShowEditConfirmModal(false)}
-                className="h-8 px-3.5 rounded-full text-xs font-semibold bg-white dark:bg-slate-800 border border-[#EBEBEB] dark:border-slate-700 text-ink dark:text-slate-100 hover:bg-[#F5F6F6] cursor-pointer"
+                className="text-xs cursor-pointer"
               >
                 {t('settings.edit_confirm_cancel', 'Batal')}
               </Button>
@@ -1808,7 +1808,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                   setShowEditConfirmModal(false);
                   setIsEditUnlocked(true);
                 }}
-                className="h-8 px-4 rounded-full text-xs font-bold bg-accent-strong text-white hover:bg-accent-strong-hover cursor-pointer shadow-2xs"
+                className="text-xs cursor-pointer"
               >
                 {t('settings.edit_confirm_proceed', 'Lanjutkan Edit')}
               </Button>
@@ -1819,9 +1819,9 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
       {/* Google Drive Picker Modal */}
       {showPickerModal && (
-        <ModalFrame onClose={() => setShowPickerModal(false)} className="bg-white rounded-2xl max-w-2xl w-full max-h-[92dvh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <ModalFrame onClose={() => setShowPickerModal(false)} className="max-w-2xl w-full max-h-[92dvh] flex flex-col overflow-hidden">
 
-            <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white">
+            <div className="ds-section-header">
               <div className="flex items-center gap-2">
                 {pickerType === 'spreadsheet' ? (
                   <FileSpreadsheet className="w-5 h-5 text-accent-text" />
@@ -1829,18 +1829,18 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                   <Folder className="w-5 h-5 text-accent-text" />
                 )}
                 <div>
-                  <ModalTitle className="text-base sm:text-lg font-extrabold text-slate-900">
+                  <ModalTitle className="ds-modal-title flex items-center gap-2">
                     {pickerType === 'spreadsheet'
                       ? t('settings.pilih_spreadsheet_dari_google_drive', 'Pilih Spreadsheet dari Google Drive')
                       : t('settings.pilih_folder_storage_dari_google_drive', 'Pilih Folder Storage dari Google Drive')}
                   </ModalTitle>
-                  <p className="text-xs text-slate-500">{t('settings.akun', 'Akun: {email}', { email: googleUser?.email ?? '' })}</p>
+                  <p className="text-xs text-ink-soft">{t('settings.akun', 'Akun: {email}', { email: googleUser?.email ?? '' })}</p>
                 </div>
               </div>
               <button aria-label={t('common.close', 'Tutup')}
                 type="button"
                 onClick={() => setShowPickerModal(false)}
-                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center text-ink-soft hover:text-ink size-8 rounded-md hover:bg-surface-2 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1848,23 +1848,23 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
             <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1">
               <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <Search className="w-4 h-4 text-ink-soft absolute left-3 top-3" />
                 <input aria-label={t('settings.cari_nama', 'Cari nama {pickerType}...', { pickerType: pickerType === 'spreadsheet' ? t('settings.picker_spreadsheet', 'spreadsheet') : t('settings.picker_folder', 'folder') })}
                   type="text"
                   placeholder={t('settings.cari_nama', 'Cari nama {pickerType}...', { pickerType: pickerType === 'spreadsheet' ? t('settings.picker_spreadsheet', 'spreadsheet') : t('settings.picker_folder', 'folder') })}
                   value={pickerSearch}
                   onChange={(e) => setPickerSearch(e.target.value)}
-                  className="w-full pl-9 pr-3.5 py-2.5 bg-[#F7F8FA] border border-hairline rounded-xl text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input w-full pl-9 pr-3.5"
                 />
               </div>
 
-              <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl bg-white">
+              <div className="max-h-72 overflow-y-auto divide-y divide-hairline border border-hairline rounded-xl bg-surface">
                 {loadingPickerItems ? (
-                  <div className="p-6 text-center text-xs text-slate-400">
+                  <div className="p-6 text-center text-xs text-ink-soft">
                     {t('settings.memuat_item_dari_google_drive', 'Memuat item dari Google Drive...')}
                   </div>
                 ) : filteredDriveItems.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-slate-400">
+                  <div className="p-6 text-center text-xs text-ink-soft">
                     {t('settings.tidak_ada_yang_ditemukan', 'Tidak ada {pickerType} yang ditemukan.', { pickerType: pickerType === 'spreadsheet' ? t('settings.picker_spreadsheet', 'spreadsheet') : t('settings.picker_folder', 'folder') })}
                   </div>
                 ) : (
@@ -1878,11 +1878,11 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                         {pickerType === 'spreadsheet' ? (
                           <FileSpreadsheet className="w-4 h-4 text-accent-text shrink-0" />
                         ) : (
-                          <Folder className="w-4 h-4 text-amber-500 shrink-0" />
+                          <Folder className="w-4 h-4 text-status-warning shrink-0" />
                         )}
-                        <span className="truncate font-semibold text-slate-800">{item.name}</span>
+                        <span className="truncate font-semibold text-ink">{item.name}</span>
                       </div>
-                      <span className="font-mono text-xs text-slate-400 shrink-0 ml-2">
+                      <span className="font-mono text-xs text-ink-soft shrink-0 ml-2">
                         {item.id.slice(0, 8)}...
                       </span>
                     </button>
@@ -1891,11 +1891,11 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
               </div>
             </div>
 
-            <div className="p-4 sm:p-5 bg-[#F7F8FA] border-t border-slate-200 dark:border-slate-800 flex justify-end shrink-0">
+            <div className="p-4 sm:p-5 bg-canvas border-t border-hairline flex justify-end shrink-0">
               <button
                 type="button"
                 onClick={() => setShowPickerModal(false)}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                className="inline-flex items-center px-4 min-h-8 bg-surface-2 hover:bg-surface-2 text-ink font-semibold rounded-md text-xs transition-colors cursor-pointer"
               >
                 {t('eval.btn_cancel', 'Batal')}
               </button>

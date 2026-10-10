@@ -1,5 +1,40 @@
 import { test, expect } from '@playwright/test';
-import { becomeSuperuser, createTenantApi, fixtureOrganization, fulfillTenantApi, workspaceInit } from './fixtures/tenantApi';
+import { createTenantApi, fixtureOrganization, fulfillTenantApi, workspaceInit } from './fixtures/tenantApi';
+
+test('workspace fields and outline actions share geometry in both themes and viewport sizes', async ({ page }, testInfo) => {
+  for (const width of [1440, 768, 375]) {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    for (const section of [/^Partners$/, /^Contracts(?: \d+)?$/, /^Settings$/]) {
+      await page.getByRole('button', { name: section }).first().click();
+      await page.setViewportSize({ width, height: 1000 });
+      for (const dark of [false, true]) {
+        await page.evaluate(dark => { document.documentElement.classList.toggle('dark', dark); document.documentElement.dataset.moduixColorScheme = dark ? 'dark' : 'light'; }, dark);
+        const fields = page.locator('main .ds-input:visible:not(textarea):not([type="file"])');
+        await expect(fields.first()).toBeVisible();
+        const issues = await fields.evaluateAll(elements => elements.flatMap(element => {
+          const style = getComputedStyle(element), rect = element.getBoundingClientRect();
+          return rect.height === 40 && style.borderRadius === '8px' && style.borderTopWidth === '1px' ? [] : [`${element.tagName}: ${rect.height}px / ${style.borderRadius} / ${style.borderTopWidth}`];
+        }));
+        expect(issues).toEqual([]);
+        for (const action of await page.locator('main .ds-button-outline:visible:not(.ds-button-sm)').all()) {
+          expect((await action.boundingBox())!.height).toBe(40);
+          await expect(action).toHaveCSS('border-radius', '8px');
+          await expect(action).toHaveCSS('border-top-width', '1px');
+          expect(await action.evaluate(element => {
+            const probe = document.createElement('span'); probe.style.color = 'var(--input)'; document.body.appendChild(probe);
+            const matches = getComputedStyle(element).borderTopColor === getComputedStyle(probe).color; probe.remove(); return matches;
+          })).toBe(true);
+        }
+        await fields.first().focus();
+        await expect(fields.first()).toHaveCSS('outline-width', '2px');
+        await expect(fields.first()).toHaveCSS('outline-offset', '2px');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      }
+      await page.screenshot({ path: testInfo.outputPath(`geometry-${section.source.replace(/[^a-z]/gi, '')}-${width}.png`), fullPage: true });
+      await page.setViewportSize({ width: 1440, height: 1000 });
+    }
+  }
+});
 
 let api: ReturnType<typeof createTenantApi>;
 
@@ -52,24 +87,7 @@ test('invite dialog names its fields, traps focus and restores the trigger on de
   await expect(page.locator('h1')).toHaveCount(1);
 });
 
-test('UI text editor traps keyboard focus and restores focus when closed', async ({ page }) => {
-  // The browser-local text editor is a direct System Admin submenu page (PRD §6.6).
-  await becomeSuperuser(page, api);
-  await page.getByRole('button', { name: /^(System Admin|Admin Sistem)$/ }).click();
-  await page.locator('aside').getByRole('button', { name: /^(UI texts|Teks UI)$/ }).click();
-  const trigger = page.getByRole('button', { name: /^(Open UI Text Editor|Buka Editor Teks UI)$/ });
-  await trigger.click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toHaveAccessibleName(/.+/);
-  expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
-  for (let i = 0; i < 20; i++) {
-    await page.keyboard.press('Tab');
-    expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
-  }
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-  await expect(trigger).toBeFocused();
-});
+// UI text editor coverage lives in system-console.live.spec.ts: it is hosted by /sys.
 
 test('mobile controls fit, drawer traps focus and restores its trigger', async ({ page }) => {
   for (const width of [320, 390]) {

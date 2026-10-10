@@ -61,8 +61,8 @@ const StateScreen: React.FC<{ title: string; message?: string; children?: React.
   return (
   <div className="flex min-h-[60vh] items-center justify-center p-6" aria-busy={busy || undefined}>
     <div className="max-w-md space-y-4 text-center" role={busy ? 'status' : undefined}>
-      <Heading className="text-xl font-semibold text-slate-900 dark:text-white">{title}</Heading>
-      {message && <p className="text-sm text-slate-600 dark:text-slate-300">{message}</p>}
+      <Heading className="text-xl font-semibold text-ink dark:text-white">{title}</Heading>
+      {message && <p className="text-sm text-ink-soft">{message}</p>}
       {children && <div className="flex flex-wrap justify-center gap-2">{children}</div>}
     </div>
   </div>
@@ -547,13 +547,13 @@ const MainApp: React.FC = () => {
               {organizations.map((org) => (
                 <li key={org.organizationId}>
                   <button type="button" onClick={() => void switchTenant(org.organizationId)}
-                    className="flex min-h-11 w-full cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-left text-sm font-medium hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
+                    className="flex min-h-10 w-full cursor-pointer items-center justify-between rounded-lg border border-hairline bg-surface px-4 text-left text-sm font-semibold hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 dark:hover:bg-surface-2">
                     {org.organizationName}
                   </button>
                 </li>
               ))}
             </ul>
-            <button type="button" onClick={() => void logout()} className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 underline dark:text-slate-300">{t('app.kembali_ke_login', 'Kembali ke login')}</button>
+            <button type="button" onClick={() => void logout()} className="rounded-md px-4 py-2 text-sm font-medium text-ink underline">{t('app.kembali_ke_login', 'Kembali ke login')}</button>
           </StateScreen>
         ) : (
           <OrganizationOnboarding />
@@ -568,16 +568,16 @@ const MainApp: React.FC = () => {
       <StateScreen busy title={t('app.memuat_halaman', 'Memuat halaman...')} />
     ) : gate.kind === 'caps-error' ? (
       <StateScreen title={t('tb.access_check_failed', 'Your access could not be checked')} message={t('tb.access_check_failed_desc', 'Nothing is shown until your permissions for this organization load.')}>
-        <button type="button" onClick={caps.retry} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-slate-900">{t('tb.retry', 'Retry')}</button>
+        <button type="button" onClick={caps.retry} className="inline-flex items-center rounded-md bg-ink px-4 min-h-10 text-sm font-semibold text-white">{t('tb.retry', 'Retry')}</button>
       </StateScreen>
     ) : gate.kind === 'denied' ? (
       <StateScreen title={t('tb.access_denied', 'You do not have access to this page')} message={t('tb.access_denied_desc', 'Your role in this organization does not include this page.')}>
-        {permittedHome && <button type="button" onClick={() => replaceActiveTab(permittedHome)} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-slate-900">{t('tb.go_to_permitted', 'Go to an allowed page')}</button>}
+        {permittedHome && <button type="button" onClick={() => replaceActiveTab(permittedHome)} className="inline-flex items-center rounded-md bg-ink px-4 min-h-10 text-sm font-semibold text-white">{t('tb.go_to_permitted', 'Go to an allowed page')}</button>}
       </StateScreen>
     ) : null;
 
   return (
-    <div data-table-design={tableDesignForTab(activeTab)} className="flex h-screen w-full bg-[#F3F4F0] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100 font-sans overflow-hidden">
+    <div data-table-design={tableDesignForTab(activeTab)} className="flex h-screen w-full bg-canvas text-ink font-sans overflow-hidden">
       <a href="#main-content" className="skip-link">
         {t('app.skip_to_content', 'Lewati ke konten utama')}
       </a>
@@ -605,7 +605,7 @@ const MainApp: React.FC = () => {
           id="main-content"
           tabIndex={-1}
           // The AI chat launcher is fixed bottom-right; reserve room so it never covers the last row's actions.
-          className={`flex-1 min-h-0 p-3.5 sm:p-5 md:p-7 ${modules.aiAssistant ? 'pb-24 sm:pb-28 md:pb-28' : ''} overflow-y-auto overflow-x-hidden bg-[#F3F4F0] dark:bg-[#0B0F19] overscroll-contain focus:outline-none`}
+          className={`flex-1 min-h-0 p-3.5 sm:p-5 md:p-7 ${modules.aiAssistant ? 'pb-24 sm:pb-28 md:pb-28' : ''} overflow-y-auto overflow-x-hidden bg-canvas dark:bg-canvas overscroll-contain focus:outline-none`}
         >
           {isPlatformAdmin && (
             <DefaultPasswordBanner
@@ -619,7 +619,7 @@ const MainApp: React.FC = () => {
               ].includes(activeTab)}
             />
           )}
-          <Suspense fallback={<div className="flex h-full min-h-70 items-center justify-center text-sm text-slate-500">{t('app.memuat_halaman', 'Memuat halaman...')}</div>}>
+          <Suspense fallback={<div className="flex h-full min-h-70 items-center justify-center text-sm text-ink-soft">{t('app.memuat_halaman', 'Memuat halaman...')}</div>}>
             {gateScreen ?? (
             <section className="w-full space-y-6">
               {activeTab === 'dashboard' && (
@@ -865,19 +865,19 @@ const MainApp: React.FC = () => {
             key={toast.id}
             className={`pointer-events-auto p-4 rounded-xl border shadow-lg flex items-start gap-3 animate-in slide-in-from-bottom-5 fade-in duration-200 ${
               toast.type === 'error'
-                ? 'bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/90 dark:border-rose-800 dark:text-rose-100'
+                ? 'bg-status-danger-soft border-status-danger-border text-status-danger dark:bg-status-danger-soft/90 '
                 : toast.type === 'warning'
-                ? 'bg-amber-50 border-amber-300 text-amber-950 dark:bg-amber-950/90 dark:border-amber-700 dark:text-amber-100'
-                : 'bg-emerald-50 border-emerald-300 text-emerald-950 dark:bg-emerald-950/90 dark:border-emerald-700 dark:text-emerald-100'
+                ? 'bg-status-warning-soft border-status-warning-border text-status-warning dark:bg-status-warning-soft/90 '
+                : 'bg-status-success-soft border-status-success-border text-status-success dark:bg-status-success-soft/90 '
             }`}
           >
             <div className="shrink-0 mt-0.5">
               {toast.type === 'error' ? (
-                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                <AlertTriangle className="w-5 h-5 text-status-danger" />
               ) : toast.type === 'warning' ? (
-                <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <AlertTriangle className="w-5 h-5 text-status-warning" />
               ) : (
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <CheckCircle2 className="w-5 h-5 text-status-success" />
               )}
             </div>
             <div className="flex-1 min-w-0">
@@ -899,7 +899,7 @@ const MainApp: React.FC = () => {
             <button
               type="button"
               onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
-              className="min-w-11 min-h-11 -mr-2 -mt-2 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 shrink-0 cursor-pointer rounded-lg focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none"
+              className="min-w-10 min-h-10 -mr-2 -mt-2 flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink shrink-0 cursor-pointer rounded-md focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none"
               aria-label={t('app.tutup_notifikasi', 'Tutup notifikasi')}
             >
               <X className="w-4 h-4" />
@@ -1008,7 +1008,7 @@ const AppContent = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F3F4F0] dark:bg-slate-950 text-slate-900 dark:text-white">
+      <div className="min-h-screen flex items-center justify-center bg-canvas text-ink dark:text-white">
         <p className="text-lg">{t('app.memuat', 'Memuat...')}</p>
       </div>
     );
@@ -1016,7 +1016,7 @@ const AppContent = () => {
 
   if (showPrivacyPolicy) {
     return (
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500">{t('app.memuat_kebijakan', 'Memuat kebijakan...')}</div>}>
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-ink-soft">{t('app.memuat_kebijakan', 'Memuat kebijakan...')}</div>}>
         <LazyPrivacyPolicyView onBack={handleBackToMain} />
       </Suspense>
     );
@@ -1024,7 +1024,7 @@ const AppContent = () => {
 
   if (showTermsOfService) {
     return (
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500">{t('app.memuat_syarat_ketentuan', 'Memuat syarat & ketentuan...')}</div>}>
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-ink-soft">{t('app.memuat_syarat_ketentuan', 'Memuat syarat & ketentuan...')}</div>}>
         <LazyTermsOfServiceView onBack={handleBackToMain} />
       </Suspense>
     );
@@ -1037,14 +1037,14 @@ const AppContent = () => {
         gridSize={40}
         gridColor="#d1d5db"
         darkGridColor="#1f2937"
-        effectColor="rgba(6, 199, 85, 0.45)"
-        darkEffectColor="rgba(6, 199, 85, 0.55)"
+        effectColor="rgba(38, 83, 246, 0.45)"
+        darkEffectColor="rgba(38, 83, 246, 0.55)"
         trailLength={5}
         glow
         glowRadius={28}
         showFade
         fadeIntensity={25}
-        className="w-full bg-slate-50 dark:bg-slate-950"
+        className="w-full bg-surface"
         style={{ height: '100dvh' }}
       >
         <main className="flex h-full w-full flex-col items-center overflow-y-auto px-4 py-6 sm:px-6 sm:py-10">
@@ -1059,7 +1059,7 @@ const AppContent = () => {
 
   if (activeTab === 'login') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F3F4F0] dark:bg-slate-950 text-slate-900 dark:text-white">
+      <div className="min-h-screen flex items-center justify-center bg-canvas text-ink dark:text-white">
         <p className="text-lg">{t('app.memuat', 'Memuat...')}</p>
       </div>
     );

@@ -1,30 +1,8 @@
-import * as React from "react"
-import { cn } from "./utils"
-
+import * as React from 'react';
+import { Input as ModuixInput } from '@moduix/react-tailwind/input';
+import { cn } from './utils';
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
-
-/**
- * shadcn-standard input. Uses the shared token contract so no
- * one-off colors/margins are introduced.
- */
-const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, ...props }, ref) => {
-    return (
-      <input
-        type={type}
-        ref={ref}
-        className={cn(
-          "flex h-11 w-full rounded-[var(--radius)] border border-[var(--input)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--foreground)] shadow-xs transition-colors",
-          "placeholder:text-[var(--muted-foreground)]",
-          "disabled:cursor-not-allowed disabled:opacity-50",
-          "aria-[invalid=true]:border-[var(--destructive)] aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-[var(--destructive)]/30",
-          className
-        )}
-        {...props}
-      />
-    )
-  }
-)
-Input.displayName = "Input"
-
-export { Input }
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, size, ...props }, ref) => <ModuixInput ref={ref} htmlSize={size} size="lg" className={cn('ds-input', className)} {...props} />);
+Input.displayName = 'Input';
+/** Class for native fields that cannot render <Input> (select, textarea, custom wrappers). */
+export const fieldControlClass = 'ds-input w-full';

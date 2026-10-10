@@ -819,7 +819,7 @@ const dataFilePath = LEGACY_DATA_FILE;
 const DEFAULT_BRANDING = {
   appName: "Legalio CLM",
   logoUrl: "/favicon.png",
-  primaryColor: "#06C755",
+  primaryColor: "#2653F6",
   footerText: "Legalio — open-source contract lifecycle management.",
   loginHeadline: "Contract, partner and commercial document management",
 };

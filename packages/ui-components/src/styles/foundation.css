@@ -1,0 +1,58 @@
+@import "@moduix/react-tailwind/style.css";
+@source "../../node_modules/@moduix/react-tailwind/dist/components/button";
+@source "../../node_modules/@moduix/react-tailwind/dist/components/input";
+@source "../../node_modules/@moduix/react-tailwind/dist/components/card";
+@source "../../node_modules/@moduix/react-tailwind/dist/components/badge";
+@source "../../node_modules/@moduix/react-tailwind/dist/components/alert";
+@source "../../node_modules/@moduix/react-tailwind/dist/components/tabs";
+@source "../../node_modules/@moduix/react-tailwind/dist/components/table";
+@source "../../node_modules/@moduix/react-tailwind/dist/components/dialog";
+@source "../../node_modules/@moduix/react-tailwind/dist/components/skeleton";
+@source "../../node_modules/@moduix/react-tailwind/dist/components/field";
+@theme inline {
+  --spacing: var(--ds-space);
+  --font-sans: var(--ds-font-sans);
+  --font-mono: var(--ds-font-mono);
+  --radius-sm: var(--ds-radius-sm);
+  --radius-md: var(--ds-radius-md);
+  --radius-lg: var(--ds-radius-lg);
+  /* Two radius tiers: controls (md, 8px) and containers (lg, 12px). */
+  --radius-xl: var(--ds-radius-lg);
+  --radius-2xl: var(--ds-radius-lg);
+  --radius-3xl: var(--ds-radius-lg);
+  --radius-full: var(--ds-radius-full);
+  --text-xs: var(--ds-text-xs);
+  --text-sm: var(--ds-text-sm);
+  --text-base: var(--ds-text-md);
+  --text-lg: var(--ds-text-lg);
+  --text-xl: var(--ds-text-xl);
+  --text-2xl: var(--ds-text-2xl);
+  --text-3xl: var(--ds-text-display);
+  --shadow-xs: var(--ds-shadow-sm);
+  --shadow-sm: var(--ds-shadow-sm);
+  --shadow-md: var(--ds-shadow-md);
+  --shadow-lg: var(--ds-shadow-lg);
+  --shadow-xl: var(--ds-shadow-lg);
+  --shadow-2xl: var(--ds-shadow-lg);
+}
+
+@theme inline {
+  --color-status-danger: var(--ds-danger);
+  --color-status-danger-soft: var(--ds-danger-soft);
+  --color-status-danger-border: var(--ds-danger-border);
+  --color-status-finance: var(--ds-finance);
+  --color-status-finance-soft: var(--ds-finance-soft);
+  --color-status-finance-border: var(--ds-finance-border);
+  --color-status-info: var(--ds-info);
+  --color-status-info-soft: var(--ds-info-soft);
+  --color-status-info-border: var(--ds-info-border);
+  --color-status-special: var(--ds-special);
+  --color-status-special-soft: var(--ds-special-soft);
+  --color-status-special-border: var(--ds-special-border);
+  --color-status-success: var(--ds-success);
+  --color-status-success-soft: var(--ds-success-soft);
+  --color-status-success-border: var(--ds-success-border);
+  --color-status-warning: var(--ds-warning);
+  --color-status-warning-soft: var(--ds-warning-soft);
+  --color-status-warning-border: var(--ds-warning-border);
+}

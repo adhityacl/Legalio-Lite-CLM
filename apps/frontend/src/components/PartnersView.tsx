@@ -275,12 +275,12 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
       <th
         scope="col"
         aria-sort={isSorted ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300 text-left select-none align-middle"
+        className="p-4 text-xs font-bold text-ink text-left select-none align-middle"
       >
         <button
           type="button"
           onClick={() => handleSort(field)}
-          className="flex items-center gap-1.5 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded py-0.5"
+          className="flex items-center gap-1.5 hover:text-ink dark:hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded-sm py-0.5"
           title={t('partners.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}
         >
           <span>{label}</span>
@@ -291,7 +291,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               <ArrowDown className="w-3.5 h-3.5 text-accent-text shrink-0" />
             )
           ) : (
-            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <ArrowUpDown className="w-3.5 h-3.5 text-ink-soft shrink-0" />
           )}
         </button>
       </th>
@@ -406,9 +406,9 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
       ) : (
         <>
           {/* Header */}
-          <div className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div className="ds-page-bar">
             <div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+              <h2 className="ds-page-heading">
                 <span>{t('partners.header_title', 'Manajemen Partner')}</span>
               </h2>
             </div>
@@ -418,7 +418,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                 <button
                   onClick={handleExportCSV}
                   disabled={filteredPartners.length === 0}
-                  className="ui-button ui-button-lg cursor-pointer shadow-sm border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-50 text-slate-600 font-bold flex items-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="ui-button ui-button-lg cursor-pointer flex items-center disabled:opacity-50 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-outline"
                   title={t('contracts.export_csv', 'Ekspor CSV')}
                 >
                   <Download className="w-4 h-4" />
@@ -429,7 +429,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               {canCreatePartner(user) && (
                 <button
                   onClick={onAddPartner}
-                  className="ui-button ui-button-lg cursor-pointer shadow-sm bg-accent-strong hover:bg-accent-strong-hover text-white font-bold flex items-center transition-all"
+                  className="ui-button ui-button-lg cursor-pointer flex items-center ds-button ds-button-lg ds-button-default"
                 >
                   <Plus className="w-4 h-4 text-white" />
                   <span>{t('ui.add_partner')}</span>
@@ -439,11 +439,11 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
           </div>
 
           {/* Filter Bar & View Toggle - Justified Responsive Grid/Flex */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-4 sm:p-5 mb-6">
-            <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
+          <div className="ds-panel p-4 sm:p-5 mb-6">
+            <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full ds-grid">
               {/* Search Input */}
               <div className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <Search className="w-4 h-4 text-ink-soft absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder={t('partners.search_placeholder')}
@@ -453,7 +453,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                     setSearchTerm(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="h-9 w-full pl-9 pr-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-accent font-medium transition-colors"
+                  className="ds-input w-full pl-9 pr-3"
                 />
               </div>
 
@@ -465,7 +465,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setSelectedPartnerStatus(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="min-h-11 sm:min-h-9 h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[130px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+                className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
               >
                 <option value="ALL">{t('partners.all_status')}</option>
                 <option value="Active">{t('partners.active')}</option>
@@ -480,7 +480,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setSelectedDDStatus(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="min-h-11 sm:min-h-9 h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[130px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+                className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
               >
                 <option value="ALL">{t('partners.all_dd_status')}</option>
                 <option value="Complete">{t('partners.dd_complete')}</option>
@@ -496,7 +496,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setSelectedBadanHukum(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="min-h-11 sm:min-h-9 h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[130px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+                className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
               >
                 <option value="ALL">{t('partners.all_legal_entity')}</option>
                 <option value="DOMESTIC">{t('partners.domestic', 'Domestic')}</option>
@@ -508,7 +508,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
               {/* Column Toggle */}
               <TableViewMenu title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
-                <div className="px-3.5 py-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 border-b border-slate-100 dark:border-slate-800">
+                <div className="px-3.5 py-1.5 text-xs font-bold text-ink-soft uppercase tracking-wider mb-1 border-b border-hairline">
                   {t('io.toggle_columns', 'Toggle Kolom')}
                 </div>
                 {Object.keys(visibleColumns).map((col) => {
@@ -524,12 +524,12 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   else if (col === 'due_diligence') label = t('partners.col_dd_status', 'Status Due Diligence');
 
                   return (
-                    <label key={col} className="flex items-center gap-2.5 px-3.5 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300 select-none">
+                    <label key={col} className="flex items-center gap-2.5 px-3.5 py-1.5 hover:bg-surface dark:hover:bg-surface-2/50 cursor-pointer text-xs font-medium text-ink select-none">
                       <input
                         type="checkbox"
                         checked={visibleColumns[col]}
                         onChange={() => toggleColumnVisibility(col)}
-                        className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                        className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                       />
                       <span className="capitalize">{label}</span>
                     </label>
@@ -540,13 +540,13 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
         </div>
 
           {/* Partners List: TABLE VIEW */}
-          <div className="ds-table-surface bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+          <div className="ds-table-surface bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
               <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_dd'), value: selectedDDStatus, active: selectedDDStatus !== 'ALL' }, { label: t('ui.filter_country'), value: selectedBadanHukum, active: selectedBadanHukum !== 'ALL' }, { label: t('ui.filter_status'), value: selectedPartnerStatus, active: selectedPartnerStatus !== 'ALL' }, { label: t('ui.filter_department'), value: selectedDepartment, active: selectedDepartment !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedDDStatus('ALL'); setSelectedBadanHukum('ALL'); setSelectedPartnerStatus('ALL'); setSelectedDepartment('ALL'); }} />
-        <p className="mobile-table-hint px-4 py-2 text-xs text-slate-600 dark:text-slate-300 md:hidden">{t('ui.scroll_table')}</p>
-        <div className="data-table-scroll overflow-x-auto bg-white dark:bg-slate-900" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
-                <table className="ds-table app-data-table w-full text-left border-collapse text-xs bg-white dark:bg-slate-900">
-                  <thead className="bg-slate-50 dark:bg-slate-800/50">
-                    <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 h-12">
+        <p className="mobile-table-hint px-4 py-2 text-xs text-ink-soft md:hidden">{t('ui.scroll_table')}</p>
+        <div className="data-table-scroll overflow-x-auto bg-surface" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
+                <table className="ds-table app-data-table w-full text-left border-collapse text-xs bg-surface">
+                  <thead className="bg-surface dark:bg-surface-2/50">
+                    <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
                       <th scope="col" className="pl-6 pr-2 py-4 w-12 text-left align-middle">
                         <div className="flex items-center justify-start">
                           <input
@@ -554,27 +554,27 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                             onChange={handleSelectAll}
                             checked={selectedRows.length > 0 && selectedRows.length === currentPartners.length}
                             aria-label={t('partners.select_all', 'Pilih semua partner')}
-                            className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                            className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                           />
                         </div>
                       </th>
                       {visibleColumns.nama_partner && renderSortHeader(t('partners.col_name', 'Nama Partner'), 'name')}
                       {visibleColumns.channel && renderSortHeader(t('partners.col_channel', 'Nama Channel'), 'channel')}
-                      {visibleColumns.badan_hukum && <th scope="col" className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300 text-left align-middle">{t('partners.col_entity', 'Badan Hukum')}</th>}
+                      {visibleColumns.badan_hukum && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('partners.col_entity', 'Badan Hukum')}</th>}
                       {visibleColumns.kategori && renderSortHeader(t('partners.col_category', 'Kategori Kerjasama'), 'tags')}
                       {visibleColumns.pic && renderSortHeader(t('partners.col_pic', 'PIC Partner'), 'pic')}
-                      {visibleColumns.email && <th scope="col" className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300 text-left align-middle">{t('partners.col_email', 'Email')}</th>}
-                      {visibleColumns.telepon && <th scope="col" className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300 text-left align-middle">{t('partners.col_phone', 'Telepon')}</th>}
+                      {visibleColumns.email && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('partners.col_email', 'Email')}</th>}
+                      {visibleColumns.telepon && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('partners.col_phone', 'Telepon')}</th>}
                       {visibleColumns.status && renderSortHeader(t('partners.col_status', 'Status Partner'), 'status')}
                       {visibleColumns.due_diligence && renderSortHeader(t('partners.col_dd_status', 'Status DD'), 'status_dd')}
-                      <th data-actions="true" scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                      <th data-actions="true" scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
                         <div className="flex items-center justify-end">
                           {t('partners.col_action', 'Aksi')}
                         </div>
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-hairline dark:divide-slate-800">
+                  <tbody className="divide-y divide-hairline">
                     {currentPartners.length === 0 ? (
                       <TableEmptyState colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} />
                     ) : (
@@ -582,7 +582,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                         const pStatus = getPartnerStatus(partner.partner_id);
 
                         return (
-                          <tr key={partner.partner_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <tr key={partner.partner_id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
                             <td className="pl-6 pr-2 py-4 text-left align-middle">
                               <div className="flex items-center justify-start">
                                 <input
@@ -590,27 +590,27 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                   checked={selectedRows.includes(partner.partner_id)}
                                   onChange={() => handleSelectRow(partner.partner_id)}
                                   aria-label={t('partners.pilih', 'Pilih {nama_partner}', { nama_partner: partner.nama_partner })}
-                                  className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                                  className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                                 />
                               </div>
                             </td>
 
                             {/* 1. Nama Partner */}
                             {visibleColumns.nama_partner && (
-                              <td className="py-4 px-4 text-xs font-semibold text-slate-900 dark:text-slate-100 text-left">
+                              <td className="py-4 px-4 text-xs font-semibold text-ink text-left">
                                 {partner.nama_partner}
                               </td>
                             )}
 
                             {visibleColumns.channel && (
-                              <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 text-left">
+                              <td className="py-4 px-4 text-xs font-normal text-ink text-left">
                                 {partner.codename || '—'}
                               </td>
                             )}
 
                             {/* 2. Country */}
                             {visibleColumns.badan_hukum && (
-                              <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left">
+                              <td className="py-4 px-4 text-xs font-normal text-ink text-left">
                                 <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center justify-center whitespace-nowrap shadow-2xs ${getStatusBadgeClass(partnerCountry(partner) === homeCountry ? 'BHI' : 'BHA')}`}>
                                   {partnerCountry(partner) || '—'}
                                 </span>
@@ -618,11 +618,11 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                             )}
 
                             {visibleColumns.kategori && (
-                              <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 text-left">
+                              <td className="py-4 px-4 text-xs font-normal text-ink text-left">
                                 {getValidPartnerTags(partner.tags).length > 0 ? (
                                   <div className="flex flex-wrap gap-1">
                                     {getValidPartnerTags(partner.tags).map((tag) => (
-                                      <span key={tag} className="px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 whitespace-nowrap">
+                                      <span key={tag} className="px-2 py-0.5 rounded-full border border-hairline bg-surface whitespace-nowrap">
                                         {tag}
                                       </span>
                                     ))}
@@ -635,13 +635,13 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
                             {/* 3. PIC Partner */}
                             {visibleColumns.pic && (
-                              <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left">
+                              <td className="py-4 px-4 text-xs font-normal text-ink text-left">
                                 {partner.nama_pic || partner.pic_partner || '-'}
                               </td>
                             )}
 
                             {visibleColumns.email && (
-                              <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 text-left whitespace-nowrap">
+                              <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
                                 {partner.email_pic ? (
                                   <a href={`mailto:${partner.email_pic}`} className="hover:underline hover:text-accent-text">
                                     {partner.email_pic}
@@ -653,7 +653,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                             )}
 
                             {visibleColumns.telepon && (
-                              <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 text-left whitespace-nowrap">
+                              <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
                                 {partner.telepon_pic ? (
                                   <a href={`tel:${partner.telepon_pic.replace(/[^\d+]/g, '')}`} className="hover:underline hover:text-accent-text">
                                     {partner.telepon_pic}
@@ -666,7 +666,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
                             {/* 4. Status Partner */}
                             {visibleColumns.status && (
-                              <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left">
+                              <td className="py-4 px-4 text-xs font-normal text-ink text-left">
                                 {pStatus === 'Active' ? (
                                   <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap ${getStatusBadgeClass('Aktif')}`}>
                                     <span>{t('status.aktif', 'Aktif')}</span>
@@ -681,7 +681,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
                             {/* 5. Status Due Diligence */}
                             {visibleColumns.due_diligence && (
-                              <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left">
+                              <td className="py-4 px-4 text-xs font-normal text-ink text-left">
                                 <button
                                   onClick={() => setSelectedPartnerDetail(partner)}
                                   className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center gap-1.5 transition-all hover:scale-105 hover:shadow-xs cursor-pointer ${getDDStatusBadge(
@@ -690,8 +690,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                   title={t('partners.klik_untuk_audit_checklist_due_diligence', 'Klik untuk Audit Checklist Due Diligence')}
                                 >
                                   {partner.status_dd === 'Complete' && <CheckCircle2 className="w-3.5 h-3.5 text-accent-text" />}
-                                  {partner.status_dd === 'Incomplete' && <Clock className="w-3.5 h-3.5 text-amber-500" />}
-                                  {partner.status_dd === 'Expired' && <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />}
+                                  {partner.status_dd === 'Incomplete' && <Clock className="w-3.5 h-3.5 text-status-warning" />}
+                                  {partner.status_dd === 'Expired' && <AlertTriangle className="w-3.5 h-3.5 text-status-danger" />}
                                   <span>{t(DD_STATUS_LABEL_KEY[partner.status_dd] || 'status.dd_incomplete', partner.status_dd)}</span>
                                 </button>
                               </td>
@@ -753,24 +753,24 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
       {/* Due Diligence Audit Modal */}
       {selectedPartnerDetail && (
-        <ModalFrame onClose={() => setSelectedPartnerDetail(null)} className="bg-white rounded-2xl max-w-4xl w-full max-h-[92dvh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <ModalFrame onClose={() => setSelectedPartnerDetail(null)} className="max-w-4xl w-full max-h-[92dvh] flex flex-col overflow-hidden">
 
             {/* Header */}
-            <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between shrink-0 bg-white">
+            <div className="ds-section-header">
               <div>
-                <ModalTitle className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                <ModalTitle className="ds-modal-title flex items-center gap-2">
                   <Building2 className="w-5 h-5 text-accent-text" />
                   <span>{selectedPartnerDetail.nama_partner}</span>
                 </ModalTitle>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {t('partners.status_dd', 'Status DD:')} <strong className="text-slate-800">{selectedPartnerDetail.status_dd}</strong> {t('partners.pic', '• PIC: {pic_partner}', { pic_partner: selectedPartnerDetail.pic_partner })}
+                <p className="text-xs text-ink-soft mt-0.5">
+                  {t('partners.status_dd', 'Status DD:')} <strong className="text-ink">{selectedPartnerDetail.status_dd}</strong> {t('partners.pic', '• PIC: {pic_partner}', { pic_partner: selectedPartnerDetail.pic_partner })}
                 </p>
               </div>
 
               <button aria-label={t('common.close', 'Tutup')}
                 type="button"
                 onClick={() => setSelectedPartnerDetail(null)}
-                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center text-ink-soft hover:text-ink size-8 rounded-md hover:bg-surface-2 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -779,12 +779,12 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
             <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1">
               {/* Due Diligence Narrative Profile */}
               {selectedPartnerDetail.catatan && (
-                <div className="p-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-1.5 shadow-2xs">
+                <div className="ds-panel p-4 space-y-1.5">
                   <h4 className="text-xs font-bold text-accent-text flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-accent-text" />
                     <span>{t('partners.profil_due_diligence_operasional_vendor_senior', 'Profil Due Diligence & Operasional Vendor (Senior Risk Analyst)')}</span>
                   </h4>
-                  <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-medium">
+                  <p className="text-xs text-ink leading-relaxed font-medium">
                     {selectedPartnerDetail.catatan}
                   </p>
                 </div>
@@ -793,10 +793,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               {/* Checklist Items List with Upload Trigger */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-ink">
                     {t('partners.req_docs_title', 'Dokumen Due Diligence')}
                   </h4>
-                  <span className="text-xs text-slate-500 font-medium">
+                  <span className="text-xs text-ink-soft font-medium">
                     {t('partners.nda_bersifat_wajib_dokumen_lain_opsional', '* NDA bersifat Wajib, dokumen lain Opsional')}
                   </span>
                 </div>
@@ -821,19 +821,19 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   return (
                     <div
                       key={doc.nama}
-                      className="p-3.5 sm:p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3 shadow-2xs"
+                      className="ds-panel p-3.5 sm:p-4 space-y-3"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-center flex-wrap gap-2">
-                          <span className="font-bold text-xs text-slate-900 dark:text-slate-100">{displayName}</span>
+                          <span className="font-bold text-xs text-ink">{displayName}</span>
 
                           {/* Wajib / Opsional Pill Badge (Refined) */}
                           {doc.wajib ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border border-rose-500/40 bg-rose-500/10 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 uppercase tracking-wide">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border border-status-danger-border/40 bg-status-danger/10 dark:bg-status-danger-soft/40 text-status-danger uppercase tracking-wide">
                               {t('settings.region.dd_required', 'Wajib')}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border border-hairline bg-surface-2 dark:bg-surface-2/80 text-ink-soft uppercase tracking-wide">
                               {t('contract_creator.optional_badge', 'Opsional')}
                             </span>
                           )}
@@ -842,10 +842,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
                               doc.status === 'Available'
-                                ? 'border-emerald-500/40 bg-emerald-500/10 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
+                                ? 'border-status-success-border/40 bg-status-success/10 dark:bg-status-success-soft/50 text-status-success '
                                 : doc.status === 'Expired'
-                                ? 'border-rose-500/40 bg-rose-500/10 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300'
-                                : 'border-amber-500/40 bg-amber-500/10 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300'
+                                ? 'border-status-danger-border/40 bg-status-danger/10 dark:bg-status-danger-soft/50 text-status-danger '
+                                : 'border-status-warning-border/40 bg-status-warning/10 dark:bg-status-warning-soft/50 text-status-warning '
                             }`}
                           >
                             {t(DOC_STATUS_LABEL_KEY[doc.status] || 'status.doc_missing', doc.status)}
@@ -861,7 +861,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                 docName: doc.nama,
                               });
                             }}
-                            className="px-3 py-1.5 bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            className="px-3 min-h-8 bg-accent-strong hover:bg-accent-strong-hover text-white rounded-md text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                           >
                             <Upload className="w-3 h-3" />
                             <span>{t('partners.upload_file', 'Upload File')}</span>
@@ -871,15 +871,15 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
                       {/* Multiple Files list for this DD Requirement */}
                       {docFiles.length > 0 && (
-                        <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800/80 space-y-1.5">
+                        <div className="pt-2.5 border-t border-hairline dark:border-hairline/80 space-y-1.5">
                           {docFiles.map((f, fIdx) => (
                             <div
                               key={f.id || fIdx}
-                              className="px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/60 rounded-lg flex items-center justify-between gap-2"
+                              className="ds-panel px-3 py-2 flex items-center justify-between gap-2"
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <FileText className="w-3.5 h-3.5 text-accent-text shrink-0" />
-                                <span className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">
+                                <span className="text-xs font-medium text-ink truncate">
                                   {f.fileName || `${doc.nama}.pdf`}
                                 </span>
                               </div>
@@ -890,7 +890,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                     href={f.linkDrive}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-accent-text rounded text-xs font-medium transition-colors flex items-center gap-1 border border-emerald-500/30"
+                                    className="px-2.5 py-1 bg-status-success-soft hover:bg-status-success-soft text-accent-text rounded-sm text-xs font-medium transition-colors flex items-center gap-1 border border-status-success-border/30"
                                   >
                                     <ExternalLink className="w-3 h-3" />
                                     <span>{t('partners.view_file', 'Lihat File')}</span>
@@ -900,7 +900,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteDDFile(selectedPartnerDetail.partner_id, doc.nama, f.id, displayName)}
-                                    className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                                    className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-status-danger rounded-sm transition-colors cursor-pointer"
                                     title={t('partners.hapus_file_ini', 'Hapus file ini')}
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -917,11 +917,11 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               </div>
             </div>
 
-            <div className="p-4 sm:p-5 bg-[#F7F8FA] border-t border-slate-200 dark:border-slate-800 flex justify-end shrink-0">
+            <div className="p-4 sm:p-5 bg-canvas border-t border-hairline flex justify-end shrink-0">
               <button
                 type="button"
                 onClick={() => setSelectedPartnerDetail(null)}
-                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                className="inline-flex items-center px-4 min-h-8 bg-ink hover:bg-ink text-white font-semibold rounded-md text-xs transition-colors cursor-pointer"
               >
                 {t('partners.audit_done')}
               </button>

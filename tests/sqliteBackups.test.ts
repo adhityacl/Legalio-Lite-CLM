@@ -110,3 +110,20 @@ test('maintenance waits for existing requests, rejects new writes and releases t
     assert.equal((await fetch(base + '/api/write', { method: 'POST' })).status, 200);
   } finally { releaseSlow(); releaseBackup(); server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); db.close(); rmSync(root, { recursive: true, force: true }); }
 });
+
+
+test('import rejects archive links before extracting or staging a restore', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const root = mkdtempSync(join(tmpdir(), 'sqlite-import-'));
+  const db = new Database(join(root, 'auth.db'));
+  try {
+    mkdirSync(join(root, 'source', 'uploads'), { recursive: true });
+    symlinkSync('/etc/passwd', join(root, 'source', 'uploads', 'link'));
+    const archive = join(root, 'unsafe.tar.gz');
+    execFileSync('tar', ['-czf', archive, '-C', join(root, 'source'), 'uploads']);
+    const service = new SQLiteBackups(db, root);
+    await assert.rejects(service.importArchive(archive), /unsafe archive/);
+    assert.deepEqual(service.list(), []);
+    assert.equal(existsSync(join(root, 'backups', 'pending-restore.json')), false);
+  } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
+});

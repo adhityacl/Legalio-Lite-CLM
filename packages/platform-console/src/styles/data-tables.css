@@ -1,37 +1,7 @@
-/* Shared table design, based on the approved Partners table reference.
-   Opt-in classes keep authored document tables outside the application UI.
-   The page/dialog scope preserves the explicitly excluded pages. */
-:root {
-  --table-surface: #ffffff;
-  --table-header: #f7f9fb;
-  --table-border: #dfe5ee;
-  --table-text: #111827;
-  --table-text-secondary: #405777;
-  --table-icon: #91a4bf;
-  --table-hover: #f8fafc;
-  --table-selected: #ecfdf5;
-  --table-radius: 20px;
-  --table-font-size: 14px;
-  --table-row-height: 58px;
-  --table-cell-padding: 16px;
-  --table-shadow: 0 1px 3px rgb(15 23 42 / 10%);
-}
-
-.dark {
-  --table-surface: #0f172a;
-  --table-header: #182235;
-  --table-border: #334155;
-  --table-text: #f1f5f9;
-  --table-text-secondary: #cbd5e1;
-  --table-icon: #94a3b8;
-  --table-hover: #1e293b;
-  --table-selected: #12332b;
-  --table-shadow: 0 1px 3px rgb(0 0 0 / 20%);
-}
-
+/* Shared application tables consume UI package tokens. */
 [data-table-design="standard"] .ds-table-surface {
   min-width: 0;
-  border: 1px solid var(--table-border);
+  border: var(--ds-border-width) solid var(--table-border);
   border-radius: var(--table-radius);
   background: var(--table-surface);
   box-shadow: var(--table-shadow);
@@ -63,14 +33,14 @@
 [data-table-design="standard"] .ds-table > thead > tr {
   background: var(--table-header);
   color: var(--table-text-secondary);
-  border-bottom: 1px solid var(--table-border);
+  border-bottom: var(--ds-border-width) solid var(--table-border);
   text-transform: none;
   letter-spacing: normal;
 }
 
 [data-table-design="standard"] .ds-table > :is(thead, tbody, tfoot) > tr > :is(th, td) {
   height: var(--table-row-height);
-  padding: 14px var(--table-cell-padding);
+  padding: var(--ds-space-sm) var(--table-cell-padding);
   border-color: var(--table-border);
   font-size: var(--table-font-size);
   vertical-align: middle;
@@ -85,17 +55,17 @@
 }
 
 [data-table-design="standard"] .ds-table > :is(thead, tbody, tfoot) > tr > :is(th, td):first-child {
-  padding-left: 28px;
+  padding-left: var(--ds-card-padding);
 }
 
 [data-table-design="standard"] .ds-table > :is(thead, tbody, tfoot) > tr > :is(th, td):last-child {
-  padding-right: 28px;
+  padding-right: var(--ds-card-padding);
 }
 
 [data-table-design="standard"] .ds-table > tbody > tr {
-  border-bottom: 1px solid var(--table-border);
+  border-bottom: var(--ds-border-width) solid var(--table-border);
   background: var(--table-surface);
-  transition: background-color 150ms;
+  transition: background-color var(--ds-duration-fast) var(--ds-ease);
 }
 
 [data-table-design="standard"] .ds-table > tbody > tr:last-child {
@@ -142,9 +112,9 @@
 }
 
 [data-table-design="standard"] .ds-table :is(.rounded-full.border, [data-slot="badge"]) {
-  border-radius: 999px;
-  padding: 3px 14px;
-  font-size: 13px;
+  border-radius: var(--ds-radius-full);
+  padding: calc(var(--ds-space) / 2) var(--ds-space-sm);
+  font-size: var(--ds-text-xs);
   line-height: 1.5;
   font-weight: 400;
   box-shadow: none;
@@ -153,7 +123,7 @@
 [data-table-design="standard"] .ds-table-pagination {
   border-color: var(--table-border);
   background: var(--table-surface);
-  padding: 16px 28px;
+  padding: var(--ds-space-md) var(--ds-card-padding);
   color: var(--table-text-secondary);
 }
 
@@ -164,8 +134,8 @@
 }
 
 [data-table-design="standard"] .ds-table-pagination :is(button, select) {
-  border-color: var(--table-border);
-  border-radius: 14px;
+  border-color: var(--input);
+  border-radius: var(--ds-radius-md);
   background-color: var(--table-surface);
   box-shadow: none;
 }
@@ -218,7 +188,7 @@
     color: var(--table-text) !important;
   }
   .dark [data-table-design="standard"] .ds-table-pagination :is(button, select) {
-    border-color: var(--table-border) !important;
+    border-color: var(--input) !important;
     background-color: var(--table-surface) !important;
     color: var(--table-text-secondary) !important;
   }

@@ -8,12 +8,12 @@ interface TermsOfServiceViewProps {
 }
 
 const ACCENT = {
-  icon: <Scale aria-hidden="true" className="w-4 h-4 text-blue-600 dark:text-blue-400" />,
-  num: 'text-blue-700 dark:text-blue-400',
-  toc: 'bg-blue-50/70 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/40',
-  tocTitle: 'text-blue-900 dark:text-blue-300',
-  button: 'bg-blue-700 hover:bg-blue-800',
-  link: 'text-blue-800 dark:text-blue-300',
+  icon: <Scale aria-hidden="true" className="w-4 h-4 text-status-info" />,
+  num: 'text-status-info ',
+  toc: 'bg-status-info-soft/70 dark:bg-status-info-soft/20 border-status-info-border dark:border-status-info-border/40',
+  tocTitle: 'text-status-info ',
+  button: 'bg-status-info hover:bg-status-info',
+  link: 'text-status-info ',
 };
 
 export const TermsOfServiceView: React.FC<TermsOfServiceViewProps> = ({ onBack }) => (

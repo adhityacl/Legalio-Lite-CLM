@@ -1,3 +1,4 @@
+import { Badge as ModuixBadge } from '@moduix/react-tailwind/badge';
 import * as React from "react";
 import { cn } from "./utils";
 
@@ -39,7 +40,7 @@ export function getStatusBadgeClass(status: string): string {
     s === "bhi" ||
     s === "never"
   ) {
-    return "bg-emerald-500/10 dark:bg-emerald-950/40 border-emerald-500/40 dark:border-emerald-500/50 text-emerald-800 dark:text-emerald-300";
+    return "ds-status-success";
   }
 
   // Warning / Akan Berakhir / Belum Lengkap / Recommended with notes / Review / Fair / Moderate / Rare / Sisa Waktu
@@ -60,7 +61,7 @@ export function getStatusBadgeClass(status: string): string {
     s.includes("hari lagi") ||
     s.includes("days left")
   ) {
-    return "bg-amber-500/10 dark:bg-amber-950/40 border-amber-500/40 dark:border-amber-500/50 text-amber-800 dark:text-amber-300";
+    return "ds-status-warning";
   }
 
   // Danger / Expired / Kadaluarsa / Terminated / Not Recommended / Inactive / Ditolak / Frequent
@@ -78,7 +79,7 @@ export function getStatusBadgeClass(status: string): string {
     s === "expensive" ||
     s === "delete"
   ) {
-    return "bg-rose-500/10 dark:bg-rose-950/40 border-rose-500/40 dark:border-rose-500/50 text-rose-800 dark:text-rose-300";
+    return "ds-status-danger";
   }
 
   // Legal / Good / Info / Selesai / BHA / Create / IO
@@ -93,7 +94,7 @@ export function getStatusBadgeClass(status: string): string {
     s === "io" ||
     s === "contract"
   ) {
-    return "bg-blue-500/10 dark:bg-blue-950/40 border-blue-500/40 dark:border-blue-500/50 text-blue-800 dark:text-blue-300";
+    return "ds-status-info";
   }
 
   // Admin / Addendum / Purple
@@ -103,16 +104,16 @@ export function getStatusBadgeClass(status: string): string {
     s === "auth" ||
     s === "add_user"
   ) {
-    return "bg-purple-500/10 dark:bg-purple-950/40 border-purple-500/40 dark:border-purple-500/50 text-purple-800 dark:text-purple-300";
+    return "ds-status-special";
   }
 
   // Finance / Cyan
   if (s === "finance" || s === "spending" || s === "invoice") {
-    return "bg-cyan-500/10 dark:bg-cyan-950/40 border-cyan-500/40 dark:border-cyan-500/50 text-cyan-800 dark:text-cyan-300";
+    return "ds-status-finance";
   }
 
   // Default / Neutral / Draft / Module / Update
-  return "bg-slate-500/10 dark:bg-slate-900/60 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200";
+  return "ds-status-neutral";
 }
 
 function Badge({ className, variant = "default", size = "md", children, ...props }: BadgeProps) {
@@ -120,33 +121,33 @@ function Badge({ className, variant = "default", size = "md", children, ...props
   switch (variant) {
     case "success":
     case "default":
-      variantClass = "bg-emerald-500/10 dark:bg-emerald-950/40 border-emerald-500/40 dark:border-emerald-500/50 text-emerald-800 dark:text-emerald-300";
+      variantClass = "ds-status-success";
       break;
     case "warning":
-      variantClass = "bg-amber-500/10 dark:bg-amber-950/40 border-amber-500/40 dark:border-amber-500/50 text-amber-800 dark:text-amber-300";
+      variantClass = "ds-status-warning";
       break;
     case "destructive":
     case "danger":
-      variantClass = "bg-rose-500/10 dark:bg-rose-950/40 border-rose-500/40 dark:border-rose-500/50 text-rose-800 dark:text-rose-300";
+      variantClass = "ds-status-danger";
       break;
     case "info":
-      variantClass = "bg-blue-500/10 dark:bg-blue-950/40 border-blue-500/40 dark:border-blue-500/50 text-blue-800 dark:text-blue-300";
+      variantClass = "ds-status-info";
       break;
     case "purple":
-      variantClass = "bg-purple-500/10 dark:bg-purple-950/40 border-purple-500/40 dark:border-purple-500/50 text-purple-800 dark:text-purple-300";
+      variantClass = "ds-status-special";
       break;
     case "secondary":
     case "neutral":
     case "outline":
     default:
-      variantClass = "bg-slate-500/10 dark:bg-slate-900/60 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200";
+      variantClass = "ds-status-neutral";
       break;
   }
 
   return (
-    <span
+    <ModuixBadge variant="outline"
       className={cn(
-        "inline-flex items-center justify-center rounded-full border font-normal transition-colors whitespace-nowrap gap-1.5 select-none",
+        "ds-badge",
         size === "sm" ? "px-2.5 py-0.5 text-xs" : "px-3 py-0.5 text-xs",
         variantClass,
         className
@@ -154,7 +155,7 @@ function Badge({ className, variant = "default", size = "md", children, ...props
       {...props}
     >
       {children}
-    </span>
+    </ModuixBadge>
   );
 }
 

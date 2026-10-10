@@ -58,7 +58,7 @@ export const AlertToastProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           const Icon = VARIANT_ICON[item.variant];
           return (
             <div key={item.id} className="pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-200">
-              <Alert variant={item.variant} className="bg-white dark:bg-slate-900 shadow-lg pr-8">
+              <Alert variant={item.variant} className="bg-surface shadow-lg pr-8">
                 <Icon className="h-4 w-4" />
                 <AlertTitle>{item.title}</AlertTitle>
                 {item.description && <AlertDescription>{item.description}</AlertDescription>}

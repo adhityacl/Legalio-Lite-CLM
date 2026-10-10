@@ -78,7 +78,7 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+        <label className="block text-xs font-medium text-ink">
           {label || t('admin.org_logo_label', 'Logo Organisasi / Workspace')}
         </label>
         <button
@@ -93,10 +93,10 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
         </button>
       </div>
 
-      <div className="flex items-center gap-3.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80">
+      <div className="ds-panel flex items-center gap-3.5 p-2">
         {/* Preview Container */}
         <div className="relative shrink-0 group">
-          <div className="w-14 h-14 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-center overflow-hidden shadow-xs">
+          <div className="w-14 h-14 rounded-full border border-hairline bg-surface flex items-center justify-center overflow-hidden shadow-xs">
             {logo ? (
               <img
                 src={logo}
@@ -117,7 +117,7 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
               type="button"
               onClick={handleRemove}
               title={t('admin.btn_remove_logo', 'Hapus Logo')}
-              className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-red-600 text-white hover:bg-red-700 shadow-md transition-all cursor-pointer"
+              className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-status-danger text-white hover:bg-status-danger shadow-md transition-all cursor-pointer"
             >
               <Trash2 className="w-3 h-3" />
             </button>
@@ -132,10 +132,10 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onClick={() => fileInputRef.current?.click()}
-              className={`flex min-h-14 items-center justify-center border-2 border-dashed rounded-xl p-2.5 text-center cursor-pointer transition-colors ${
+              className={`ds-panel flex min-h-14 items-center justify-center p-2.5 text-center cursor-pointer transition-colors ${
                 isDragging
-                  ? 'border-accent/30 bg-accent-soft'
-                  : 'border-slate-300 dark:border-slate-700 hover:border-accent/30 hover:bg-white dark:hover:bg-slate-900'
+                  ? 'bg-accent-soft'
+                  : ''
               }`}
             >
               <input
@@ -146,7 +146,7 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
                 onChange={(e) => handleFileChange(e.target.files?.[0])}
                 className="hidden"
               />
-              <div className="flex items-center justify-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-medium">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-ink-soft font-medium">
                 <Upload className="w-3.5 h-3.5 text-accent-text" />
                 <span>{t('admin.logo_upload_cta', 'Pilih atau Tarik Logo')}</span>
               </div>
@@ -159,12 +159,12 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
                   placeholder="https://example.com/logo.png"
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
-                  className="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-accent outline-none"
+                  className="ds-input flex-1"
                 />
                 <button
                   type="button"
                   onClick={handleApplyUrl}
-                  className="theme-action ui-button ui-button-lg font-medium text-white transition-colors cursor-pointer"
+                  className="theme-action ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
                 >
                   {t('admin.btn_apply', 'Terapkan')}
                 </button>

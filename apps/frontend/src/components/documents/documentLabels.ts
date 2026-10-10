@@ -36,5 +36,5 @@ export const typeBadgeClass = (type: DocumentType) => `${BADGE_CLASS} ${getStatu
 
 /** Field styling without width, for inline controls; INPUT_CLASS is the full-width default. */
 export const FIELD_CLASS =
-  'text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500';
+  'ds-input';
 export const INPUT_CLASS = `w-full ${FIELD_CLASS}`;

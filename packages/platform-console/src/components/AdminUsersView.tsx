@@ -1,3 +1,4 @@
+import { DesignSystemCatalog } from '@legalio/ui-components/catalog';
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -125,18 +126,18 @@ export const AdminUsersView: React.FC<{ initialTab?: SystemSubmenu; onManageOrga
   }));
 
   return (
-    <div className="flex w-full flex-col space-y-6 text-slate-900 dark:text-slate-100">
+    <div className="flex w-full flex-col space-y-6 text-ink">
       {toast && (
         <div role="status" aria-live="polite" className={`fixed right-4 top-4 z-50 flex items-center gap-2.5 rounded-xl border px-4 py-2.5 text-xs font-medium shadow-lg ${toast.type === 'success'
-          ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/90 dark:text-emerald-200'
-          : 'border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950/90 dark:text-red-200'}`}>
+          ? 'border-status-success-border bg-status-success-soft text-status-success dark:bg-status-success-soft/90 '
+          : 'border-status-danger-border bg-status-danger-soft text-status-danger dark:bg-status-danger-soft/90 '}`}>
           {toast.type === 'success' ? <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" /> : <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />}
           <span>{toast.message}</span>
-          <button type="button" onClick={() => setToast(null)} aria-label={t('admin.toast.dismiss', 'Tutup notifikasi')} className="ml-2 rounded-md p-1 hover:bg-slate-200/50"><X className="h-3.5 w-3.5" /></button>
+          <button type="button" onClick={() => setToast(null)} aria-label={t('admin.toast.dismiss', 'Tutup notifikasi')} className="inline-flex items-center justify-center ml-2 rounded-md size-8 hover:bg-surface-2/50"><X className="h-3.5 w-3.5" /></button>
         </div>
       )}
 
-      {!configurationSection && activeTab !== 'backups' && (
+      {!configurationSection && activeTab !== 'backups' && activeTab !== 'design-system' && (
         <AdminConsoleHeader
           area="system"
           activeTab={activeTab as ConsoleDashboardTab}
@@ -149,19 +150,19 @@ export const AdminUsersView: React.FC<{ initialTab?: SystemSubmenu; onManageOrga
       )}
 
       <div id={`admin-system-${activeTab}-panel`} role="tabpanel" aria-labelledby={`admin-system-${activeTab}-tab`} className="w-full">
-        {activeTab === 'backups' ? (
+        {activeTab === 'design-system' ? <DesignSystemCatalog /> : activeTab === 'backups' ? (
           <Suspense fallback={<p role="status">{t('sys.loading', 'Loading…')}</p>}><LazySQLiteBackups /></Suspense>
         ) : configurationSection ? (
-          <Suspense fallback={<div role="status" className="flex min-h-56 items-center justify-center text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /></div>}>
+          <Suspense fallback={<div role="status" className="flex min-h-56 items-center justify-center text-sm text-ink-soft"><Loader2 className="h-4 w-4 animate-spin" /></div>}>
             <LazyPlatformConfigurationPanel activeSection={configurationSection} />
           </Suspense>
         ) : loadError ? (
-          <div role="alert" className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+          <div role="alert" className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-status-danger-border bg-status-danger-soft p-4 text-sm text-status-danger dark:bg-status-danger-soft/40">
             <span>{t('admin.load_error', 'Data gagal dimuat')}: {loadError}</span>
             <button type="button" onClick={() => loadConsoleData()} className="shrink-0 font-semibold underline underline-offset-2">{t('admin.retry', 'Coba lagi')}</button>
           </div>
         ) : isLoading ? (
-          <div role="status" className="flex min-h-56 items-center justify-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />{t('admin.loading', 'Memuat data akses admin...')}</div>
+          <div role="status" className="flex min-h-56 items-center justify-center gap-2 text-sm text-ink-soft"><Loader2 className="h-4 w-4 animate-spin" />{t('admin.loading', 'Memuat data akses admin...')}</div>
         ) : (
           <>
             {activeTab === 'dashboard' && (
@@ -195,10 +196,10 @@ export const AdminUsersView: React.FC<{ initialTab?: SystemSubmenu; onManageOrga
                 onRevokeAllUserSessions={(userId) => act(() => consoleApi(`/sessions/revoke-all/${userId}`, { method: 'POST' }), t('admin.toast.revoke_all_sessions_success', 'All active sessions for user successfully revoked.')).catch(() => {})} />
             )}
             {activeTab === 'accounts' && (
-              <ul className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white text-sm dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
+              <ul className="divide-y divide-hairline rounded-2xl border border-hairline bg-surface text-sm">
                 {accounts.map((a) => (
                   <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                    <span>{a.userName} · {a.userEmail}</span><span className="text-slate-600 dark:text-slate-400">{a.providerId}</span>
+                    <span>{a.userName} · {a.userEmail}</span><span className="text-ink-soft">{a.providerId}</span>
                   </li>
                 ))}
               </ul>

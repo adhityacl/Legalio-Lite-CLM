@@ -67,6 +67,7 @@ import { SUPPORTED_CURRENCIES, currencyMinorUnits, currencyLabel, formatMoney, g
 import { formatInvoiceFileName, formatBillingFileName } from '@legalio/shared/fileNaming';
 import { DateInput } from './DateInput';
 import { usePermissions } from '../lib/permissions';
+import { fieldControlClass } from '@legalio/ui-components/input';
 import {
   parseMonthStr,
   parseAllMonths,
@@ -79,11 +80,11 @@ import {
   type SpendingAllocationInput,
 } from '@legalio/shared/spendingAllocations';
 
-const spendingFieldClass = 'w-full min-w-0 min-h-11 px-3 py-2.5 bg-white dark:bg-slate-900 border border-hairline dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:border-accent';
-const spendingLabelClass = 'block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5';
-const spendingButtonClass = 'ui-button ui-button-md border border-hairline dark:border-slate-700 bg-white dark:bg-slate-900 font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40 disabled:cursor-not-allowed';
-const spendingUploadClass = 'min-w-0 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-accent dark:hover:border-accent rounded-2xl p-4 text-center bg-slate-50 dark:bg-slate-800/40 hover:bg-emerald-50/40 transition-colors';
-const spendingFileInputClass = 'w-[220px] max-w-full min-w-0 text-sm text-slate-500 dark:text-slate-400 file:mr-2 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-xl';
+const spendingFieldClass = `${fieldControlClass} min-w-0`;
+const spendingLabelClass = 'block text-sm font-semibold text-ink  mb-1.5';
+const spendingButtonClass = 'ui-button ui-button-md border border-hairline  bg-surface  font-semibold hover:bg-surface-2 dark:hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40 disabled:cursor-not-allowed';
+const spendingUploadClass = 'ds-upload min-w-0 text-center';
+const spendingFileInputClass = 'w-[220px] max-w-full min-w-0 text-sm text-ink-soft  file:mr-2 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-xl';
 
 // Re-export formatMonthTagDisplay for backwards compatibility with any external consumers
 export { formatMonthTagDisplay };
@@ -629,12 +630,12 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
     <th
       scope="col"
       aria-sort={sortField === field ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-      className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300 text-left select-none align-middle"
+      className="p-4 text-xs font-bold text-ink text-left select-none align-middle"
      data-numeric={field === 'amount'}>
       <button
         type="button"
         onClick={() => handleSort(field)}
-        className="flex items-center gap-1.5 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded py-0.5"
+        className="flex items-center gap-1.5 hover:text-ink dark:hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded-sm py-0.5"
         title={t('spending.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}
       >
         <span>{label}</span>
@@ -645,7 +646,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
             <ArrowDown className="w-3.5 h-3.5 text-accent-text shrink-0" />
           )
         ) : (
-          <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <ArrowUpDown className="w-3.5 h-3.5 text-ink-soft shrink-0" />
         )}
       </button>
     </th>
@@ -688,9 +689,9 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="ds-page-bar">
         <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+          <h2 className="ds-page-heading">
             <span>{t('spending.partner_spending_invoicing', 'Partner Spending / Invoicing')}</span>
           </h2>
         </div>
@@ -700,7 +701,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
             <button
               onClick={handleExportCSV}
               disabled={sortedSpendings.length === 0}
-              className="ui-button ui-button-lg cursor-pointer shadow-sm border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-50 text-slate-600 font-bold flex items-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="ui-button ui-button-lg cursor-pointer flex items-center disabled:opacity-50 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-outline"
               title={t('contracts.export_csv', 'Ekspor CSV')}
             >
               <Download className="w-4 h-4" />
@@ -711,7 +712,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
           {canCreateContract(user) && (
             <button
               onClick={handleAddNew}
-              className="ui-button ui-button-lg cursor-pointer shadow-sm bg-accent-strong hover:bg-accent-strong-hover text-white font-bold flex items-center transition-all"
+              className="ui-button ui-button-lg cursor-pointer flex items-center ds-button ds-button-lg ds-button-default"
             >
               <Plus className="w-4 h-4 text-white" />
               <span>{t('ui.add_spending')}</span>
@@ -722,11 +723,11 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
 
       {/* Filter Bar with 3 Dropdowns */}
       {/* Search & Filter Bar - Justified Responsive Grid/Flex */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-4 sm:p-5 mb-6">
-        <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
+      <div className="ds-panel p-4 sm:p-5 mb-6">
+        <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full ds-grid">
           {/* 1 Box Search */}
           <div className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <Search className="w-4 h-4 text-ink-soft absolute left-3 top-2.5" />
             <input
               type="text"
               placeholder={t('spending.search_placeholder', 'Cari invoice, partner, deskripsi...')}
@@ -736,7 +737,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="h-9 w-full pl-9 pr-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-accent font-medium transition-colors"
+              className="ds-input w-full pl-9 pr-3"
             />
           </div>
 
@@ -748,7 +749,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               setSelectedYear(e.target.value);
               setCurrentPage(1);
             }}
-            className="min-h-11 sm:min-h-9 h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[130px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
           >
             <option value="ALL">{t('dashboard.all_years', 'Semua Tahun')}</option>
             {availableYears.map(year => (
@@ -764,7 +765,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               setSelectedVendorFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="min-h-11 sm:min-h-9 h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[130px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
           >
             <option value="ALL">{t('spending.all_vendors', 'Semua Partner')}</option>
             {Array.from(new Set(spendings.map(s => s.vendor_name).filter(Boolean))).sort().map(vendor => (
@@ -780,7 +781,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               setSelectedMonthFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="min-h-11 sm:min-h-9 h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[130px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
           >
             <option value="ALL">{t('spending.semua_bulan', 'Semua Bulan')}</option>
             <option value="01">{t('spending.januari_01', 'Januari (01)')}</option>
@@ -799,7 +800,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
 
           {/* Column Toggle */}
           <TableViewMenu title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
-            <div className="px-3.5 py-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 border-b border-slate-100 dark:border-slate-800">
+            <div className="px-3.5 py-1.5 text-xs font-bold text-ink-soft uppercase tracking-wider mb-1 border-b border-hairline">
               {t('io.toggle_columns', 'Toggle Kolom')}
             </div>
             {Object.keys(visibleColumns).map((col) => {
@@ -813,12 +814,12 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               else if (col === 'billing_doc') label = t('spending.col_billing_doc', 'Billing');
 
               return (
-                <label key={col} className="flex items-center gap-2.5 px-3.5 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300 select-none">
+                <label key={col} className="flex items-center gap-2.5 px-3.5 py-1.5 hover:bg-surface dark:hover:bg-surface-2/50 cursor-pointer text-xs font-medium text-ink select-none">
                   <input
                     type="checkbox"
                     checked={visibleColumns[col]}
                     onChange={() => toggleColumnVisibility(col)}
-                    className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                    className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                   />
                   <span className="capitalize">{label}</span>
                 </label>
@@ -829,13 +830,13 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
       </div>
 
       {/* Table */}
-      <div className="ds-table-surface bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+      <div className="ds-table-surface bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_year'), value: selectedYear, active: selectedYear !== 'ALL' }, { label: t('ui.filter_partner'), value: selectedVendorFilter, active: selectedVendorFilter !== 'ALL' }, { label: t('ui.filter_month'), value: selectedMonthFilter, active: selectedMonthFilter !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedYear('ALL'); setSelectedVendorFilter('ALL'); setSelectedMonthFilter('ALL'); }} />
-        <p className="mobile-table-hint px-4 py-2 text-xs text-slate-600 dark:text-slate-300 md:hidden">{t('ui.scroll_table')}</p>
-        <div className="data-table-scroll overflow-x-auto bg-white dark:bg-slate-900" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
-          <table className="ds-table app-data-table w-full text-left border-collapse text-xs bg-white dark:bg-slate-900">
-            <thead className="bg-slate-50 dark:bg-slate-800/50">
-              <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 h-12">
+        <p className="mobile-table-hint px-4 py-2 text-xs text-ink-soft md:hidden">{t('ui.scroll_table')}</p>
+        <div className="data-table-scroll overflow-x-auto bg-surface" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
+          <table className="ds-table app-data-table w-full text-left border-collapse text-xs bg-surface">
+            <thead className="bg-surface dark:bg-surface-2/50">
+              <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
                 <th scope="col" className="pl-6 pr-2 py-4 w-12 text-left align-middle">
                   <div className="flex items-center justify-start">
                     <input
@@ -843,7 +844,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                       aria-label={t('spending.pilih_semua_spending', 'Pilih semua spending')}
                       onChange={handleSelectAll}
                       checked={selectedRows.length > 0 && selectedRows.length === currentSpendings.length}
-                      className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                      className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                     />
                   </div>
                 </th>
@@ -853,26 +854,26 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                 {visibleColumns.invoice_date && renderSortHeader(t('spending.col_date', 'Tanggal Invoice'), 'invoice_date')}
                 {visibleColumns.amount && renderSortHeader(t('spending.col_amount', 'Total Nilai'), 'amount')}
                 {visibleColumns.invoice_doc && (
-                  <th scope="col" className="p-4 text-left text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                  <th scope="col" className="p-4 text-left text-xs font-bold text-ink align-middle">
                     <span>{t('spending.col_invoice_doc', 'Invoice')}</span>
                   </th>
                 )}
                 {visibleColumns.billing_doc && (
-                  <th scope="col" className="p-4 text-left text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                  <th scope="col" className="p-4 text-left text-xs font-bold text-ink align-middle">
                     <span>{t('spending.col_billing_doc', 'Billing')}</span>
                   </th>
                 )}
-                <th data-actions="true" scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                <th data-actions="true" scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
                   <div className="flex items-center justify-end">{t('spending.col_action', 'Aksi')}</div>
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-hairline dark:divide-slate-800">
+            <tbody className="divide-y divide-hairline">
               {sortedSpendings.length === 0 ? (
                 <TableEmptyState colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} />
               ) : (
                 currentSpendings.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <tr key={s.id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
                     <td className="pl-6 pr-2 py-4 text-left align-middle">
                       <div className="flex items-center justify-start">
                         <input
@@ -880,28 +881,28 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                           aria-label={t('spending.pilih_spending', 'Pilih spending {value}', { value: s.invoice_number || s.vendor_name || '' })}
                           checked={selectedRows.includes(s.id || '')}
                           onChange={() => handleSelectRow(s.id || '')}
-                          className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                          className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                         />
                       </div>
                     </td>
 
                     {/* 1. No. Invoice */}
                     {visibleColumns.invoice_no && (
-                      <td className="py-4 px-4 text-xs font-semibold text-slate-900 dark:text-slate-100 text-left whitespace-nowrap">
+                      <td className="py-4 px-4 text-xs font-semibold text-ink text-left whitespace-nowrap">
                         {s.invoice_number}
                       </td>
                     )}
 
                     {/* 2. Partner */}
                     {visibleColumns.vendor && (
-                      <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left whitespace-nowrap">
+                      <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
                         {s.vendor_name}
                       </td>
                     )}
 
                     {/* 3. Invoice Month */}
                     {visibleColumns.invoice_month && (
-                      <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 text-left whitespace-nowrap">
+                      <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
                         {s.invoice_month && s.invoice_month.length > 0
                           ? s.invoice_month.map((m) => formatMonthTagDisplay(m, language)).join(', ')
                           : '-'}
@@ -910,21 +911,21 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
 
                     {/* 4. Invoice Date */}
                     {visibleColumns.invoice_date && (
-                      <td className="py-4 px-4 text-xs font-normal text-slate-700 text-left whitespace-nowrap">
+                      <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
                         {formatBusinessDate(s.invoice_date)}
                       </td>
                     )}
 
                     {/* 5. Amount */}
                     {visibleColumns.amount && (
-                      <td className="py-4 px-4 text-xs font-normal text-slate-700 text-right whitespace-nowrap tabular-nums">
+                      <td className="py-4 px-4 text-xs font-normal text-ink text-right whitespace-nowrap tabular-nums">
                         {formatMoney(s.total_amount, s.currency)}
                       </td>
                     )}
 
                     {/* 6. Invoice Doc */}
                     {visibleColumns.invoice_doc && (
-                      <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 text-left whitespace-nowrap">
+                      <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
                         {s.invoice_file_url ? (
                           <a
                             href={s.invoice_file_url}
@@ -935,14 +936,14 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                             <FileDown className="w-3.5 h-3.5" /> {t('spending.pdf', 'PDF')}
                           </a>
                         ) : (
-                          <span className="text-slate-300 dark:text-slate-600">—</span>
+                          <span className="text-on-solid">—</span>
                         )}
                       </td>
                     )}
 
                     {/* 7. Billing Doc */}
                     {visibleColumns.billing_doc && (
-                      <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 text-left whitespace-nowrap">
+                      <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
                         {s.billing_file_url ? (
                           <a
                             href={s.billing_file_url}
@@ -953,7 +954,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                             <FileSpreadsheet className="w-3.5 h-3.5" /> {t('spending.sheet', 'Sheet')}
                           </a>
                         ) : (
-                          <span className="text-slate-300 dark:text-slate-600">—</span>
+                          <span className="text-on-solid">—</span>
                         )}
                       </td>
                     )}
@@ -1010,9 +1011,9 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
       {showModal && (
     <ModalFrame onClose={closeSpendingModal}>
             {/* Modal Header */}
-            <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
+            <div className="ds-section-header">
               <div>
-                <ModalTitle className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <ModalTitle className="ds-modal-title flex items-center gap-2">
                   <CreditCard className="w-5 h-5 text-accent-text" />
                   <span>
                     {editingSpending
@@ -1025,7 +1026,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                 type="button"
                 onClick={closeSpendingModal} disabled={formBusy}
                 aria-label={t('common.close', 'Close')}
-            className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="min-w-10 min-h-10 flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink p-1.5 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1033,16 +1034,16 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
 
             {/* Modal Form */}
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-              <div className="p-5 sm:p-6 overflow-y-auto space-y-6 text-sm flex-1 min-w-0 text-slate-900 dark:text-slate-100">
-                {errorMessage && <div ref={errorRef} tabIndex={-1} role="alert" className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl">{errorMessage}</div>}
-                {parseSuccessMsg && <div role="status" className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-xl flex items-center gap-2"><CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />{parseSuccessMsg}</div>}
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-6 text-sm flex-1 min-w-0 text-ink">
+                {errorMessage && <div ref={errorRef} tabIndex={-1} role="alert" className="ds-alert ds-status-danger border">{errorMessage}</div>}
+                {parseSuccessMsg && <div role="status" className="ds-alert ds-status-success border flex items-start gap-2"><CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />{parseSuccessMsg}</div>}
                 <fieldset disabled={formBusy} className="space-y-6 min-w-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ds-grid">
                     <section aria-labelledby="spending-partner-heading" className="min-w-0">
                       <h3 id="spending-partner-heading" className="font-semibold text-base mb-3">{t('spending.partner_details', 'Partner Details')}</h3>
-                      <div className="rounded-xl border border-hairline dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-5 space-y-3">
+                      <div className="ds-panel p-4 sm:p-5 space-y-3">
                         <div>
-                          <label htmlFor="spending-partner" className={spendingLabelClass}>{t('spending.partner_name', 'Partner Name')} <span className="text-rose-500">*</span></label>
+                          <label htmlFor="spending-partner" className={spendingLabelClass}>{t('spending.partner_name', 'Partner Name')} <span className="text-status-danger">*</span></label>
                           <AlphabeticalSelect id="spending-partner" required value={formVendorId || formVendorName} onChange={e => {
                             const partner = partners.find(p => p.partner_id === e.target.value);
                             handleVendorSelect(partner?.nama_partner || e.target.value, partner?.partner_id);
@@ -1053,9 +1054,9 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                           </AlphabeticalSelect>
                         </div>
                         <div>
-                          <label htmlFor="spending-invoice-number" className={spendingLabelClass}>{t('spending.invoice_no_label', 'Invoice Number')} <span className="text-rose-500">*</span></label>
+                          <label htmlFor="spending-invoice-number" className={spendingLabelClass}>{t('spending.invoice_no_label', 'Invoice Number')} <span className="text-status-danger">*</span></label>
                           <input id="spending-invoice-number" required value={formInvoiceNumber} onChange={e => setFormInvoiceNumber(e.target.value)} placeholder={t('spending.invoice_no_ph', 'Contoh: INV-2026-0801')} className={spendingFieldClass} />
-                          {formInvoiceNumber.trim() && spendings.some(s => s.invoice_number.toLowerCase() === formInvoiceNumber.trim().toLowerCase() && s.id !== editingSpending?.id) && <p className="text-xs text-amber-700 dark:text-amber-400 mt-1 flex gap-1"><Lightbulb className="size-3.5 shrink-0" aria-hidden="true" />{t('spending.nomor_invoice_ini_sudah_dicatat_sebelumnya', 'Nomor invoice ini sudah dicatat sebelumnya. Diizinkan menginput nomor invoice sama untuk bulan/amount berbeda.')}</p>}
+                          {formInvoiceNumber.trim() && spendings.some(s => s.invoice_number.toLowerCase() === formInvoiceNumber.trim().toLowerCase() && s.id !== editingSpending?.id) && <p className="text-xs text-status-warning mt-1 flex gap-1"><Lightbulb className="size-3.5 shrink-0" aria-hidden="true" />{t('spending.nomor_invoice_ini_sudah_dicatat_sebelumnya', 'Nomor invoice ini sudah dicatat sebelumnya. Diizinkan menginput nomor invoice sama untuk bulan/amount berbeda.')}</p>}
                         </div>
                         <div>
                           <label htmlFor="spending-invoice-title" className={spendingLabelClass}>{t('spending.invoice_title_label', 'Invoice Title')}</label>
@@ -1065,7 +1066,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                     </section>
                     <section aria-labelledby="spending-bank-heading" className="min-w-0">
                       <h3 id="spending-bank-heading" className="font-semibold text-base mb-3">{t('spending.bank_panel_title', 'Bank Account Information')}</h3>
-                      <div className="rounded-xl border border-hairline dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-5 space-y-3">
+                      <div className="ds-panel p-4 sm:p-5 space-y-3">
                         <div>
                           <label htmlFor="spending-bank-name" className={spendingLabelClass}>{t('spending.bank_name_label', 'Bank Name')}</label>
                           <input id="spending-bank-name" value={formBankName} onChange={e => { bankEdited.current.name = true; setFormBankName(e.target.value); }} className={spendingFieldClass} />
@@ -1081,7 +1082,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                       </div>
                     </section>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 ds-grid">
                     <div className="min-w-0">
                       <label htmlFor="spending-invoice-date" className={spendingLabelClass}>{t('spending.invoice_date_label', 'Invoice Date')}</label>
                       <DateInput id="spending-invoice-date" value={formInvoiceDate} onChange={setFormInvoiceDate} focusColor="emerald" />
@@ -1093,75 +1094,75 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                       </AlphabeticalSelect>
                     </div>
                     <div className="min-w-0">
-                      <label htmlFor="spending-total" className={spendingLabelClass}>{t('spending.total_amount_label', 'Total Amount')} <span className="text-rose-500">*</span></label>
-                      <input id="spending-total" required type="number" min="0" step="any" value={formTotalAmount} onChange={e => setFormTotalAmount(e.target.value === '' ? '' : Number(e.target.value))} className={`${spendingFieldClass} text-right font-semibold`} />
-                      <div className="mt-2 text-xs text-slate-600 dark:text-slate-400 flex flex-wrap justify-between gap-1" aria-live="polite">
-                        <span>{t('spending.usd_estimate', 'Estimated USD Conversion')}</span><strong className="text-slate-900 dark:text-slate-100">{formatMoney(estimatedUsd, 'USD')}</strong>
+                      <label htmlFor="spending-total" className={spendingLabelClass}>{t('spending.total_amount_label', 'Total Amount')} <span className="text-status-danger">*</span></label>
+                      <input id="spending-total" required type="number" min="0" step="any" value={formTotalAmount} onChange={e => setFormTotalAmount(e.target.value === '' ? '' : Number(e.target.value))} className={`ds-input${spendingFieldClass} text-right`} />
+                      <div className="mt-2 text-xs text-ink-soft flex flex-wrap justify-between gap-1" aria-live="polite">
+                        <span>{t('spending.usd_estimate', 'Estimated USD Conversion')}</span><strong className="text-ink">{formatMoney(estimatedUsd, 'USD')}</strong>
                       </div>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{formCurrency === 'USD' ? t('spending.sama_mata_uang_usd', 'Sama (Mata uang USD)') : t('spending.1_usd', '1 {formCurrency} ≈ {value} USD', { formCurrency, value: historicalRate.toFixed(8) })}</p>
+                      <p className="mt-1 text-xs text-ink-soft">{formCurrency === 'USD' ? t('spending.sama_mata_uang_usd', 'Sama (Mata uang USD)') : t('spending.1_usd', '1 {formCurrency} ≈ {value} USD', { formCurrency, value: historicalRate.toFixed(8) })}</p>
                     </div>
                   </div>
-                  <section aria-labelledby="spending-allocation-heading" aria-describedby="spending-allocation-status" className="rounded-xl border border-hairline dark:border-slate-700 overflow-hidden">
+                  <section aria-labelledby="spending-allocation-heading" aria-describedby="spending-allocation-status" className="rounded-xl border border-hairline overflow-hidden">
                     <div className="flex flex-wrap justify-between items-center gap-3 p-4">
-                      <div><h3 id="spending-allocation-heading" className="font-semibold">{t('spending.allocation_title', 'Spending Month Allocation')}</h3><p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{t('spending.allocation_help', 'One invoice can cover one or multiple spending months.')}</p></div>
+                      <div><h3 id="spending-allocation-heading" className="font-semibold">{t('spending.allocation_title', 'Spending Month Allocation')}</h3><p className="text-xs text-ink-soft mt-1">{t('spending.allocation_help', 'One invoice can cover one or multiple spending months.')}</p></div>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" disabled={!monthAllocations.length || formTotalAmount === '' || Number(formTotalAmount) < 0} onClick={() => setMonthAllocations(rows => splitSpendingEqually(rows, Number(formTotalAmount), currencyMinorUnits(formCurrency)))} className={spendingButtonClass}>{t('spending.split_equally', 'Split Equally')}</button>
                         <button type="button" onClick={() => setMonthAllocations(rows => [...rows, { month: '', amount: '' }])} className={`${spendingButtonClass} flex items-center gap-1`}><Plus className="size-4" aria-hidden="true" />{t('spending.add_month', 'Add Month')}</button>
                       </div>
                     </div>
-                    <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-y border-hairline dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300" aria-hidden="true"><span>{t('spending.spending_month', 'Spending Month')}</span><span className="text-right">{t('spending.allocated_amount', 'Allocated Amount')} ({formCurrency})</span><span className="sr-only">{t('spending.delete_month', 'Delete spending month {index}', { index: '' })}</span></div>
-                    <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                    <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-3 px-4 py-3 bg-surface dark:bg-surface-2/50 border-y border-hairline text-xs font-semibold text-ink-soft ds-grid" aria-hidden="true"><span>{t('spending.spending_month', 'Spending Month')}</span><span className="text-right">{t('spending.allocated_amount', 'Allocated Amount')} ({formCurrency})</span><span className="sr-only">{t('spending.delete_month', 'Delete spending month {index}', { index: '' })}</span></div>
+                    <div className="divide-y divide-hairline">
                       {monthAllocations.map((row, index) => {
                         const duplicate = Boolean(row.month && monthAllocations.some((other, otherIndex) => index !== otherIndex && other.month === row.month));
-                        return <div key={index} className="grid grid-cols-[minmax(0,1fr)_44px] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-3 p-4 items-end">
+                        return <div key={index} className="grid grid-cols-[minmax(0,1fr)_44px] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-3 p-4 items-end ds-grid">
                           <div className="min-w-0">
                             <label htmlFor={`spending-month-${index}`} className="block text-xs font-semibold mb-1.5 sm:sr-only">{t('spending.spending_month', 'Spending Month')} {index + 1}</label>
                             <input id={`spending-month-${index}`} type="month" required min="1900-01" max="2100-12" value={row.month} aria-invalid={duplicate || !row.month} aria-describedby="spending-allocation-status" onChange={e => setMonthAllocations(rows => rows.map((item, i) => i === index ? { ...item, month: e.target.value } : item))} className={spendingFieldClass} />
                           </div>
                           <div className="min-w-0 col-start-1 row-start-2 sm:col-start-auto sm:row-start-auto">
                             <label htmlFor={`spending-amount-${index}`} className="block text-xs font-semibold mb-1.5 sm:sr-only">{t('spending.allocated_amount', 'Allocated Amount')} {index + 1} ({formCurrency})</label>
-                            <input id={`spending-amount-${index}`} type="number" min="0" step="any" required value={row.amount} aria-invalid={row.amount === '' || Number(row.amount) < 0} aria-describedby="spending-allocation-status" onChange={e => setMonthAllocations(rows => rows.map((item, i) => i === index ? { ...item, amount: e.target.value === '' ? '' : Number(e.target.value) } : item))} className={`${spendingFieldClass} text-right font-semibold`} />
+                            <input id={`spending-amount-${index}`} type="number" min="0" step="any" required value={row.amount} aria-invalid={row.amount === '' || Number(row.amount) < 0} aria-describedby="spending-allocation-status" onChange={e => setMonthAllocations(rows => rows.map((item, i) => i === index ? { ...item, amount: e.target.value === '' ? '' : Number(e.target.value) } : item))} className={`ds-input${spendingFieldClass} text-right`} />
                           </div>
-                          <button type="button" aria-label={t('spending.delete_month', 'Delete spending month {index}', { index: index + 1 })} onClick={() => setMonthAllocations(rows => rows.filter((_, i) => i !== index))} className={`${spendingButtonClass.replace('ui-button-md', 'ui-button-lg')} ui-button-icon col-start-2 row-start-1 sm:col-start-auto sm:row-start-auto hover:text-rose-600`}><Trash2 className="size-4 mx-auto" aria-hidden="true" /></button>
+                          <button type="button" aria-label={t('spending.delete_month', 'Delete spending month {index}', { index: index + 1 })} onClick={() => setMonthAllocations(rows => rows.filter((_, i) => i !== index))} className={`ds-button ds-button-md ds-button-ghost${spendingButtonClass.replace('ui-button-md', 'ui-button-lg')} ui-button-icon col-start-2 row-start-1 sm:col-start-auto sm:row-start-auto`}><Trash2 className="size-4 mx-auto" aria-hidden="true" /></button>
                         </div>;
                       })}
                     </div>
-                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-hairline dark:border-slate-700 flex flex-wrap items-center justify-between gap-2">
-                      <p id="spending-allocation-status" role="status" className={`text-sm font-medium ${!allocationError ? 'text-emerald-700 dark:text-emerald-300' : remaining < -ALLOCATION_TOLERANCE ? 'text-rose-700 dark:text-rose-300' : 'text-amber-800 dark:text-amber-300'}`}>{allocationStatus}</p>
-                      <span className="text-xs text-slate-600 dark:text-slate-400">{t('spending.allocated_total', 'Allocated: {amount}', { amount: formatMoney(allocatedTotal, formCurrency) })}</span>
+                    <div className="p-4 bg-surface dark:bg-surface-2/50 border-t border-hairline flex flex-wrap items-center justify-between gap-2">
+                      <p id="spending-allocation-status" role="status" className={`text-sm font-medium ${!allocationError ? 'text-status-success ' : remaining < -ALLOCATION_TOLERANCE ? 'text-status-danger ' : 'text-status-warning '}`}>{allocationStatus}</p>
+                      <span className="text-xs text-ink-soft">{t('spending.allocated_total', 'Allocated: {amount}', { amount: formatMoney(allocatedTotal, formCurrency) })}</span>
                     </div>
                   </section>
                   <div>
                     <label htmlFor="spending-description" className={spendingLabelClass}>{t('spending.invoice_desc_label', 'Invoice Description')}</label>
-                    <textarea id="spending-description" rows={4} value={formInvoiceDesc} onChange={e => setFormInvoiceDesc(e.target.value)} placeholder={t('spending.invoice_desc_ph', 'Keterangan lengkap pengeluaran / rincian invoice...')} className={`${spendingFieldClass} resize-y`} />
+                    <textarea id="spending-description" rows={4} value={formInvoiceDesc} onChange={e => setFormInvoiceDesc(e.target.value)} placeholder={t('spending.invoice_desc_ph', 'Keterangan lengkap pengeluaran / rincian invoice...')} className={`ds-input${spendingFieldClass} resize-y`} />
                   </div>
                   <section aria-labelledby="spending-documents-heading">
                     <h3 id="spending-documents-heading" className="font-semibold text-base mb-3">{t('spending.documents_title', 'Documents')}</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ds-grid">
                       <div className="min-w-0">
                         <label htmlFor="spending-invoice-file" className={spendingLabelClass}>{t('spending.upload_invoice_label', 'Upload Invoice')}</label>
                         <div className={spendingUploadClass}>
                           <Upload className="size-6 text-accent-text mx-auto mb-1.5" aria-hidden="true" />
-                          <p className="text-sm font-bold text-slate-800 dark:text-slate-200 break-words">
+                          <p className="text-sm font-bold text-ink break-words">
                             {invoiceFileObj ? <>{t('form.contract.file_selected', 'File selected:')} <span className="break-all">{invoiceFileObj.fileName}</span></>
                               : editingSpending?.invoice_file_url ? <a href={editingSpending.invoice_file_url} target="_blank" rel="noopener noreferrer" className="break-all underline">{editingSpending.invoice_file_name || t('spending.existing_invoice', 'View existing invoice')}</a>
                               : t('form.partner.drag_ref', 'Choose a reference document')}
                           </p>
                           <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
-                            {invoiceFileObj && <button type="button" disabled={formBusy} onClick={handleParseSpending} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-accent-soft text-accent-text hover:bg-accent/20 font-bold text-sm rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                            {invoiceFileObj && <button type="button" disabled={formBusy} onClick={handleParseSpending} className="flex items-center gap-1.5 px-4 min-h-10 bg-accent-soft text-accent-text hover:bg-accent/20 font-semibold text-sm rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
                               {isParsing && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
                               {isParsing ? t('spending.mengekstrak', 'Mengekstrak...') : t('partners.parse_file', 'Parse File')}
                             </button>}
                             <input id="spending-invoice-file" type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => handleFileChange(e, 'invoice')} className={spendingFileInputClass} />
                           </div>
                         </div>
-                        <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">{t('spending.documents_help', 'PDF, Word, JPG or PNG. Maximum 20 MB.')}</p>
+                        <p className="mt-2 text-xs text-ink-soft">{t('spending.documents_help', 'PDF, Word, JPG or PNG. Maximum 20 MB.')}</p>
                       </div>
                       <div className="min-w-0">
                         <label htmlFor="spending-billing-file" className={spendingLabelClass}>{t('spending.upload_billing_label', 'Upload Billing')}</label>
                         <div className={spendingUploadClass}>
                           <Upload className="size-6 text-accent-text mx-auto mb-1.5" aria-hidden="true" />
-                          <p className="text-sm font-bold text-slate-800 dark:text-slate-200 break-words">
+                          <p className="text-sm font-bold text-ink break-words">
                             {billingFileObj ? <>{t('form.contract.file_selected', 'File selected:')} <span className="break-all">{billingFileObj.fileName}</span></>
                               : editingSpending?.billing_file_url ? <a href={editingSpending.billing_file_url} target="_blank" rel="noopener noreferrer" className="break-all underline">{editingSpending.billing_file_name || t('spending.existing_billing', 'View existing billing')}</a>
                               : t('form.partner.drag_ref', 'Choose a reference document')}
@@ -1170,7 +1171,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                             <input id="spending-billing-file" type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => handleFileChange(e, 'billing')} className={spendingFileInputClass} />
                           </div>
                         </div>
-                        <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">{t('spending.documents_help', 'PDF, Word, JPG or PNG. Maximum 20 MB.')}</p>
+                        <p className="mt-2 text-xs text-ink-soft">{t('spending.documents_help', 'PDF, Word, JPG or PNG. Maximum 20 MB.')}</p>
                       </div>
                     </div>
                   </section>
@@ -1178,22 +1179,22 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               </div>
 
               {/* Actions */}
-              <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0">
-                <span className="text-xs text-slate-400 dark:text-slate-500 font-medium hidden sm:inline">
+              <div className="p-4 sm:p-5 bg-surface border-t border-hairline flex items-center justify-between gap-2 shrink-0">
+                <span className="text-xs text-ink-soft font-medium hidden sm:inline">
                   {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
                 </span>
                 <div className="flex items-center gap-2 ml-auto">
                   <button
                     type="button"
                     onClick={closeSpendingModal} disabled={formBusy}
-                    className="ui-button ui-button-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold transition-colors cursor-pointer"
+                    className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
                   >
                     {t('spending.cancel_btn', 'Batal')}
                   </button>
                   <button
                     type="submit"
                     disabled={formBusy || Boolean(allocationError) || !formVendorName || !formInvoiceNumber.trim()}
-                    className="ui-button ui-button-lg bg-accent-strong hover:bg-accent-strong-hover text-white font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="ui-button ui-button-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-default"
                   >
                     {isSubmitting
                       ? t('spending.saving_btn', 'Menyimpan...')

@@ -120,7 +120,7 @@ export const isEmptyInstall = (db: DB): boolean =>
 /* Validation (§7.4)                                                    */
 /* ------------------------------------------------------------------ */
 
-export const DEFAULT_PRIMARY_COLOR = '#06C755';
+export const DEFAULT_PRIMARY_COLOR = '#2653F6';
 const EMAIL = /^[^\s@,;<>"']+@[^\s@,;<>"']+\.[^\s@,;<>"']+$/;
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const RESOURCE_ID = /^[A-Za-z0-9_-]{10,200}$/;

@@ -364,9 +364,9 @@ export const IOModal: React.FC<IOModalProps> = ({
   return (
     <ModalFrame onClose={onClose}>
         {/* Header */}
-        <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
+        <div className="ds-section-header">
           <div>
-            <ModalTitle className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <ModalTitle className="ds-modal-title flex items-center gap-2">
               <FileSpreadsheet className="w-5 h-5 text-accent-text" />
               <span>
                 {ioToEdit?.io_id
@@ -379,24 +379,24 @@ export const IOModal: React.FC<IOModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label={t('common.close', 'Close')}
-            className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="min-w-10 min-h-10 flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink p-1.5 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-sm flex-1 text-slate-900 dark:text-slate-100">
+          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-sm flex-1 text-ink">
             {/* Row 1: Partner & Induk Kontrak */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ds-grid">
               <div>
-                <label htmlFor="IOModal-field-1" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-1" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.io.partner_media', 'Partner / Media Vendor *')}
                 </label>
                 <AlphabeticalSelect id="IOModal-field-1"
                   value={partnerId}
                   onChange={(e) => handlePartnerChange(e.target.value)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer"
+                  className="ds-input w-full cursor-pointer"
                 >
                   <option value="">{t('io.pilih_partner_vendor', '-- Pilih Partner / Vendor --')}</option>
                   {partners.map((p) => (
@@ -408,13 +408,13 @@ export const IOModal: React.FC<IOModalProps> = ({
               </div>
 
               <div>
-                <label htmlFor="IOModal-field-2" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-2" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.io.select_master', 'Pilih Induk Kontrak (Opsional)')}
                 </label>
                 <AlphabeticalSelect id="IOModal-field-2"
                   value={contractId}
                   onChange={(e) => handleContractChange(e.target.value)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer"
+                  className="ds-input w-full cursor-pointer"
                 >
                   <option value="">{t('form.io.standalone_opt', '-- IO Standalone (Tanpa Kontrak Induk) --')}</option>
                   {availableContracts.map((c) => (
@@ -427,9 +427,9 @@ export const IOModal: React.FC<IOModalProps> = ({
             </div>
 
             {/* Row 2: Nomor IO & Kanal Media */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ds-grid">
               <div>
-                <label htmlFor="IOModal-field-3" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-3" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.io.nomor_io', 'Nomor IO *')}
                 </label>
                 <input id="IOModal-field-3"
@@ -438,12 +438,12 @@ export const IOModal: React.FC<IOModalProps> = ({
                   placeholder={t('form.io.nomor_io_ph', 'contoh: IO/DETIK/2026/012')}
                   value={nomorIO}
                   onChange={(e) => setNomorIO(e.target.value)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input w-full"
                 />
               </div>
 
               <div>
-                <label htmlFor="IOModal-field-4" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-4" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.io.kanal_media', 'Kanal Media / Placement *')}
                 </label>
                 <input id="IOModal-field-4"
@@ -452,14 +452,14 @@ export const IOModal: React.FC<IOModalProps> = ({
                   placeholder={t('form.io.kanal_ph', 'contoh: Homepage Masthead & Instagram Live Session')}
                   value={kanalMedia}
                   onChange={(e) => setKanalMedia(e.target.value)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input w-full"
                 />
               </div>
             </div>
 
             {/* Row 3: Judul Insertion Order / Campaign */}
             <div>
-              <label htmlFor="IOModal-field-5" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+              <label htmlFor="IOModal-field-5" className="block font-bold text-ink mb-1.5 text-sm">
                 {t('form.io.judul_campaign', 'Judul Insertion Order / Campaign *')}
               </label>
               <input id="IOModal-field-5"
@@ -471,20 +471,20 @@ export const IOModal: React.FC<IOModalProps> = ({
                   setJudulIO(e.target.value);
                   setIsAutoTitle(false);
                 }}
-                className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                className="ds-input w-full"
               />
             </div>
 
             {/* Row 4: Pricing Model & Charging Type */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ds-grid">
               <div>
-                <label htmlFor="IOModal-field-6" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-6" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.io.pricing_model', 'Pricing Model *')}
                 </label>
                 <AlphabeticalSelect id="IOModal-field-6"
                   value={pricingModelSelect}
                   onChange={(e) => setPricingModelSelect(e.target.value)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer"
+                  className="ds-input w-full cursor-pointer"
                 >
                   {PRICING_MODELS.map((model) => <option key={model} value={model}>{model}</option>)}
                   {isInitialCustom && !STANDARD_PRICING_MODELS.includes(initialPricingModel) && (
@@ -501,20 +501,20 @@ export const IOModal: React.FC<IOModalProps> = ({
                       placeholder={t('form.io.pricing_model_custom_ph', 'Ketik nama pricing model baru (misal: CPV, Hybrid)...')}
                       value={customPricingModel}
                       onChange={(e) => setCustomPricingModel(e.target.value)}
-                      className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-accent rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
+                      className="ds-input w-full"
                     />
                   </div>
                 )}
               </div>
 
               <div>
-                <label htmlFor="IOModal-field-7" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-7" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.io.charging_type', 'Skema Penagihan (Charging Type) *')}
                 </label>
                 <AlphabeticalSelect id="IOModal-field-7"
                   value={chargingType}
                   onChange={(e) => setChargingType(e.target.value as ChargingType)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer"
+                  className="ds-input w-full cursor-pointer"
                 >
                   <option value="Prepaid">{t('io.prepaid_bayar_di_awal', 'Prepaid (Bayar di Awal)')}</option>
                   <option value="Postpaid">{t('io.postpaid_bayar_di_akhir_periode', 'Postpaid (Bayar di Akhir Periode)')}</option>
@@ -523,9 +523,9 @@ export const IOModal: React.FC<IOModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ds-grid">
               <div>
-                <label htmlFor="IOModal-field-8" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-8" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.io.tanggal_mulai', 'Tanggal Mulai *')}
                 </label>
                 <DateInput id="IOModal-field-8"
@@ -537,7 +537,7 @@ export const IOModal: React.FC<IOModalProps> = ({
               </div>
 
               <div>
-                <label htmlFor="IOModal-field-9" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-9" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.io.tanggal_selesai', 'Tanggal Selesai *')}
                 </label>
                 <DateInput id="IOModal-field-9"
@@ -549,13 +549,13 @@ export const IOModal: React.FC<IOModalProps> = ({
               </div>
 
               <div>
-                <label htmlFor="IOModal-field-10" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-10" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.io.currency', 'Mata Uang')}
                 </label>
                 <AlphabeticalSelect id="IOModal-field-10"
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent transition-all"
+                  className="ds-input w-full"
                 >
                   {SUPPORTED_CURRENCIES.map((c) => (
                     <option key={c.code} value={c.code}>
@@ -566,7 +566,7 @@ export const IOModal: React.FC<IOModalProps> = ({
               </div>
 
               <div>
-                <label htmlFor="IOModal-field-11" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-11" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.io.nilai_io', 'Nilai IO *')}
                 </label>
                 <input id="IOModal-field-11"
@@ -574,7 +574,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                   required
                   value={nilaiIO}
                   onChange={(e) => setNilaiIO(Number(e.target.value))}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input w-full"
                 />
               </div>
             </div>
@@ -582,18 +582,18 @@ export const IOModal: React.FC<IOModalProps> = ({
             {/* USD Conversion Info Banner */}
             <div className="bg-accent/5 border border-accent/20 rounded-xl p-3 text-sm flex flex-wrap items-center justify-between gap-2">
               <div>
-                <span className="font-semibold text-slate-700 dark:text-slate-300">{t('io.estimasi_konversi_usd_kurs', 'Estimasi Konversi USD (Kurs {tanggalMulai}):', { tanggalMulai })}</span>
-                <span className="ml-2 font-bold text-accent-text ">
+                <span className="font-semibold text-ink">{t('io.estimasi_konversi_usd_kurs', 'Estimasi Konversi USD (Kurs {tanggalMulai}):', { tanggalMulai })}</span>
+                <span className="ml-2 font-bold text-accent-text">
                   {formatMoney(estimatedUsd, 'USD')}
                 </span>
               </div>
-              <span className="text-xs text-slate-500 dark:text-slate-400 italic">
+              <span className="text-xs text-ink-soft italic">
                 {currency === 'USD' ? t('io.sama_mata_uang_usd', 'Sama (Mata uang USD)') : t('io.1_usd', '1 {currency} ≈ {value} USD', { currency, value: historicalRate.toFixed(8) })}
               </span>
             </div>
 
             <div>
-              <label htmlFor="IOModal-field-12" className="block font-bold text-slate-700 dark:text-slate-300 text-sm mb-1.5">
+              <label htmlFor="IOModal-field-12" className="block font-bold text-ink text-sm mb-1.5">
                 {t('form.io.deliverables', 'Rincian Terstruktur Deliverables *')}
               </label>
               <textarea id="IOModal-field-12"
@@ -602,25 +602,25 @@ export const IOModal: React.FC<IOModalProps> = ({
                 placeholder={t('form.io.deliverables_ph', 'Sebutkan detail garansi impresi, kuota SMS, tayangan banner, atau jumlah artikel...')}
                 value={deliverables}
                 onChange={(e) => setDeliverables(e.target.value)}
-                className="w-full min-h-[130px] max-h-[600px] resize-y bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl p-3.5 text-sm text-slate-900 dark:text-slate-100 leading-relaxed focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                className="ds-input w-full max-h-[600px] resize-y"
               />
             </div>
 
             {/* File Upload Area */}
             <div>
-              <label htmlFor="IOModal-field-13" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+              <label htmlFor="IOModal-field-13" className="block font-bold text-ink mb-1.5 text-sm">
                 {t('form.io.upload_label', 'Dokumen Asli IO (Drive PDF Upload)')}
               </label>
-              <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-accent dark:hover:border-accent rounded-2xl p-4 text-center bg-slate-50 dark:bg-slate-800/40 hover:bg-emerald-50/40 transition-all">
+              <div className="ds-upload text-center">
                 <Upload className="w-6 h-6 text-accent-text mx-auto mb-1.5" />
                 {fileData || fileName ? (
                   <div className="space-y-1">
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                      {t('io.file_terpilih', '📄 File terpilih:')} <span className="font-normal font-mono text-slate-900 dark:text-white">{rawFileName || fileName}</span>
+                    <p className="text-sm font-bold text-ink">
+                      {t('io.file_terpilih', '📄 File terpilih:')} <span className="font-normal font-mono text-ink dark:text-white">{rawFileName || fileName}</span>
                     </p>
                   </div>
                 ) : (
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                  <p className="text-sm font-bold text-ink">
                     {t('form.io.select_pdf', 'Pilih atau Drag Dokumen Insertion Order ke sini')}
                   </p>
                 )}
@@ -630,7 +630,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                       type="button"
                       onClick={handleParseIO}
                       disabled={isParsing}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-accent-soft text-accent-text hover:bg-accent/20 font-bold text-sm rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-4 min-h-10 bg-accent-soft text-accent-text hover:bg-accent/20 font-semibold text-sm rounded-md transition-all cursor-pointer disabled:opacity-50"
                     >
                       {isParsing ? t('io.parsing', 'Parsing...') : t('io.parse_file', 'Parse File')}
                     </button>
@@ -639,35 +639,35 @@ export const IOModal: React.FC<IOModalProps> = ({
                     type="file"
                     accept=".pdf"
                     onChange={handleFileChange}
-                    className="w-[220px] text-sm text-slate-500 dark:text-slate-400 file:mr-2 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer"
+                    className="w-[220px] text-sm text-ink-soft file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer"
                   />
                 </div>
               </div>
             </div>
 
             {parseSuccessMsg && (
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-xl text-sm font-semibold flex items-center gap-2">
+              <div className="p-3 bg-status-success-soft dark:bg-status-success-soft/40 border border-status-success-border text-status-success rounded-xl text-sm font-semibold flex items-center gap-2">
                 <span>{parseSuccessMsg}</span>
               </div>
             )}
 
             {error && (
-              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl text-sm font-bold flex items-center gap-2">
+              <div className="p-3.5 bg-status-danger-soft dark:bg-status-danger-soft/40 border border-status-danger-border text-status-danger rounded-xl text-sm font-bold flex items-center gap-2">
                 <span>⚠️</span>
                 <span>{error}</span>
               </div>
             )}
           </div>
 
-          <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0">
-            <span className="text-xs text-slate-400 dark:text-slate-500 font-medium hidden sm:inline">
+          <div className="p-4 sm:p-5 bg-surface border-t border-hairline flex items-center justify-between gap-2 shrink-0">
+            <span className="text-xs text-ink-soft font-medium hidden sm:inline">
               {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
             </span>
             <div className="flex items-center gap-2 ml-auto">
               <button
                 type="button"
                 onClick={onClose}
-                className="ui-button ui-button-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold transition-colors cursor-pointer"
+                className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
               >
                 {t('form.common.cancel', 'Batal')}
               </button>
@@ -675,7 +675,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                 type="submit"
                 disabled={submitting || !isFormValid}
                 title={!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : ''}
-                className="ui-button ui-button-lg bg-accent-strong hover:bg-accent-strong-hover text-white font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="ui-button ui-button-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-default"
               >
                 {submitting
                   ? t('form.io.saving_btn', 'Menyimpan IO...')

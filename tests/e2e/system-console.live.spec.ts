@@ -25,7 +25,7 @@ async function login(page: import('@playwright/test').Page, email: string) {
 
 test('fresh browser logs in at /sys with no workspace frontend and preserves the requested tab', async ({ page }) => {
   await page.goto('/sys?tab=admin-system-users');
-  await expect(page.getByRole('heading', { name: 'Welcome to Legalio CLM', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Switch Language', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Register/ })).toHaveCount(0);
   await page.getByLabel('Email', { exact: true }).fill('super@example.test');
@@ -40,7 +40,7 @@ test('fresh browser logs in at /sys with no workspace frontend and preserves the
   await expect(page.getByRole('row').filter({ hasText: 'super@example.test' })).toBeVisible();
   await page.getByRole('button', { name: 'User Menu', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Sign Out', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Welcome to Legalio CLM', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Sign in$/i })).toBeVisible();
   const workspace = await page.request.get('/app?tab=contracts');
   expect(workspace.status()).toBe(404); // backend is running API_ONLY=true, no Vite/preview
@@ -250,8 +250,102 @@ test('backup management creates and downloads a full backup, confirms restore an
     fresh.db = new Database(join(fresh.dir, 'auth.db'));
     expect(readFileSync(join(uploads, 'document.txt'), 'utf8')).toBe('before backup');
     await page.goto(fresh.base + '/sys?tab=admin-system-backups');
-    await expect(page.getByRole('heading', { name: 'Welcome to Legalio CLM', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
     await login(page, 'backup@example.test');
     await expect(page.getByRole('row').filter({ hasText: 'Before restore' })).toBeVisible();
   } finally { await fresh.stop(); }
+});
+
+test('design system tokens reach backup controls and portalled dialogs in both themes', async ({ page }, testInfo) => {
+  await signIn(page, 'super');
+  await page.goto('/sys?tab=admin-system-backups');
+  const trigger = page.getByRole('button', { name: 'Restore from file', exact: true });
+  await expect(trigger).toBeVisible();
+  expect(await trigger.evaluate(el => getComputedStyle(el).borderRadius)).toBe('8px');
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  for (const dark of [false, true]) {
+    await page.evaluate((dark) => { document.documentElement.classList.toggle('dark', dark); document.documentElement.dataset.moduixColorScheme = dark ? 'dark' : 'light'; }, dark);
+    await trigger.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel('Backup file')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Restore', exact: true })).toBeDisabled();
+    await dialog.getByLabel('Backup file').setInputFiles({ name: 'invalid.zip', mimeType: 'application/zip', buffer: Buffer.from('invalid') });
+    await expect(dialog.getByRole('alert')).toBeVisible();
+    await dialog.getByLabel('Backup file').setInputFiles({ name: 'example.tar.gz', mimeType: 'application/gzip', buffer: Buffer.from('example') });
+    await dialog.getByLabel('Type RESTORE to confirm').fill('RESTORE');
+    await expect(dialog.getByRole('button', { name: 'Restore', exact: true })).toBeEnabled();
+    const colors = await dialog.evaluate(el => ({ actual: getComputedStyle(el).backgroundColor, expected: getComputedStyle(document.documentElement).getPropertyValue('--ds-surface').trim() }));
+    expect(colors.expected).toBeTruthy();
+    const surface = await page.locator('[data-slot="card-root"]').first().evaluate(el => getComputedStyle(el).backgroundColor);
+    expect(colors.actual).toBe(surface);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  }
+  await page.setViewportSize({ width: 375, height: 812 });
+  await trigger.click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.evaluate(async () => { await Promise.all(document.getAnimations().filter(animation => animation.effect?.getTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => {}))); });
+  await page.screenshot({ path: testInfo.outputPath('backup-mobile-dark.png'), fullPage: true });
+  await page.keyboard.press('Escape');
+  await page.goto('/sys?tab=admin-system-design-system');
+  await expect(page.getByRole('heading', { name: 'Design System', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Blocks', exact: true }).click();
+  await expect(page.getByRole('cell', { name: 'Example record' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Components', exact: true }).click();
+  await page.getByRole('button', { name: 'Open example dialog' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Open example dialog' })).toBeFocused();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator('#sys-content').evaluate(el => { el.scrollTop = 0; });
+  await page.evaluate(async () => { await Promise.all(document.getAnimations().filter(animation => animation.effect?.getTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => {}))); });
+  await page.screenshot({ path: testInfo.outputPath('design-system-desktop.png'), fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test('catalog controls, outlines and neighboring panels share their tokens', async ({ page }, testInfo) => {
+  await signIn(page, 'super');
+  await page.goto('/sys?tab=admin-system-design-system');
+  await page.getByRole('tab', { name: 'Blocks', exact: true }).click();
+  for (const width of [1440, 768, 375]) {
+    await page.setViewportSize({ width, height: 1000 });
+    for (const dark of [false, true]) {
+      await page.evaluate(dark => { document.documentElement.classList.toggle('dark', dark); document.documentElement.dataset.moduixColorScheme = dark ? 'dark' : 'light'; }, dark);
+      const controls = page.getByTestId('aligned-controls').locator('input, select, button');
+      await expect(controls).toHaveCount(4);
+      for (const control of await controls.all()) {
+        expect((await control.boundingBox())!.height).toBe(40);
+        await expect(control).toHaveCSS('border-radius', '8px');
+        await expect(control).toHaveCSS('border-top-width', '1px');
+      }
+      const borders = await page.getByTestId('aligned-controls').locator('input, select, .ds-button-outline').evaluateAll(elements => elements.map(element => getComputedStyle(element).borderTopColor));
+      expect(new Set(borders).size).toBe(1);
+      const panels = await page.getByTestId('aligned-panels').locator('.ds-card').evaluateAll(elements => elements.map(element => ({ height: element.getBoundingClientRect().height, top: element.getBoundingClientRect().top, radius: getComputedStyle(element).borderRadius })));
+      expect(panels.map(panel => panel.radius)).toEqual(['12px', '12px']);
+      if (width >= 640) { expect(panels[0].top).toBe(panels[1].top); expect(panels[0].height).toBe(panels[1].height); }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+    await page.screenshot({ path: testInfo.outputPath(`catalog-geometry-${width}.png`), fullPage: true });
+  }
+});
+
+
+test('system UI text editor traps focus and restores its trigger', async ({ page }) => {
+  await signIn(page, 'super');
+  await page.goto('/sys?tab=admin-system-ui-texts');
+  const trigger = page.getByRole('button', { name: 'Open UI Text Editor', exact: true });
+  await trigger.click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toHaveAccessibleName(/.+/);
+  for (let i = 0; i < 20; i++) {
+    await page.keyboard.press('Tab');
+    expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
 });

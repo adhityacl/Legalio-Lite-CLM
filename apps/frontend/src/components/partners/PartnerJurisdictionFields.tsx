@@ -6,6 +6,7 @@ import { useTenantSettings } from '../../context/TenantSettingsContext';
 import type { PartyIdentifier } from '@legalio/types';
 import { localizeName } from '@legalio/shared/policy';
 
+import { fieldControlClass } from '@legalio/ui-components/input';
 export interface PartnerJurisdictionFieldsProps {
   country: string;
   entityType: string;
@@ -15,9 +16,8 @@ export interface PartnerJurisdictionFieldsProps {
   onIdentifiersChange: (next: PartyIdentifier[]) => void;
 }
 
-const fieldClass =
-  'block min-h-11 w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs leading-5 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20';
-const labelClass = 'block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-xs';
+const fieldClass = fieldControlClass;
+const labelClass = 'block font-bold text-ink  mb-1.5 text-xs';
 
 /**
  * Country of incorporation, legal form and identifiers for a counterparty
@@ -54,10 +54,10 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 ds-grid">
         <div>
           <label htmlFor={countryId} className={labelClass}>{t('form.partner.country', 'Country of incorporation')}</label>
-          <AlphabeticalSelect id={countryId} className={`${fieldClass} cursor-pointer`} value={country} onChange={(e) => onCountryChange(e.target.value)}>
+          <AlphabeticalSelect id={countryId} className={`ds-input${fieldClass} cursor-pointer`} value={country} onChange={(e) => onCountryChange(e.target.value)}>
             <option value="">{t('form.partner.country_unknown', 'Unknown / not stated')}</option>
             {countries.filter((c) => c.code !== 'INTL').map((c) => (
               <option key={c.code} value={c.code}>{localizeName(c.name, language)}</option>
@@ -82,7 +82,7 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
 
       <fieldset>
         <legend className={labelClass}>{t('form.partner.identifiers', 'Registration & tax identifiers')}</legend>
-        <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">
+        <p className="mb-2 text-xs text-ink-soft">
           {t('form.partner.identifiers_hint', 'Stored as entered. Format hints come from the selected country pack.')}
         </p>
         <ul className="space-y-2">
@@ -90,10 +90,10 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
             const scheme = schemes.find((s) => s.key === item.scheme);
             const schemeLabel = (scheme && localizeName(scheme.label, language)) || t('form.partner.identifier_other', 'Other identifier');
             return (
-              <li key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <li key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto] ds-grid">
                 <AlphabeticalSelect
                   aria-label={t('form.partner.identifier_scheme', 'Identifier type')}
-                  className={`${fieldClass} cursor-pointer`}
+                  className={`ds-input${fieldClass} cursor-pointer`}
                   value={item.scheme}
                   onChange={(e) => updateIdentifier(index, { scheme: e.target.value })}
                 >
@@ -110,7 +110,7 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
                 <button
                   type="button"
                   onClick={() => onIdentifiersChange(identifiers.filter((_, i) => i !== index))}
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                  className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md text-status-danger hover:bg-status-danger-soft dark:hover:bg-status-danger-soft/40"
                   aria-label={`${t('form.partner.identifier_remove', 'Remove identifier')}: ${schemeLabel}`}
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -122,7 +122,7 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
         <button
           type="button"
           onClick={addIdentifier}
-          className="ui-button ui-button-md mt-2 inline-flex items-center gap-2 border border-dashed border-slate-300 font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="ui-button ui-button-md mt-2 inline-flex items-center ds-button ds-button-md ds-button-outline"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           {t('form.partner.identifier_add', 'Add identifier')}

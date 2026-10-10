@@ -1,3 +1,5 @@
+> The shared Moduix design system supersedes the former Dashboard/Hierarchy exclusions. Every application page now uses the standard table token contract. See `design-system/legalio/MASTER.md`.
+
 # Application table design
 
 The supplied Partners table is the visual reference. Its white card, pale header,

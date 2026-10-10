@@ -18,7 +18,7 @@ export function EventFilterPopover({ enabled, onToggle, search, onSearch, onRese
   const filtered = enabled.size < EVENT_TYPES.length || Boolean(search.trim());
   return <Popover>
     <PopoverTrigger asChild>
-      <Button type="button" variant="ghost" size="icon" className="size-11 relative" aria-label={t('calendar.filter_events')}>
+      <Button type="button" variant="ghost" size="icon" className="size-10 relative" aria-label={t('calendar.filter_events')}>
         <CalendarSearch className="size-5" aria-hidden="true" />
         {filtered && <span className="absolute right-2 top-2 size-2 rounded-full bg-accent-strong" aria-hidden="true" />}
       </Button>
@@ -31,7 +31,7 @@ export function EventFilterPopover({ enabled, onToggle, search, onSearch, onRese
       </label>
       <fieldset>
         <legend className="mb-1 text-xs font-medium">{t('calendar.event_types')}</legend>
-        {EVENT_TYPES.map(type => <label key={type} className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+        {EVENT_TYPES.map(type => <label key={type} className="flex min-h-10 cursor-pointer items-center gap-3 text-sm">
           <input type="checkbox" checked={enabled.has(type)} onChange={() => onToggle(type)} className="size-4 accent-[var(--primary)]" />
           <EventIndicator type={type} />
           <span>{t(EVENT_TYPE_CONFIG[type].labelKey)}</span>

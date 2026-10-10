@@ -24,7 +24,7 @@ export function EventItem({ event, chip = false, onEventClick }: {
   const done = event.type === 'task' && event.status === 'done';
   const label = [t(EVENT_TYPE_CONFIG[event.type].labelKey), new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(date),
     event.title, done ? t('calendar.done') : '', event.projected ? t('calendar.projected') : ''].filter(Boolean).join(' · ');
-  const className = cn('min-h-11 w-full min-w-0 justify-start gap-2 rounded-md px-2 py-1 text-xs font-normal text-[var(--foreground)]',
+  const className = cn('min-h-10 w-full min-w-0 justify-start gap-2 rounded-md px-2 py-1 text-xs font-normal text-[var(--foreground)]',
     chip ? EVENT_TYPE_CONFIG[event.type].chip : 'hover:bg-[var(--muted)]');
   const content = <>
     <EventIndicator type={event.type} done={done} />

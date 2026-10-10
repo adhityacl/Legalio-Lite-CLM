@@ -8,12 +8,12 @@ interface PrivacyPolicyViewProps {
 }
 
 const ACCENT = {
-  icon: <Shield aria-hidden="true" className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />,
-  num: 'text-emerald-700 dark:text-emerald-400',
-  toc: 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/40',
-  tocTitle: 'text-emerald-900 dark:text-emerald-300',
-  button: 'bg-emerald-700 hover:bg-emerald-800',
-  link: 'text-emerald-800 dark:text-emerald-300',
+  icon: <Shield aria-hidden="true" className="w-4 h-4 text-status-success" />,
+  num: 'text-status-success ',
+  toc: 'bg-status-success-soft/70 dark:bg-status-success-soft/20 border-status-success-border dark:border-status-success-border/40',
+  tocTitle: 'text-status-success ',
+  button: 'bg-status-success hover:bg-status-success',
+  link: 'text-status-success ',
 };
 
 export const PrivacyPolicyView: React.FC<PrivacyPolicyViewProps> = ({ onBack }) => (

@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 import { OrgApiError, orgApi, orgPath } from './orgApi';
 
+import { fieldControlClass } from '@legalio/ui-components/input';
 const LazyActivityLogsView = lazy(() => import('../ActivityLogsView').then((m) => ({ default: m.ActivityLogsView })));
 
 interface Member { id: string; userId: string; name: string; email: string; tenantRole: TenantRole; status: 'active' | 'suspended'; departmentIds: string[]; createdAt: string }
@@ -25,8 +26,8 @@ type Filter = 'active' | 'suspended' | 'pending';
 const PAGE_SIZE = 25;
 const RANK: Record<TenantRole, number> = { admin: 4, manager: 3, editor: 2, viewer: 1 };
 
-const fieldClass = 'block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-accent focus:outline-none aria-[invalid=true]:border-rose-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';
-const labelClass = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300';
+const fieldClass = fieldControlClass;
+const labelClass = 'mb-1.5 block text-sm font-medium text-ink ';
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
@@ -34,14 +35,14 @@ const errorText = (err: unknown) => (err instanceof Error ? err.message : String
 const DepartmentPicker: React.FC<{ departments: Department[]; value: string[]; onChange: (ids: string[]) => void; disabled?: boolean; legend: string; 'aria-describedby'?: string }> = ({ departments, value, onChange, disabled, legend, 'aria-describedby': ariaDescribedby }) => (
   <fieldset className="m-0 min-w-0 border-0 p-0" disabled={disabled} aria-describedby={ariaDescribedby}>
     <legend className={labelClass}>{legend}</legend>
-    <div className="grid max-h-48 gap-1 overflow-y-auto rounded-xl border border-slate-200 p-2 dark:border-slate-700 sm:grid-cols-2">
+    <div className="grid max-h-48 gap-1 overflow-y-auto rounded-xl border border-hairline p-2 sm:grid-cols-2 ds-grid">
       {departments.map((d) => (
-        <label key={d.id} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-slate-800 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">
+        <label key={d.id} className="inline-flex min-h-10 items-center gap-2 rounded-md px-2 text-sm text-ink hover:bg-surface dark:hover:bg-surface-2">
           <input type="checkbox" className="h-4 w-4" checked={value.includes(d.id)} onChange={(e) => onChange(e.target.checked ? [...value, d.id] : value.filter((id) => id !== d.id))} />
           {d.name}
         </label>
       ))}
-      {departments.length === 0 && <p className="p-2 text-sm text-slate-600 dark:text-slate-400">—</p>}
+      {departments.length === 0 && <p className="p-2 text-sm text-ink-soft">—</p>}
     </div>
   </fieldset>
 );
@@ -169,28 +170,28 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <div className="mobile-controls-bar flex flex-col items-stretch justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 lg:flex-row lg:items-center">
+      <div className="ds-panel mobile-controls-bar flex flex-col items-stretch justify-between gap-3 p-4 lg:flex-row lg:items-center">
         <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           <div
             role="group"
             aria-label={t('tb.member_status_filter', 'Member status')}
-            className="flex h-11 shrink-0 items-center rounded-xl border border-slate-200 bg-slate-100 p-0.75 dark:border-slate-700 dark:bg-slate-800"
+            className="ds-panel flex h-10 shrink-0 items-center p-0.75"
           >
             {([['active', t('tb.filter_active', 'Active')], ['suspended', t('tb.filter_suspended', 'Suspended')], ...(can('tenant.invitation.read') ? [['pending', t('tb.filter_pending', 'Pending')]] : [])] as Array<[Filter, string]>).map(([value, label]) => (
               <button key={value} type="button" aria-pressed={filter === value} onClick={() => { setFilter(value); setPage(0); }}
-                className={`ui-button ui-button-md cursor-pointer font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 ${filter === value ? 'theme-action bg-accent-strong text-white' : 'text-slate-700 hover:bg-accent-soft dark:text-slate-300'}`}>
+                className={`ui-button ui-button-md cursor-pointer ds-button ds-button-md ds-button-default ${filter === value ? 'theme-action' : ' '}`}>
                 {label}
               </button>
             ))}
           </div>
           <div className="relative min-w-55 max-w-md flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-soft" aria-hidden="true" />
             <input
               id={searchId}
               type="search"
               aria-label={t('tb.search_members', 'Search members')}
               placeholder={t('tb.search_members', 'Search members...')}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-3 text-xs text-slate-900 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-accent dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100"
+              className="ds-input w-full pl-9 pr-3"
               value={search}
               maxLength={200}
               onChange={(e) => setSearch(e.target.value)}
@@ -205,16 +206,16 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
         </div>
       </div>
 
-      <div className="ds-table-surface overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="ds-table-surface overflow-hidden rounded-2xl border border-hairline bg-surface shadow-sm">
         {failed ? (
-          <div role="alert" className="flex flex-col items-start gap-3 p-5 text-sm text-rose-800 dark:text-rose-200">
+          <div role="alert" className="flex flex-col items-start gap-3 p-5 text-sm text-status-danger">
             {t('tb.members_load_error', 'Members could not be loaded.')}
             <Button type="button" variant="outline" size="sm" onClick={() => refresh()}><RefreshCw className="h-4 w-4" aria-hidden="true" />{t('tb.retry', 'Retry')}</Button>
           </div>
         ) : loading ? (
           <div className="space-y-2 p-4" aria-busy="true"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
         ) : filter === 'pending' ? (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto ds-table-surface">
             <Table>
               <TableHeader><TableRow>
                 <TableHead>{t('tb.col_email', 'Email')}</TableHead><TableHead>{t('tb.col_role', 'Role')}</TableHead>
@@ -237,13 +238,13 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
                   </TableRow>
                 ))}
                 {(invitationsQuery.data?.invitations || []).length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="py-8 text-center text-slate-600 dark:text-slate-400">{t('tb.no_invitations', 'No pending invitations.')}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="py-8 text-center text-ink-soft">{t('tb.no_invitations', 'No pending invitations.')}</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto ds-table-surface">
             <Table>
               <TableHeader><TableRow>
                 <TableHead>{t('tb.col_name', 'Name')}</TableHead><TableHead>{t('tb.col_email', 'Email')}</TableHead><TableHead>{t('tb.col_role', 'Role')}</TableHead>
@@ -255,7 +256,7 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
                   const manage = canManage(m);
                   return (
                     <TableRow key={m.id}>
-                      <TableCell className="font-medium">{m.name || '—'}{m.userId === identity?.id && <span className="ml-2 text-xs text-slate-500">({t('tb.you', 'you')})</span>}</TableCell>
+                      <TableCell className="font-medium">{m.name || '—'}{m.userId === identity?.id && <span className="ml-2 text-xs text-ink-soft">({t('tb.you', 'you')})</span>}</TableCell>
                       <TableCell>{m.email}</TableCell>
                       <TableCell>{roleLabel(m.tenantRole)}</TableCell>
                       <TableCell>{m.tenantRole === 'admin' ? t('tb.all_departments', 'All departments') : names(m.departmentIds)}</TableCell>
@@ -271,21 +272,21 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
                               : <Button type="button" variant="ghost" size="sm" onClick={() => setStatus(m, 'active')} aria-label={t('tb.reactivate_for', 'Reactivate membership of {name}', { name: m.name || m.email })}><UserCheck className="h-4 w-4" aria-hidden="true" /></Button>)}
                             {can('tenant.member.remove') && <Button type="button" variant="ghost" size="sm" onClick={() => remove(m)} aria-label={t('tb.remove_for', 'Remove membership of {name}', { name: m.name || m.email })}><UserMinus className="h-4 w-4" aria-hidden="true" /></Button>}
                           </div>
-                        ) : <MoreHorizontal className="ml-auto h-4 w-4 text-slate-300 dark:text-slate-600" aria-hidden="true" />}
+                        ) : <MoreHorizontal className="ml-auto h-4 w-4 text-on-solid" aria-hidden="true" />}
                       </TableCell>
                     </TableRow>
                   );
                 })}
                 {(membersQuery.data?.members || []).length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-slate-600 dark:text-slate-400">{t('tb.no_members', 'No members match this view.')}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-ink-soft">{t('tb.no_members', 'No members match this view.')}</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
         )}
         {pages > 1 && (
-          <div className="ds-table-pagination flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm dark:border-slate-800">
-            <span className="text-slate-600 dark:text-slate-400">{t('tb.page_of', 'Page {page} of {pages}', { page: page + 1, pages })}</span>
+          <div className="ds-table-pagination flex items-center justify-between gap-3 border-t border-hairline px-4 py-3 text-sm">
+            <span className="text-ink-soft">{t('tb.page_of', 'Page {page} of {pages}', { page: page + 1, pages })}</span>
             <div className="flex gap-2">
               <Button type="button" variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>{t('tb.previous', 'Previous')}</Button>
               <Button type="button" variant="outline" size="sm" disabled={page + 1 >= pages} onClick={() => setPage((p) => p + 1)}>{t('tb.next', 'Next')}</Button>
@@ -316,8 +317,8 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
 const DialogHeader: React.FC<{ title: string; onClose: () => void }> = ({ title, onClose }) => {
   const { t } = useLanguage();
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-      <ModalTitle className="text-lg font-semibold text-slate-900 dark:text-white">{title}</ModalTitle>
+    <div className="ds-section-header">
+      <ModalTitle className="ds-modal-title flex items-center gap-2">{title}</ModalTitle>
       <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label={t('common.close', 'Close')}><X className="h-4 w-4" aria-hidden="true" /></Button>
     </div>
   );
@@ -358,7 +359,7 @@ const InviteDialog: React.FC<{
         {!codeOnly && <div>
           <label htmlFor={ids.email} className={labelClass}>{t('tb.col_email', 'Email')}</label>
           <input id={ids.email} type="email" autoComplete="off" className={fieldClass} value={email} aria-invalid={email.length > 0 && !emailValid} aria-describedby={email.length > 0 && !emailValid ? `${ids.email}-error` : undefined} onChange={(e) => setEmail(e.target.value)} />
-          {email.length > 0 && !emailValid && <p id={`${ids.email}-error`} className="mt-1.5 text-xs text-rose-700 dark:text-rose-300">{t('tb.invalid_email', 'Enter a valid email address.')}</p>}
+          {email.length > 0 && !emailValid && <p id={`${ids.email}-error`} className="mt-1.5 text-xs text-status-danger">{t('tb.invalid_email', 'Enter a valid email address.')}</p>}
         </div>}
         <div>
           <label htmlFor={ids.role} className={labelClass}>{t('tb.col_role', 'Role')}</label>
@@ -369,10 +370,10 @@ const InviteDialog: React.FC<{
         {role !== 'admin' && (
           <div>
             <DepartmentPicker departments={departments} value={departmentIds} onChange={setDepartmentIds} legend={t('tb.col_departments', 'Departments')} aria-describedby={!deptValid ? `invite-dept-error` : undefined} />
-            {!deptValid && <p id="invite-dept-error" className="mt-1.5 text-xs text-slate-600 dark:text-slate-400">{t('tb.department_required', 'Choose at least one department.')}</p>}
+            {!deptValid && <p id="invite-dept-error" className="mt-1.5 text-xs text-ink-soft">{t('tb.department_required', 'Choose at least one department.')}</p>}
           </div>
         )}
-        {error && <p role="alert" className="flex items-center gap-2 text-sm text-rose-700 dark:text-rose-300"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
+        {error && <p role="alert" className="flex items-center gap-2 text-sm text-status-danger"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
         <div className="flex justify-end gap-2">
           <Button type="button" size="lg" variant="outline" onClick={onClose}>{t('tb.cancel', 'Cancel')}</Button>
           <Button type="submit" size="lg" disabled={busy || !emailValid || !deptValid}>{busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Mail className="h-4 w-4" aria-hidden="true" />}{codeOnly ? t('onboarding.generate_code', 'Generate invite code') : t('tb.send_invitation', 'Send invitation')}</Button>
@@ -390,15 +391,15 @@ const InviteLinkDialog: React.FC<{ url: string; code?: string; expiresAt?: strin
     <ModalFrame onClose={onClose} className="max-w-xl">
       <DialogHeader title={code ? t('onboarding.code_created', 'Invite code created') : t('tb.invitation_not_sent_title', 'Invitation created; email not sent')} onClose={onClose} />
       <div className="flex flex-col gap-3 p-5">
-        <p className="text-sm text-slate-700 dark:text-slate-300">{code ? t('onboarding.code_hint', 'Share this code with an approved account. It expires in 24 hours and can be used once.') : t('tb.invitation_not_sent', 'The invitation is saved, but no email was delivered. Share this link with the invited person yourself.')}</p>
+        <p className="text-sm text-ink">{code ? t('onboarding.code_hint', 'Share this code with an approved account. It expires in 24 hours and can be used once.') : t('tb.invitation_not_sent', 'The invitation is saved, but no email was delivered. Share this link with the invited person yourself.')}</p>
         <label htmlFor={id} className={labelClass}>{code ? t('onboarding.invite_code', 'Invite code') : t('tb.invitation_link', 'Invitation link')}</label>
-        <div className="flex items-center rounded-xl border border-slate-200 bg-white pr-1 focus-within:border-accent dark:border-slate-700 dark:bg-slate-800">
-          <input id={id} readOnly className="min-h-11 min-w-0 flex-1 rounded-xl bg-transparent px-3 py-2.5 font-mono text-xs text-slate-900 focus:outline-none dark:text-slate-100" value={code || url} onFocus={(e) => e.currentTarget.select()} />
-          <Button type="button" variant="ghost" className="min-h-11 shrink-0" aria-live="polite" onClick={async () => { await navigator.clipboard?.writeText(code || url).catch(() => {}); setCopied(true); }}>
+        <div className="flex items-center rounded-xl border border-hairline bg-surface pr-1 focus-within:border-accent">
+          <input id={id} readOnly className="min-h-10 min-w-0 flex-1 rounded-md bg-transparent px-3 py-2.5 font-mono text-xs text-ink focus:outline-none" value={code || url} onFocus={(e) => e.currentTarget.select()} />
+          <Button type="button" variant="ghost" className="shrink-0" aria-live="polite" onClick={async () => { await navigator.clipboard?.writeText(code || url).catch(() => {}); setCopied(true); }}>
             <Copy className="h-4 w-4" aria-hidden="true" />{copied ? t('tb.copied', 'Copied') : code ? t('onboarding.copy_code', 'Copy code') : t('tb.copy_link', 'Copy link')}
           </Button>
         </div>
-        {expiresAt && <p className="text-sm text-slate-600 dark:text-slate-400">{t('tb.col_expires', 'Expires')}: {new Date(expiresAt).toLocaleString()}</p>}
+        {expiresAt && <p className="text-sm text-ink-soft">{t('tb.col_expires', 'Expires')}: {new Date(expiresAt).toLocaleString()}</p>}
         <div className="flex justify-end gap-2">
           <Button type="button" size="lg" onClick={onClose}>{t('tb.done', 'Done')}</Button>
         </div>
@@ -449,15 +450,15 @@ const EditMemberDialog: React.FC<{
           <select id={roleId} className={fieldClass} value={role} disabled={!canRole} onChange={(e) => setRole(e.target.value as TenantRole)}>
             {roles.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
           </select>
-          {role === 'admin' && member.tenantRole !== 'admin' && <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-400">{t('tb.admin_drops_departments', 'Administrators cover the whole organization; department assignments are removed.')}</p>}
+          {role === 'admin' && member.tenantRole !== 'admin' && <p className="mt-1.5 text-xs text-ink-soft">{t('tb.admin_drops_departments', 'Administrators cover the whole organization; department assignments are removed.')}</p>}
         </div>
         {role !== 'admin' && (
           <div>
             <DepartmentPicker departments={departments} value={departmentIds} onChange={setDepartmentIds} disabled={!canDepartments} legend={t('tb.col_departments', 'Departments')} aria-describedby={needsDepartments ? `edit-dept-error` : undefined} />
-            {needsDepartments && <p id="edit-dept-error" className="mt-1.5 text-xs text-rose-700 dark:text-rose-300">{t('tb.department_required', 'Choose at least one department.')}</p>}
+            {needsDepartments && <p id="edit-dept-error" className="mt-1.5 text-xs text-status-danger">{t('tb.department_required', 'Choose at least one department.')}</p>}
           </div>
         )}
-        {error && <p role="alert" className="flex items-center gap-2 text-sm text-rose-700 dark:text-rose-300"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
+        {error && <p role="alert" className="flex items-center gap-2 text-sm text-status-danger"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
         <div className="flex justify-end gap-2">
           <Button type="button" size="lg" variant="outline" onClick={onClose}>{t('tb.cancel', 'Cancel')}</Button>
           <Button type="submit" size="lg" disabled={busy || needsDepartments}>{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{t('tb.save', 'Save')}</Button>
@@ -496,7 +497,7 @@ const DepartmentsDialog: React.FC<{ organizationId: string; departments: Departm
     <ModalFrame onClose={onClose} className="max-w-xl">
       <DialogHeader title={t('tb.departments', 'Departments')} onClose={onClose} />
       <div className="flex flex-col gap-4 overflow-y-auto p-5">
-        {!hasPermission('department.create') && <p className="text-sm text-slate-600 dark:text-slate-400">{t('tb.departments_readonly', 'You can see your assigned departments. Only administrators can change them.')}</p>}
+        {!hasPermission('department.create') && <p className="text-sm text-ink-soft">{t('tb.departments_readonly', 'You can see your assigned departments. Only administrators can change them.')}</p>}
         {hasPermission('department.create') && (
           <form className="flex items-end gap-2" onSubmit={async (e) => { e.preventDefault(); if (name.trim() && (await act(() => orgApi(orgPath(organizationId, '/departments'), { method: 'POST', body: { name: name.trim() } })))) setName(''); }}>
             <div className="min-w-0 flex-1">
@@ -506,9 +507,9 @@ const DepartmentsDialog: React.FC<{ organizationId: string; departments: Departm
             <Button type="submit" size="lg" disabled={busy || !name.trim()}><Plus className="h-4 w-4" aria-hidden="true" />{t('tb.add', 'Add')}</Button>
           </form>
         )}
-        {error && <p role="alert" className="flex items-center gap-2 text-sm text-rose-700 dark:text-rose-300"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
+        {error && <p role="alert" className="flex items-center gap-2 text-sm text-status-danger"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
         {loading ? <Skeleton className="h-24 w-full" /> : (
-          <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+          <ul className="divide-y divide-hairline rounded-xl border border-hairline">
             {departments.map((d) => (
               <li key={d.id} className="flex min-h-12 items-center justify-between gap-2 px-3 py-1.5">
                 {editing?.id === d.id ? (
@@ -520,7 +521,7 @@ const DepartmentsDialog: React.FC<{ organizationId: string; departments: Departm
                   </form>
                 ) : (
                   <>
-                    <span className="text-sm text-slate-900 dark:text-slate-100">{d.name}</span>
+                    <span className="text-sm text-ink">{d.name}</span>
                     <span className="flex gap-1">
                       {hasPermission('department.edit') && <Button type="button" variant="ghost" size="sm" onClick={() => setEditing({ id: d.id, name: d.name })} aria-label={t('tb.rename_department', 'Rename {name}', { name: d.name })}><Pencil className="h-4 w-4" aria-hidden="true" /></Button>}
                       {hasPermission('department.delete') && (
@@ -534,7 +535,7 @@ const DepartmentsDialog: React.FC<{ organizationId: string; departments: Departm
                 )}
               </li>
             ))}
-            {departments.length === 0 && <li className="px-3 py-4 text-sm text-slate-600 dark:text-slate-400">{t('tb.no_departments', 'No departments yet.')}</li>}
+            {departments.length === 0 && <li className="px-3 py-4 text-sm text-ink-soft">{t('tb.no_departments', 'No departments yet.')}</li>}
           </ul>
         )}
       </div>
@@ -564,9 +565,9 @@ const HistoryDialog: React.FC<{ organizationId: string; onClose: () => void }> =
           </TabsList>
           <TabsContent value="admin" className="pt-3">
             {audit.isError ? (
-              <div role="alert" className="text-sm text-rose-700 dark:text-rose-300">{t('tb.history_load_error', 'History could not be loaded.')}</div>
+              <div role="alert" className="ds-alert ds-status-danger border">{t('tb.history_load_error', 'History could not be loaded.')}</div>
             ) : audit.isLoading ? <Skeleton className="h-32 w-full" /> : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto ds-table-surface">
                 <Table>
                   <TableHeader><TableRow>
                     <TableHead>{t('tb.col_when', 'When')}</TableHead><TableHead>{t('tb.col_actor', 'By')}</TableHead>
@@ -576,12 +577,12 @@ const HistoryDialog: React.FC<{ organizationId: string; onClose: () => void }> =
                     {(audit.data?.events || []).map((e) => (
                       <TableRow key={e.id}>
                         <TableCell className="whitespace-nowrap">{new Date(e.createdAt).toLocaleString()}</TableCell>
-                        <TableCell>{e.actorName || '—'}{e.accessMode === 'platform' && <span className="ml-1 text-xs text-slate-500">({t('tb.platform_admin_short', 'platform')})</span>}</TableCell>
+                        <TableCell>{e.actorName || '—'}{e.accessMode === 'platform' && <span className="ml-1 text-xs text-ink-soft">({t('tb.platform_admin_short', 'platform')})</span>}</TableCell>
                         <TableCell className="font-mono text-xs">{e.action}</TableCell>
                         <TableCell className="text-xs">{e.changedFields.join(', ') || '—'}</TableCell>
                       </TableRow>
                     ))}
-                    {(audit.data?.events || []).length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-slate-600 dark:text-slate-400">{t('tb.no_history', 'No administrative changes yet.')}</TableCell></TableRow>}
+                    {(audit.data?.events || []).length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-ink-soft">{t('tb.no_history', 'No administrative changes yet.')}</TableCell></TableRow>}
                   </TableBody>
                 </Table>
                 {pages > 1 && (

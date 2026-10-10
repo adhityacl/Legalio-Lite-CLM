@@ -14,8 +14,8 @@ export function TableViewMenu({ children, label, title, className = '' }: {
     <Popover>
       <PopoverTrigger asChild>
         <button type="button" title={description}
-          className="ui-button ui-button-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center shadow-xs cursor-pointer active:scale-[0.98] w-full">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden />
+          className="ui-button ui-button-lg flex items-center justify-center cursor-pointer active:scale-[0.98] w-full ds-button ds-button-lg ds-button-outline">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-ink-soft" aria-hidden />
           <span>{buttonLabel}</span>
         </button>
       </PopoverTrigger>

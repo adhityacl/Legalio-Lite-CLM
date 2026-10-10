@@ -154,7 +154,7 @@ export const DateInput: React.FC<DateInputProps> = ({
     focusColor === 'emerald'
       ? 'focus-within:border-accent focus:border-accent'
       : focusColor === 'slate'
-      ? 'focus-within:border-slate-500 focus:border-slate-500'
+      ? 'focus-within:border-hairline focus:border-hairline'
       : 'focus-within:border-accent focus:border-accent';
 
   const selectedDate = isoToDate(formatDdMmYyyyToIso(value) || value);
@@ -174,7 +174,7 @@ export const DateInput: React.FC<DateInputProps> = ({
         onChange={handleTextChange}
         onBlur={handleBlur}
         maxLength={10}
-        className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-3 pr-9 py-2 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 font-mono text-xs focus:outline-none focus:bg-white dark:focus:bg-slate-800 transition-colors ${focusBorderClass} ${
+        className={`ds-input w-full pl-3 pr-9 ${focusBorderClass}  ${
           disabled ? 'opacity-60 cursor-not-allowed' : ''
         }`}
       />
@@ -185,7 +185,7 @@ export const DateInput: React.FC<DateInputProps> = ({
             disabled={disabled}
             title={t('common.buka_kalender', 'Buka Kalender')}
             aria-label={t('common.buka_kalender', 'Buka Kalender')}
-            className="absolute right-2.5 text-slate-400 hover:text-accent-text transition-colors cursor-pointer disabled:cursor-not-allowed p-0.5"
+            className="absolute right-2.5 text-ink-soft hover:text-accent-text transition-colors cursor-pointer disabled:cursor-not-allowed p-0.5"
           >
             <CalendarIcon className="w-4 h-4" />
           </button>

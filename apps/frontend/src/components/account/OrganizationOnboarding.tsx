@@ -8,7 +8,8 @@ import { useTenant } from '../../context/TenantContext';
 import { AlphabeticalSelect } from '../ui/alphabetical-select';
 import { capturePendingInvitation } from './InvitationPrompt';
 
-const fieldClass = 'min-h-11 w-full rounded-xl border border-(--border) bg-(--background) px-3 py-2 text-base text-(--foreground) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)';
+import { fieldControlClass } from '@legalio/ui-components/input';
+const fieldClass = fieldControlClass;
 
 export function OrganizationOnboarding() {
   const { t, language } = useLanguage();
@@ -60,7 +61,7 @@ export function OrganizationOnboarding() {
     <main className="flex min-h-dvh w-full items-center justify-center bg-(--background) px-4 py-8 text-(--foreground)">
       <section aria-labelledby="onboarding-title" className="w-full max-w-xl rounded-2xl border border-(--border) bg-(--card) p-6 shadow-sm sm:p-8">
         {(stage === 'profile' || stage === 'region') && (
-          <ol aria-label={t('onboarding.progress', 'Organization setup progress')} className="mb-6 grid grid-cols-2 gap-3 text-sm">
+          <ol aria-label={t('onboarding.progress', 'Organization setup progress')} className="mb-6 grid grid-cols-2 gap-3 text-sm ds-grid">
             {[['profile', t('tb.section_profile', 'Organization profile')], ['region', t('tb.section_region', 'Region and formatting')]].map(([step, label], index) => (
               <li key={step} aria-current={stage === step ? 'step' : undefined} className={`border-t-2 pt-2 ${stage === step ? 'border-(--primary) font-semibold' : 'border-(--border) text-(--muted-foreground)'}`}>{index + 1}. {label}</li>
             ))}
@@ -74,10 +75,10 @@ export function OrganizationOnboarding() {
             : t('onboarding.region_description', 'Choose the country, industry, and language for your workspace.')}
         </p>
         {stage === 'choose' ? (
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 ds-grid">
             {([{ next: 'join', Icon: Users, label: t('onboarding.join', 'Join organization'), description: t('onboarding.join_hint', 'I have an invite code') },
               { next: 'profile', Icon: Building2, label: t('onboarding.create', 'Create organization'), description: t('onboarding.create_hint', 'Start a new workspace') }] as const).map(({ next, Icon, label, description }) => (
-              <button key={next} type="button" aria-label={label} onClick={() => navigate(next)} className="cursor-pointer rounded-xl border border-(--border) p-5 text-left transition-colors hover:bg-(--muted) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)">
+              <button key={next} type="button" aria-label={label} onClick={() => navigate(next)} className="cursor-pointer rounded-lg border border-(--border) p-5 text-left transition-colors hover:bg-(--muted) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)">
                 <Icon aria-hidden="true" className="mb-4 h-6 w-6 text-(--muted-foreground)" />
                 <span className="block font-semibold">{label}</span><span className="mt-1 block text-sm text-(--muted-foreground)">{description}</span>
               </button>
@@ -114,7 +115,7 @@ export function OrganizationOnboarding() {
                 </>
               )}
             </fieldset>
-            {error && <p id="onboarding-error" role="alert" className="text-sm text-rose-700 dark:text-rose-300">{error}</p>}
+            {error && <p id="onboarding-error" role="alert" className="ds-alert ds-status-danger border">{error}</p>}
             <div className="flex justify-between gap-3 pt-2">
               <Button type="button" size="lg" variant="outline" disabled={busy} onClick={() => navigate(stage === 'region' ? 'profile' : 'choose')}>{t('onboarding.back', 'Back')}</Button>
               <Button type="submit" size="lg" disabled={busy}>

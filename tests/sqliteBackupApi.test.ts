@@ -28,7 +28,18 @@ test('backup API gates platform access, downloads an archive and restores on res
     writeFileSync(join(server.dir, 'data', 'uploads', 'sample.txt'), 'after');
     assert.equal((await request('POST', `/api/auth-console/backups/${id}/restore`, user, { confirmation: 'RESTORE' })).status, 403);
     assert.equal((await request('POST', `/api/auth-console/backups/${id}/restore`, superuser, { confirmation: 'wrong' })).status, 400);
-    const restored = await request('POST', `/api/auth-console/backups/${id}/restore`, superuser, { confirmation: 'RESTORE' });
+    const upload = async (who: typeof superuser, confirmation: string, content: Uint8Array = bytes) => {
+      const form = new FormData();
+      form.append('confirmation', confirmation);
+      form.append('file', new Blob([content]), 'backup.tar.gz');
+      const response = await fetch(server.base + '/api/auth-console/backups/restore-file', { method: 'POST', headers: { Authorization: `Bearer ${who.token}` }, body: form });
+      return { status: response.status, data: await response.json() };
+    };
+    assert.equal((await upload(user, 'RESTORE')).status, 403);
+    assert.equal((await upload(superuser, 'wrong')).status, 400);
+    assert.equal((await upload(superuser, 'RESTORE', Buffer.from('not an archive'))).status, 400);
+    assert.equal(readFileSync(join(server.dir, 'data', 'uploads', 'sample.txt'), 'utf8'), 'after');
+    const restored = await upload(superuser, 'RESTORE');
     assert.equal(restored.status, 202, JSON.stringify(restored.data));
     assert.ok(restored.data.safetyBackupId);
     assert.equal((await request('POST', '/api/auth-console/backups', superuser, {})).status, 409);
@@ -41,6 +52,6 @@ test('backup API gates platform access, downloads an archive and restores on res
     const fresh = server.session(ids.super);
     const listing = await request('GET', '/api/auth-console/backups', fresh);
     assert.equal(listing.status, 200);
-    assert.equal(listing.data.backups.length, 2);
+    assert.equal(listing.data.backups.length, 3);
   } finally { await server.stop(); }
 });

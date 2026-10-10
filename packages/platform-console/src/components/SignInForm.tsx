@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { authClient } from '../lib/auth-client';
 import { useAuth } from '../context/AuthContext';
-import { useTenant } from '../context/TenantContext';
 import { LANGUAGE_OPTIONS, useLanguage, type Language } from '../context/LanguageContext';
 import { signInWithGoogle } from '../lib/googleAuthService';
 import { Mail, Lock, User, Loader2, Clock } from 'lucide-react';
@@ -27,7 +26,6 @@ interface SignInFormProps {
 export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onOpenTermsOfService, allowRegistration = true }) => {
   const { t, language, setLanguage } = useLanguage();
   const { login } = useAuth();
-  const { branding } = useTenant();
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -155,7 +153,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
   if (registrationSuccess) {
     return (
       <div className="my-auto w-full min-w-0 max-w-md shrink-0">
-        <div className="w-full rounded-2xl sm:rounded-[2rem] border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm">
+        <div className="w-full rounded-2xl sm:rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm">
           <div className="px-5 py-6 sm:px-8 sm:py-8 text-center">
             <div className="flex justify-center mb-6">
               <LanguageSwitcher language={language} setLanguage={setLanguage} t={t} />
@@ -191,23 +189,26 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
 
   return (
     <div className="my-auto w-full min-w-0 max-w-md shrink-0">
-      <div className="w-full rounded-2xl sm:rounded-[2rem] border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm">
+      <div className="w-full rounded-2xl sm:rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm">
         <div className="px-5 py-6 sm:px-8 sm:py-8">
           <div className="flex justify-center mb-6">
             <LanguageSwitcher language={language} setLanguage={setLanguage} t={t} />
           </div>
-          <div className="text-center mb-6 sm:mb-8">
-            <h1 className="text-xl sm:text-2xl font-bold break-words">
-              {setupMode
-                ? t('login.setup_title', 'Create your admin account')
-                : isRegister ? t('login.create_account') : t('login.welcome_app', 'Welcome to {appName}', { appName: branding.appName })}
-            </h1>
-            <p className="text-[var(--muted-foreground)] mt-1.5 text-xs sm:text-sm">
-              {setupMode
-                ? t('login.setup_subtitle', 'First-time setup: this account will manage the whole workspace.')
-                : isRegister ? t('login.fill_form_reg') : t('login.fill_form_login')}
-            </p>
+          <div className="flex justify-center mb-6">
+            <img src={new URL('../assets/logo-full.png', import.meta.url).href} alt="Legalio" className="h-10 w-auto" />
           </div>
+          {(setupMode || isRegister) && (
+            <div className="text-center mb-6 sm:mb-8">
+              <h1 className="text-xl sm:text-2xl font-bold break-words">
+                {setupMode ? t('login.setup_title', 'Create your admin account') : t('login.create_account')}
+              </h1>
+              <p className="text-[var(--muted-foreground)] mt-1.5 text-xs sm:text-sm">
+                {setupMode
+                  ? t('login.setup_subtitle', 'First-time setup: this account will manage the whole workspace.')
+                  : t('login.fill_form_reg')}
+              </p>
+            </div>
+          )}
 
           {invitation && (
             <Alert className="mb-6">
@@ -229,7 +230,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
                 <Label htmlFor="signin-name">{t('login.fullname_label')}</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                  <Input id="signin-name" type="text" required value={name} onChange={(e) => setName(e.target.value)} className="h-11 pl-9 text-base sm:text-sm" placeholder={t('login.fullname_placeholder')} />
+                  <Input id="signin-name" type="text" required value={name} onChange={(e) => setName(e.target.value)} className="ds-input pl-9" placeholder={t('login.fullname_placeholder')} />
                 </div>
               </div>
             )}
@@ -238,7 +239,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
               <Label htmlFor="signin-email">{t('login.email_label')}</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                <Input id="signin-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="h-11 pl-9 text-base sm:text-sm" placeholder={t('login.email_placeholder')} />
+                <Input id="signin-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="ds-input pl-9" placeholder={t('login.email_placeholder')} />
               </div>
             </div>
 
@@ -254,7 +255,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
                   autoComplete={setupMode ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 pl-9 text-base sm:text-sm"
+                  className="ds-input pl-9"
                   placeholder="••••••••"
                 />
               </div>
@@ -292,7 +293,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
                 size="lg"
                 onClick={handleGoogleSignIn}
                 disabled={loading || (!allowRegistration && !statusReady)}
-                className="w-full gap-3 bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
+                className="w-full"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -307,7 +308,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
                 <Button
                   type="button"
                   variant="link"
-                  className="h-auto min-h-11 max-w-full whitespace-normal text-sm"
+                  className="max-w-full whitespace-normal text-sm"
                   onClick={() => {
                     setIsRegister(!isRegister);
                     setError('');
@@ -331,7 +332,7 @@ const LanguageSwitcher: React.FC<{ language: Language; setLanguage: (lang: Langu
   <div
     role="group"
     aria-label={t('header.switch_language', 'Pilih bahasa')}
-    className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-full border border-slate-200/80 dark:border-slate-700/80 text-xs font-semibold"
+    className="ds-panel flex items-center p-0.5 text-xs font-semibold"
   >
     {LANGUAGE_OPTIONS.map((option) => (
       <button
@@ -339,10 +340,10 @@ const LanguageSwitcher: React.FC<{ language: Language; setLanguage: (lang: Langu
         type="button"
         lang={option.htmlLang}
         onClick={() => setLanguage(option.code)}
-        className={`min-w-11 min-h-11 px-2.5 py-1.5 rounded-full transition-all cursor-pointer text-xs font-bold flex items-center justify-center focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none ${
+        className={`min-w-10 min-h-10 px-2.5 py-1.5 rounded-full transition-all cursor-pointer text-xs font-bold flex items-center justify-center focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none ${
           language === option.code
             ? 'bg-accent-strong text-white shadow-2xs'
-            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+            : 'text-ink-soft hover:text-ink dark:hover:text-ink'
         }`}
         title={option.nativeName}
         aria-label={option.nativeName}

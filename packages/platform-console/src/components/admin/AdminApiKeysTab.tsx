@@ -45,22 +45,22 @@ export const AdminApiKeysTab: React.FC<AdminApiKeysTabProps> = ({
   return (
     <div className="space-y-4">
       {/* Controls Bar */}
-      <div className="mobile-controls-bar flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+      <div className="ds-panel mobile-controls-bar flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4">
         <div className="relative flex-1 min-w-[220px] max-w-md">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
           <input aria-label={t('admin.key_search_ph', 'Cari nama API Key...')}
             type="text"
             placeholder={t('admin.key_search_ph', 'Cari nama API Key...')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-accent"
+            className="ds-input w-full pl-9 pr-3"
           />
         </div>
 
         <button
           type="button"
           onClick={onOpenCreateKey}
-          className="theme-action ui-button ui-button-lg text-white font-medium transition-colors shadow-xs"
+          className="theme-action ui-button ui-button-lg ds-button ds-button-lg ds-button-ghost"
         >
           <Plus className="w-4 h-4" />
           <span>{t('admin.btn_generate_key', 'Generate API Key')}</span>
@@ -68,11 +68,11 @@ export const AdminApiKeysTab: React.FC<AdminApiKeysTabProps> = ({
       </div>
 
       {/* Keys Table */}
-      <div className="ds-table-surface bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
+      <div className="ds-table-surface bg-surface rounded-xl border border-hairline overflow-hidden shadow-xs">
+        <div className="overflow-x-auto ds-table-surface">
           <table className="ds-table w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-xs">
+              <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-ink-soft font-semibold uppercase tracking-wider text-xs">
                 <th className="py-3 px-4">{t('admin.col_key_name', 'Nama Kunci')}</th>
                 <th className="py-3 px-4">{t('admin.col_key_token', 'Key Token')}</th>
                 <th className="py-3 px-4">{t('admin.col_scopes', 'Cakupan Izin (Scopes)')}</th>
@@ -81,24 +81,24 @@ export const AdminApiKeysTab: React.FC<AdminApiKeysTabProps> = ({
                 <th className="py-3 px-4 text-right">{t('admin.col_action', 'Aksi')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-hairline">
               {filteredKeys.length === 0 ? (
                 <TableEmptyState colSpan={6} />
               ) : (
                 filteredKeys.map((k) => (
                   <tr
                     key={k.id}
-                    className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                    className="hover:bg-surface/70 dark:hover:bg-surface-2/40 transition-colors"
                   >
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                        <Lock className="w-3.5 h-3.5 text-slate-400" />
+                      <div className="font-semibold text-ink flex items-center gap-2">
+                        <Lock className="w-3.5 h-3.5 text-ink-soft" />
                         <span>{k.name}</span>
                       </div>
                     </td>
                     <td className="py-3 px-4 font-mono text-xs">
                       <div className="flex items-center gap-1.5">
-                        <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">
+                        <span className="bg-surface-2 px-1.5 py-0.5 rounded-sm text-ink">
                           {k.keyPreview}
                         </span>
                       </div>
@@ -108,7 +108,7 @@ export const AdminApiKeysTab: React.FC<AdminApiKeysTabProps> = ({
                         {k.scopes.map((scope) => (
                           <span
                             key={scope}
-                            className="text-xs font-mono px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                            className="text-xs font-mono px-1.5 py-0.2 rounded-sm bg-surface-2 text-ink-soft border border-hairline"
                           >
                             {scope}
                           </span>
@@ -117,16 +117,16 @@ export const AdminApiKeysTab: React.FC<AdminApiKeysTabProps> = ({
                     </td>
                     <td className="py-3 px-4">
                       {k.status === 'active' ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-status-success-soft text-status-success dark:bg-status-success-soft/50">
                           {t('admin.status_active', 'Aktif')}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-status-danger-soft text-status-danger dark:bg-status-danger-soft/50">
                           {t('admin.status_revoked', 'Dicabut (Revoked)')}
                         </span>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-slate-500 text-xs">
+                    <td className="py-3 px-4 text-ink-soft text-xs">
                       {new Date(k.createdAt).toLocaleDateString(getActiveFormattingLocale())}
                     </td>
                     <td className="py-3 px-4 text-right">
@@ -135,7 +135,7 @@ export const AdminApiKeysTab: React.FC<AdminApiKeysTabProps> = ({
                           <button
                             type="button"
                             onClick={() => onRevokeKey(k.id)}
-                            className="px-2 py-1 rounded text-xs font-medium text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+                            className="inline-flex items-center px-2 min-h-8 rounded-sm text-xs font-semibold text-status-warning hover:bg-status-warning-soft dark:hover:bg-status-warning-soft/40 transition-colors"
                           >
                             {t('admin.btn_revoke', 'Cabut')}
                           </button>
@@ -143,7 +143,7 @@ export const AdminApiKeysTab: React.FC<AdminApiKeysTabProps> = ({
                         <button
                           type="button"
                           onClick={() => onDeleteKey(k.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
+                          className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-status-danger dark:hover:text-status-danger rounded-sm transition-colors"
                           title={t('admin.title_delete_key', 'Hapus Kunci')}
                         >
                           <Trash2 className="w-3.5 h-3.5" />

@@ -138,7 +138,7 @@ export const TableSelectionOverlay: React.FC<{
           }
           title={t('editor.pilih_seluruh_baris', 'Pilih seluruh baris')}
           style={{ top: rowHandle.top, left: rowHandle.left - 18, height: Math.max(rowHandle.height, 16) }}
-          className="absolute w-4 flex items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 hover:text-emerald-600 dark:hover:text-emerald-400 z-20 cursor-pointer transition-colors"
+          className="absolute w-4 flex items-center justify-center rounded-md bg-surface-2 text-ink-soft hover:bg-status-success-soft dark:hover:bg-status-success-soft/60 hover:text-status-success dark:hover:text-status-success z-20 cursor-pointer transition-colors"
         >
           <GripVertical className="w-3 h-3" />
         </button>
@@ -154,7 +154,7 @@ export const TableSelectionOverlay: React.FC<{
           }
           title={t('editor.pilih_seluruh_kolom', 'Pilih seluruh kolom')}
           style={{ top: colHandle.top - 16, left: colHandle.left, width: Math.max(colHandle.width, 16) }}
-          className="absolute h-4 flex items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 hover:text-emerald-600 dark:hover:text-emerald-400 z-20 cursor-pointer transition-colors"
+          className="absolute h-4 flex items-center justify-center rounded-md bg-surface-2 text-ink-soft hover:bg-status-success-soft dark:hover:bg-status-success-soft/60 hover:text-status-success dark:hover:text-status-success z-20 cursor-pointer transition-colors"
         >
           <GripHorizontal className="w-3 h-3" />
         </button>
@@ -166,13 +166,13 @@ export const TableSelectionOverlay: React.FC<{
         shouldShow={({ state }) => state.selection instanceof CellSelection}
         options={{ placement: 'top', offset: 8 }}
       >
-        <div className="flex items-center gap-0.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg p-1">
+        <div className="ds-panel flex items-center gap-0.5 p-1">
           <button
             type="button"
             disabled={!editor.can().mergeCells()}
             onClick={() => editor.chain().focus().mergeCells().run()}
             title={t('editor.gabung_sel', 'Gabung Sel')}
-            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center size-8 rounded-md text-ink-soft dark:text-ink hover:bg-surface-2 dark:hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <Combine className="w-3.5 h-3.5" />
           </button>
@@ -181,18 +181,18 @@ export const TableSelectionOverlay: React.FC<{
             disabled={!editor.can().splitCell()}
             onClick={() => editor.chain().focus().splitCell().run()}
             title={t('editor.pisah_sel', 'Pisah Sel')}
-            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center size-8 rounded-md text-ink-soft dark:text-ink hover:bg-surface-2 dark:hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <SplitSquareHorizontal className="w-3.5 h-3.5" />
           </button>
 
-          <div className="w-px self-stretch bg-slate-200 dark:bg-slate-800 mx-0.5" />
+          <div className="w-px self-stretch bg-surface-2 mx-0.5" />
 
           <button
             type="button"
             onClick={() => editor.chain().focus().setCellAttribute('align', 'left').run()}
             title={t('editor.rata_kiri', 'Rata Kiri')}
-            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="inline-flex items-center justify-center size-8 rounded-md text-ink-soft dark:text-ink hover:bg-surface-2 dark:hover:bg-surface-2"
           >
             <AlignLeft className="w-3.5 h-3.5" />
           </button>
@@ -200,7 +200,7 @@ export const TableSelectionOverlay: React.FC<{
             type="button"
             onClick={() => editor.chain().focus().setCellAttribute('align', 'center').run()}
             title={t('editor.rata_tengah', 'Rata Tengah')}
-            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="inline-flex items-center justify-center size-8 rounded-md text-ink-soft dark:text-ink hover:bg-surface-2 dark:hover:bg-surface-2"
           >
             <AlignCenter className="w-3.5 h-3.5" />
           </button>
@@ -208,12 +208,12 @@ export const TableSelectionOverlay: React.FC<{
             type="button"
             onClick={() => editor.chain().focus().setCellAttribute('align', 'right').run()}
             title={t('editor.rata_kanan', 'Rata Kanan')}
-            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="inline-flex items-center justify-center size-8 rounded-md text-ink-soft dark:text-ink hover:bg-surface-2 dark:hover:bg-surface-2"
           >
             <AlignRight className="w-3.5 h-3.5" />
           </button>
 
-          <div className="w-px self-stretch bg-slate-200 dark:bg-slate-800 mx-0.5" />
+          <div className="w-px self-stretch bg-surface-2 mx-0.5" />
 
           <div className="flex items-center gap-1 px-1">
             {['transparent', '#f1f5f9', '#fee2e2', '#fef9c3', '#dcfce7', '#dbeafe', '#ede9fe'].map((color) => (
@@ -228,19 +228,19 @@ export const TableSelectionOverlay: React.FC<{
                     .setCellAttribute('backgroundColor', color === 'transparent' ? null : color)
                     .run()
                 }
-                className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-600 shrink-0"
+                className="w-4 h-4 rounded-full border border-hairline shrink-0"
                 style={{ backgroundColor: color }}
               />
             ))}
           </div>
 
-          <div className="w-px self-stretch bg-slate-200 dark:bg-slate-800 mx-0.5" />
+          <div className="w-px self-stretch bg-surface-2 mx-0.5" />
 
           <button
             type="button"
             onClick={() => editor.chain().focus().deleteRow().run()}
             title={t('editor.hapus_baris', 'Hapus Baris')}
-            className="p-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+            className="inline-flex items-center justify-center size-8 rounded-md text-status-danger hover:bg-status-danger-soft dark:hover:bg-status-danger-soft/30"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>

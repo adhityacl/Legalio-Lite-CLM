@@ -207,9 +207,9 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-200">
       {/* 1. Standard Header Card */}
-      <div className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="ds-page-bar">
         <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+          <h2 className="ds-page-heading">
             <span>{t('notifications.title', 'Pusat Notifikasi & Alarm Notice Period')}</span>
             {unreadCount > 0 && (
               <span className={`text-xs font-normal px-3 py-0.5 rounded-full border shadow-2xs whitespace-nowrap ${getStatusBadgeClass('warning')}`}>
@@ -223,9 +223,9 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           {unreadCount > 0 && onMarkRead && (
             <button
               onClick={handleMarkAllRead}
-              className="ui-button ui-button-lg ui-button-lg cursor-pointer shadow-xs gap-1.5 border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-50 text-slate-700 font-bold flex items-center transition-all shrink-0"
+              className="ui-button ui-button-lg ui-button-lg cursor-pointer flex items-center shrink-0 ds-button ds-button-lg ds-button-outline"
             >
-              <CheckCheck className="w-4 h-4 text-slate-600" />
+              <CheckCheck className="w-4 h-4 text-ink-soft" />
               <span>{t('notifications.mark_all', 'Tandai Semua Dibaca')}</span>
             </button>
           )}
@@ -233,7 +233,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           <button
             onClick={handleManualTrigger}
             disabled={runningCron}
-            className="ui-button ui-button-lg ui-button-lg cursor-pointer shadow-sm gap-1.5 bg-accent-strong hover:bg-accent-strong-hover text-white font-bold flex items-center transition-all shrink-0 disabled:opacity-50"
+            className="ui-button ui-button-lg ui-button-lg cursor-pointer flex items-center shrink-0 disabled:opacity-50 ds-button ds-button-lg ds-button-default"
           >
             <RefreshCw className={`w-4 h-4 text-white ${runningCron ? 'animate-spin' : ''}`} />
             <span>{runningCron ? t('notifications.processing', 'Memproses...') : t('notifications.refresh_logs', 'Refresh Logs')}</span>
@@ -242,11 +242,11 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       </div>
 
       {/* 2. Standard Filter Bar with 3 Dropdowns and View Column Toggle - Justified Responsive Grid/Flex */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 mb-6">
-        <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
+      <div className="ds-panel p-6 mb-6">
+        <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full ds-grid">
           {/* 1. Search Box */}
           <div className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <Search className="w-4 h-4 text-ink-soft absolute left-3 top-2.5" />
             <input aria-label={t('notifications.search_ph', 'Cari nomor kontrak, partner, atau IO...')}
               type="text"
               placeholder={t('notifications.search_ph', 'Cari nomor kontrak, partner, atau IO...')}
@@ -255,7 +255,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="h-9 w-full pl-9 pr-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-accent font-medium transition-colors"
+              className="ds-input w-full pl-9 pr-3"
             />
           </div>
 
@@ -266,7 +266,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               setFilterStatus(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[130px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
           >
             <option value="ALL">{t('notifications.all_status', 'Semua Status')} ({notifications.length})</option>
             <option value="UNREAD">{t('notifications.status_unread', 'Belum Dibaca')} ({unreadCount})</option>
@@ -280,7 +280,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               setFilterType(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[130px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
           >
             <option value="ALL">{t('notifications.all_types', 'Semua Jenis Notifikasi')}</option>
             {typeOptions.map((opt) => (
@@ -295,7 +295,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               setFilterTimeRange(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[130px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
           >
             <option value="ALL">{t('notifications.all_time_periods', 'Semua Periode Waktu')}</option>
             <option value="TODAY">{t('notifications.time_today', 'Hari Ini (24 Jam Terakhir)')}</option>
@@ -307,17 +307,17 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           <div className="relative flex-initial">
             <button
               onClick={() => setIsViewMenuOpen(!isViewMenuOpen)}
-              className="ui-button ui-button-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-[0.98] w-full"
+              className="ui-button ui-button-lg flex items-center justify-center cursor-pointer active:scale-[0.98] w-full ds-button ds-button-lg ds-button-outline"
               title={t('notifications.view_settings', 'Pengaturan Tampilan Kolom')}
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+              <SlidersHorizontal className="w-3.5 h-3.5 text-ink-soft" />
               <span>{t('notifications.view', 'View')}</span>
             </button>
             {isViewMenuOpen && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setIsViewMenuOpen(false)}></div>
-                <div className="absolute right-0 top-11 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-30 py-2 animate-in fade-in zoom-in-95">
-                <div className="px-3.5 py-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 border-b border-slate-100 dark:border-slate-800">
+                <div className="ds-panel absolute right-0 top-11 w-52 z-30 py-2 animate-in fade-in zoom-in-95">
+                <div className="px-3.5 py-1.5 text-xs font-bold text-ink-soft uppercase tracking-wider mb-1 border-b border-hairline">
                   {t('notifications.toggle_columns', 'Toggle Kolom')}
                 </div>
                 {Object.keys(visibleColumns).map((col) => {
@@ -331,13 +331,13 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                   return (
                     <label
                       key={col}
-                      className="flex items-center gap-2.5 px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-xs font-semibold text-slate-700"
+                      className="flex items-center gap-2.5 px-3.5 py-2 hover:bg-surface dark:hover:bg-surface-2 cursor-pointer text-xs font-semibold text-ink"
                     >
                       <input
                         type="checkbox"
                         checked={visibleColumns[col]}
                         onChange={() => toggleColumnVisibility(col)}
-                        className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent w-3.5 h-3.5"
+                        className="rounded-sm border-hairline text-accent-text focus:ring-accent w-3.5 h-3.5"
                       />
                       <span>{label}</span>
                     </label>
@@ -352,8 +352,8 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
       {/* Bulk Action Bar (Visible when items selected) */}
       {selectedIds.length > 0 && (
-        <div className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300">
+        <div className="ds-panel p-3 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-ink">
             <span className="font-bold text-accent-text">{selectedIds.length}</span>
             <span>{t('notifications.selected_count', 'notifikasi dipilih')}</span>
           </div>
@@ -363,7 +363,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               <button
                 type="button"
                 onClick={handleMarkSelectedRead}
-                className="min-h-11 sm:min-h-9 h-9 px-3 text-xs bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-700 dark:text-slate-200 hover:text-accent-text font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                className="min-h-10 h-10 px-4 text-sm bg-surface dark:bg-surface-2 border border-hairline rounded-md text-ink hover:text-accent-text font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
               >
                 <CheckCircle2 className="w-3.5 h-3.5 text-accent-text" />
                 <span>{t('notifications.mark_read_btn', 'Tandai Dibaca')}</span>
@@ -374,9 +374,9 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               <button
                 type="button"
                 onClick={handleDeleteSelected}
-                className="min-h-11 sm:min-h-9 h-9 px-3 text-xs bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl text-rose-700 dark:text-rose-300 hover:bg-rose-100 font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                className="min-h-10 h-10 px-4 text-sm bg-status-danger-soft dark:bg-status-danger-soft/40 border border-status-danger-border rounded-md text-status-danger hover:bg-status-danger-soft font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
               >
-                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <Trash2 className="w-3.5 h-3.5 text-status-danger" />
                 <span>{t('notifications.delete_selected', 'Hapus Terpilih')}</span>
               </button>
             )}
@@ -385,11 +385,11 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       )}
 
       {/* 3. Main Standard Table Card */}
-      <div className="ds-table-surface bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="ds-table-surface bg-surface rounded-2xl border border-hairline/80 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto ds-table-surface">
           <table className="ds-table w-full text-left text-xs border-collapse">
             {/* Table Header */}
-            <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300">
+            <thead className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink">
               <tr>
                 {/* 0. Checkbox */}
                 <th className="pl-6 pr-2 py-4 w-12 text-left align-middle">
@@ -398,7 +398,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                       type="checkbox"
                       checked={isAllCurrentSelected}
                       onChange={toggleSelectAll}
-                      className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent cursor-pointer"
+                      className="rounded-sm border-hairline text-accent-text focus:ring-accent cursor-pointer"
                     />
                   </div>
                 </th>
@@ -407,14 +407,14 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 {visibleColumns.time && (
                   <th
                     onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
-                    className="p-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors select-none align-middle"
+                    className="p-4 cursor-pointer hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors select-none align-middle"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>{t('notifications.col_created_time', 'Created time')}</span>
                       {sortOrder === 'desc' ? (
-                        <ArrowDown className="w-3.5 h-3.5 text-slate-400" />
+                        <ArrowDown className="w-3.5 h-3.5 text-ink-soft" />
                       ) : (
-                        <ArrowUp className="w-3.5 h-3.5 text-slate-400" />
+                        <ArrowUp className="w-3.5 h-3.5 text-ink-soft" />
                       )}
                     </div>
                   </th>
@@ -441,14 +441,14 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 )}
 
                 {/* 6. Actions */}
-                <th className="pl-2 pr-6 py-4 text-right w-24 text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                <th className="pl-2 pr-6 py-4 text-right w-24 text-xs font-bold text-ink align-middle">
                   <div className="flex items-center justify-end">{t('notifications.col_actions', 'Aksi')}</div>
                 </th>
               </tr>
             </thead>
 
             {/* Table Body */}
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+            <tbody className="divide-y divide-hairline text-ink">
               {currentNotifications.length === 0 ? (
                 <TableEmptyState colSpan={7} />
               ) : (
@@ -459,11 +459,11 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                   return (
                     <tr
                       key={notif.notif_id}
-                      className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors ${
+                      className={`hover:bg-surface/80 dark:hover:bg-surface-2/50 transition-colors ${
                         isSelected
-                          ? 'bg-slate-50/90 dark:bg-slate-800/80'
+                          ? 'bg-surface/90 dark:bg-surface-2/80'
                           : isUnread
-                          ? 'bg-emerald-50/20 dark:bg-emerald-950/10'
+                          ? 'bg-status-success-soft/20 dark:bg-status-success-soft/10'
                           : ''
                       }`}
                     >
@@ -474,21 +474,21 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleSelectRow(notif.notif_id)}
-                            className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent cursor-pointer"
+                            className="rounded-sm border-hairline text-accent-text focus:ring-accent cursor-pointer"
                           />
                         </div>
                       </td>
 
                       {/* Created Time */}
                       {visibleColumns.time && (
-                        <td className="py-4 px-4 text-xs font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap align-middle">
+                        <td className="py-4 px-4 text-xs font-semibold text-ink whitespace-nowrap align-middle">
                           {formatDateTime(notif.tanggal_terkirim)}
                         </td>
                       )}
 
                       {/* Type Badge */}
                       {visibleColumns.type && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 whitespace-nowrap align-middle">
+                        <td className="py-4 px-4 text-xs font-normal text-ink whitespace-nowrap align-middle">
                           <span
                             className={`text-xs font-normal px-3 py-0.5 rounded-full border shadow-2xs whitespace-nowrap inline-flex items-center justify-center ${getStatusBadgeClass(
                               notif.jenis_notifikasi
@@ -501,12 +501,12 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
                       {/* Subject */}
                       {visibleColumns.subject && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 whitespace-nowrap align-middle">
+                        <td className="py-4 px-4 text-xs font-normal text-ink whitespace-nowrap align-middle">
                           <span className="font-medium">
                             {notif.parent_nomor || notif.parent_id}
                           </span>
                           {notif.parent_judul && (
-                            <span className="text-slate-500 dark:text-slate-400 ml-1.5">
+                            <span className="text-ink-soft ml-1.5">
                               • {notif.parent_judul}
                             </span>
                           )}
@@ -515,7 +515,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
                       {/* Message */}
                       {visibleColumns.message && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 max-w-[400px] align-middle">
+                        <td className="py-4 px-4 text-xs font-normal text-ink max-w-[400px] align-middle">
                           <span className="line-clamp-2" title={notificationMessage(notif, t)}>
                             {notificationMessage(notif, t)}
                           </span>
@@ -524,7 +524,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
                       {/* Recipient */}
                       {visibleColumns.recipient && (
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 whitespace-nowrap align-middle">
+                        <td className="py-4 px-4 text-xs font-normal text-ink whitespace-nowrap align-middle">
                           {notif.penerima}
                         </td>
                       )}
@@ -537,7 +537,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                             <button
                               type="button"
                               onClick={(e) => handleMarkSingleRead(notif.notif_id, e)}
-                              className="inline-flex size-9 items-center justify-center rounded-lg text-slate-400 hover:text-accent-text hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                              className="inline-flex size-10 items-center justify-center rounded-md text-ink-soft hover:text-accent-text hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
                               title={t('notifications.mark_read', 'Tandai Dibaca')}
                             >
                               <CheckCircle2 className="w-4 h-4" />
@@ -549,7 +549,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                             <button
                               type="button"
                               onClick={(e) => handleDeleteSingle(notif.notif_id, e)}
-                              className="inline-flex size-9 items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                              className="inline-flex size-10 items-center justify-center rounded-md text-ink-soft hover:text-status-danger hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
                               title={t('notifications.delete_notif', 'Hapus Notifikasi')}
                             >
                               <Trash2 className="w-4 h-4" />

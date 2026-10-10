@@ -39,5 +39,5 @@ test('existing custom organization colors keep their saved value', () => {
   assert.equal(findAccentPalette('#0537FF'), undefined);
   assert.equal(organizationThemeTokens('#0537FF', false)['--primary'], '#0537FF');
   assert.equal(organizationThemeTokens('#0537FF', true)['--primary'], '#0537FF');
-  assert.equal(organizationThemeTokens('invalid', false)['--primary'], '#06C755');
+  assert.equal(organizationThemeTokens('invalid', false)['--primary'], '#2653F6');
 });

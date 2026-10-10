@@ -15,8 +15,8 @@ const EmptyContent: React.FC<EmptyContentProps> = ({ message, action, icon: Icon
   const { t } = useLanguage();
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-      <Icon className="size-6 text-slate-400 dark:text-slate-500" aria-hidden="true" />
-      <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+      <Icon className="size-6 text-ink-soft" aria-hidden="true" />
+      <p className="text-sm font-medium text-ink-soft">
         {message || t('common.no_data', 'Belum ada data untuk ditampilkan')}
       </p>
       {action}

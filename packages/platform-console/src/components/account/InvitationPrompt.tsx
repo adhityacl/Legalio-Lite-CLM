@@ -80,18 +80,18 @@ export const InvitationPrompt: React.FC = () => {
 
   return (
     <ModalFrame onClose={close} className="max-w-md">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-        <ModalTitle className="text-lg font-semibold text-slate-900 dark:text-white">{t('tb.invitation_title', 'Organization invitation')}</ModalTitle>
+      <div className="ds-section-header">
+        <ModalTitle className="ds-modal-title flex items-center gap-2">{t('tb.invitation_title', 'Organization invitation')}</ModalTitle>
         <Button type="button" variant="ghost" size="icon" onClick={close} aria-label={t('common.close', 'Close')}><X className="h-4 w-4" aria-hidden="true" /></Button>
       </div>
       <div className="flex flex-col gap-4 p-5 text-sm">
-        <p className="text-slate-700 dark:text-slate-300">
+        <p className="text-ink">
           {t('tb.invitation_body', 'You are invited to join {org} as {role}.', { org: preview.organizationName, role: preview.tenantRole })}
         </p>
-        {preview.status !== 'pending' && <p role="alert" className="text-rose-700 dark:text-rose-300">{t('tb.invitation_not_pending', 'This invitation can no longer be accepted.')}</p>}
-        {state.kind === 'done' && <p role="status" className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />{t('tb.invitation_accepted', 'You joined the organization.')}</p>}
+        {preview.status !== 'pending' && <p role="alert" className="ds-alert ds-status-danger border">{t('tb.invitation_not_pending', 'This invitation can no longer be accepted.')}</p>}
+        {state.kind === 'done' && <p role="status" className="flex items-center gap-2 text-status-success"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />{t('tb.invitation_accepted', 'You joined the organization.')}</p>}
         {state.kind === 'error' && (
-          <p role="alert" className="flex items-start gap-2 text-rose-700 dark:text-rose-300">
+          <p role="alert" className="flex items-start gap-2 text-status-danger">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             {state.code === 'INVITATION_IDENTITY_MISMATCH'
                 ? t('tb.invitation_other_account', 'This invitation was sent to a different account. Sign in with the invited email address.')

@@ -200,12 +200,12 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full max-h-[92dvh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+    <ModalFrame onClose={onClose} className="max-w-4xl w-full max-h-[92dvh] flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
+        <div className="ds-section-header">
           <div>
-            <ModalTitle className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <ModalTitle className="ds-modal-title flex items-center gap-2">
               <GitCommit className="w-5 h-5 text-accent-text" />
               <span>{t('amendments.tambah_addendum_amendment_baru', 'Tambah Addendum / Amendment Baru')}</span>
             </ModalTitle>
@@ -213,17 +213,17 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
           <button aria-label={t('common.close', 'Tutup')}
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink size-8 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1 text-slate-900 dark:text-slate-100">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1 text-ink">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ds-grid">
               <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-xs">{t('amendments.tipe_induk_perjanjian', 'Tipe Induk Perjanjian *')}</label>
+                <label className="block font-bold text-ink mb-1.5 text-xs">{t('amendments.tipe_induk_perjanjian', 'Tipe Induk Perjanjian *')}</label>
                 <AlphabeticalSelect
                   value={parentType}
                   onChange={(e) => {
@@ -231,7 +231,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                     setParentType(val);
                     setParentId(val === 'Contract' ? contracts[0]?.contract_id || '' : ios[0]?.io_id || '');
                   }}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-slate-100 font-semibold focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer"
+                  className="ds-input w-full cursor-pointer"
                 >
                   <option value="Contract">{t('amendments.kontrak_utama_master_contract', 'Kontrak Utama (Master Contract)')}</option>
                   <option value="IO">{t('import.type_io', 'Insertion Order (IO)')}</option>
@@ -239,11 +239,11 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-xs">{t('amendments.pilih_perjanjian_induk', 'Pilih Perjanjian Induk *')}</label>
+                <label className="block font-bold text-ink mb-1.5 text-xs">{t('amendments.pilih_perjanjian_induk', 'Pilih Perjanjian Induk *')}</label>
                 <AlphabeticalSelect
                   value={parentId}
                   onChange={(e) => setParentId(e.target.value)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-slate-100 font-semibold focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer"
+                  className="ds-input w-full cursor-pointer"
                 >
                   {parentType === 'Contract'
                     ? contracts.map((c) => (
@@ -260,20 +260,20 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ds-grid">
               <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-xs">{t('form.contract.nomor_addendum', 'Nomor Addendum *')}</label>
+                <label className="block font-bold text-ink mb-1.5 text-xs">{t('form.contract.nomor_addendum', 'Nomor Addendum *')}</label>
                 <input
                   type="text"
                   required
                   value={nomorAddendum}
                   onChange={(e) => setNomorAddendum(e.target.value)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input w-full"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-xs">{t('amendments.tanggal_addendum', 'Tanggal Addendum *')}</label>
+                <label className="block font-bold text-ink mb-1.5 text-xs">{t('amendments.tanggal_addendum', 'Tanggal Addendum *')}</label>
                 <DateInput
                   required
                   value={tanggalAddendum}
@@ -283,7 +283,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-xs">{t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')}</label>
+              <label className="block font-bold text-ink mb-1.5 text-xs">{t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')}</label>
               <div className="flex flex-wrap gap-1.5">
                 {['Nilai Kontrak / IO', 'Jangka Waktu Periode', 'Ruang Lingkup / Deliverables', 'Syarat Pembayaran', 'Pihak Berwenang'].map(
                   (f) => (
@@ -293,7 +293,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer select-none transition-all ${
                         selectedFields.includes(f)
                           ? 'bg-accent-soft text-accent-text border-accent/40 font-bold'
-                          : 'bg-[#F7F8FA] dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-hairline dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                          : 'bg-canvas dark:bg-surface-2/80 text-ink-soft border-hairline hover:border-hairline dark:hover:border-hairline'
                       }`}
                     >
                       {selectedFields.includes(f) ? '✓ ' : '+ '}
@@ -305,7 +305,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-xs">
+              <label className="block font-bold text-ink mb-1.5 text-xs">
                 {t('form.contract.track_change_summary', 'Ringkasan Detail Track-Change Perubahan * (Wajib)')}
               </label>
               <textarea
@@ -314,15 +314,15 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                 placeholder={t('form.amendment.notes_ph', 'Jelaskan secara eksplisit nilai lama -> nilai baru, tanggal lama -> tanggal baru, atau perubahan pasal...')}
                 value={ringkasanPerubahan}
                 onChange={(e) => setRingkasanPerubahan(e.target.value)}
-                className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl p-3.5 text-slate-900 dark:text-slate-100 text-xs leading-relaxed focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                className="ds-input w-full"
               />
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-xs">{t('amendments.file_dokumen_addendum_pdf_drive_upload', 'File Dokumen Addendum PDF (Drive Upload)')}</label>
-              <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-accent dark:hover:border-accent rounded-2xl p-4 text-center bg-slate-50 dark:bg-slate-800/40 hover:bg-emerald-50/40 transition-all">
+              <label className="block font-bold text-ink mb-1.5 text-xs">{t('amendments.file_dokumen_addendum_pdf_drive_upload', 'File Dokumen Addendum PDF (Drive Upload)')}</label>
+              <div className="ds-upload text-center">
                 <Upload className="w-6 h-6 text-accent-text mx-auto mb-1.5" />
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                <p className="text-xs font-bold text-ink">
                   {fileName ? t('amendments.file_terpilih', 'File terpilih: {fileName}', { fileName }) : t('amendments.pilih_file_pdf_addendum', 'Pilih File PDF Addendum')}
                 </p>
                 <div className="mt-2.5 flex flex-wrap items-center justify-center gap-3">
@@ -331,7 +331,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                       type="button"
                       onClick={handleParseAmendment}
                       disabled={isParsing}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-accent-soft text-accent-text hover:bg-accent/20 font-bold text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 min-h-8 bg-accent-soft text-accent-text hover:bg-accent/20 font-semibold text-xs rounded-md transition-all cursor-pointer disabled:opacity-50"
                     >
                       {isParsing ? t('amendments.parsing', 'Parsing...') : t('amendments.parse_file', 'Parse File')}
                     </button>
@@ -340,35 +340,35 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                     type="file"
                     accept=".pdf"
                     onChange={handleFileChange}
-                    className="w-[220px] text-xs text-slate-500 dark:text-slate-400 file:mr-2 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer"
+                    className="w-[220px] text-xs text-ink-soft file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer"
                   />
                 </div>
               </div>
             </div>
 
             {parseSuccessMsg && (
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-semibold flex items-center gap-2">
+              <div className="p-3 bg-status-success-soft dark:bg-status-success-soft/40 border border-status-success-border text-status-success rounded-xl text-xs font-semibold flex items-center gap-2">
                 <span>{parseSuccessMsg}</span>
               </div>
             )}
 
             {error && (
-              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl text-xs font-bold flex items-center gap-2">
+              <div className="p-3.5 bg-status-danger-soft dark:bg-status-danger-soft/40 border border-status-danger-border text-status-danger rounded-xl text-xs font-bold flex items-center gap-2">
                 <span>⚠️</span>
                 <span>{error}</span>
               </div>
             )}
           </div>
 
-          <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0">
-            <span className="text-xs text-slate-400 dark:text-slate-500 font-medium hidden sm:inline">
+          <div className="p-4 sm:p-5 bg-surface border-t border-hairline flex items-center justify-between gap-2 shrink-0">
+            <span className="text-xs text-ink-soft font-medium hidden sm:inline">
               {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
             </span>
             <div className="flex items-center gap-2 ml-auto">
               <button
                 type="button"
                 onClick={onClose}
-                className="ui-button ui-button-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold transition-colors cursor-pointer"
+                className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
               >
                 {t('eval.btn_cancel', 'Batal')}
               </button>
@@ -376,7 +376,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                 type="submit"
                 disabled={submitting || !isFormValid}
                 title={!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : ''}
-                className="ui-button ui-button-lg bg-accent-strong hover:bg-accent-strong-hover text-white font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="ui-button ui-button-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-default"
               >
                 {submitting ? t('eval.btn_saving', 'Menyimpan...') : t('amendments.simpan_track_change_addendum', 'Simpan Track-Change Addendum')}
               </button>

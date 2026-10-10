@@ -1,5 +1,8 @@
 export const BACKUP_TRANSLATIONS = {
   "ID": {
+    "backup.fromFile": "Restore dari file",
+    "backup.file": "File backup",
+    "backup.fileHelp": "Pilih backup Legalio .tar.gz, maksimal 512 MB. Arsip divalidasi sebelum restore.",
     "backup.title": "Backup & Restore",
     "backup.create": "Backup sekarang",
     "backup.pause": "Permintaan aplikasi akan dijeda sebentar saat SQLite dan dokumen di-backup.",
@@ -26,6 +29,9 @@ export const BACKUP_TRANSLATIONS = {
     "backup.cancel": "Batal"
   },
   "EN": {
+    "backup.fromFile": "Restore from file",
+    "backup.file": "Backup file",
+    "backup.fileHelp": "Choose a Legalio .tar.gz backup, up to 512 MB. The archive is validated before restore.",
     "backup.title": "Backup & Restore",
     "backup.create": "Back up now",
     "backup.pause": "Application requests will pause briefly while SQLite and uploaded documents are backed up.",
@@ -52,6 +58,9 @@ export const BACKUP_TRANSLATIONS = {
     "backup.cancel": "Cancel"
   },
   "ZH": {
+    "backup.fromFile": "从文件恢复",
+    "backup.file": "备份文件",
+    "backup.fileHelp": "请选择 Legalio .tar.gz 备份，最大 512 MB。恢复前将验证归档。",
     "backup.title": "备份与恢复",
     "backup.create": "立即备份",
     "backup.pause": "备份 SQLite 和上传的文档时，应用请求将短暂暂停。",

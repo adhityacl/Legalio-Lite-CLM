@@ -54,11 +54,11 @@ export const NewsTicker: React.FC = () => {
 
   return (
     <div
-      className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl mb-3 flex flex-wrap sm:flex-nowrap items-stretch overflow-hidden"
+      className="relative bg-surface border border-hairline rounded-2xl mb-3 flex flex-wrap sm:flex-nowrap items-stretch overflow-hidden"
       role="region"
       aria-label={label}
     >
-      <div className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs sm:text-sm font-bold whitespace-nowrap">
+      <div className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 px-4 py-3 bg-status-success-soft dark:bg-status-success-soft/40 text-status-success text-xs sm:text-sm font-bold whitespace-nowrap">
         <Megaphone className="w-4 h-4 shrink-0" />
         <span>{label}</span>
       </div>
@@ -76,9 +76,9 @@ export const NewsTicker: React.FC = () => {
           {[0, 1].map((copy) => (
             <div key={copy} className="flex shrink-0 items-center">
               {items.map((item) => (
-                <span key={item} className="flex items-center whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">
+                <span key={item} className="flex items-center whitespace-nowrap text-sm text-ink">
                   {item}
-                  <span className="mx-6 size-1.5 shrink-0 rounded-full bg-emerald-500/70" />
+                  <span className="mx-6 size-1.5 shrink-0 rounded-full bg-status-success/70" />
                 </span>
               ))}
             </div>

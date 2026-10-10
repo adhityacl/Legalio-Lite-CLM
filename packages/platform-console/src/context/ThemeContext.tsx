@@ -28,6 +28,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     const root = document.documentElement;
+    root.dataset.moduixTheme = 'legalio';
+    root.dataset.moduixColorScheme = theme;
     if (theme === 'dark') {
       root.classList.add('dark');
     } else {

@@ -49,7 +49,7 @@ test('no text utility below 12px outside the dashboard', () => {
 });
 
 test('every color token utility used in src is registered in index.css @theme', () => {
-  // Only src/index.css's @theme generates utilities (styles/tokens.css is not loaded);
+  // Application role utilities are registered in the shared @theme;
   // an unregistered token silently renders transparent/inherited colors.
   const theme = readFileSync('packages/platform-console/src/index.css', 'utf8');
   const TOKENS = ['accent', 'accent-text', 'accent-strong', 'accent-strong-hover', 'accent-soft', 'accent-dark', 'ink', 'ink-soft', 'ink-faint', 'hairline', 'surface', 'surface-2', 'canvas'];
@@ -61,4 +61,26 @@ test('every color token utility used in src is registered in index.css @theme', 
   }
   const missing = [...used].filter((token) => !theme.includes(`--color-${token}:`));
   assert.deepEqual(missing, []);
+});
+
+test('application components use semantic colors instead of palette utilities', () => {
+  const files = FILES;
+  const offenders = files.flatMap(({ path, text }) => [...text.matchAll(/\b(?:bg|text|border|ring)-(?:slate|gray|zinc|neutral|emerald|green|red|rose|amber|blue|purple)-\d+\b/g)].map(match => `${path}: ${match[0]}`));
+  assert.deepEqual(offenders, []);
+});
+
+test('semantic feedback pairs meet normal-text contrast in light and dark themes', async () => {
+  const { contrastRatio } = await import('../packages/platform-console/src/lib/organizationColors');
+  const css = readFileSync('packages/ui-components/src/styles/tokens.css', 'utf8');
+  const [light, rest] = css.split(".dark, [data-moduix-color-scheme='dark'] {");
+  const dark = rest.split('}')[0];
+  const palette = (source: string) => Object.fromEntries([...source.matchAll(/--ds-([\w-]+):\s*(#[\da-f]{6});/gi)].map(match => [match[1], match[2]]));
+  const base = palette(light);
+  for (const colors of [base, { ...base, ...palette(dark) }]) {
+    for (const status of ['success', 'warning', 'danger', 'info', 'special', 'finance']) {
+      assert.ok(contrastRatio(colors[status], colors[`${status}-soft`]) >= 4.5, `${status} feedback must be readable`);
+    }
+    assert.ok(contrastRatio(colors.text, colors.surface) >= 4.5);
+    assert.ok(contrastRatio(colors['text-muted'], colors.surface) >= 4.5);
+  }
 });

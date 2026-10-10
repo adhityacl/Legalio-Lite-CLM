@@ -57,55 +57,55 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
   return (
     <div className="space-y-4">
       {/* Controls Bar */}
-      <div className="mobile-controls-bar flex flex-col items-stretch justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
+      <div className="ds-panel mobile-controls-bar flex flex-col items-stretch justify-between gap-3 p-4 sm:flex-row sm:items-center">
         <div className="relative min-w-[220px] max-w-md flex-1">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-soft" aria-hidden="true" />
           <input
             type="text"
             aria-label={t('admin.sess_search_ph', 'Cari sesi berdasarkan email, IP, browser, token...')}
             placeholder={t('admin.sess_search_ph', 'Cari sesi berdasarkan email, IP, browser, token...')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-3 text-xs text-slate-900 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-accent dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100"
+            className="ds-input w-full pl-9 pr-3"
           />
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 text-xs text-slate-500">
-          <Radio className="h-4 w-4 animate-pulse text-emerald-500" aria-hidden="true" />
+        <div className="flex shrink-0 items-center gap-2 text-xs text-ink-soft">
+          <Radio className="h-4 w-4 animate-pulse text-status-success" aria-hidden="true" />
           <span>
-            <strong className="text-slate-900 dark:text-slate-100">{activeSessionCount}</strong> {t('admin.active_sessions_in_database', 'Sesi aktif di database')}
+            <strong className="text-ink">{activeSessionCount}</strong> {t('admin.active_sessions_in_database', 'Sesi aktif di database')}
           </span>
         </div>
       </div>
-      {copyError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">{copyError}</div>}
+      {copyError && <div role="alert" className="ds-alert ds-status-danger border">{copyError}</div>}
 
       {/* Sessions Table */}
-      <div className="ds-table-surface bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto bg-white dark:bg-slate-900">
-          <table className="ds-table w-full text-left border-collapse text-xs bg-white dark:bg-slate-900">
-            <thead className="bg-slate-50 dark:bg-slate-800/50">
-              <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 h-12">
-                <th scope="col" className="p-4 text-left text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+      <div className="ds-table-surface bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto ds-table-surface bg-surface">
+          <table className="ds-table w-full text-left border-collapse text-xs bg-surface">
+            <thead className="bg-surface dark:bg-surface-2/50">
+              <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
+                <th scope="col" className="p-4 text-left text-xs font-bold text-ink align-middle">
                   {t('admin.col_identifier', 'Pengguna')}
                 </th>
-                <th scope="col" className="p-4 text-left text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                <th scope="col" className="p-4 text-left text-xs font-bold text-ink align-middle">
                   {t('admin.col_token', 'Session Token')}
                 </th>
-                <th scope="col" className="p-4 text-left text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                <th scope="col" className="p-4 text-left text-xs font-bold text-ink align-middle">
                   {t('admin.col_ip_agent', 'IP Address & Device')}
                 </th>
-                <th scope="col" className="p-4 text-left text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                <th scope="col" className="p-4 text-left text-xs font-bold text-ink align-middle">
                   {t('admin.col_started', 'Mulai Login')}
                 </th>
-                <th scope="col" className="p-4 text-left text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                <th scope="col" className="p-4 text-left text-xs font-bold text-ink align-middle">
                   {t('admin.col_expires', 'Kadaluarsa')}
                 </th>
-                <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
                   <div className="flex items-center justify-end">{t('admin.col_action', 'Aksi')}</div>
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-hairline">
               {filteredSessions.length === 0 ? (
                 <TableEmptyState colSpan={6} />
               ) : (
@@ -115,18 +115,18 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
                   const displayName = s.userName || t('admin.unnamed', 'Unnamed');
 
                   return (
-                    <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={s.id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
                       {/* User */}
                       <td className="py-4 px-4 text-left align-middle">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 font-semibold shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-surface-2 flex items-center justify-center text-ink font-semibold shrink-0">
                             {displayName.charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                            <div className="font-semibold text-ink truncate">
                               {displayName}
                             </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                            <div className="text-xs text-ink-soft truncate">
                               {s.userEmail}
                             </div>
                           </div>
@@ -136,33 +136,33 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
                       {/* Token Preview */}
                       <td className="py-4 px-4 text-left align-middle font-mono">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                          <span className="text-xs text-ink-soft bg-surface-2 px-1.5 py-0.5 rounded-sm">
                             {s.token ? `${s.token.slice(0, 12)}...` : `${(s.id || '').slice(0, 12)}...`}
                           </span>
                           <button
                             type="button"
                             onClick={() => handleCopy(s.token || s.id, s.id)}
-                            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft dark:hover:text-ink"
                             title={t('admin.copy_token', 'Copy Token')}
                             aria-label={t('admin.copy_token', 'Salin token sesi')}
                           >
-                            {isCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                            {isCopied ? <Check className="w-3 h-3 text-status-success" /> : <Copy className="w-3 h-3" />}
                           </button>
                         </div>
                       </td>
 
                       {/* IP & User Agent */}
                       <td className="py-4 px-4 text-left align-middle">
-                        <div className="font-mono text-xs text-slate-700 dark:text-slate-300">
+                        <div className="font-mono text-xs text-ink">
                           {s.ipAddress || t('admin.not_available', 'Tidak tersedia')}
                         </div>
-                        <div className="text-xs text-slate-400 truncate max-w-[200px]" title={s.userAgent}>
+                        <div className="text-xs text-ink-soft truncate max-w-[200px]" title={s.userAgent}>
                           {s.userAgent || t('admin.standard_browser', 'Standard Browser')}
                         </div>
                       </td>
 
                       {/* Created At */}
-                      <td className="py-4 px-4 text-left align-middle text-slate-500 dark:text-slate-400 text-xs">
+                      <td className="py-4 px-4 text-left align-middle text-ink-soft text-xs">
                         {new Date(s.createdAt).toLocaleString(getActiveFormattingLocale(), {
                           day: 'numeric',
                           month: 'short',
@@ -178,7 +178,7 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
                             {t('status.expired', 'Expired')}
                           </Badge>
                         ) : (
-                          <span className="text-slate-600 dark:text-slate-400 text-xs">
+                          <span className="text-ink-soft text-xs">
                             {new Date(s.expiresAt).toLocaleDateString(getActiveFormattingLocale(), {
                               day: 'numeric',
                               month: 'short',
@@ -199,7 +199,7 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
                               onClick={() => onRevokeAllUserSessions(s.userId)}
                               aria-label={t('admin.revoke_all_user_sessions', 'Cabut Semua Sesi User')}
                               title={t('admin.revoke_all_user_sessions', 'Cabut Semua Sesi User')}
-                              className="h-7 w-7 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                              className="w-7"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
                             </Button>
@@ -211,7 +211,7 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
                             onClick={() => onRevokeSession(s.id)}
                             aria-label={t('admin.revoke_session', 'Cabut Sesi')}
                             title={t('admin.revoke_session', 'Cabut Sesi')}
-                            className="h-7 w-7 text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                            className="w-7"
                           >
                             <X className="w-3.5 h-3.5" />
                           </Button>

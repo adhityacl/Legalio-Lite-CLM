@@ -45,11 +45,11 @@ export const AmendmentsView: React.FC<AmendmentsViewProps> = ({
   });
 
   return (
-    <div className="space-y-4 animate-in fade-in-50 duration-200">
+    <div className="ds-page animate-in fade-in-50 duration-200">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 transition-colors">
+      <div className="ds-panel p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 transition-colors">
         <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
+          <h2 className="ds-page-heading">
             <span>{t('amendments.title')}</span>
           </h2>
         </div>
@@ -57,7 +57,7 @@ export const AmendmentsView: React.FC<AmendmentsViewProps> = ({
         {isLegal && (
           <button
             onClick={() => onOpenAddendumModal()}
-            className="ui-button ui-button-lg mobile-page-action cursor-pointer shadow-sm gap-1.5 bg-accent-strong hover:bg-accent-strong-hover text-white font-bold flex items-center transition-all shrink-0"
+            className="ui-button ui-button-lg mobile-page-action cursor-pointer flex items-center shrink-0 ds-button ds-button-lg ds-button-default"
           >
             <Plus className="w-4 h-4 text-white" />
             <span>{t('io.add_btn', 'Tambah')}</span>
@@ -66,23 +66,23 @@ export const AmendmentsView: React.FC<AmendmentsViewProps> = ({
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 transition-colors">
-        <div className="mobile-filter-grid flex flex-1 flex-wrap items-center gap-2 w-full">
+      <div className="ds-panel p-6 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 transition-colors">
+        <div className="mobile-filter-grid flex flex-1 flex-wrap items-center gap-2 w-full ds-grid">
           <div className="relative flex-1 min-w-[200px] md:max-w-xs">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <Search className="w-4 h-4 text-ink-soft absolute left-3 top-2.5" />
             <input
               type="text"
               placeholder={t('amendments.search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-9 w-full pl-9 pr-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:border-accent font-medium transition-colors"
+              className="ds-input w-full pl-9 pr-3"
             />
           </div>
 
           <AlphabeticalSelect
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as any)}
-            className="h-9 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[140px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2313192B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[140px] appearance-none pr-8"
           >
             <option value="ALL">{t('amendments.filter_all')}</option>
             <option value="Contract">{t('amendments.filter_contract')}</option>
@@ -94,31 +94,31 @@ export const AmendmentsView: React.FC<AmendmentsViewProps> = ({
       {/* Amendments List */}
       <div className="space-y-4">
         {filteredAmendments.length === 0 ? (
-          <div className="p-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-center text-slate-400 dark:text-slate-500 text-xs">
+          <div className="ds-panel p-8 text-center text-ink-soft text-xs">
             {t('amendments.no_data')}
           </div>
         ) : (
           filteredAmendments.map((add) => (
             <div
               key={add.contract_id || add.addendum_id}
-              className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs hover:border-accent/50 transition-all space-y-3"
+              className="ds-panel p-5 transition-all space-y-3"
             >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-hairline">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-accent-soft text-accent-text rounded-xl">
+                  <div className="ds-icon-tile ds-icon-tile-sm bg-accent-soft text-accent-text">
                     <GitCommit className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{add.nomor_kontrak || add.nomor_addendum}</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                    <h3 className="ds-section-title">{add.nomor_kontrak || add.nomor_addendum}</h3>
+                    <p className="text-xs text-ink-soft flex items-center gap-1 mt-0.5">
                       <span>{t('amendments.parent_doc')} ({add.parent_type || t('import.type_contract', 'Contract')}):</span>
-                      <strong className="text-slate-800 dark:text-slate-200 font-mono">{add.parent_contract_nomor || add.parent_nomor || add.parent_contract_id || add.parent_id}</strong>
+                      <strong className="text-ink font-mono">{add.parent_contract_nomor || add.parent_nomor || add.parent_contract_id || add.parent_id}</strong>
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-400 dark:text-slate-500 font-mono text-xs">
+                  <span className="text-ink-soft font-mono text-xs">
                     {t('amendments.date')} {new Date(add.tanggal_mulai || add.tanggal_addendum).toLocaleDateString(getActiveFormattingLocale())}
                   </span>
                   {(add.link_file_kontrak || add.link_file_addendum) && (
@@ -126,7 +126,7 @@ export const AmendmentsView: React.FC<AmendmentsViewProps> = ({
                       href={add.link_file_kontrak || add.link_file_addendum}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1 bg-surface-2 hover:bg-surface-2 dark:hover:bg-surface-2 text-ink rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
                     >
                       <FileDown className="w-3.5 h-3.5 text-accent-text" />
                       <span>{t('amendments.pdf_btn')}</span>
@@ -137,19 +137,19 @@ export const AmendmentsView: React.FC<AmendmentsViewProps> = ({
 
               <div>
                 <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('amendments.changed_elements')}</span>
+                  <span className="text-xs font-semibold text-ink-soft">{t('amendments.changed_elements')}</span>
                   {(Array.isArray(add.field_yang_berubah) ? add.field_yang_berubah : []).map((f) => (
                     <span
                       key={f}
-                      className="bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 text-xs font-bold px-2 py-0.5 rounded"
+                      className="bg-status-warning-soft dark:bg-status-warning-soft/60 text-status-warning border border-status-warning-border dark:border-status-warning-border/50 text-xs font-bold px-2 py-0.5 rounded-sm"
                     >
                       {f}
                     </span>
                   ))}
                 </div>
 
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-mono text-xs leading-relaxed">
-                  <span className="text-slate-500 dark:text-slate-400 block text-xs font-sans font-bold uppercase mb-1">
+                <div className="ds-panel p-3 text-ink font-mono text-xs leading-relaxed">
+                  <span className="text-ink-soft block text-xs font-sans font-bold uppercase mb-1">
                     {t('amendments.summary_label')}
                   </span>
                   {add.ringkasan_perubahan}

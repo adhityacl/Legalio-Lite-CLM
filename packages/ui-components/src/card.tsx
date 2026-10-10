@@ -1,34 +1,9 @@
-import * as React from "react"
-import { cn } from "./utils"
-
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("rounded-2xl border border-slate-200 dark:border-slate-800 bg-white text-slate-900 shadow-sm overflow-hidden", className)} {...props} />
-))
-Card.displayName = "Card"
-
-const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("flex flex-col space-y-1 p-5 sm:p-6 ", className)} {...props} />
-))
-CardHeader.displayName = "CardHeader"
-
-const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(({ className, ...props }, ref) => (
-  <h3 ref={ref} className={cn("text-lg font-bold text-slate-900 tracking-tight", className)} {...props} />
-))
-CardTitle.displayName = "CardTitle"
-
-const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn("text-xs text-slate-500 leading-relaxed mt-1", className)} {...props} />
-))
-CardDescription.displayName = "CardDescription"
-
-const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("p-5 sm:p-6", className)} {...props} />
-))
-CardContent.displayName = "CardContent"
-
-const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("flex items-center p-5 sm:p-6 pt-0", className)} {...props} />
-))
-CardFooter.displayName = "CardFooter"
-
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+import * as React from 'react';
+import { Card as ModuixCard, CardHeader as ModuixHeader, CardBody as ModuixBody, CardFooter as ModuixFooter, CardTitle as ModuixTitle, CardDescription as ModuixDescription } from '@moduix/react-tailwind/card';
+import { cn } from './utils';
+export const Card = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<typeof ModuixCard>>(({ className, ...props }, ref) => <ModuixCard ref={ref} className={cn('ds-card', className)} {...props} />);
+export const CardHeader = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<typeof ModuixHeader>>(({ className, ...props }, ref) => <ModuixHeader ref={ref} className={cn('ds-card-header', className)} {...props} />);
+export const CardContent = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<typeof ModuixBody>>(({ className, ...props }, ref) => <ModuixBody ref={ref} className={cn('ds-card-body', className)} {...props} />);
+export const CardFooter = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<typeof ModuixFooter>>(({ className, ...props }, ref) => <ModuixFooter ref={ref} className={cn('ds-card-footer', className)} {...props} />);
+export const CardTitle = React.forwardRef<HTMLHeadingElement, React.ComponentPropsWithoutRef<typeof ModuixTitle>>(({ className, ...props }, ref) => <ModuixTitle ref={ref} className={cn('ds-card-title', className)} {...props} />);
+export const CardDescription = React.forwardRef<HTMLParagraphElement, React.ComponentPropsWithoutRef<typeof ModuixDescription>>(({ className, ...props }, ref) => <ModuixDescription ref={ref} className={cn('ds-muted', className)} {...props} />);

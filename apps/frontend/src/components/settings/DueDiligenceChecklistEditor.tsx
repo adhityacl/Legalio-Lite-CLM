@@ -62,8 +62,8 @@ export const DueDiligenceChecklistEditor: React.FC<DueDiligenceChecklistEditorPr
     onChange({ overrides, customItems: customItems.filter((item) => item.key !== key) });
   };
 
-  const rowClass = 'flex flex-col gap-2 border-b border-slate-100 py-3 last:border-b-0 dark:border-slate-800 sm:flex-row sm:items-center';
-  const toggleClass = 'inline-flex min-h-11 items-center gap-2 text-sm text-slate-700 dark:text-slate-300';
+  const rowClass = 'flex flex-col gap-2 border-b border-hairline py-3 last:border-b-0  sm:flex-row sm:items-center';
+  const toggleClass = 'inline-flex min-h-10 items-center gap-2 text-sm text-ink ';
 
   return (
     <div>
@@ -75,10 +75,10 @@ export const DueDiligenceChecklistEditor: React.FC<DueDiligenceChecklistEditorPr
           return (
             <li key={item.key} className={rowClass}>
               <div className="min-w-0 flex-1">
-                <span className={`wrap-break-word text-sm font-medium ${hidden ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-slate-100'}`}>
+                <span className={`wrap-break-word text-sm font-medium ${hidden ? 'text-ink-soft line-through' : 'text-ink '}`}>
                   {localize(item.label, language)}
                 </span>
-                <span className="ml-2 rounded-full border border-slate-200 px-2 py-0.5 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-400">
+                <span className="ml-2 rounded-full border border-hairline px-2 py-0.5 text-xs text-ink-soft">
                   {t(SOURCE_KEY[item.source || 'core'] || SOURCE_KEY.core, item.source || 'core')}
                 </span>
               </div>
@@ -108,8 +108,8 @@ export const DueDiligenceChecklistEditor: React.FC<DueDiligenceChecklistEditorPr
         {customItems.map((item) => (
           <li key={item.key} className={rowClass}>
             <div className="min-w-0 flex-1">
-              <span className="wrap-break-word text-sm font-medium text-slate-900 dark:text-slate-100">{localize(item.label, language)}</span>
-              <span className="ml-2 rounded-full border border-slate-200 px-2 py-0.5 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-400">
+              <span className="wrap-break-word text-sm font-medium text-ink">{localize(item.label, language)}</span>
+              <span className="ml-2 rounded-full border border-hairline px-2 py-0.5 text-xs text-ink-soft">
                 {t('settings.region.dd_source_tenant', 'Custom')}
               </span>
             </div>
@@ -127,7 +127,7 @@ export const DueDiligenceChecklistEditor: React.FC<DueDiligenceChecklistEditorPr
               type="button"
               onClick={() => removeCustom(item.key)}
               disabled={disabled}
-              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md text-status-danger hover:bg-status-danger-soft dark:hover:bg-status-danger-soft/40"
               aria-label={`${t('settings.region.dd_remove', 'Remove item')}: ${localize(item.label, language)}`}
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -137,7 +137,7 @@ export const DueDiligenceChecklistEditor: React.FC<DueDiligenceChecklistEditorPr
       </ul>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label htmlFor={newLabelId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={newLabelId} className="mb-1 block text-sm font-medium text-ink">
             {t('settings.region.dd_new_label', 'New item name')}
           </label>
           <input
@@ -152,14 +152,14 @@ export const DueDiligenceChecklistEditor: React.FC<DueDiligenceChecklistEditorPr
                 addCustom();
               }
             }}
-            className="block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-5 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            className="ds-input w-full"
           />
         </div>
         <button
           type="button"
           onClick={addCustom}
           disabled={disabled || !newLabel.trim()}
-          className="ui-button ui-button-lg border border-slate-200 font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          className="ui-button ui-button-lg disabled:opacity-50 ds-button ds-button-lg ds-button-outline"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           {t('settings.region.dd_add', 'Add checklist item')}

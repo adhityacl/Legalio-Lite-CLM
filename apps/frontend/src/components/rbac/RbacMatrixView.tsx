@@ -69,11 +69,11 @@ export default function RbacMatrixView() {
   if (state.status === 'loading') {
     return (
       <div className="mx-auto w-full max-w-6xl p-4 sm:p-6" aria-busy="true" aria-live="polite">
-        <div className="h-6 w-56 rounded-[var(--radius-xs)] bg-surface-2" />
-        <div className="mt-2 h-3 w-80 rounded-[var(--radius-xs)] bg-surface-2" />
-        <div className="mt-6 space-y-2 rounded-[var(--radius-xl)] border border-hairline bg-surface p-4 shadow-elevated">
+        <div className="h-6 w-56 rounded-sm bg-surface-2" />
+        <div className="mt-2 h-3 w-80 rounded-sm bg-surface-2" />
+        <div className="ds-panel mt-6 space-y-2 p-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-4 rounded-[var(--radius-xs)] bg-surface-2" style={{ width: `${90 - i * 4}%` }} />
+            <div key={i} className="h-4 rounded-sm bg-surface-2" style={{ width: `${90 - i * 4}%` }} />
           ))}
         </div>
       </div>
@@ -84,13 +84,13 @@ export default function RbacMatrixView() {
   if (state.status === 'error') {
     return (
       <div className="mx-auto w-full max-w-6xl p-4 sm:p-6">
-        <div role="alert" className="rounded-[var(--radius-lg)] border border-red-300 bg-red-50 p-4 text-ink">
+        <div role="alert" className="ds-alert ds-status-danger border">
           <p className="font-semibold">{t('rbac.gagal_memuat_matriks_peran', 'Gagal memuat matriks peran')}</p>
           <p className="mt-1 text-sm text-ink-soft">{state.message}</p>
           <button
             type="button"
             onClick={() => void load()}
-            className="mt-3 rounded-[var(--radius-md)] bg-accent px-3 py-2 text-sm font-semibold text-[var(--color-on-accent)] shadow-sm transition hover:bg-accent-hover focus-visible:shadow-[var(--shadow-focus)]"
+            className="inline-flex items-center mt-3 rounded-[var(--radius-md)] bg-accent px-4 min-h-10 text-sm font-semibold text-[var(--color-on-accent)] shadow-sm transition hover:bg-accent-hover focus-visible:shadow-[var(--shadow-focus)]"
           >
             {t('common.retry', 'Coba lagi')}
           </button>
@@ -107,7 +107,7 @@ export default function RbacMatrixView() {
   if (!roles.length || !permissions.length) {
     return (
       <div className="mx-auto w-full max-w-6xl p-4 sm:p-6">
-        <div className="rounded-[var(--radius-xl)] border border-dashed border-hairline bg-surface p-8 text-center">
+        <div className="ds-panel p-8 text-center">
           <p className="font-semibold text-ink">{t('rbac.belum_ada_data_matriks', 'Belum ada data matriks')}</p>
           <p className="mt-1 text-sm text-ink-soft">{t('rbac.pastikan_endpoint', 'Pastikan endpoint')} <code className="font-mono text-xs">{t('rbac.get_api_rbac_matrix', 'GET /api/rbac/matrix')}</code> {t('rbac.aktif', 'aktif.')}</p>
         </div>
@@ -135,9 +135,9 @@ export default function RbacMatrixView() {
 
       <Separator className="my-4" />
 
-      <section aria-label={t('rbac.ringkasan_peran', 'Ringkasan peran')} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <section aria-label={t('rbac.ringkasan_peran', 'Ringkasan peran')} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 ds-grid">
         {roles.map((r) => (
-          <div key={r.code} className="rounded-[var(--radius-lg)] border border-hairline bg-surface p-3 shadow-sm transition-shadow hover:shadow-[var(--shadow-md)]">
+          <div key={r.code} className="ds-panel p-3 transition-shadow">
             <div className="flex items-center justify-between gap-2">
               <strong className="text-sm text-ink">{r.name}</strong>
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${roleBadgeClass(r.code)}`}>{t('rbac.level', 'level {level}', { level: r.level })}</span>

@@ -30,10 +30,10 @@ interface DocumentInfoPanelProps {
 
 type SaveState = { status: 'idle' } | { status: 'saving' } | { status: 'error'; message: string };
 
-const SECTION_TITLE = 'text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5';
-const LABEL = 'block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400';
+const SECTION_TITLE = 'text-xs font-bold text-ink  flex items-center gap-1.5';
+const LABEL = 'block text-xs font-bold uppercase tracking-wide text-ink-soft ';
 const BUTTON =
-  'theme-action w-full inline-flex items-center justify-center gap-1.5 min-h-11 sm:min-h-8 rounded-lg text-xs font-bold text-white disabled:opacity-50 cursor-pointer';
+  'theme-action w-full inline-flex items-center justify-center gap-1.5 min-h-10 sm:min-h-8 rounded-md text-xs font-bold text-white disabled:opacity-50 cursor-pointer';
 
 export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, organizationName, canEdit, canManageFields, onUpdate }) => {
   const { t, language } = useLanguage();
@@ -127,7 +127,7 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
         <fieldset key={field.id} className="space-y-1">
           <legend className={LABEL}>{field.name}</legend>
           {field.options.map((option) => (
-            <label key={option} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200 min-h-8">
+            <label key={option} className="flex items-center gap-2 text-xs text-ink min-h-8">
               <input
                 type="checkbox"
                 disabled={!canEdit}
@@ -177,15 +177,15 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
     <div className="space-y-5">
       <section className="space-y-2.5" aria-labelledby={`${idPrefix}-info`}>
         <h3 id={`${idPrefix}-info`} className={SECTION_TITLE}>
-          <Info className="w-3.5 h-3.5 text-slate-400" aria-hidden />
+          <Info className="w-3.5 h-3.5 text-ink-soft" aria-hidden />
           {t('documents.info.title', 'Informasi Dokumen')}
         </h3>
         {!document ? (
-          <p className="text-xs text-slate-500 dark:text-slate-400 p-3 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+          <p className="text-xs text-ink-soft p-3 border border-dashed border-hairline rounded-lg">
             {t('documents.info.unsaved', 'Dokumen belum disimpan. Pembuat dan waktu dicatat otomatis saat penyimpanan pertama.')}
           </p>
         ) : (
-          <dl className="grid grid-cols-2 gap-x-3 gap-y-4 text-xs text-slate-800 dark:text-slate-100">
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-4 text-xs text-ink ds-grid">
             <div className="col-span-2 space-y-1">
               <dt className={LABEL}>{t('documents.field.name', 'Nama')}</dt>
               <dd className="font-semibold break-words">{document.name}</dd>
@@ -239,7 +239,7 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
               <dd>
                 {t('documents.info.by', 'oleh {name}', { name: document.created_by_name || '—' })}
                 <br />
-                <span className="text-slate-500 dark:text-slate-400">{formatDateTime(document.created_at, language)}</span>
+                <span className="text-ink-soft">{formatDateTime(document.created_at, language)}</span>
               </dd>
             </div>
             <div className="space-y-1">
@@ -247,7 +247,7 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
               <dd>
                 {t('documents.info.by', 'oleh {name}', { name: document.modified_by_name || '—' })}
                 <br />
-                <span className="text-slate-500 dark:text-slate-400">{formatDateTime(document.modified_at, language)}</span>
+                <span className="text-ink-soft">{formatDateTime(document.modified_at, language)}</span>
               </dd>
             </div>
             <div className="space-y-1">
@@ -264,26 +264,26 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
         )}
       </section>
 
-      <section className="space-y-2.5 pt-3 border-t border-slate-100 dark:border-slate-800" aria-labelledby={`${idPrefix}-meta`}>
+      <section className="space-y-2.5 pt-3 border-t border-hairline" aria-labelledby={`${idPrefix}-meta`}>
         <h3 id={`${idPrefix}-meta`} className={SECTION_TITLE}>
-          <Tags className="w-3.5 h-3.5 text-slate-400" aria-hidden />
+          <Tags className="w-3.5 h-3.5 text-ink-soft" aria-hidden />
           {t('documents.metadata.title', 'Metadata')}
         </h3>
         {fields.length === 0 ? (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-ink-soft">
             {canManageFields
               ? t('documents.metadata.empty_admin', 'Belum ada kolom metadata. Tambahkan di bawah (mis. Kode Matter, Nama Klien).')
               : t('documents.metadata.empty', 'Admin organisasi belum menambahkan kolom metadata.')}
           </p>
         ) : !document ? (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-ink-soft">
             {t('documents.metadata.unsaved', 'Simpan dokumen terlebih dahulu untuk mengisi metadata.')}
           </p>
         ) : (
           <form onSubmit={saveMetadata} className="space-y-2.5" aria-busy={saveState.status === 'saving'}>
             {fields.map(renderInput)}
             {saveState.status === 'error' && (
-              <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">
+              <p role="alert" className="ds-alert ds-status-danger border">
                 {saveState.message}
               </p>
             )}
@@ -298,23 +298,23 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
       </section>
 
       {canManageFields && (
-        <section className="space-y-2.5 pt-3 border-t border-slate-100 dark:border-slate-800" aria-labelledby={`${idPrefix}-fields`}>
+        <section className="space-y-2.5 pt-3 border-t border-hairline" aria-labelledby={`${idPrefix}-fields`}>
           <h3 id={`${idPrefix}-fields`} className={SECTION_TITLE}>
-            <PlusCircle className="w-3.5 h-3.5 text-slate-400" aria-hidden />
+            <PlusCircle className="w-3.5 h-3.5 text-ink-soft" aria-hidden />
             {t('documents.metadata.manage_title', 'Kelola Kolom Metadata (Organisasi)')}
           </h3>
           {fields.length > 0 && (
             <ul className="space-y-1">
               {fields.map((field) => (
-                <li key={field.id} className="flex items-center justify-between gap-2 text-xs p-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                <li key={field.id} className="flex items-center justify-between gap-2 text-xs p-1.5 rounded-lg border border-hairline">
                   <span className="min-w-0">
-                    <span className="font-semibold text-slate-800 dark:text-slate-100">{field.name}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400"> · {fieldTypeLabel(field.field_type)}</span>
+                    <span className="font-semibold text-ink">{field.name}</span>
+                    <span className="text-xs text-ink-soft"> · {fieldTypeLabel(field.field_type)}</span>
                   </span>
                   <button
                     type="button"
                     onClick={() => removeField(field)}
-                    className="inline-flex items-center justify-center h-11 w-11 sm:h-7 sm:w-7 rounded-lg text-slate-400 hover:text-rose-600 cursor-pointer"
+                    className="inline-flex items-center justify-center h-10 w-10 sm:h-8 sm:w-8 rounded-md text-ink-soft hover:text-status-danger cursor-pointer"
                     aria-label={`${t('documents.action.delete', 'Hapus')}: ${field.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" aria-hidden />
@@ -323,7 +323,7 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
               ))}
             </ul>
           )}
-          <form onSubmit={addField} className="space-y-2 editor-panel-card p-4 rounded-xl border border-dashed border-emerald-300 dark:border-emerald-800">
+          <form onSubmit={addField} className="space-y-2 editor-panel-card p-4 rounded-xl border border-dashed border-status-success-border">
             <label className="block space-y-1">
               <span className={LABEL}>{t('documents.metadata.field_name', 'Nama kolom')}</span>
               <input

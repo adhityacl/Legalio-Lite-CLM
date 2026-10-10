@@ -65,16 +65,16 @@ export const ConfirmDialogProvider: React.FC<{ children: React.ReactNode }> = ({
             <div className="relative mb-1 flex h-16 w-16 items-center justify-center shrink-0">
               <span
                 className={`absolute h-16 w-16 rounded-full ${
-                  isDanger ? 'bg-rose-50 dark:bg-rose-950/30' : 'bg-slate-100 dark:bg-slate-800/60'
+                  isDanger ? 'bg-status-danger-soft dark:bg-status-danger-soft/30' : 'bg-surface-2 dark:bg-surface-2/60'
                 }`}
               />
               <span
-                className={`absolute h-11 w-11 rounded-full ${
-                  isDanger ? 'bg-rose-100 dark:bg-rose-900/40' : 'bg-slate-200/80 dark:bg-slate-700/60'
+                className={`absolute h-10 w-10 rounded-full ${
+                  isDanger ? 'bg-status-danger-soft dark:bg-status-danger-soft/40' : 'bg-surface-2/80 dark:bg-surface-2/60'
                 }`}
               />
               <Icon
-                className={`relative h-6 w-6 ${isDanger ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-300'}`}
+                className={`relative h-6 w-6 ${isDanger ? 'text-status-danger ' : 'text-ink-soft dark:text-ink'}`}
               />
             </div>
             <AlertDialogTitle className="text-center">

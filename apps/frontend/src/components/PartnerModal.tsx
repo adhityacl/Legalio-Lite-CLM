@@ -317,9 +317,9 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
   return (
     <ModalFrame onClose={onClose}>
         {/* Header */}
-        <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
+        <div className="ds-section-header">
           <div>
-            <ModalTitle className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <ModalTitle className="ds-modal-title flex items-center gap-2">
               <Building2 className="w-5 h-5 text-accent-text" />
               <span>
                 {partnerToEdit
@@ -332,17 +332,17 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label={t('common.close', 'Close')}
-            className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="min-w-10 min-h-10 flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink p-1.5 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-sm flex-1 text-slate-900 dark:text-slate-100">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-sm flex-1 text-ink">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ds-grid">
               <div>
-                <label htmlFor="PartnerModal-field-1" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="PartnerModal-field-1" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.partner.nama_legal', 'Nama Legal *')}
                 </label>
                 <input id="PartnerModal-field-1"
@@ -351,12 +351,12 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                   placeholder={t('form.partner.nama_legal_placeholder', 'contoh: PT Telekomunikasi Selular')}
                   value={namaPartner}
                   onChange={(e) => setNamaPartner(e.target.value)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input w-full"
                 />
               </div>
 
               <div>
-                <label htmlFor="PartnerModal-field-2" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="PartnerModal-field-2" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.partner.nama_channel', 'Nama Channel')}
                 </label>
                 <input id="PartnerModal-field-2"
@@ -364,7 +364,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                   placeholder={t('form.partner.nama_channel_placeholder', 'mis. TSEL, XL, INDOSAT')}
                   value={codename}
                   onChange={(e) => setCodename(e.target.value)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input w-full"
                 />
               </div>
             </div>
@@ -378,9 +378,9 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
               onIdentifiersChange={setIdentifiers}
             />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ds-grid">
               <div className="space-y-1.5">
-                <label htmlFor="PartnerModal-field-3" className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-sm flex items-center justify-between">
+                <label htmlFor="PartnerModal-field-3" className="block font-bold text-ink mb-1 text-sm flex items-center justify-between">
                   <span>{t('form.partner.department', 'Department')}</span>
                 </label>
 
@@ -403,7 +403,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                           setPicInternal(val);
                         }
                       }}
-                      className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-semibold focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer"
+                      className="ds-input w-full cursor-pointer"
                     >
                       <option value="" disabled>{t('partners.pilih_department', '-- Pilih Department --')}</option>
                       {ENTERPRISE_DEPARTMENTS.map((dept) => (
@@ -422,7 +422,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                         placeholder={t('partners.ketik_nama_departemen_kustom', 'Ketik nama departemen kustom...')}
                         value={picInternal}
                         onChange={(e) => setPicInternal(e.target.value)}
-                        className="w-full bg-white dark:bg-slate-800 border border-purple-300 dark:border-purple-700 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                        className="ds-input w-full"
                       />
                     )}
                   </div>
@@ -434,7 +434,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                       placeholder={t('form.partner.department_placeholder', 'contoh: Marketing')}
                       value={picInternal}
                       onChange={(e) => setPicInternal(e.target.value)}
-                      className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                      className="ds-input w-full"
                     />
                     <AlphabeticalDatalist id="departments-list">
                       {ENTERPRISE_DEPARTMENTS.map((dept) => (
@@ -447,14 +447,14 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
             </div>
 
             {/* Separated PIC Contact Person Section */}
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-3">
+            <div className="ds-panel p-4 space-y-3">
               <div className="text-xs font-extrabold text-accent-text uppercase tracking-wider flex items-center gap-1.5">
                 <User className="w-4 h-4 text-accent-text" />
                 <span>{t('form.partner.contact_section_title', 'Informasi Kontak PIC (Person In Charge)')}</span>
               </div>
 
               <div>
-                <label htmlFor="PartnerModal-field-4" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="PartnerModal-field-4" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.partner.nama_pic', 'Nama PIC *')}
                 </label>
                 <input id="PartnerModal-field-4"
@@ -463,14 +463,14 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                   placeholder={t('form.partner.nama_pic_placeholder', 'contoh: Andi Hermawan')}
                   value={namaPic}
                   onChange={(e) => setNamaPic(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input w-full"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ds-grid">
                 <div>
-                  <label htmlFor="PartnerModal-field-5" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm flex items-center gap-1">
-                    <Mail className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                  <label htmlFor="PartnerModal-field-5" className="block font-bold text-ink mb-1.5 text-sm flex items-center gap-1">
+                    <Mail className="w-3.5 h-3.5 text-ink-soft" />
                     <span>{t('form.partner.email_pic', 'Email PIC *')}</span>
                   </label>
                   <input id="PartnerModal-field-5"
@@ -479,13 +479,13 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                     placeholder={t('form.partner.email_pic_placeholder', 'contoh: andi@telkomsel.co.id')}
                     value={emailPic}
                     onChange={(e) => setEmailPic(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                    className="ds-input w-full"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="PartnerModal-field-6" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm flex items-center gap-1">
-                    <Phone className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                  <label htmlFor="PartnerModal-field-6" className="block font-bold text-ink mb-1.5 text-sm flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-ink-soft" />
                     <span>{t('form.partner.telepon_pic', 'Nomor Telepon / WA PIC *')}</span>
                   </label>
                   <input id="PartnerModal-field-6"
@@ -494,13 +494,13 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                     placeholder={t('form.partner.telepon_pic_placeholder', 'contoh: 0811-2233-4455')}
                     value={teleponPic}
                     onChange={(e) => setTeleponPic(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                    className="ds-input w-full"
                   />
                 </div>
 
                 <div className="md:col-span-2 mt-2">
-                  <label htmlFor="PartnerModal-field-7" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                  <label htmlFor="PartnerModal-field-7" className="block font-bold text-ink mb-1.5 text-sm flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-ink-soft" />
                     <span>{t('form.partner.alamat_pic', 'Alamat *')}</span>
                   </label>
                   <textarea id="PartnerModal-field-7"
@@ -509,14 +509,14 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                     value={alamatPic}
                     onChange={(e) => setAlamatPic(e.target.value)}
                     rows={2}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all resize-none"
+                    className="ds-input w-full resize-none"
                   />
                 </div>
               </div>
             </div>
 
             <div>
-              <label htmlFor="PartnerModal-field-8" className="block font-bold text-slate-700 dark:text-slate-300 text-sm mb-1.5">
+              <label htmlFor="PartnerModal-field-8" className="block font-bold text-ink text-sm mb-1.5">
                 {t('form.partner.kategori_kerjasama', 'Kategori Kerjasama *')}
               </label>
               <div className="flex gap-2 mb-2">
@@ -532,7 +532,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                       handleAddTag();
                     }
                   }}
-                  className="min-w-0 flex-1 bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input min-w-0 flex-1"
                 />
                 <AlphabeticalDatalist id="partner-category-templates-list">
                   {savedTemplates.map((cat) => (
@@ -542,7 +542,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddTag}
-                  className="ui-button ui-button-lg bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-bold transition-colors cursor-pointer"
+                  className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
                 >
                   {t('form.partner.add_tag_btn', 'Tambah Tag')}
                 </button>
@@ -571,7 +571,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
 
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <label htmlFor="PartnerModal-field-9" className="block font-bold text-slate-700 dark:text-slate-300 text-sm">
+                <label htmlFor="PartnerModal-field-9" className="block font-bold text-ink text-sm">
                   {t('form.partner.notes_label', 'Catatan Due Diligence / Internal Notes')}
                 </label>
                 <div className="flex flex-wrap items-center gap-2">
@@ -579,7 +579,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                     type="button"
                     onClick={handleGenerateNotes}
                     disabled={isGeneratingNotes || !namaPartner.trim()}
-                    className="px-3 py-1 text-xs font-bold bg-accent-soft text-accent-text border border-accent/30 hover:bg-accent/20 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 min-h-8 text-xs font-semibold bg-accent-soft text-accent-text border border-accent/30 hover:bg-accent/20 rounded-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     title={t('partners.generate_analisis_due_diligence_ai_senior', 'Generate Analisis Due Diligence (AI Senior Analyst)')}
                   >
                     {isGeneratingNotes ? (
@@ -602,19 +602,19 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                 placeholder={t('partners.format_1_paragraf_narrative_analyst_nama', 'Format 1 Paragraf Narrative Analyst: [Nama Entitas] merupakan vendor digital/ad-tech berbadan hukum... (Mencakup: 1. Core Business, 2. Media Network, 3. Proprietary Tech/AI, 4. Strategic Function/Location)')}
                 value={catatan}
                 onChange={(e) => setCatatan(e.target.value)}
-                className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl p-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all leading-relaxed"
+                className="ds-input w-full"
               />
             </div>
 
 
             {/* File Upload Area for Parsing */}
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
-              <label htmlFor="PartnerModal-field-10" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+            <div className="pt-4 border-t border-hairline">
+              <label htmlFor="PartnerModal-field-10" className="block font-bold text-ink mb-1.5 text-sm">
                 {t('form.partner.upload_label', 'Auto-fill dari Dokumen Kontrak (AI Parse)')}
               </label>
-              <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-accent dark:hover:border-accent rounded-2xl p-4 text-center bg-slate-50 dark:bg-slate-800/40 hover:bg-emerald-50/40 transition-all">
+              <div className="ds-upload text-center">
                 <Upload className="w-6 h-6 text-accent-text mx-auto mb-1.5" />
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                <p className="text-sm font-bold text-ink">
                   {fileName
                     ? `${t('form.contract.file_selected', 'File terpilih:')} ${fileName}`
                     : t('form.partner.drag_ref', 'Pilih atau Drag Dokumen Referensi ke sini')}
@@ -625,7 +625,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                       type="button"
                       onClick={handleParsePartner}
                       disabled={isParsing}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-accent-soft text-accent-text hover:bg-accent/20 font-bold text-sm rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-4 min-h-10 bg-accent-soft text-accent-text hover:bg-accent/20 font-semibold text-sm rounded-md transition-all cursor-pointer disabled:opacity-50"
                     >
                       {isParsing ? t('partners.parsing', 'Parsing...') : t('partners.parse_file', 'Parse File')}
                     </button>
@@ -634,28 +634,28 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                     type="file"
                     accept=".pdf,.doc,.docx"
                     onChange={handleFileChange}
-                    className="w-[220px] text-sm text-slate-500 dark:text-slate-400 file:mr-2 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer"
+                    className="w-[220px] text-sm text-ink-soft file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer"
                   />
                 </div>
               </div>
             </div>
             {error && (
-              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl text-sm font-bold flex items-center gap-2">
+              <div className="p-3.5 bg-status-danger-soft dark:bg-status-danger-soft/40 border border-status-danger-border text-status-danger rounded-xl text-sm font-bold flex items-center gap-2">
                 <span>⚠️</span>
                 <span>{error}</span>
               </div>
             )}
           </div>
 
-          <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0">
-            <span className="text-xs text-slate-400 dark:text-slate-500 font-medium hidden sm:inline">
+          <div className="p-4 sm:p-5 bg-surface border-t border-hairline flex items-center justify-between gap-2 shrink-0">
+            <span className="text-xs text-ink-soft font-medium hidden sm:inline">
               {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
             </span>
             <div className="flex items-center gap-2 ml-auto">
               <button
                 type="button"
                 onClick={onClose}
-                className="ui-button ui-button-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold transition-colors cursor-pointer"
+                className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
               >
                 {t('form.common.cancel', 'Batal')}
               </button>
@@ -663,7 +663,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                 type="submit"
                 disabled={submitting || !isFormValid}
                 title={!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : ''}
-                className="ui-button ui-button-lg bg-accent-strong hover:bg-accent-strong-hover text-white font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="ui-button ui-button-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-default"
               >
                 {submitting
                   ? t('form.partner.saving_btn', 'Menyimpan Partner...')

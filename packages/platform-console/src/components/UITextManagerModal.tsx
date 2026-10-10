@@ -125,14 +125,14 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
             value={editing.value}
             onChange={(e) => setEditing({ ...editing, value: e.target.value })}
             onKeyDown={(e) => e.key === 'Escape' && setEditing(null)}
-            className="w-full px-2.5 py-1 text-xs border border-accent rounded-lg outline-none bg-white dark:bg-slate-800 font-normal text-slate-900 dark:text-slate-100"
+            className="ds-input w-full"
             autoFocus
           />
           <button
             type="submit"
             disabled={translationsBusy}
             aria-busy={translationsBusy}
-            className="ui-button ui-button-lg ui-button-icon p-1 bg-accent-strong text-white hover:bg-accent-strong-hover cursor-pointer shrink-0"
+            className="ui-button ui-button-lg ui-button-icon cursor-pointer shrink-0 ds-button ds-button-lg ds-button-default"
             aria-label={t('common.save', 'Simpan')}
           >
             <Check className="w-3.5 h-3.5" aria-hidden />
@@ -144,15 +144,15 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
       <div className="flex items-center justify-between gap-1 group">
         <span
           lang={LANGUAGE_OPTIONS.find((o) => o.code === lang)?.htmlLang}
-          className={custom ? 'font-medium text-accent-text ' : 'text-slate-700 dark:text-slate-300'}
+          className={custom ? 'font-medium text-accent-text ' : 'text-ink '}
         >
-          {valueOf(key, lang) || <em className="text-rose-600 dark:text-rose-400 not-italic">{t('ui_text.missing', '(belum diterjemahkan)')}</em>}
+          {valueOf(key, lang) || <em className="text-status-danger not-italic">{t('ui_text.missing', '(belum diterjemahkan)')}</em>}
         </span>
         <button
           type="button"
           onClick={() => setEditing({ key, lang, value: valueOf(key, lang) })}
           disabled={translationsBusy}
-          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-slate-400 hover:text-accent-text p-1 cursor-pointer transition-opacity shrink-0"
+          className="inline-flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-ink-soft hover:text-accent-text size-8 cursor-pointer transition-opacity shrink-0"
           aria-label={t('ui_text.edit_in', 'Edit dalam {lang}', { lang: languageName(lang) })}
           title={t('ui_text.edit_in', 'Edit dalam {lang}', { lang: languageName(lang) })}
         >
@@ -163,16 +163,16 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
   };
 
   return (
-    <ModalFrame onClose={onClose} className="bg-white dark:bg-slate-900 rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden ">
+    <ModalFrame onClose={onClose} className="max-w-6xl w-full max-h-[92vh] flex flex-col overflow-hidden">
 
-        <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
+        <div className="ds-section-header">
           <div className="flex flex-wrap items-center gap-2">
-            <ModalTitle className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <ModalTitle className="ds-modal-title flex items-center gap-2">
               <FileSpreadsheet className="w-5 h-5 text-accent-text" aria-hidden />
               <span>{t('ui_text.title', 'Struktur Teks UI & Ekspor / Impor CSV')}</span>
             </ModalTitle>
             {totalCustomCount > 0 && (
-              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+              <span className="text-xs font-bold text-status-success bg-status-success-soft dark:bg-status-success-soft/60 px-2 py-0.5 rounded-sm border border-status-success-border flex items-center gap-1">
                 <Sparkles className="w-3 h-3" aria-hidden />
                 {t('ui_text.custom_active', '{n} teks kustom aktif', { n: totalCustomCount })}
               </span>
@@ -182,19 +182,19 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
             type="button"
             onClick={onClose}
             aria-label={t('common.close', 'Tutup')}
-            className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink size-8 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" aria-hidden />
           </button>
         </div>
 
-        <div className="mobile-controls-bar p-4 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div className="mobile-controls-bar p-4 bg-surface dark:bg-surface-2/60 border-b border-hairline flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="mobile-page-actions flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={exportToCSV}
               disabled={translationsBusy}
-              className="ui-button ui-button-lg inline-flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-accent-soft hover:text-accent-text text-slate-800 dark:text-slate-200 font-bold border border-hairline dark:border-slate-700 transition-colors cursor-pointer shadow-2xs"
+              className="ui-button ui-button-lg inline-flex items-center cursor-pointer ds-button ds-button-lg ds-button-outline"
             >
               <Download className="w-4 h-4 text-accent-text" aria-hidden />
               <span>{t('ui_text.export', 'Ekspor CSV')}</span>
@@ -203,7 +203,7 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={translationsBusy}
-              className="theme-action ui-button ui-button-lg inline-flex items-center gap-2 text-white font-semibold shadow-xs transition-colors cursor-pointer"
+              className="theme-action ui-button ui-button-lg inline-flex items-center cursor-pointer ds-button ds-button-lg ds-button-ghost"
             >
               <Upload className="w-4 h-4" aria-hidden />
               <span>{t('ui_text.import', 'Unggah CSV Hasil Revisi')}</span>
@@ -214,15 +214,15 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
                 type="button"
                 onClick={handleReset}
                 disabled={translationsBusy}
-                className="ui-button ui-button-lg inline-flex items-center gap-1.5 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-800 text-slate-700 dark:text-slate-300 hover:text-rose-700 dark:hover:text-rose-400 font-semibold transition-colors cursor-pointer"
+                className="ui-button ui-button-lg inline-flex items-center cursor-pointer ds-button ds-button-lg ds-button-destructive"
               >
-                <RotateCcw className="w-3.5 h-3.5 text-rose-500" aria-hidden />
+                <RotateCcw className="w-3.5 h-3.5 text-status-danger" aria-hidden />
                 <span>{t('ui_text.reset_to_default', 'Kembalikan ke Bawaan')}</span>
               </button>
             )}
           </div>
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
-            <Languages className="w-4 h-4 text-emerald-500" aria-hidden />
+          <div className="text-xs text-ink-soft font-medium flex items-center gap-1">
+            <Languages className="w-4 h-4 text-status-success" aria-hidden />
             <span>{t('ui_text.total_keys', 'Total key teks: {n}', { n: allKeys.length })}</span>
           </div>
         </div>
@@ -234,15 +234,15 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
             role={notice.type === 'error' ? 'alert' : 'status'}
             className={`px-6 py-3 border-b text-xs font-semibold flex items-center justify-between ${
               notice.type === 'success'
-                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
-                : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+                ? 'bg-status-success-soft dark:bg-status-success-soft/40 border-status-success-border text-status-success '
+                : 'bg-status-danger-soft dark:bg-status-danger-soft/40 border-status-danger-border text-status-danger '
             }`}
           >
             <div className="flex items-center gap-2">
               {notice.type === 'success' ? (
-                <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" aria-hidden />
+                <Check className="w-4 h-4 text-status-success shrink-0" aria-hidden />
               ) : (
-                <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" aria-hidden />
+                <AlertCircle className="w-4 h-4 text-status-danger shrink-0" aria-hidden />
               )}
               <span>{notice.message}</span>
             </div>
@@ -250,16 +250,16 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
               type="button"
               onClick={() => setNotice(null)}
               aria-label={t('common.close', 'Tutup')}
-              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer text-xs"
+              className="text-ink-soft hover:text-ink-soft dark:hover:text-ink cursor-pointer text-xs"
             >
               <X className="w-3.5 h-3.5" aria-hidden />
             </button>
           </div>
         )}
 
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
+        <div className="p-4 border-b border-hairline bg-surface grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0 ds-grid">
           <div className="sm:col-span-2 relative">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" aria-hidden />
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-ink-soft" aria-hidden />
             <input
               type="search"
               aria-label={t('settings.search_ui_text', 'Cari kata kunci, ID key, atau teks UI...')}
@@ -269,7 +269,7 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-9 pr-4 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-xs focus:ring-2 focus:ring-accent/20 focus:border-accent outline-none"
+              className="ds-input w-full pl-9 pr-4"
             />
           </div>
           <AlphabeticalSelect
@@ -279,7 +279,7 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
               setSelectedModule(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-accent/20 focus:border-accent outline-none bg-slate-50 dark:bg-slate-800 font-medium text-slate-700 dark:text-slate-200"
+            className="ds-input w-full"
           >
             <option value="ALL">{t('ui_text.all_modules', 'Semua modul ({n})', { n: allKeys.length })}</option>
             {modules.map((mod) => (
@@ -290,10 +290,10 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
           </AlphabeticalSelect>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50 dark:bg-slate-900/60">
-          <div className="ds-table-surface bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto shadow-xs">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-surface dark:bg-surface/60">
+          <div className="ds-table-surface bg-surface border border-hairline rounded-xl overflow-x-auto shadow-xs">
             <table className="ds-table w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300">
+              <thead className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink">
                 <tr>
                   <th scope="col" className="p-4 w-1/5">{t('ui_text.col_key', 'Key teks')}</th>
                   <th scope="col" className="p-4 w-1/8">{t('ui_text.col_module', 'Modul')}</th>
@@ -305,25 +305,25 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
                   <th scope="col" className="p-4 text-center w-20">{t('ui_text.col_status', 'Status')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+              <tbody className="divide-y divide-hairline text-ink">
                 {filteredKeys.length === 0 ? (
                   <TableEmptyState colSpan={CODES.length + 3} />
                 ) : (
                   currentKeys.map((key) => {
                     const isCustom = CODES.some((code) => customTranslations[code]?.[key]);
                     return (
-                      <tr key={key} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors align-top">
-                        <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 break-all">{key}</td>
+                      <tr key={key} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors align-top">
+                        <td className="py-4 px-4 text-xs font-normal text-ink break-all">{key}</td>
                         <td className="py-4 px-4 text-left">
-                          <span className={`${BADGE} ${getStatusBadgeClass('Neutral')}`}>{moduleLabel(moduleOf(key))}</span>
+                          <span className={`${BADGE}  ${getStatusBadgeClass('Neutral')}`}>{moduleLabel(moduleOf(key))}</span>
                         </td>
                         {CODES.map((code) => (
-                          <td key={code} className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300">
+                          <td key={code} className="py-4 px-4 text-xs font-normal text-ink">
                             {renderCell(key, code)}
                           </td>
                         ))}
                         <td className="py-4 px-4 text-center whitespace-nowrap">
-                          <span className={`${BADGE} ${getStatusBadgeClass(isCustom ? 'Aktif' : 'Neutral')}`}>
+                          <span className={`${BADGE}  ${getStatusBadgeClass(isCustom ? 'Aktif' : 'Neutral')}`}>
                             {isCustom ? t('ui_text.status_custom', 'Kustom') : t('ui_text.status_default', 'Bawaan')}
                           </span>
                         </td>
@@ -346,8 +346,8 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+        <div className="p-4 sm:p-5 bg-surface border-t border-hairline flex items-center justify-between gap-3 shrink-0">
+          <p className="text-xs text-ink-soft">
             {t(
               'ui_text.hint',
               'Petunjuk: ekspor CSV untuk mengunduh semua teks (Indonesia, Inggris, Mandarin), edit di Excel / Google Sheets, lalu unggah kembali file CSV tersebut di sini.',
@@ -356,7 +356,7 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-bold text-xs rounded-xl cursor-pointer transition-colors shrink-0"
+            className="inline-flex items-center px-4 min-h-8 bg-ink hover:bg-ink dark:bg-surface-2 dark:hover:bg-surface-2 text-white font-semibold text-xs rounded-md cursor-pointer transition-colors shrink-0"
           >
             {t('ui_text.done', 'Selesai & Tutup')}
           </button>

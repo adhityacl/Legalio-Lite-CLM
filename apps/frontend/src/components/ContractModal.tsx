@@ -492,16 +492,16 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   return (
     <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
       <Dialog.Portal>
-      <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs animate-in" />
+      <Dialog.Overlay className="fixed inset-0 z-50 bg-ink/60 backdrop-blur-xs animate-in" />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 pointer-events-none">
       <Dialog.Content
         onOpenAutoFocus={() => { returnFocusRef.current = document.activeElement as HTMLElement; }}
         onCloseAutoFocus={(event) => { event.preventDefault(); returnFocusRef.current?.focus(); }}
-        aria-describedby={undefined} onPointerDownOutside={(event) => event.preventDefault()} className="contract-form pointer-events-auto animate-in bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+        aria-describedby={undefined} onPointerDownOutside={(event) => event.preventDefault()} className="contract-form pointer-events-auto animate-in bg-surface rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-hairline overflow-hidden">
         {/* Header */}
-        <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
+        <div className="ds-section-header">
           <div>
-            <Dialog.Title className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <Dialog.Title className="ds-modal-title flex items-center gap-2">
               <FileText className="w-5 h-5 text-accent-text" />
               <span>
                 {contractToEdit?.contract_id
@@ -518,25 +518,25 @@ export const ContractModal: React.FC<ContractModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label={t('common.close', 'Tutup')}
-            className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="min-w-10 min-h-10 flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink p-1.5 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-sm flex-1 text-slate-900 dark:text-slate-100">
+          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-sm flex-1 text-ink">
             {/* Document Type Selection & Parent Contract Selector */}
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="ds-panel p-4 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ds-grid">
                 <div>
-                  <label htmlFor="contract-field-1" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                  <label htmlFor="contract-field-1" className="block font-bold text-ink mb-1.5 text-sm">
                     {t('form.contract.jenis_dokumen', 'Jenis Dokumen Perjanjian *')}
                   </label>
                   <AlphabeticalSelect id="contract-field-1"
                     value={jenisDokumen}
                     onChange={(e) => setJenisDokumen(e.target.value as JenisDokumenContract)}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-semibold focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer"
+                    className="ds-input w-full cursor-pointer"
                   >
                     <option value="Master Agreement">
                       {t('form.contract.master_agreement_opt', 'Master Agreement (Kontrak Induk Utama)')}
@@ -548,7 +548,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 </div>
 
                 <div>
-                  <label htmlFor="contract-field-2" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                  <label htmlFor="contract-field-2" className="block font-bold text-ink mb-1.5 text-sm">
                     {t('form.contract.partner_vendor', 'Partner *')}
                   </label>
                   <AlphabeticalSelect id="contract-field-2"
@@ -557,7 +557,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                       setPartnerId(e.target.value);
                       setParentContractId('');
                     }}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer"
+                    className="ds-input w-full cursor-pointer"
                   >
                     {partners.map((p) => (
                       <option key={p.partner_id} value={p.partner_id}>
@@ -570,14 +570,14 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
               {/* Referensi Master Agreement Field - Active when Agreement Addendum is chosen */}
               {jenisDokumen === 'Agreement Addendum' && (
-                <div className="pt-2 border-t border-slate-200 dark:border-slate-700/80 space-y-3">
+                <div className="pt-2 border-t border-hairline dark:border-hairline/80 space-y-3">
                   <div>
-                    <label htmlFor="contract-field-3" className="block font-bold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center gap-1.5 text-sm">
+                    <label htmlFor="contract-field-3" className="block font-bold text-ink mb-1.5 flex items-center gap-1.5 text-sm">
                       <Link2 className="w-4 h-4 text-accent-text" />
                       <span>{t('form.contract.ref_master_agreement', 'Referensi Master Agreement (Kontrak Induk) *')}</span>
                     </label>
                     {availableMasterContracts.length === 0 ? (
-                      <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-800 dark:text-amber-300 text-sm font-semibold">
+                      <div className="p-3 bg-status-warning-soft dark:bg-status-warning-soft/40 border border-status-warning-border rounded-xl text-status-warning text-sm font-semibold">
                         {t('form.contract.no_master_warning', 'Harap pilih partner lain atau buat Master Agreement terlebih dahulu.')}
                       </div>
                     ) : (
@@ -585,7 +585,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                         required={jenisDokumen === 'Agreement Addendum'}
                         value={parentContractId}
                         onChange={(e) => setParentContractId(e.target.value)}
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-semibold focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer"
+                        className="ds-input w-full cursor-pointer"
                       >
                         <option value="">{t('form.contract.select_master_placeholder', '-- Pilih Master Agreement Induk --')}</option>
                         {availableMasterContracts.map((m) => (
@@ -597,9 +597,9 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                     )}
                   </div>
 
-                  <div className="p-3.5 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 rounded-xl space-y-3">
+                  <div className="p-3.5 bg-status-warning-soft/80 dark:bg-status-warning-soft/30 border border-status-warning-border/80 dark:border-status-warning-border/60 rounded-xl space-y-3">
                     <div>
-                      <div className="block font-bold text-amber-950 dark:text-amber-300 mb-1.5 text-sm">
+                      <div className="block font-bold text-status-warning mb-1.5 text-sm">
                         {t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')}
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -617,10 +617,10 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                               key={f}
                               aria-pressed={isSelected}
                               onClick={() => handleFieldToggle(f)}
-                              className={`px-3 py-1 rounded-lg text-sm font-semibold border cursor-pointer select-none transition-colors ${
+                              className={`inline-flex items-center px-4 min-h-10 rounded-md text-sm font-semibold border cursor-pointer select-none transition-colors ${
                                 isSelected
-                                  ? 'bg-accent-soft text-accent-text border-accent/50 font-bold'
-                                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                  ? 'bg-accent-soft text-accent-text border-accent/50 font-semibold'
+                                  : 'bg-surface text-ink-soft border-hairline hover:bg-surface dark:hover:bg-surface-2'
                               }`}
                             >
                               {isSelected ? '✓ ' : '+ '}
@@ -632,7 +632,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                     </div>
 
                     <div>
-                      <label htmlFor="contract-field-4" className="block font-bold text-amber-950 dark:text-amber-300 mb-1.5 text-sm">
+                      <label htmlFor="contract-field-4" className="block font-bold text-status-warning mb-1.5 text-sm">
                         {t('form.contract.track_change_summary', 'Ringkasan Detail Track-Change Perubahan * (Wajib)')}
                       </label>
                       <textarea id="contract-field-4"
@@ -641,7 +641,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                         placeholder={t('form.contract.track_change_placeholder', 'Jelaskan secara eksplisit nilai lama -> nilai baru, tanggal lama -> tanggal baru, atau perubahan pasal...')}
                         value={ringkasanPerubahan}
                         onChange={(e) => setRingkasanPerubahan(e.target.value)}
-                        className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/80 rounded-xl p-3 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                        className="ds-input w-full"
                       />
                     </div>
                   </div>
@@ -649,9 +649,9 @@ export const ContractModal: React.FC<ContractModalProps> = ({
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ds-grid">
               <div>
-                <label htmlFor="contract-field-5" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="contract-field-5" className="block font-bold text-ink mb-1.5 text-sm">
                   {jenisDokumen === 'Agreement Addendum'
                     ? t('form.contract.nomor_addendum', 'Nomor Addendum *')
                     : t('form.contract.nomor_kontrak', 'Nomor Kontrak Legal *')}
@@ -666,12 +666,12 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                   }
                   value={nomorKontrak}
                   onChange={(e) => setNomorKontrak(e.target.value)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all font-mono"
+                  className="ds-input w-full"
                 />
               </div>
 
               <div>
-                <label htmlFor="contract-field-6" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="contract-field-6" className="block font-bold text-ink mb-1.5 text-sm">
                   {jenisDokumen === 'Agreement Addendum'
                     ? t('form.contract.judul_addendum', 'Judul Perjanjian Addendum *')
                     : t('form.contract.judul_kontrak', 'Judul Perjanjian Kontrak *')}
@@ -685,14 +685,14 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                     setJudulKontrak(e.target.value);
                     setIsAutoTitle(false);
                   }}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input w-full"
                 />
               </div>
             </div>
 
             {/* Kategori Tags */}
             <div>
-              <label htmlFor="contract-field-7" className="block font-bold text-slate-700 dark:text-slate-300 text-sm mb-1.5">
+              <label htmlFor="contract-field-7" className="block font-bold text-ink text-sm mb-1.5">
                 {t('form.contract.kategori_tag', 'Kategori Kerjasama Tag *')}
               </label>
               <div className="flex items-center gap-2 mb-2">
@@ -708,7 +708,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                       handleAddTag();
                     }
                   }}
-                  className="min-w-0 flex-1 bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input min-w-0 flex-1"
                 />
                 <AlphabeticalDatalist id="contract-category-templates-list">
                   {savedTemplates.map((cat) => (
@@ -718,7 +718,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddTag}
-                  className="ui-button ui-button-lg bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-bold transition-colors cursor-pointer"
+                  className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
                 >
                   {t('form.partner.add_tag_btn', 'Tambah Tag')}
                 </button>
@@ -734,7 +734,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleRemoveTag(tag)}
-                      className="text-accent-text hover:text-accent-text font-extrabold cursor-pointer"
+                      className="inline-flex size-6 items-center justify-center rounded-sm text-accent-text hover:bg-accent-soft font-semibold cursor-pointer"
                     >
                       ×
                     </button>
@@ -743,9 +743,9 @@ export const ContractModal: React.FC<ContractModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ds-grid">
               <div>
-                <label htmlFor="contract-field-8" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="contract-field-8" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.contract.tanggal_mulai', 'Tanggal Mulai *')}
                 </label>
                 <DateInput id="contract-field-8"
@@ -758,11 +758,11 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="contract-field-9" className="block font-bold text-slate-700 dark:text-slate-300 text-sm">
+                  <label htmlFor="contract-field-9" className="block font-bold text-ink text-sm">
                     {t('form.contract.tanggal_berakhir', 'Tanggal Berakhir *')}
                   </label>
                   {autoRenewal && (
-                    <span className="text-xs bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 font-semibold px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                    <span className="text-xs bg-status-success-soft text-status-success dark:bg-status-success-soft/50 font-semibold px-2 py-0.5 rounded-md border border-status-success-border">
                       {t('contracts.auto_renewal', 'Auto-Renewal')}
                     </span>
                   )}
@@ -776,13 +776,13 @@ export const ContractModal: React.FC<ContractModalProps> = ({
               </div>
 
               <div>
-                <label htmlFor="contract-field-10" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="contract-field-10" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.contract.currency', 'Mata Uang')}
                 </label>
                 <AlphabeticalSelect id="contract-field-10"
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent transition-all"
+                  className="ds-input w-full"
                 >
                   {SUPPORTED_CURRENCIES.map((c) => (
                     <option key={c.code} value={c.code}>
@@ -793,7 +793,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
               </div>
 
               <div>
-                <label htmlFor="contract-field-11" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="contract-field-11" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.contract.nilai_kontrak', 'Nilai Kontrak *')}
                 </label>
                 <input id="contract-field-11"
@@ -801,7 +801,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                   required
                   value={nilaiKontrak}
                   onChange={(e) => setNilaiKontrak(Number(e.target.value))}
-                  className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input w-full"
                 />
               </div>
             </div>
@@ -809,19 +809,19 @@ export const ContractModal: React.FC<ContractModalProps> = ({
             {/* USD Conversion Info Banner */}
             <div className="bg-accent/5 border border-accent/20 rounded-xl p-3 text-sm flex flex-wrap items-center justify-between gap-2">
               <div>
-                <span className="font-semibold text-slate-700 dark:text-slate-300">{t('contracts.estimasi_konversi_usd_kurs', 'Estimasi Konversi USD (Kurs {tanggalMulai}):', { tanggalMulai })}</span>
-                <span className="ml-2 font-bold text-accent-text ">
+                <span className="font-semibold text-ink">{t('contracts.estimasi_konversi_usd_kurs', 'Estimasi Konversi USD (Kurs {tanggalMulai}):', { tanggalMulai })}</span>
+                <span className="ml-2 font-bold text-accent-text">
                   {formatMoney(estimatedUsd, 'USD')}
                 </span>
               </div>
-              <span className="text-xs text-slate-500 dark:text-slate-400 italic">
+              <span className="text-xs text-ink-soft italic">
                 {currency === 'USD' ? t('contracts.sama_mata_uang_usd', 'Sama (Mata uang USD)') : t('contracts.1_usd', '1 {currency} ≈ {value} USD', { currency, value: historicalRate.toFixed(8) })}
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700">
+            <div className="ds-panel grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 ds-grid">
               <div>
-                <label htmlFor="contract-field-12" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="contract-field-12" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.contract.masa_notice', 'Masa Notice (Hari) *')}
                 </label>
                 <input id="contract-field-12"
@@ -829,18 +829,18 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                   required
                   value={noticePeriodHari}
                   onChange={(e) => setNoticePeriodHari(Number(e.target.value))}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                  className="ds-input w-full"
                 />
               </div>
 
               <div>
-                <label htmlFor="contract-field-13" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+                <label htmlFor="contract-field-13" className="block font-bold text-ink mb-1.5 text-sm">
                   {t('form.contract.notice_type', 'Notice Type Required *')}
                 </label>
                 <AlphabeticalSelect id="contract-field-13"
                   value={noticeTypeRequired}
                   onChange={(e) => setNoticeTypeRequired(e.target.value as any)}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer"
+                  className="ds-input w-full cursor-pointer"
                 >
                   <option value="Termination">{t('contracts.notice_of_termination', 'Notice of Termination')}</option>
                   <option value="Extension">{t('contracts.notice_of_extension', 'Notice of Extension')}</option>
@@ -855,9 +855,9 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                     checked={autoRenewal}
                     disabled={status === 'Terminated'}
                     onChange={(e) => handleAutoRenewalChange(e.target.checked)}
-                    className="w-4 h-4 text-accent-text rounded border-slate-300 dark:border-slate-700 focus:ring-accent"
+                    className="w-4 h-4 text-accent-text rounded-sm border-hairline focus:ring-accent"
                   />
-                  <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+                  <span className="font-bold text-ink text-sm">
                     {t('form.contract.auto_renewal', 'Auto Renewal')}
                   </span>
                 </label>
@@ -865,20 +865,20 @@ export const ContractModal: React.FC<ContractModalProps> = ({
             </div>
 
             <div>
-              <label htmlFor="contract-field-14" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+              <label htmlFor="contract-field-14" className="block font-bold text-ink mb-1.5 text-sm">
                 {t('form.contract.status_kontrak', 'Status Kontrak *')}
               </label>
               <AlphabeticalSelect id="contract-field-14"
                 value={status === 'Terminated' ? 'Terminated' : 'Active'}
                 onChange={(e) => { setStatus(e.target.value as ContractStatus); if (e.target.value === 'Terminated') setAutoRenewal(false); }}
-                className="w-full bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-semibold focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer"
+                className="ds-input w-full cursor-pointer"
               >
                 <option value="Active">{t('form.contract.status_normal', 'Normal (Sesuai tanggal berlaku)')}</option>
                 <option value="Terminated">{t('form.contract.status_terminated', 'Dihentikan (Penghentian Perjanjian)')}</option>
               </AlphabeticalSelect>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Badge variant={lifecyclePreview.status === 'Expired' ? 'warning' : lifecyclePreview.status === 'Terminated' ? 'danger' : 'info'}>{t(CONTRACT_STATUS_LABEL_KEY[lifecyclePreview.status])}</Badge>
-                {lifecyclePreview.scheduled && terminationDate && <p className="text-xs text-slate-500 dark:text-slate-400">{t('termination.scheduled')}</p>}
+                {lifecyclePreview.scheduled && terminationDate && <p className="text-xs text-ink-soft">{t('termination.scheduled')}</p>}
               </div>
             </div>
 
@@ -888,7 +888,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
             {/* Internal Notes */}
             <div>
-              <label htmlFor="contract-field-15" className="block font-bold text-slate-700 dark:text-slate-300 text-sm mb-1.5">
+              <label htmlFor="contract-field-15" className="block font-bold text-ink text-sm mb-1.5">
                 {t('form.contract.internal_notes', 'Internal Notes')}
               </label>
               <textarea id="contract-field-15"
@@ -896,25 +896,25 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 onChange={(e) => setInternalNotes(e.target.value)}
                 rows={5}
                 placeholder={t('form.contract.internal_notes_placeholder', 'Rangkuman kontrak...')}
-                className="w-full min-h-[110px] max-h-[500px] resize-y bg-[#F7F8FA] dark:bg-slate-800 border border-hairline dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium leading-relaxed focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                className="ds-input w-full max-h-[500px] resize-y"
               />
             </div>
 
             {/* File Upload Area */}
             <div>
-              <label htmlFor="contract-field-16" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-sm">
+              <label htmlFor="contract-field-16" className="block font-bold text-ink mb-1.5 text-sm">
                 {t('form.contract.upload_label', 'Dokumen Asli Kontrak (Drive PDF Upload)')}
               </label>
-              <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-accent dark:hover:border-accent rounded-2xl p-4 text-center bg-slate-50 dark:bg-slate-800/40 hover:bg-emerald-50/40 transition-all">
+              <div className="ds-upload text-center">
                 <Upload className="w-6 h-6 text-accent-text mx-auto mb-1.5" />
                 {fileData || fileName ? (
                   <div className="space-y-1">
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                      {t('contracts.file_terpilih', '📄 File terpilih:')} <span className="font-normal font-mono text-slate-900 dark:text-white">{rawFileName || fileName}</span>
+                    <p className="text-sm font-bold text-ink">
+                      {t('contracts.file_terpilih', '📄 File terpilih:')} <span className="font-normal font-mono text-ink dark:text-white">{rawFileName || fileName}</span>
                     </p>
                   </div>
                 ) : (
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                  <p className="text-sm font-bold text-ink">
                     {t('form.contract.drag_pdf', 'Pilih atau Drag Dokumen Kontrak ke sini')}
                   </p>
                 )}
@@ -924,7 +924,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                       type="button"
                       onClick={handleParseContract}
                       disabled={isParsing}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-accent-soft text-accent-text hover:bg-accent/20 font-bold text-sm rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-4 min-h-10 bg-accent-soft text-accent-text hover:bg-accent/20 font-semibold text-sm rounded-md transition-all cursor-pointer disabled:opacity-50"
                     >
                       {isParsing ? t('contracts.parsing', 'Parsing...') : t('contracts.parse_file', 'Parse File')}
                     </button>
@@ -933,35 +933,35 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                     type="file"
                     accept=".pdf,.doc,.docx"
                     onChange={handleFileChange}
-                    className="w-[220px] max-w-full text-sm text-slate-500 dark:text-slate-400 file:mr-2 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer"
+                    className="w-[220px] max-w-full text-sm text-ink-soft file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer"
                   />
                 </div>
               </div>
             </div>
 
             {parseSuccessMsg && (
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-xl text-sm font-semibold flex items-center gap-2">
+              <div className="p-3 bg-status-success-soft dark:bg-status-success-soft/40 border border-status-success-border text-status-success rounded-xl text-sm font-semibold flex items-center gap-2">
                 <span>{parseSuccessMsg}</span>
               </div>
             )}
 
             {error && (
-              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl text-sm font-bold flex items-center gap-2">
+              <div className="p-3.5 bg-status-danger-soft dark:bg-status-danger-soft/40 border border-status-danger-border text-status-danger rounded-xl text-sm font-bold flex items-center gap-2">
                 <span>⚠️</span>
                 <span>{error}</span>
               </div>
             )}
           </div>
 
-          <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 shrink-0">
-            <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
+          <div className="p-4 sm:p-5 bg-surface border-t border-hairline flex flex-wrap items-center justify-between gap-2 shrink-0">
+            <span className="text-xs text-ink-soft font-medium">
               {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
             </span>
             <div className="flex items-center gap-2 ml-auto">
               <button
                 type="button"
                 onClick={onClose}
-                className="ui-button ui-button-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold transition-colors cursor-pointer"
+                className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
               >
                 {t('form.common.cancel', 'Batal')}
               </button>
@@ -969,7 +969,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 type="submit"
                 disabled={submitting || readingTerminationFile || !isFormValid}
                 title={!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : ''}
-                className="ui-button ui-button-lg bg-accent-strong hover:bg-accent-strong-hover text-white font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="ui-button ui-button-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-default"
               >
                 {submitting
                   ? t('form.contract.saving_btn', 'Menyimpan Kontrak...')

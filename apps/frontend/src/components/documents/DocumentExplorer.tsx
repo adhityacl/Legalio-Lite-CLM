@@ -194,12 +194,12 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
         key={sortKey}
         scope="col"
         aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className={`${className} text-xs font-bold text-slate-700 dark:text-slate-300 text-left select-none align-middle`}
+        className={`${className} text-xs font-bold text-ink text-left select-none align-middle`}
       >
         <button
           type="button"
           onClick={() => toggleSort(sortKey)}
-          className="flex items-center gap-1.5 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded py-0.5"
+          className="flex items-center gap-1.5 hover:text-ink dark:hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded-sm py-0.5"
         >
           <span>{label}</span>
           {active ? (
@@ -209,7 +209,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               <ArrowDown className="w-3.5 h-3.5 text-accent-text shrink-0" aria-hidden />
             )
           ) : (
-            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden />
+            <ArrowUpDown className="w-3.5 h-3.5 text-ink-soft shrink-0" aria-hidden />
           )}
         </button>
       </th>
@@ -219,9 +219,9 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
   return (
     <section className="w-full min-w-0 bg-transparent" aria-labelledby="document-explorer-heading">
       <div className="w-full space-y-6">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="ds-page-bar">
           <div>
-            <h2 id="document-explorer-heading" ref={headingRef} tabIndex={-1} className="outline-none text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+            <h2 id="document-explorer-heading" ref={headingRef} tabIndex={-1} className="ds-page-heading">
               {t('documents.explorer.title', 'Dokumen Saya')}
             </h2>
           </div>
@@ -229,7 +229,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
             <button
               type="button"
               onClick={onCreate}
-              className="ui-button ui-button-lg mobile-page-action inline-flex w-fit items-center font-bold bg-accent-strong hover:bg-accent-strong-hover text-white shadow-sm cursor-pointer transition-all"
+              className="ui-button ui-button-lg mobile-page-action inline-flex w-fit items-center cursor-pointer ds-button ds-button-lg ds-button-default"
             >
               <FilePlus2 className="w-4 h-4" aria-hidden />
               <span>{t('documents.explorer.new', 'Dokumen Baru')}</span>
@@ -237,10 +237,10 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
           )}
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-4 sm:p-5">
-          <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
+        <div className="ds-panel p-4 sm:p-5">
+          <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full ds-grid">
             <div className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
+              <Search className="w-4 h-4 text-ink-soft absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
               <label htmlFor="document-search" className="sr-only">
                 {t('documents.explorer.search_label', 'Search Document')}
               </label>
@@ -250,7 +250,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder={t('documents.explorer.search_placeholder', 'Search Documents…')}
-                className="h-11 sm:h-9 w-full pl-9 pr-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-accent font-medium transition-colors"
+                className="ds-input w-full pl-9 pr-3"
               />
             </div>
             <label htmlFor="document-status-filter" className="sr-only">
@@ -260,7 +260,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               id="document-status-filter"
               value={filters.status}
               onChange={(e) => updateFilter('status', e.target.value)}
-              className="min-h-11 sm:min-h-9 h-9 min-w-[130px] flex-1 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent cursor-pointer"
+              className="ds-input min-w-[130px] flex-1 cursor-pointer"
             >
               <option value="">{t('documents.filter.status_active', 'Semua status aktif')}</option>
               {DOCUMENT_STATUSES.map((s) => (
@@ -278,7 +278,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               id="document-type-filter"
               value={filters.type}
               onChange={(e) => updateFilter('type', e.target.value)}
-              className="min-h-11 sm:min-h-9 h-9 min-w-[130px] flex-1 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent cursor-pointer"
+              className="ds-input min-w-[130px] flex-1 cursor-pointer"
             >
               <option value="">{t('documents.filter.type_all', 'All Document Types')}</option>
               {DOCUMENT_TYPES.map((type) => (
@@ -295,7 +295,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               id="document-creator-filter"
               value={filters.created_by}
               onChange={(e) => updateFilter('created_by', e.target.value)}
-              className="min-h-11 sm:min-h-9 h-9 min-w-[130px] flex-1 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-accent cursor-pointer"
+              className="ds-input min-w-[130px] flex-1 cursor-pointer"
             >
               <option value="">{t('documents.filter.created_by_all', 'All Creators')}</option>
               {(data?.creators ?? []).map((creator) => (
@@ -306,7 +306,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
             </AlphabeticalSelect>
 
             <TableViewMenu label={t('documents.filter.view', 'View')}>
-              <div className="mb-1 border-b border-slate-100 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800">
+              <div className="mb-1 border-b border-hairline px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-ink-soft">
                 {t('documents.filter.toggle_columns', 'Toggle Columns')}
               </div>
               {([
@@ -317,12 +317,12 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                 ['createdBy', t('documents.field.created_by', 'Created by')],
                 ['size', t('documents.field.size', 'Size')],
               ] as const).map(([column, label]) => (
-                <label key={column} className="flex cursor-pointer items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800">
+                <label key={column} className="flex cursor-pointer items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-ink hover:bg-surface dark:hover:bg-surface-2">
                   <input
                     type="checkbox"
                     checked={visibleColumns[column]}
                     onChange={() => toggleColumnVisibility(column)}
-                    className="rounded border-slate-300 text-accent-text focus:ring-accent dark:border-slate-700"
+                    className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                   />
                   <span>{label}</span>
                 </label>
@@ -332,18 +332,18 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
         </div>
 
         <section
-          className="ds-table-surface bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden"
+          className="ds-table-surface bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden"
           aria-busy={isFetching}
           aria-live="polite"
         >
           {state.status === 'loading' && (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800" role="status">
+            <div className="divide-y divide-hairline" role="status">
               <span className="sr-only">{t('common.loading', 'Memuat…')}</span>
               {Array.from({ length: 6 }, (_, i) => (
                 <div key={i} className="h-14 px-3 flex items-center gap-3 animate-pulse motion-reduce:animate-none">
-                  <div className="h-3 w-1/3 rounded bg-slate-200 dark:bg-slate-800" />
-                  <div className="h-3 w-16 rounded bg-slate-200 dark:bg-slate-800" />
-                  <div className="h-3 w-20 rounded bg-slate-200 dark:bg-slate-800 ml-auto" />
+                  <div className="h-3 w-1/3 rounded-sm bg-surface-2" />
+                  <div className="h-3 w-16 rounded-sm bg-surface-2" />
+                  <div className="h-3 w-20 rounded-sm bg-surface-2 ml-auto" />
                 </div>
               ))}
             </div>
@@ -351,14 +351,14 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
 
           {state.status === 'error' && (
             <div role="alert" className="p-8 text-center space-y-3">
-              <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">
+              <p className="text-sm font-semibold text-status-danger">
                 {t('documents.explorer.load_failed', 'Gagal memuat daftar dokumen.')}
               </p>
-              <p className="text-xs text-slate-500">{state.message}</p>
+              <p className="text-xs text-ink-soft">{state.message}</p>
               <button
                 type="button"
                 onClick={reload}
-                className="inline-flex items-center gap-1.5 px-3 min-h-11 sm:min-h-9 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-xs font-semibold cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 min-h-10 rounded-md bg-ink text-white text-sm font-semibold cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" aria-hidden />
                 {t('common.retry', 'Coba lagi')}
@@ -368,11 +368,11 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
 
           {data && (
             <>
-              <div className="relative overflow-x-auto bg-white dark:bg-slate-900">
-                <table className="ds-table app-data-table document-data-table w-full text-left border-collapse text-xs bg-white dark:bg-slate-900">
+              <div className="relative overflow-x-auto bg-surface">
+                <table className="ds-table app-data-table document-data-table w-full text-left border-collapse text-xs bg-surface">
                   <caption className="sr-only">{t('documents.explorer.title', 'Dokumen Saya')}</caption>
-                  <thead className="bg-slate-50 dark:bg-slate-800/50">
-                    <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 h-12">
+                  <thead className="bg-surface dark:bg-surface-2/50">
+                    <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
                       {sortHeader('name', t('documents.field.name', 'Nama'), 'pl-6 pr-4 py-4')}
                       {visibleColumns.type && sortHeader('type', t('documents.field.type', 'Jenis'), 'p-4 hidden md:table-cell')}
                       {visibleColumns.status && sortHeader('status', t('documents.field.status', 'Status'))}
@@ -380,19 +380,19 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                       {visibleColumns.modified && sortHeader('modified_at', t('documents.field.modified', 'Diubah'))}
                       {visibleColumns.createdBy && sortHeader('created_by', t('documents.field.created_by', 'Dibuat oleh'), 'p-4 hidden md:table-cell')}
                       {visibleColumns.size && sortHeader('file_size', t('documents.field.size', 'Ukuran'), 'p-4 hidden lg:table-cell')}
-                      <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                      <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
                         <div className="flex items-center justify-end">{t('documents.field.actions', 'Aksi')}</div>
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-hairline dark:divide-slate-800">
+                  <tbody className="divide-y divide-hairline">
                     {data.documents.length === 0 ? (
                       <TableEmptyState
                         colSpan={Object.values(visibleColumns).filter(Boolean).length + 2}
                         message={t('documents.explorer.empty', 'Belum ada dokumen tersimpan.')}
                       />
                     ) : data.documents.map((doc) => (
-                      <tr key={doc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <tr key={doc.id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
                         <td className="pl-6 pr-4 py-4 text-xs text-left align-middle max-w-[320px]">
                           {renaming?.id === doc.id ? (
                             <input
@@ -411,13 +411,13 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                             <button
                               type="button"
                               onClick={() => onOpen(doc.id)}
-                              className="font-semibold text-left text-slate-900 dark:text-slate-100 hover:text-accent-text truncate block max-w-full cursor-pointer transition-colors"
+                              className="font-semibold text-left text-ink hover:text-accent-text truncate block max-w-full cursor-pointer transition-colors"
                               title={doc.name}
                             >
                               {doc.name}
                             </button>
                           )}
-                          <span className="text-xs text-slate-500 dark:text-slate-400">v{doc.current_version}</span>
+                          <span className="text-xs text-ink-soft">v{doc.current_version}</span>
                         </td>
                         {visibleColumns.type && <td className="py-4 px-4 text-xs text-left align-middle hidden md:table-cell">
                           <span className={typeBadgeClass(doc.type)}>{typeLabel(t, doc.type)}</span>
@@ -425,16 +425,16 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                         {visibleColumns.status && <td className="py-4 px-4 text-xs text-left align-middle">
                           <span className={statusBadgeClass(doc.status)}>{statusLabel(t, doc.status)}</span>
                         </td>}
-                        {visibleColumns.created && <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 text-left align-middle whitespace-nowrap hidden lg:table-cell">
+                        {visibleColumns.created && <td className="py-4 px-4 text-xs font-normal text-ink text-left align-middle whitespace-nowrap hidden lg:table-cell">
                           <RelativeTime iso={doc.created_at} />
                         </td>}
-                        {visibleColumns.modified && <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 text-left align-middle whitespace-nowrap">
+                        {visibleColumns.modified && <td className="py-4 px-4 text-xs font-normal text-ink text-left align-middle whitespace-nowrap">
                           <RelativeTime iso={doc.modified_at} />
                         </td>}
-                        {visibleColumns.createdBy && <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 text-left align-middle hidden md:table-cell">
+                        {visibleColumns.createdBy && <td className="py-4 px-4 text-xs font-normal text-ink text-left align-middle hidden md:table-cell">
                           {doc.created_by_name || '—'}
                         </td>}
-                        {visibleColumns.size && <td className="py-4 px-4 text-xs font-normal text-slate-700 dark:text-slate-300 text-left align-middle whitespace-nowrap hidden lg:table-cell">
+                        {visibleColumns.size && <td className="py-4 px-4 text-xs font-normal text-ink text-left align-middle whitespace-nowrap hidden lg:table-cell">
                           {formatBytes(doc.file_size)}
                         </td>}
                         <td className="pl-2 pr-6 py-4 text-right align-middle w-20">

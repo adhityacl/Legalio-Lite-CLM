@@ -9,7 +9,7 @@ export function Legend({ enabled, onToggle }: EventFilters) {
   const { t } = useLanguage();
   return <div role="group" aria-label={t('calendar.event_types')} className="flex flex-wrap justify-center gap-x-1 gap-y-0">
     {EVENT_TYPES.filter(type => type !== 'task').map(type => <Button key={type} type="button" variant="ghost" aria-pressed={enabled.has(type)}
-      className={cn('min-h-11 gap-2 px-2 text-xs font-normal', !enabled.has(type) && 'opacity-60 line-through')}
+      className={cn('text-xs', !enabled.has(type) && 'opacity-60 line-through')}
       onClick={() => onToggle(type)}><EventIndicator type={type} />{t(EVENT_TYPE_CONFIG[type].labelKey)}</Button>)}
   </div>;
 }

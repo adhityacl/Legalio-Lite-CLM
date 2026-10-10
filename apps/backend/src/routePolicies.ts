@@ -143,6 +143,7 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/auth-console/backups', platform('platform.database.read')],
   ['POST', '/api/auth-console/backups', platform('platform.database.optimize')],
   ['GET', '/api/auth-console/backups/:id/download', platform('platform.database.read')],
+  ['POST', '/api/auth-console/backups/restore-file', platform('platform.application.reset')],
   ['POST', '/api/auth-console/backups/:id/restore', platform('platform.application.reset')],
   ['GET', '/api/auth-console/sqlite/status', platform('platform.database.read')],
   ['GET', '/api/auth-console/sqlite/tables', platform('platform.database.read')],

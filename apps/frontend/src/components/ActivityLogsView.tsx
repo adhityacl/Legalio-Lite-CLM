@@ -122,9 +122,9 @@ export const ActivityLogsView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="ds-page-bar">
         <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+          <h2 className="ds-page-heading">
             <span>{t('logs.title', 'Log Aktivitas Sesi System')}</span>
           </h2>
         </div>
@@ -132,7 +132,7 @@ export const ActivityLogsView: React.FC = () => {
         <button
           onClick={loadLogs}
           disabled={loading}
-          className="ui-button ui-button-lg mobile-page-action cursor-pointer shadow-sm gap-1.5 bg-accent-strong hover:bg-accent-strong-hover text-white font-bold flex items-center transition-all shrink-0 disabled:opacity-50"
+          className="ui-button ui-button-lg mobile-page-action cursor-pointer flex items-center shrink-0 disabled:opacity-50 ds-button ds-button-lg ds-button-default"
         >
           <RefreshCw className={`w-4 h-4 text-white ${loading ? 'animate-spin' : ''}`} />
           <span>{t('logs.refresh_btn', 'Refresh Log')}</span>
@@ -140,11 +140,11 @@ export const ActivityLogsView: React.FC = () => {
       </div>
 
       {/* Filter Bar with 3 Dropdowns */}
-      <div className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5">
-        <div className="mobile-filter-grid flex flex-1 flex-wrap items-center gap-2 w-full">
+      <div className="ds-panel p-6 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5">
+        <div className="mobile-filter-grid flex flex-1 flex-wrap items-center gap-2 w-full ds-grid">
           {/* 1 Box Search */}
           <div className="relative flex-1 min-w-[200px] md:max-w-xs">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <Search className="w-4 h-4 text-ink-soft absolute left-3 top-2.5" />
             <input aria-label={t('logs.search_placeholder', 'Cari aktivitas, email, atau deskripsi...')}
               type="text"
               placeholder={t('logs.search_placeholder', 'Cari aktivitas, email, atau deskripsi...')}
@@ -153,7 +153,7 @@ export const ActivityLogsView: React.FC = () => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="h-9 w-full pl-9 pr-3 bg-white border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 placeholder:text-slate-500 focus:outline-none focus:border-accent font-medium transition-colors"
+              className="ds-input w-full pl-9 pr-3"
             />
           </div>
 
@@ -164,7 +164,7 @@ export const ActivityLogsView: React.FC = () => {
               setFilterModule(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-white border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[140px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2313192B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[140px] appearance-none pr-8"
           >
             <option value="ALL">{t('logs.all_modules', 'Semua Modul')}</option>
             {moduleOptions.map((mod) => (
@@ -181,7 +181,7 @@ export const ActivityLogsView: React.FC = () => {
               setSelectedAction(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-white border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[140px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2313192B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[140px] appearance-none pr-8"
           >
             <option value="ALL">{t('logs.all_actions', 'Semua Jenis Aksi')}</option>
             <option value="LOGIN">{t('logs.login', 'LOGIN')}</option>
@@ -202,7 +202,7 @@ export const ActivityLogsView: React.FC = () => {
               setSelectedTimeRange(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-white border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:border-accent transition-colors flex-1 min-w-[140px] appearance-none pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2313192B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[right_12px_center]"
+            className="ds-input flex-1 min-w-[140px] appearance-none pr-8"
           >
             <option value="ALL">{t('notifications.all_time_periods', 'Semua Periode Waktu')}</option>
             <option value="TODAY">{t('notifications.time_today', 'Hari Ini (24 Jam Terakhir)')}</option>
@@ -213,7 +213,7 @@ export const ActivityLogsView: React.FC = () => {
 
         {/* View Toggle */}
         <TableViewMenu className="ml-auto" title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
-          <div className="px-3.5 py-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 border-b border-slate-100 dark:border-slate-800">
+          <div className="px-3.5 py-1.5 text-xs font-bold text-ink-soft uppercase tracking-wider mb-1 border-b border-hairline">
             {t('io.toggle_columns', 'Toggle Kolom')}
           </div>
           {Object.keys(visibleColumns).map((col) => {
@@ -225,12 +225,12 @@ export const ActivityLogsView: React.FC = () => {
             else if (col === 'detail') label = 'Rincian Deskripsi';
 
             return (
-              <label key={col} className="flex items-center gap-2.5 px-3.5 py-1.5 hover:bg-slate-50 cursor-pointer text-xs font-medium text-slate-700 select-none">
+              <label key={col} className="flex items-center gap-2.5 px-3.5 py-1.5 hover:bg-surface cursor-pointer text-xs font-medium text-ink select-none">
                 <input
                   type="checkbox"
                   checked={visibleColumns[col]}
                   onChange={() => toggleColumnVisibility(col)}
-                  className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                  className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                 />
                 <span className="capitalize">{label}</span>
               </label>
@@ -240,11 +240,11 @@ export const ActivityLogsView: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="ds-table-surface bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto bg-white dark:bg-slate-900">
-          <table className="ds-table w-full text-left border-collapse text-xs bg-white dark:bg-slate-900">
-            <thead className="bg-slate-50 dark:bg-slate-800/50">
-              <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 h-12">
+      <div className="ds-table-surface bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto ds-table-surface bg-surface">
+          <table className="ds-table w-full text-left border-collapse text-xs bg-surface">
+            <thead className="bg-surface dark:bg-surface-2/50">
+              <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
                 <th scope="col" className="pl-6 pr-2 py-4 w-12 text-left align-middle">
                   <div className="flex items-center justify-start">
                     <input
@@ -252,24 +252,24 @@ export const ActivityLogsView: React.FC = () => {
                       aria-label={t('logs.pilih_semua_log_aktivitas', 'Pilih semua log aktivitas')}
                       onChange={handleSelectAll}
                       checked={selectedRows.length > 0 && selectedRows.length === currentLogs.length}
-                      className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                      className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                     />
                   </div>
                 </th>
-                {visibleColumns.time && <th scope="col" className="p-4 text-xs font-bold text-slate-700 text-left align-middle">{t('logs.col_time', 'Waktu')}</th>}
-                {visibleColumns.user && <th scope="col" className="p-4 text-xs font-bold text-slate-700 text-left align-middle">{t('logs.col_user', 'Pengguna')}</th>}
-                {visibleColumns.action && <th scope="col" className="p-4 text-xs font-bold text-slate-700 text-left align-middle">{t('logs.col_action', 'Jenis Aksi')}</th>}
-                {visibleColumns.module && <th scope="col" className="p-4 text-xs font-bold text-slate-700 text-left align-middle">{t('logs.col_module', 'Modul')}</th>}
-                {visibleColumns.detail && <th scope="col" className="p-4 text-xs font-bold text-slate-700 text-left align-middle">{t('logs.col_detail', 'Rincian Deskripsi')}</th>}
-                <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-slate-700 align-middle">
+                {visibleColumns.time && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('logs.col_time', 'Waktu')}</th>}
+                {visibleColumns.user && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('logs.col_user', 'Pengguna')}</th>}
+                {visibleColumns.action && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('logs.col_action', 'Jenis Aksi')}</th>}
+                {visibleColumns.module && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('logs.col_module', 'Modul')}</th>}
+                {visibleColumns.detail && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('logs.col_detail', 'Rincian Deskripsi')}</th>}
+                <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
                   <div className="flex items-center justify-end">{t('dashboard.action', 'Aksi')}</div>
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-hairline dark:divide-slate-800">
+            <tbody className="divide-y divide-hairline">
               {loading ? (
                 <tr>
-                  <td colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} className="py-12 text-center text-slate-400">
+                  <td colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} className="py-12 text-center text-ink-soft">
                     {t('logs.loading', 'Memuat log aktivitas...')}
                   </td>
                 </tr>
@@ -277,7 +277,7 @@ export const ActivityLogsView: React.FC = () => {
                 <TableEmptyState colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} />
               ) : (
                 currentLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <tr key={log.id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
                     <td className="pl-6 pr-2 py-4 text-left align-middle">
                       <div className="flex items-center justify-start">
                         <input
@@ -285,14 +285,14 @@ export const ActivityLogsView: React.FC = () => {
                           aria-label={t('logs.pilih_log_oleh', 'Pilih log {actionType} oleh {userEmail}', { actionType: log.actionType, userEmail: log.userName || log.userEmail })}
                           checked={selectedRows.includes(log.id || '')}
                           onChange={() => handleSelectRow(log.id || '')}
-                          className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                          className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                         />
                       </div>
                     </td>
 
                     {/* 1. Waktu */}
                     {visibleColumns.time && (
-                      <td className="py-4 px-4 text-xs font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap text-left">
+                      <td className="py-4 px-4 text-xs font-semibold text-ink whitespace-nowrap text-left">
                         {new Date(log.timestamp).toLocaleString(getActiveFormattingLocale(), {
                           dateStyle: 'medium',
                           timeStyle: 'short',
@@ -302,7 +302,7 @@ export const ActivityLogsView: React.FC = () => {
 
                     {/* 2. Pengguna */}
                     {visibleColumns.user && (
-                      <td className="py-4 px-4 text-xs font-normal text-slate-700 whitespace-nowrap text-left">
+                      <td className="py-4 px-4 text-xs font-normal text-ink whitespace-nowrap text-left">
                         {log.userName || log.userEmail}
                       </td>
                     )}
@@ -322,7 +322,7 @@ export const ActivityLogsView: React.FC = () => {
 
                     {/* 4. Modul */}
                     {visibleColumns.module && (
-                      <td className="py-4 px-4 text-xs font-normal text-slate-700 uppercase whitespace-nowrap text-left">
+                      <td className="py-4 px-4 text-xs font-normal text-ink uppercase whitespace-nowrap text-left">
                         <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center justify-center whitespace-nowrap shadow-2xs ${getStatusBadgeClass(log.module)}`}>
                           {log.module}
                         </span>
@@ -331,7 +331,7 @@ export const ActivityLogsView: React.FC = () => {
 
                     {/* 5. Rincian Deskripsi */}
                     {visibleColumns.detail && (
-                      <td className="py-4 px-4 max-w-sm text-left text-xs font-normal text-slate-700">
+                      <td className="py-4 px-4 max-w-sm text-left text-xs font-normal text-ink">
                         <p className="line-clamp-1" title={log.description}>{log.description}</p>
                       </td>
                     )}
@@ -371,26 +371,26 @@ export const ActivityLogsView: React.FC = () => {
 
       {/* Detail Modal */}
       {selectedLogForDetail && (
-        <ModalFrame onClose={() => setSelectedLogForDetail(null)} className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 max-w-lg w-full overflow-hidden">
+        <ModalFrame onClose={() => setSelectedLogForDetail(null)} className="max-w-lg w-full overflow-hidden">
 
-            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <div className="ds-section-header">
               <div>
-                <ModalTitle className="text-base font-bold text-slate-900 dark:text-white">{t('logs.rincian_log_aktivitas', 'Rincian Log Aktivitas')}</ModalTitle>
-                <p className="text-xs text-slate-500 mt-0.5">{t('logs.id', 'ID: {id}', { id: selectedLogForDetail.id })}</p>
+                <ModalTitle className="ds-modal-title flex items-center gap-2">{t('logs.rincian_log_aktivitas', 'Rincian Log Aktivitas')}</ModalTitle>
+                <p className="text-xs text-ink-soft mt-0.5">{t('logs.id', 'ID: {id}', { id: selectedLogForDetail.id })}</p>
               </div>
               <button aria-label={t('common.close', 'Tutup')}
                 onClick={() => setSelectedLogForDetail(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg transition-colors"
+                className="text-ink-soft hover:text-ink-soft dark:hover:text-ink p-1 rounded-md transition-colors"
               >
                 ✕
               </button>
             </div>
 
             <div className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+              <div className="ds-panel grid grid-cols-2 gap-4 p-4 ds-grid">
                 <div>
-                  <span className="text-slate-400 font-medium block mb-1">{t('notifications.col_time', 'Waktu')}</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  <span className="text-ink-soft font-medium block mb-1">{t('notifications.col_time', 'Waktu')}</span>
+                  <span className="font-semibold text-ink">
                     {new Date(selectedLogForDetail.timestamp).toLocaleString(getActiveFormattingLocale(), {
                       dateStyle: 'full',
                       timeStyle: 'medium',
@@ -398,19 +398,19 @@ export const ActivityLogsView: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-400 font-medium block mb-1">{t('admin.generic_user', 'Pengguna')}</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  <span className="text-ink-soft font-medium block mb-1">{t('admin.generic_user', 'Pengguna')}</span>
+                  <span className="font-semibold text-ink">
                     {selectedLogForDetail.userName || selectedLogForDetail.userEmail} ({selectedLogForDetail.role})
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-400 font-medium block mb-1">{t('logs.col_action', 'Jenis Aksi')}</span>
+                  <span className="text-ink-soft font-medium block mb-1">{t('logs.col_action', 'Jenis Aksi')}</span>
                   <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full border inline-block ${getActionBadge(selectedLogForDetail.actionType)}`}>
                     {selectedLogForDetail.actionType}
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-400 font-medium block mb-1">{t('settings.region.modules', 'Modul')}</span>
+                  <span className="text-ink-soft font-medium block mb-1">{t('settings.region.modules', 'Modul')}</span>
                   <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full border inline-block ${getStatusBadgeClass(selectedLogForDetail.module)}`}>
                     {selectedLogForDetail.module}
                   </span>
@@ -418,24 +418,24 @@ export const ActivityLogsView: React.FC = () => {
               </div>
 
               <div>
-                <span className="text-slate-500 font-semibold block mb-1.5">{t('logs.deskripsi_detail_teknis', 'Deskripsi / Detail Teknis:')}</span>
-                <div className="p-3.5 bg-slate-900 text-slate-100 rounded-xl font-mono text-xs leading-relaxed wrap-break-word whitespace-pre-wrap max-h-48 overflow-y-auto">
+                <span className="text-ink-soft font-semibold block mb-1.5">{t('logs.deskripsi_detail_teknis', 'Deskripsi / Detail Teknis:')}</span>
+                <div className="p-3.5 bg-ink text-on-solid rounded-xl font-mono text-xs leading-relaxed wrap-break-word whitespace-pre-wrap max-h-48 overflow-y-auto">
                   {selectedLogForDetail.description}
                 </div>
               </div>
 
               {(selectedLogForDetail.ipAddress || selectedLogForDetail.userAgent) && (
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1 text-xs text-slate-500">
+                <div className="pt-2 border-t border-hairline space-y-1 text-xs text-ink-soft">
                   {selectedLogForDetail.ipAddress && <div><span className="font-semibold">{t('logs.ip_address', 'IP Address:')}</span> {selectedLogForDetail.ipAddress}</div>}
                   {selectedLogForDetail.userAgent && <div className="truncate"><span className="font-semibold">{t('logs.user_agent', 'User Agent:')}</span> {selectedLogForDetail.userAgent}</div>}
                 </div>
               )}
             </div>
 
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+            <div className="p-4 bg-surface dark:bg-surface-2/50 border-t border-hairline flex justify-end">
               <button
                 onClick={() => setSelectedLogForDetail(null)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-xl font-semibold text-xs transition-all cursor-pointer"
+                className="inline-flex items-center px-4 min-h-8 bg-surface-2 hover:bg-ink-faint dark:hover:bg-surface-2 text-ink rounded-md font-semibold text-xs transition-all cursor-pointer"
               >
                 {t('redline.close', 'Tutup')}
               </button>

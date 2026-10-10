@@ -10,7 +10,7 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({ className, ch
     <AlphabeticalSelect
       ref={ref}
       className={cn(
-        "flex h-11 w-full appearance-none rounded-[var(--radius)] border border-[var(--input)] bg-[var(--card)] px-3 py-2 pr-8 text-sm text-[var(--foreground)] shadow-xs transition-colors",
+        "ds-input flex w-full appearance-none pr-8",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}

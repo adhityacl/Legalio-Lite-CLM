@@ -8,6 +8,7 @@ import { SUPPORTED_CURRENCIES, currencyLabel } from '@legalio/shared/currencyUti
 import { buildDueDiligenceChecklist, getCountryPack, getIndustryPack, localize, localizeName, type TenantSettings } from '@legalio/shared/policy';
 import { DueDiligenceChecklistEditor } from './DueDiligenceChecklistEditor';
 
+import { fieldControlClass } from '@legalio/ui-components/input';
 type SaveStatus =
   | { kind: 'idle' }
   | { kind: 'saving' }
@@ -24,11 +25,10 @@ function timezoneOptions(extra: string[]): string[] {
   return Array.from(new Set([...extra, 'UTC', ...all])).sort();
 }
 
-const fieldClass =
-  'block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-5 text-slate-900 focus:border-accent focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';
-const labelClass = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300';
-const hintClass = 'mt-1.5 text-xs leading-relaxed text-slate-600 dark:text-slate-400';
-const sectionClass = 'min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900';
+const fieldClass = fieldControlClass;
+const labelClass = 'mb-1.5 block text-sm font-medium text-ink ';
+const hintClass = 'mt-1.5 text-xs leading-relaxed text-ink-soft ';
+const sectionClass = 'min-w-0 rounded-2xl border border-hairline bg-surface p-5 shadow-sm  ';
 /**
  * A native `<legend>` renders flush with its `<fieldset>`'s own border-box
  * top edge, ignoring the fieldset's padding — so a legend inside a
@@ -43,7 +43,7 @@ const sectionClass = 'min-w-0 rounded-2xl border border-slate-200 bg-white p-5 s
  */
 const fieldsetResetClass = 'min-w-0 border-0 p-0 m-0';
 const legendClass = 'sr-only';
-const sectionHeadingClass = 'mb-4 text-base font-semibold text-slate-900 dark:text-white';
+const sectionHeadingClass = 'mb-4 text-base font-semibold text-ink dark:text-white';
 
 /**
  * Organization & region settings (PRD §2.1, §3.3.5): country and industry
@@ -133,7 +133,7 @@ export const OrganizationRegionSettings: React.FC = () => {
 
   if (status === 'error') {
     return (
-      <p role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+      <p role="alert" className="ds-alert ds-status-danger border">
         {t('settings.region.load_error', 'Organization settings could not be loaded.')}
       </p>
     );
@@ -150,21 +150,21 @@ export const OrganizationRegionSettings: React.FC = () => {
   return (
     <form onSubmit={submit} noValidate aria-busy={save.kind === 'saving' || status === 'loading'} className="flex min-w-0 flex-col gap-6">
       <div className={sectionClass}>
-        <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white">
+        <h3 className="flex items-center gap-2 text-lg font-bold text-ink dark:text-white">
           <Globe2 className="h-5 w-5 text-accent-text" aria-hidden="true" />
           {t('settings.region.title', 'Organization & region')}
         </h3>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+        <p className="mt-1 text-sm text-ink-soft">
           {t('settings.region.subtitle', 'These settings drive due-diligence checklists, currencies, dates, reminders, contract templates and AI prompts for {org}.', { org: policy.tenantName || '—' })}
         </p>
-        {!canEdit && <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">{t('settings.region.admin_only', 'Only administrators can change organization settings.')}</p>}
+        {!canEdit && <p className="mt-2 text-sm text-status-warning">{t('settings.region.admin_only', 'Only administrators can change organization settings.')}</p>}
       </div>
 
       <fieldset className={fieldsetResetClass} disabled={!canEdit}>
         <legend className={legendClass}>{t('settings.region.profile', 'Profile')}</legend>
         <div className={sectionClass}>
           <h3 className={sectionHeadingClass}>{t('settings.region.profile', 'Profile')}</h3>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 ds-grid">
             <div>
               <label htmlFor={ids.country} className={labelClass}>{t('settings.region.country', 'Country / jurisdiction pack')}</label>
               <AlphabeticalSelect id={ids.country} className={fieldClass} value={draft.countryCode} onChange={(e) => onCountryChange(e.target.value)}>
@@ -211,7 +211,7 @@ export const OrganizationRegionSettings: React.FC = () => {
         <legend className={legendClass}>{t('settings.region.lifecycle', 'Lifecycle & reminders')}</legend>
         <div className={sectionClass}>
           <h3 className={sectionHeadingClass}>{t('settings.region.lifecycle', 'Lifecycle & reminders')}</h3>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 ds-grid">
             <div>
               <label htmlFor={ids.expiry} className={labelClass}>{t('settings.region.expiry_days', 'Mark as "expiring soon" when this many days remain')}</label>
               <input id={ids.expiry} type="number" min={1} max={730} className={fieldClass} value={draft.expiryWarningDays} onChange={(e) => update('expiryWarningDays', Number(e.target.value) || 1)} />
@@ -237,7 +237,7 @@ export const OrganizationRegionSettings: React.FC = () => {
         <legend className={legendClass}>{t('settings.region.legal_defaults', 'Contract defaults')}</legend>
         <div className={sectionClass}>
           <h3 className={sectionHeadingClass}>{t('settings.region.legal_defaults', 'Contract defaults')}</h3>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 ds-grid">
             <div>
               <label htmlFor={ids.law} className={labelClass}>{t('settings.region.governing_law', 'Governing law')}</label>
               <input id={ids.law} className={fieldClass} value={draft.governingLaw || ''} placeholder={packLaw} onChange={(e) => update('governingLaw', e.target.value || undefined)} aria-describedby={`${ids.law}-hint`} />
@@ -256,9 +256,9 @@ export const OrganizationRegionSettings: React.FC = () => {
         <legend className={legendClass}>{t('settings.region.modules', 'Modules')}</legend>
         <div className={sectionClass}>
           <h3 className={sectionHeadingClass}>{t('settings.region.modules', 'Modules')}</h3>
-          <div className="grid gap-1 md:grid-cols-2">
+          <div className="grid gap-1 md:grid-cols-2 ds-grid">
             {moduleRows.map((row) => (
-              <label key={row.key} className="inline-flex min-h-11 items-center gap-3 text-sm text-slate-800 dark:text-slate-200">
+              <label key={row.key} className="inline-flex min-h-10 items-center gap-3 text-sm text-ink">
                 <input
                   type="checkbox"
                   className="h-4 w-4"
@@ -291,7 +291,7 @@ export const OrganizationRegionSettings: React.FC = () => {
         <button
           type="submit"
           disabled={!canEdit || save.kind === 'saving'}
-          className="ui-button ui-button-lg inline-flex cursor-pointer items-center justify-center gap-1.5 bg-accent-strong font-bold text-white transition-colors hover:bg-accent-strong-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
+          className="ui-button ui-button-lg inline-flex cursor-pointer items-center justify-center disabled:cursor-not-allowed disabled:opacity-60 ds-button ds-button-lg ds-button-default"
         >
           {save.kind === 'saving'
             ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
@@ -300,14 +300,14 @@ export const OrganizationRegionSettings: React.FC = () => {
         </button>
         <div aria-live="polite">
           {save.kind === 'saved' && (
-            <p className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300">
+            <p className="flex items-center gap-2 text-sm text-status-success">
               <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
               {t('settings.region.saved', 'Organization settings saved. Checklists and statuses were recalculated.')}
             </p>
           )}
         </div>
         {save.kind === 'error' && (
-          <p id={ids.error} role="alert" className="flex items-center gap-2 text-sm text-rose-700 dark:text-rose-300">
+          <p id={ids.error} role="alert" className="flex items-center gap-2 text-sm text-status-danger">
             <AlertCircle className="h-4 w-4" aria-hidden="true" />
             {save.message}
           </p>

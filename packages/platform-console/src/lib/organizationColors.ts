@@ -82,7 +82,7 @@ const darkLabelPalettes = new Set(['amber', 'yellow', 'lime', 'mint', 'sky']);
 
 /** Legacy custom colors remain usable until an organization chooses a Radix family. */
 export function organizationThemeTokens(color: string, dark: boolean): Record<string, string> {
-  const validColor = /^#[0-9a-f]{6}$/i.test(color) ? color : '#06C755';
+  const validColor = /^#[0-9a-f]{6}$/i.test(color) && color.toUpperCase() !== '#06C755' ? color : '#2653F6'; // #06C755 = legacy default green
   const palette = findAccentPalette(validColor);
   const scale = palette?.[dark ? 'dark' : 'light'];
   const paletteSolid = scale?.[8] || validColor;

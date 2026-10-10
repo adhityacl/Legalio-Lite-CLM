@@ -217,9 +217,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const totalNilaiKontrak = contractTotalInCurrency(activeContracts, viewCurrency);
   return (
-    <div className="space-y-4 animate-in fade-in-50 duration-200">
+    <div className="ds-page animate-in fade-in-50 duration-200">
       {noDepartmentAccess && (
-        <p role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+        <p role="status" className="ds-alert ds-status-warning border">
           {t('tb.no_department_access', 'You are not assigned to a department in this organization, so no records are shown. Ask an administrator to assign one.')}
         </p>
       )}
@@ -236,14 +236,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <NewsTicker />
 
       {/* Notice Period Tracker Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center">
+      <div className="bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
+        <div className="ds-section-header">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-500/30 shrink-0">
-              <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+            <div className="ds-icon-tile bg-status-danger-soft dark:bg-status-danger-soft/60 text-status-danger border border-status-danger-border dark:border-status-danger-border/30">
+              <AlertTriangle className="w-5 h-5 text-status-danger" />
             </div>
             <div>
-              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+              <h3 className="ds-section-title">
                 {t('dashboard.expiring_table_title')}
               </h3>
             </div>
@@ -251,16 +251,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         </div>
 
-        <div className="overflow-x-auto" role="region" tabIndex={0} aria-label={t('dashboard.expiring_table_title')}>
-          <table className="dashboard-data-table dashboard-document-table w-full min-w-[760px] text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-800/50">
-              <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 h-12">
+        <div className="overflow-x-auto ds-table-surface" role="region" tabIndex={0} aria-label={t('dashboard.expiring_table_title')}>
+          <table className="ds-table dashboard-data-table dashboard-document-table w-full min-w-[760px] text-left text-xs">
+            <thead className="bg-surface dark:bg-surface-2/50">
+              <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
                 <th scope="col" className="pl-6 pr-2 py-4 w-12 text-left align-middle">
                   <div className="flex items-center justify-start">
                     <input
                       type="checkbox"
                       aria-label={t('dashboard.select_all_requiring_action', 'Select all documents requiring action')}
-                      className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                      className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                       disabled
                     />
                   </div>
@@ -270,45 +270,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.partner', 'Partner')}</th>
                 <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.remaining_time', 'Sisa Waktu')}</th>
                 <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.end_date', 'Tanggal Berakhir')}</th>
-                <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
                   <div className="flex items-center justify-end">{t('dashboard.action', 'Aksi')}</div>
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-hairline dark:divide-slate-800">
+            <tbody className="divide-y divide-hairline">
               {requiringActionDocuments.length === 0 ? (
                 <TableEmptyState colSpan={7} />
               ) : (
                 requiringActionDocuments.map((document) => (
-                  <tr key={document.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <tr key={document.id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
                     <td className="pl-6 pr-2 py-4 text-left align-middle">
                       <div className="flex items-center justify-start">
                         <input
                           type="checkbox"
                           aria-label={t('dashboard.select_requiring_action', 'Select {name}', { name: document.name })}
-                          className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                          className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                           disabled
                         />
                       </div>
                     </td>
 
                     {/* 1. Document Name */}
-                    <td className="px-6 py-4 max-w-72 font-semibold text-slate-900 dark:text-slate-100">
+                    <td className="px-6 py-4 max-w-72 font-semibold text-ink">
                       <span className="line-clamp-2" title={document.name}>{document.name}</span>
                     </td>
 
                     {/* 2. Type */}
-                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 max-w-72">
+                    <td className="px-6 py-4 text-ink max-w-72">
                       {document.type}
                     </td>
 
                     {/* 3. Partner */}
-                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    <td className="px-6 py-4 text-ink whitespace-nowrap">
                       {document.partner}
                     </td>
 
                     {/* 4. Sisa Waktu */}
-                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    <td className="px-6 py-4 text-ink whitespace-nowrap">
                       <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap ${getStatusBadgeClass('Akan Berakhir')}`}>
                         <Clock className="w-3.5 h-3.5" />
                         <span>{document.remainingDays ?? Math.ceil((Date.parse(document.endDate) - Date.now()) / 86_400_000)} {t('dashboard.days_left', 'Days Left')}</span>
@@ -316,7 +316,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </td>
 
                     {/* 5. Tanggal Berakhir */}
-                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    <td className="px-6 py-4 text-ink whitespace-nowrap">
                       {new Date(document.endDate).toLocaleDateString(getActiveFormattingLocale(), {
                         day: 'numeric',
                         month: 'short',
@@ -330,7 +330,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         type="button"
                         onClick={document.onOpen}
                         aria-label={`${t('common.open', 'Open')} ${document.name}`}
-                        className="inline-flex size-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-emerald-700 dark:hover:bg-slate-800 dark:hover:text-emerald-300 cursor-pointer"
+                        className="inline-flex size-10 items-center justify-center rounded-md text-ink-soft hover:bg-surface-2 hover:text-status-success dark:hover:bg-surface-2 dark:hover:text-status-success cursor-pointer"
                       >
                         <ArrowUpRight className="size-4" />
                       </button>
@@ -345,14 +345,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       <RecentDocumentsTable contracts={scopedContracts} ios={scopedIOs} onNavigate={onNavigateTab} />
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center">
+      <div className="bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
+        <div className="ds-section-header">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 rounded-xl border border-amber-200 dark:border-amber-500/30 shrink-0">
-              <FileClock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <div className="ds-icon-tile bg-status-warning-soft dark:bg-status-warning-soft/60 text-status-warning border border-status-warning-border dark:border-status-warning-border/30">
+              <FileClock className="w-5 h-5 text-status-warning" />
             </div>
             <div>
-              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+              <h3 className="ds-section-title">
                 {t('dashboard.pending_review_table_title', 'Dokumen Menunggu Review (Pending Review)')}
               </h3>
             </div>
@@ -360,16 +360,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         </div>
 
-        <div className="overflow-x-auto" role="region" tabIndex={0} aria-label={t('dashboard.pending_review_table_title')}>
-          <table className="dashboard-data-table w-full min-w-[760px] text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-800/50">
-              <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 h-12">
+        <div className="overflow-x-auto ds-table-surface" role="region" tabIndex={0} aria-label={t('dashboard.pending_review_table_title')}>
+          <table className="ds-table dashboard-data-table w-full min-w-[760px] text-left text-xs">
+            <thead className="bg-surface dark:bg-surface-2/50">
+              <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
                 <th scope="col" className="pl-6 pr-2 py-4 w-12 text-left align-middle">
                   <div className="flex items-center justify-start">
                     <input
                       type="checkbox"
                       aria-label={t('dashboard.pilih_semua_dokumen_pending_review', 'Pilih semua dokumen pending review')}
-                      className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                      className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                       disabled
                     />
                   </div>
@@ -379,15 +379,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.doc_pending_col_modified_by', 'Diubah Oleh')}</th>
                 <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.doc_pending_col_created_at', 'Dibuat')}</th>
                 <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.doc_pending_col_modified_at', 'Terakhir Diubah')}</th>
-                <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-slate-700 dark:text-slate-300 align-middle">
+                <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
                   <div className="flex items-center justify-end">{t('dashboard.action', 'Aksi')}</div>
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-hairline dark:divide-slate-800">
+            <tbody className="divide-y divide-hairline">
               {pendingReviewState === 'loading' ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-6 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={7} className="px-6 py-6 text-center text-ink-soft">
                     {t('common.loading', 'Memuat Data...')}
                   </td>
                 </tr>
@@ -395,40 +395,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <TableEmptyState colSpan={7} />
               ) : (
                 pendingReviewDocs.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <tr key={doc.id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
                     <td className="pl-6 pr-2 py-4 text-left align-middle">
                       <div className="flex items-center justify-start">
                         <input
                           type="checkbox"
                           aria-label={t('dashboard.pilih_dokumen', 'Pilih dokumen {nama}', { nama: doc.name })}
-                          className="rounded border-slate-300 dark:border-slate-700 text-accent-text focus:ring-accent"
+                          className="rounded-sm border-hairline text-accent-text focus:ring-accent"
                           disabled
                         />
                       </div>
                     </td>
 
                     {/* 1. Nama Dokumen */}
-                    <td className="px-6 py-4 font-semibold text-slate-900 dark:text-slate-100 max-w-72">
+                    <td className="px-6 py-4 font-semibold text-ink max-w-72">
                       <span className="line-clamp-2" title={doc.name}>{doc.name}</span>
                     </td>
 
                     {/* 2. Jenis */}
-                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    <td className="px-6 py-4 text-ink whitespace-nowrap">
                       {typeLabel(t, doc.type)}
                     </td>
 
                     {/* 3. Diubah Oleh */}
-                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    <td className="px-6 py-4 text-ink whitespace-nowrap">
                       {doc.modified_by_name || '—'}
                     </td>
 
                     {/* 4. Dibuat */}
-                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    <td className="px-6 py-4 text-ink whitespace-nowrap">
                       {formatDateTime(doc.created_at, language)}
                     </td>
 
                     {/* 5. Terakhir Diubah */}
-                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    <td className="px-6 py-4 text-ink whitespace-nowrap">
                       {formatDateTime(doc.modified_at, language)}
                     </td>
 
@@ -438,7 +438,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         type="button"
                         onClick={() => onNavigateTab('create-contract')}
                         aria-label={`${t('common.open', 'Open')} ${doc.name}`}
-                        className="inline-flex size-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-emerald-700 dark:hover:bg-slate-800 dark:hover:text-emerald-300 cursor-pointer"
+                        className="inline-flex size-10 items-center justify-center rounded-md text-ink-soft hover:bg-surface-2 hover:text-status-success dark:hover:bg-surface-2 dark:hover:text-status-success cursor-pointer"
                       >
                         <ArrowUpRight className="size-4" />
                       </button>
@@ -453,27 +453,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Stacked Spending Chart Card (Under Table); hidden with the spending module (PRD §4.5.3) */}
       {policy.settings.modules.spending && (
-      <div className="min-w-0 bg-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-4 sm:p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+      <div className="ds-panel min-w-0 p-4 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-hairline">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-accent-soft text-accent-text rounded-xl border border-accent/30 shrink-0">
+            <div className="ds-icon-tile bg-accent-soft text-accent-text border border-accent/30">
               <DollarSign className="w-5 h-5 text-accent-text" />
             </div>
             <div>
-              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+              <h3 className="ds-section-title">
                 {t('dashboard.spending_title', 'Tren Spending')}
               </h3>
             </div>
           </div>
 
           {/* Chart Filters */}
-          <div className="mobile-filter-grid flex w-full min-w-0 flex-nowrap items-center gap-2 sm:w-auto">
+          <div className="mobile-filter-grid flex w-full min-w-0 flex-nowrap items-center gap-2 sm:w-auto ds-grid">
             {/* 1. Year Filter */}
             <select
               aria-label={t('ui.filter_year')}
               value={spendingFilterYear}
               onChange={(e) => setSpendingFilterYear(e.target.value)}
-              className="h-11 w-[92px] shrink-0 px-2 sm:h-9 sm:w-auto sm:px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-accent cursor-pointer"
+              className="ds-input w-[92px] shrink-0 sm:w-auto"
             >
               <option value="ALL">{t('dashboard.all_years', 'Semua Tahun')}</option>
               {availableSpendingYears.map((y) => (
@@ -488,7 +488,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               aria-label={t('ui.filter_category')}
               value={spendingCategoryFilter}
               onChange={(e) => setSpendingCategoryFilter(e.target.value)}
-              className="h-11 min-w-0 flex-1 px-2 sm:h-9 sm:w-48 sm:flex-none sm:px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-accent cursor-pointer truncate"
+              className="ds-input min-w-0 flex-1 sm:w-48 sm:flex-none cursor-pointer truncate"
             >
               <option value="ALL">{t('dashboard.all_categories', 'Semua Kategori')}</option>
               {categoryOptions.map((cat) => (
@@ -499,17 +499,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </AlphabeticalSelect>
 
             {/* 3. Currency Toggle */}
-            <div role="group" aria-label={t('settings.region.reporting_currency', 'Reporting currency')} className="flex h-11 shrink-0 items-center bg-slate-100 p-0.75 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div role="group" aria-label={t('settings.region.reporting_currency', 'Reporting currency')} className="ds-panel flex h-10 shrink-0 items-center p-0.75">
               {currencyViews.map((code) => (
                 <button
                   key={code}
                   type="button"
                   aria-pressed={viewCurrency === code}
                   onClick={() => setSpendingCurrencyView(code)}
-                  className={`ui-button ui-button-md font-extrabold transition-all cursor-pointer ${
+                  className={`ui-button ui-button-md cursor-pointer ds-button ds-button-md ds-button-default ${
                     viewCurrency === code
-                      ? 'bg-accent-strong text-white shadow-2xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                      ? ''
+                      : ''
                   }`}
                 >
                   {code}
@@ -520,8 +520,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Chart Visualization */}
-        <p className="text-sm text-slate-700 dark:text-slate-200">{t('ui.period_total')}: <strong className="tabular-nums">{formatView(spendingChart.total)}</strong> · {spendingFilterYear === 'ALL' ? t('dashboard.all_years') : spendingFilterYear} · {spendingCategoryFilter === 'ALL' ? t('dashboard.all_categories') : spendingCategoryFilter}</p>
-        {spendingChart.skipped > 0 && <p className="text-sm text-amber-800 dark:text-amber-300">{t('ui.skipped_dates', undefined, { count: spendingChart.skipped })}</p>}
+        <p className="text-sm text-ink">{t('ui.period_total')}: <strong className="tabular-nums">{formatView(spendingChart.total)}</strong> · {spendingFilterYear === 'ALL' ? t('dashboard.all_years') : spendingFilterYear} · {spendingCategoryFilter === 'ALL' ? t('dashboard.all_categories') : spendingCategoryFilter}</p>
+        {spendingChart.skipped > 0 && <p className="text-sm text-status-warning">{t('ui.skipped_dates', undefined, { count: spendingChart.skipped })}</p>}
         <div className="min-w-0 w-full" role="region" aria-label={t('dashboard.spending_title')}>
         <div className="w-full pt-2" style={stackKeys.length ? { height: 'clamp(240px, 28vw, 360px)' } : undefined}>
           {stackKeys.length === 0 ? (
@@ -564,7 +564,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       const formattedTotal = formatView(total);
 
                       return (
-                        <div className="bg-surface border border-hairline rounded-xl p-3 shadow-xl text-xs text-ink min-w-42.5">
+                        <div className="ds-panel p-3 text-xs text-ink min-w-42.5">
                           <div className="font-extrabold pb-2 mb-2 border-b border-hairline text-ink flex justify-between items-center gap-2">
                             <span>{formatChartMonth(String(label))}</span>
                             <span className="text-accent-text font-black">({formattedTotal})</span>

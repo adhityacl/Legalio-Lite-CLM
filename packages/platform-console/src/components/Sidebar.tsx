@@ -113,18 +113,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isTokenValid = isGoogleTokenValid();
   const tokenMinutes = getGoogleTokenRemainingMinutes();
 
-  let driveDotClass = 'bg-slate-400 ring-slate-400/20';
+  let driveDotClass = 'bg-ink-faint ring-hairline/20';
   let driveTooltip = 'Google Drive: Belum Dikonfigurasi (Unggahan file disimpan lokal)';
 
   if (isDriveConfigured) {
     if (!hasGoogleToken || !isTokenValid || tokenMinutes <= 0) {
-      driveDotClass = 'bg-red-500 ring-red-500/20';
+      driveDotClass = 'bg-status-danger ring-status-danger-border/20';
       driveTooltip = 'Google Drive: Sesi Google kadaluarsa atau belum terhubung';
     } else if (tokenMinutes <= 10) {
-      driveDotClass = 'bg-amber-500 ring-amber-500/20';
+      driveDotClass = 'bg-status-warning ring-status-warning-border/20';
       driveTooltip = `Google Drive: Token akan kadaluarsa (Sisa ~${tokenMinutes} menit)`;
     } else {
-      driveDotClass = 'bg-emerald-500 ring-emerald-500/20';
+      driveDotClass = 'bg-status-success ring-status-success-border/20';
       driveTooltip = `Google Drive: Terhubung & Siap (Sisa ~${tokenMinutes} menit)`;
     }
   }
@@ -155,7 +155,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: FileText,
       permission: 'document.view',
       badge: expiringContractsCount > 0 ? `${expiringContractsCount}` : null,
-      badgeColor: 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800',
+      badgeColor: 'bg-status-warning-soft text-status-warning dark:bg-status-warning-soft/60  border border-status-warning-border ',
     },
     ...(modules.commercialDocuments
       ? [{
@@ -171,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Bell,
       permission: 'document.view',
       badge: unresolvedNotifsCount > 0 ? `${unresolvedNotifsCount}` : null,
-      badgeColor: 'bg-red-100 text-red-900 dark:bg-red-950/60 dark:text-red-300 border border-red-200 dark:border-red-800',
+      badgeColor: 'bg-status-danger-soft text-status-danger dark:bg-status-danger-soft/60  border border-status-danger-border ',
     },
   ];
 
@@ -222,6 +222,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'admin-system-ai', label: t('settings.nav_ai', 'AI Model & Parser'), icon: AiIcon },
     { id: 'admin-system-smtp', label: t('tb.config_smtp', 'SMTP relay'), icon: Mail },
     { id: 'admin-system-ui-texts', label: t('tb.config_texts_short', 'UI texts'), icon: Languages },
+    { id: 'admin-system-design-system', label: t('designSystem.title', 'Design System'), icon: Sliders },
     { id: 'admin-system-backups', label: t('backup.title', 'Backup & Restore'), icon: Database },
     { id: 'admin-system-database', label: t('tb.config_maintenance', 'Database & reset'), icon: Database },
   ];
@@ -247,11 +248,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {navSections.map((section, sectionIdx) => (
           <div key={section.id} className="space-y-1">
             {!isCollapsed || isMobile ? (
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-3 pt-1 pb-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-ink-soft px-3 pt-1 pb-1">
                 {section.title}
               </p>
             ) : (
-              sectionIdx > 0 && <div className="w-8 h-px bg-slate-200 dark:bg-slate-800 mx-auto my-2" />
+              sectionIdx > 0 && <div className="w-8 h-px bg-surface-2 mx-auto my-2" />
             )}
 
             <nav className="space-y-1" role="navigation" aria-label={section.title}>
@@ -293,12 +294,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       className={`relative w-10 h-10 mx-auto flex items-center justify-center rounded-xl transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none ${
                         collapsedActive
                           ? 'bg-accent-strong text-white shadow-2xs font-semibold'
-                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                          : 'text-ink-soft hover:bg-surface-2 dark:hover:bg-surface-2 hover:text-ink dark:hover:text-white'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
                       {item.badge && (
-                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900">
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-status-danger text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
                           {item.badge}
                         </span>
                       )}
@@ -316,7 +317,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         } rounded-xl text-xs font-semibold transition-colors cursor-pointer select-none ${
                           isPartnerActive
                             ? 'bg-accent-strong text-white shadow-2xs'
-                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                            : 'text-ink hover:bg-surface-2 dark:hover:bg-surface-2 hover:text-ink dark:hover:text-white'
                         }`}
                       >
                         <button type="button" onClick={() => {
@@ -343,7 +344,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
 
                       {isPartnerExpanded && (
-                        <div className="pl-3.5 pr-1 space-y-0.5 border-l border-slate-200 dark:border-slate-800 ml-3.5 mt-0.5 animate-in fade-in duration-150">
+                        <div className="pl-3.5 pr-1 space-y-0.5 border-l border-hairline ml-3.5 mt-0.5 animate-in fade-in duration-150">
                           {partnerSubItems.map((sub) => {
                             const SubIcon = sub.icon;
                             const isSubActive = activeTab === sub.id;
@@ -358,7 +359,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 } rounded-lg text-xs font-medium transition-colors cursor-pointer text-left focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none ${
                                   isSubActive
                                     ? 'bg-accent-soft text-accent-text font-semibold'
-                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                                    : 'text-ink-soft hover:text-ink dark:hover:text-white hover:bg-surface-2 dark:hover:bg-surface-2/60'
                                 }`}
                               >
                                 <SubIcon className="w-3.5 h-3.5 shrink-0" />
@@ -383,7 +384,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         } rounded-xl text-xs font-semibold transition-colors cursor-pointer select-none ${
                           isAdminActive
                             ? 'bg-accent-strong text-white shadow-2xs'
-                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                            : 'text-ink hover:bg-surface-2 dark:hover:bg-surface-2 hover:text-ink dark:hover:text-white'
                         }`}
                       >
                         <button type="button" onClick={() => {
@@ -410,7 +411,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
 
                       {isAdminExpanded && (
-                        <div className="pl-3.5 pr-1 space-y-0.5 border-l border-slate-200 dark:border-slate-800 ml-3.5 mt-0.5 animate-in fade-in duration-150">
+                        <div className="pl-3.5 pr-1 space-y-0.5 border-l border-hairline ml-3.5 mt-0.5 animate-in fade-in duration-150">
                           {submenuItems.map((sub) => {
                             const SubIcon = sub.icon;
                             const subTab = sub.id;
@@ -428,7 +429,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 } rounded-lg text-xs font-medium transition-colors cursor-pointer text-left focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none ${
                                   isSubActive
                                     ? 'bg-accent-soft text-accent-text font-semibold'
-                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                                    : 'text-ink-soft hover:text-ink dark:hover:text-white hover:bg-surface-2 dark:hover:bg-surface-2/60'
                                 }`}
                               >
                                 <SubIcon className="w-3.5 h-3.5 shrink-0" />
@@ -454,7 +455,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     } rounded-xl text-xs font-semibold transition-colors cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none ${
                       isActive
                         ? 'bg-accent-strong text-white shadow-2xs'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-ink hover:bg-surface-2 dark:hover:bg-surface-2 hover:text-ink dark:hover:text-white'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -466,7 +467,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span
                         className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                           item.badgeColor ||
-                          'bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400 border border-red-200 dark:border-red-900/50'
+                          'bg-status-danger-soft text-status-danger dark:bg-status-danger-soft/50 border border-status-danger-border dark:border-status-danger-border/50'
                         }`}
                       >
                         {item.badge}
@@ -488,19 +489,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside
         className={`hidden md:flex ${
           isCollapsed ? 'w-18' : 'w-64'
-        } bg-white dark:bg-slate-900 flex-col shrink-0 text-slate-900 dark:text-slate-100 border-r border-slate-200/80 dark:border-slate-800 transition-all duration-300 ease-in-out z-30 sticky top-0 h-screen`}
+        } bg-surface flex-col shrink-0 text-ink border-r border-hairline/80 transition-all duration-300 ease-in-out z-30 sticky top-0 h-screen`}
       >
         {/* Workspace Switcher + Collapse Button */}
         <div
           className={`h-16 px-3 flex items-center ${
             isCollapsed ? 'justify-center' : 'justify-between gap-1.5'
-          } border-b border-slate-200/80 dark:border-slate-800 shrink-0 relative`}
+          } border-b border-hairline/80 shrink-0 relative`}
         >
           {isCollapsed ? (
             <button
               type="button"
               onClick={toggleCollapse}
-              className="min-w-11 min-h-11 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-accent-text dark:hover:text-[#06C755] flex items-center justify-center transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none"
+              className="min-w-11 min-h-11 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 text-ink-soft hover:text-accent-text dark:hover:text-accent-strong flex items-center justify-center transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none"
               title={t('nav.expand_menu', 'Perluas Menu')}
               aria-label={t('nav.expand_menu', 'Perluas Menu')}
             >
@@ -518,7 +519,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={toggleCollapse}
-                className="min-w-11 min-h-11 flex items-center justify-center p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none"
+                className="min-w-11 min-h-11 flex items-center justify-center p-2 hover:bg-surface-2 dark:hover:bg-surface-2 rounded-md text-ink-soft hover:text-ink dark:hover:text-white transition-colors cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none"
                 title={t('nav.collapse_menu', 'Kecilkan Menu')}
                 aria-label={t('nav.collapse_menu', 'Kecilkan Menu')}
               >
@@ -534,7 +535,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Footer: System Status Indicators & Version */}
-        <div className="p-3 border-t border-slate-200/80 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 select-none">
+        <div className="p-3 border-t border-hairline/80 text-xs text-ink-soft select-none">
           {isCollapsed ? (
             <div className="flex flex-col items-center gap-1.5 py-1">
               <div
@@ -551,7 +552,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 />
               </div>
 
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-medium text-ink-soft">
                 {t('nav.version', 'v2.5.0 • ACL')}
               </span>
             </div>
@@ -561,16 +562,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <Dialog.Root open={isMobileOpen} onOpenChange={(open) => { if (!open) onCloseMobile?.(); }}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 md:hidden animate-in" />
+          <Dialog.Overlay className="fixed inset-0 bg-ink/50 backdrop-blur-xs z-40 md:hidden animate-in" />
           <Dialog.Content
             onOpenAutoFocus={() => { returnFocusRef.current = document.activeElement as HTMLElement; }}
             onCloseAutoFocus={(event) => { event.preventDefault(); returnFocusRef.current?.focus(); }}
             aria-describedby={undefined}
-            className="mobile-drawer fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white dark:bg-slate-900 z-50 flex flex-col shadow-2xl border-r border-slate-200 dark:border-slate-800 md:hidden"
+            className="mobile-drawer fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-surface z-50 flex flex-col shadow-2xl border-r border-hairline md:hidden"
           >
-            <Dialog.Title className="sr-only">{t('nav.menu_navigasi_mobile', 'Menu Navigasi Mobile')}</Dialog.Title>
+            <Dialog.Title className="ds-modal-title flex items-center gap-2">{t('nav.menu_navigasi_mobile', 'Menu Navigasi Mobile')}</Dialog.Title>
         {/* Mobile Header: Workspace Switcher + Close Button */}
-        <div className="h-16 px-3 flex items-center justify-between gap-2 border-b border-slate-200/80 dark:border-slate-800 shrink-0">
+        <div className="h-16 px-3 flex items-center justify-between gap-2 border-b border-hairline/80 shrink-0">
           <div className="flex-1 min-w-0">
             <WorkspaceSwitcher
               isCollapsed={false}
@@ -584,7 +585,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             type="button"
             onClick={onCloseMobile}
-            className="min-w-11 min-h-11 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none"
+            className="min-w-11 min-h-11 rounded-md text-ink-soft hover:text-ink dark:hover:text-white hover:bg-surface-2 dark:hover:bg-surface-2 flex items-center justify-center transition-colors cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none"
             aria-label={t('nav.tutup_menu', 'Tutup Menu')}
           >
             <X className="w-5 h-5" />
@@ -597,7 +598,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Mobile Drawer Footer */}
-        <div className="p-3 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+        <div className="p-3 border-t border-hairline/80 flex items-center justify-between text-xs text-ink-soft">
           <div className="flex items-center gap-2">
             <div
               title={driveTooltip}

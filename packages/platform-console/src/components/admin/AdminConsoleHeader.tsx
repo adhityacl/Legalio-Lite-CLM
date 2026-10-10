@@ -84,18 +84,18 @@ export const AdminConsoleHeader: React.FC<AdminConsoleHeaderProps> = ({
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex min-h-14 items-center justify-between gap-4 border-b border-slate-200 px-4 dark:border-slate-800 sm:px-5">
+    <div className="ds-card">
+      <div className="ds-context-bar">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-strong text-white shadow-xs">
+          <div className="ds-context-bar-icon">
             {isSystemArea ? <Shield className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+            <h2 className="ds-page-heading">
               {isSystemArea ? t('admin.system_admin', 'System Admin') : t('admin.organization_admin', 'Organization Admin')}
             </h2>
             {!isSystemArea && (
-              <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+              <p className="ds-page-subtitle truncate">
                 {t('admin.active_organization_controls', 'Active organization controls')}
               </p>
             )}
@@ -120,7 +120,7 @@ export const AdminConsoleHeader: React.FC<AdminConsoleHeaderProps> = ({
       <div
         role="tablist"
         aria-label={isSystemArea ? t('admin.system_admin', 'System Admin') : t('admin.organization_admin', 'Organization Admin')}
-        className="admin-tab-list flex flex-wrap items-center gap-1 bg-slate-50/70 px-3 py-2 dark:bg-slate-950/30 sm:px-4"
+        className="admin-tab-list flex flex-wrap items-center gap-1 bg-surface/70 px-3 py-2 dark:bg-surface/30 sm:px-4"
       >
         {visibleNavItems.map((item, index) => {
           const Icon = item.icon;
@@ -140,8 +140,8 @@ export const AdminConsoleHeader: React.FC<AdminConsoleHeaderProps> = ({
               onKeyDown={(event) => handleTabKeyDown(event, index)}
               className={
                 isActive
-                  ? 'bg-white dark:bg-slate-800 text-accent-text shadow-xs font-semibold hover:bg-white dark:hover:bg-slate-800'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/60'
+                  ? ''
+                  : ''
               }
             >
               <Icon className="w-3.5 h-3.5 shrink-0" />

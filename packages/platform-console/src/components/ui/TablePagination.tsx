@@ -18,7 +18,7 @@ export interface TablePaginationProps {
 }
 
 // Same height as the rows-per-page select beside it (see docs/button-sizes.md).
-const pageButtonClass = 'ui-button ui-button-lg ui-button-icon border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-2xs';
+const pageButtonClass = 'ui-button ui-button-lg ui-button-icon border border-hairline  bg-surface  hover:bg-surface dark:hover:bg-surface-2/80 text-ink-soft  disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-2xs';
 
 export const TablePagination: React.FC<TablePaginationProps> = ({
   currentPage,
@@ -35,7 +35,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
 
   return (
     <div
-      className={`ds-table-pagination mobile-pagination p-4 sm:px-6 sm:py-3.5 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs select-none ${className}`}
+      className={`ds-table-pagination mobile-pagination p-4 sm:px-6 sm:py-3.5 border-t border-hairline bg-surface dark:bg-surface/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs select-none ${className}`}
     >
       {/* Left: Rows per page selector */}
       <div className="flex items-center gap-2.5">
@@ -44,27 +44,27 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
             aria-label={t('pagination.rows_per_page', 'Rows per page')}
             value={rowsPerPage}
             onChange={(e) => onRowsPerPageChange(Number(e.target.value))}
-            className="h-8 pl-3 pr-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:border-accent cursor-pointer appearance-none transition-colors shadow-2xs"
+            className="ds-input pl-3 pr-7 appearance-none"
           >
             {rowsPerPageOptions.map((opt) => (
               <option
                 key={opt}
                 value={opt}
-                className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
+                className="bg-surface text-ink"
               >
                 {opt}
               </option>
             ))}
           </select>
         </div>
-        <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+        <span className="text-xs text-ink-soft font-medium">
           {t('pagination.rows_per_page', 'Rows per page')}
         </span>
       </div>
 
       {/* Right: Page indicator & 4 Nav buttons */}
       <div className="flex items-center gap-4 sm:gap-6">
-        <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+        <span className="text-xs text-ink-soft font-medium">
           {t('pagination.page', 'Page')} {safeCurrentPage} {t('pagination.of', 'of')} {safeTotalPages}
         </span>
 

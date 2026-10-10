@@ -7,6 +7,7 @@ import { useTenantSettings } from '../../context/TenantSettingsContext';
 import { localize } from '@legalio/shared/policy';
 import { Button } from '@legalio/ui-components/button';
 
+import { fieldControlClass } from '@legalio/ui-components/input';
 type ResetMode = 'empty' | 'demo';
 
 type ResetStatus =
@@ -21,9 +22,8 @@ export interface ResetWorkspaceDialogProps {
   onDone: (message: string, defaultOrgId: string) => void;
 }
 
-const fieldClass =
-  'block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-5 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';
-const labelClass = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300';
+const fieldClass = fieldControlClass;
+const labelClass = 'mb-1.5 block text-sm font-medium text-ink ';
 
 /**
  * Superuser "reset & set up" flow: wipe business data, then either create
@@ -78,25 +78,25 @@ export const ResetWorkspaceDialog: React.FC<ResetWorkspaceDialogProps> = ({ open
   };
 
   const radioClass = (active: boolean) =>
-    `flex cursor-pointer gap-3 rounded-xl border p-3 ${active ? 'border-rose-400 bg-rose-50 dark:border-rose-700 dark:bg-rose-950/30' : 'border-slate-200 dark:border-slate-700'}`;
+    `flex cursor-pointer gap-3 rounded-xl border p-3 ${active ? 'border-status-danger-border bg-status-danger-soft  dark:bg-status-danger-soft/30' : 'border-hairline '}`;
 
   return (
     <Dialog.Root open={open} onOpenChange={(value) => status.kind !== 'running' && onOpenChange(value)}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-1000 bg-slate-900/60" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-1001 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
-          <div className="flex items-start gap-3 border-b border-rose-100 bg-rose-50/60 p-5 dark:border-rose-900/40 dark:bg-rose-950/20">
-            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-600 dark:text-rose-400" aria-hidden="true" />
+        <Dialog.Overlay className="fixed inset-0 z-1000 bg-ink/60" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-1001 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-surface shadow-2xl">
+          <div className="flex items-start gap-3 border-b border-status-danger-border bg-status-danger-soft/60 p-5 dark:border-status-danger-border/40 dark:bg-status-danger-soft/20">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-status-danger" aria-hidden="true" />
             <div className="flex-1">
-              <Dialog.Title className="text-base font-bold text-slate-900 dark:text-white">
+              <Dialog.Title className="ds-modal-title flex items-center gap-2">
                 {t('settings.reset_modal_title', 'Reset workspace')}
               </Dialog.Title>
-              <Dialog.Description className="mt-0.5 text-sm text-rose-700 dark:text-rose-300">
+              <Dialog.Description className="mt-0.5 text-sm text-status-danger">
                 {t('settings.reset_modal_warning', 'This action is permanent and cannot be undone.')}
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
-              <button type="button" className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-white/60 dark:hover:bg-slate-800" aria-label={t('common.close', 'Close')}>
+              <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-md text-ink-soft hover:bg-surface/60 dark:hover:bg-surface-2" aria-label={t('common.close', 'Close')}>
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </Dialog.Close>
@@ -104,25 +104,25 @@ export const ResetWorkspaceDialog: React.FC<ResetWorkspaceDialogProps> = ({ open
 
           <form onSubmit={submit} noValidate aria-busy={status.kind === 'running'} className="space-y-4 p-5">
             <fieldset className="space-y-2">
-              <legend className="mb-1 text-sm font-semibold text-slate-900 dark:text-white">{t('settings.reset.mode_label', 'After the reset')}</legend>
+              <legend className="mb-1 text-sm font-semibold text-ink dark:text-white">{t('settings.reset.mode_label', 'After the reset')}</legend>
               <label className={radioClass(mode === 'empty')}>
                 <input type="radio" name="reset-mode" value="empty" checked={mode === 'empty'} onChange={() => setMode('empty')} className="mt-1" />
                 <span>
-                  <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">{t('settings.reset.mode_empty', 'Start empty with my organization')}</span>
-                  <span className="block text-sm text-slate-600 dark:text-slate-400">{t('settings.reset.mode_empty_desc', 'Removes all data and creates one organization from the profile below.')}</span>
+                  <span className="block text-sm font-semibold text-ink">{t('settings.reset.mode_empty', 'Start empty with my organization')}</span>
+                  <span className="block text-sm text-ink-soft">{t('settings.reset.mode_empty_desc', 'Removes all data and creates one organization from the profile below.')}</span>
                 </span>
               </label>
               <label className={radioClass(mode === 'demo')}>
                 <input type="radio" name="reset-mode" value="demo" checked={mode === 'demo'} onChange={() => setMode('demo')} className="mt-1" />
                 <span>
-                  <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">{t('settings.reset.mode_demo', 'Reload the demo data')}</span>
-                  <span className="block text-sm text-slate-600 dark:text-slate-400">{t('settings.reset.mode_demo_desc', 'Removes all data and loads the Bank Mindiri demo workspace (Indonesia, Banking) again.')}</span>
+                  <span className="block text-sm font-semibold text-ink">{t('settings.reset.mode_demo', 'Reload the demo data')}</span>
+                  <span className="block text-sm text-ink-soft">{t('settings.reset.mode_demo_desc', 'Removes all data and loads the Bank Mindiri demo workspace (Indonesia, Banking) again.')}</span>
                 </span>
               </label>
             </fieldset>
 
             {mode === 'empty' && (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2 ds-grid">
                 <div className="sm:col-span-2">
                   <label htmlFor={ids.name} className={labelClass}>{t('settings.reset.org_name', 'Organization name')}</label>
                   <input
@@ -150,13 +150,13 @@ export const ResetWorkspaceDialog: React.FC<ResetWorkspaceDialogProps> = ({ open
               </div>
             )}
 
-            <p className="text-sm text-slate-600 dark:text-slate-400">{t('settings.reset.keeps_accounts', 'Login accounts, AI and e-mail provider settings are kept.')}</p>
+            <p className="text-sm text-ink-soft">{t('settings.reset.keeps_accounts', 'Login accounts, AI and e-mail provider settings are kept.')}</p>
 
             <div>
               <label htmlFor={ids.confirm} className={labelClass}>{t('settings.reset.confirm_hint', 'Type RESET NOW to confirm.')}</label>
               <input
                 id={ids.confirm}
-                className={`${fieldClass} font-mono`}
+                className={`ds-input${fieldClass} `}
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
                 placeholder={t('settings.reset_modal_input_placeholder', 'RESET NOW')}
@@ -165,16 +165,16 @@ export const ResetWorkspaceDialog: React.FC<ResetWorkspaceDialogProps> = ({ open
             </div>
 
             {status.kind === 'error' && (
-              <p id={ids.error} role="alert" className="text-sm text-rose-700 dark:text-rose-300">{status.message}</p>
+              <p id={ids.error} role="alert" className="ds-alert ds-status-danger border">{status.message}</p>
             )}
 
-            <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <div className="flex justify-end gap-2 border-t border-hairline pt-4">
               <Dialog.Close asChild>
                 <Button size="lg" type="button" variant="outline" disabled={status.kind === 'running'}>
                   {t('common.cancel', 'Cancel')}
                 </Button>
               </Dialog.Close>
-              <Button size="lg" type="submit" variant="destructive" className="gap-2" disabled={!canSubmit}>
+              <Button size="lg" type="submit" variant="destructive" className="" disabled={!canSubmit}>
                 {status.kind === 'running' ? (
                   <><RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />{t('settings.resetting_db', 'Resetting…')}</>
                 ) : (

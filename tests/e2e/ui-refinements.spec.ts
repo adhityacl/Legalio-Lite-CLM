@@ -536,10 +536,10 @@ test('header controls align, desktop checkboxes stay 14px and dropdowns share Co
   const controls = page.locator('.app-header-control:visible');
   for (const control of await controls.all()) {
     const bounds = await control.boundingBox();
-    expect(bounds!.width).toBe(44);
-    expect(bounds!.height).toBe(44);
+    expect(bounds!.width).toBe(40);
+    expect(bounds!.height).toBe(40);
   }
-  expect((await page.locator('.app-header-languages').boundingBox())!.height).toBe(44);
+  expect((await page.locator('.app-header-languages').boundingBox())!.height).toBe(40);
   for (const icon of await page.locator('.app-header-control > svg:visible').all()) {
     expect((await icon.boundingBox())!.height).toBe(18);
   }
@@ -556,7 +556,7 @@ test('header controls align, desktop checkboxes stay 14px and dropdowns share Co
     await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), dark);
     await page.getByRole('button', { name: /^Contracts(?: \d+)?$/ }).click();
     const reference = await dropdownStyle(page.getByRole('combobox').first());
-    expect(reference.height).toBe(44);
+    expect(reference.height).toBe(40);
     for (const select of await page.locator('select:visible').all()) expect(await dropdownStyle(select)).toEqual(reference);
     await page.getByRole('button', { name: 'My Documents', exact: true }).click();
     for (const select of await page.locator('select:visible').all()) expect(await dropdownStyle(select)).toEqual(reference);
@@ -574,8 +574,8 @@ test('header controls align, desktop checkboxes stay 14px and dropdowns share Co
   }
   await page.screenshot({ path: test.info().outputPath('controls-desktop-dark.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const control of await controls.all()) expect((await control.boundingBox())!.height).toBe(44);
-  for (const select of await page.locator('select:visible').all()) expect((await select.boundingBox())!.height).toBe(44);
+  for (const control of await controls.all()) expect((await control.boundingBox())!.height).toBe(40);
+  for (const select of await page.locator('select:visible').all()) expect((await select.boundingBox())!.height).toBe(40);
   await page.screenshot({ path: test.info().outputPath('controls-mobile-dark.png'), fullPage: true });
 });
 
@@ -594,7 +594,7 @@ test('single-line inputs and selects share one height and font size across core 
     expect(await fields.count()).toBeGreaterThan(1);
     const fontSizes = new Set<string>();
     for (const field of await fields.all()) {
-      expect((await field.boundingBox())!.height).toBe(44);
+      expect((await field.boundingBox())!.height).toBe(40);
       fontSizes.add(await field.evaluate(element => getComputedStyle(element).fontSize));
     }
     expect([...fontSizes]).toEqual(['14px']);
@@ -635,7 +635,7 @@ test('New Document matches primary action styling on desktop and mobile in both 
       const newDocument = page.getByRole('button', { name: 'New Document', exact: true });
       await expect(newDocument).toBeVisible();
       expect(await style(newDocument)).toEqual(reference);
-      expect((await newDocument.boundingBox())!.height).toBeGreaterThanOrEqual(width < 768 ? 44 : 36);
+      expect((await newDocument.boundingBox())!.height).toBeGreaterThanOrEqual(40);
     }
   }
 });
@@ -650,17 +650,17 @@ test('large, medium and small actions keep icon-and-text labels inside their but
     };
     await navigate('Main Dashboard');
     const currencies = page.getByRole('group', { name: 'Reporting currency', exact: true });
-    await expectReadableAction(currencies.getByRole('button', { name: 'USD', exact: true }), 36);
+    await expectReadableAction(currencies.getByRole('button', { name: 'USD', exact: true }), 40);
 
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: /^Contract and due diligence rules/ }).click();
     await page.setViewportSize({ width, height: 1000 });
-    await expectReadableAction(page.getByRole('button', { name: 'Save Profile', exact: true }), 44);
-    await expectReadableAction(page.getByRole('button', { name: 'Add checklist item', exact: true }), 44);
+    await expectReadableAction(page.getByRole('button', { name: 'Save Profile', exact: true }), 40);
+    await expectReadableAction(page.getByRole('button', { name: 'Add checklist item', exact: true }), 40);
 
     await navigate('Partners');
-    await expectReadableAction(page.getByRole('button', { name: 'Add Partner', exact: true }), 44);
+    await expectReadableAction(page.getByRole('button', { name: 'Add Partner', exact: true }), 40);
     await page.getByRole('button', { name: 'Add Partner', exact: true }).click();
     await expectReadableAction(page.getByRole('dialog').getByRole('button', { name: 'Add identifier', exact: true }), 36);
     await page.keyboard.press('Escape');
@@ -1040,7 +1040,7 @@ for (const width of [1440, 390]) {
         await expect(panel).toBeVisible();
         expect(await panel.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
         for (const button of await panel.locator('button:visible').all()) {
-          expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(width < 1024 ? 44 : 36);
+          expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(40);
         }
       }
       await expect(page.getByText('Select text in the document, then choose Comment or Suggest Change.', { exact: false })).toHaveCount(0);
@@ -1151,7 +1151,7 @@ async function undersizedPrimaryActions(page: import('@playwright/test').Page) {
       const filled = a > 0.5 && Math.max(r, g, b) - Math.min(r, g, b) > 60;
       if (!filled && (button as HTMLButtonElement).type !== 'submit') continue;
       const label = (button.getAttribute('aria-label') || button.textContent || '').trim();
-      if (!cardLevel.has(label) && Math.round(box.height) !== 44) issues.push(`${label} ${Math.round(box.height)}px`);
+      if (!cardLevel.has(label) && Math.round(box.height) !== 40) issues.push(`${label} ${Math.round(box.height)}px`);
     }
     return issues;
   });
