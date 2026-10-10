@@ -10,10 +10,10 @@ interface IndustryPackDetailsProps {
   defaultCurrency: string;
 }
 
-const listClass = 'list-disc space-y-1 pl-5 text-sm leading-relaxed text-ink ';
-const subtleClass = 'text-xs text-ink-soft ';
+const listClass = 'list-disc space-y-1 pl-5 text-sm leading-relaxed text-foreground ';
+const subtleClass = 'text-xs text-muted-foreground ';
 const chipClass =
-  'inline-flex items-center rounded-full border border-hairline bg-surface px-2.5 py-0.5 text-xs text-ink  dark:bg-surface-2 ';
+  'inline-flex items-center rounded-full border border-border bg-card px-2.5 py-0.5 text-xs text-foreground   ';
 
 interface AccordionItemProps {
   icon: LucideIcon;
@@ -25,15 +25,15 @@ interface AccordionItemProps {
 
 /** Native <details> keeps keyboard and screen-reader behaviour for free. Module-level so open state survives re-renders. */
 const AccordionItem: React.FC<AccordionItemProps> = ({ icon: Icon, title, summary, children }) => (
-  <details className="group border-b border-hairline last:border-b-0">
-    <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent dark:hover:bg-surface-2/60 [&::-webkit-details-marker]:hidden">
-      <Icon className="h-4 w-4 shrink-0 text-accent-text" aria-hidden="true" />
-      <span className="min-w-0 flex-1 text-sm font-semibold text-ink dark:text-white">{title}</span>
-      <span className="hidden text-xs text-ink-soft sm:inline">{summary}</span>
-      <ChevronDown className="h-4 w-4 shrink-0 text-ink-soft transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+  <details className="group border-b border-border last:border-b-0">
+    <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+      <Icon className="h-4 w-4 shrink-0 text-accent-foreground" aria-hidden="true" />
+      <span className="min-w-0 flex-1 text-sm font-semibold text-foreground ">{title}</span>
+      <span className="hidden text-xs text-muted-foreground sm:inline">{summary}</span>
+      <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
     </summary>
     <div className="px-4 pb-4 pt-1 sm:pl-11">
-      <p className="mb-2 text-xs text-ink-soft sm:hidden">{summary}</p>
+      <p className="mb-2 text-xs text-muted-foreground sm:hidden">{summary}</p>
       {children}
     </div>
   </details>
@@ -58,9 +58,9 @@ export const IndustryPackDetails: React.FC<IndustryPackDetailsProps> = ({ indust
   return (
     <section
       aria-labelledby="industry-pack-details-heading"
-      className="ds-panel min-w-0 p-5"
+      className="min-w-0 p-5"
     >
-      <h3 id="industry-pack-details-heading" className="text-base font-semibold text-ink dark:text-white">
+      <h3 id="industry-pack-details-heading" className="text-base font-semibold text-foreground ">
         {t('settings.region.industry_details_title', 'Isi industry pack: {name}', { name: localize(industry.name, language) })}
       </h3>
       <p className={`${subtleClass} mb-4 mt-1`}>
@@ -71,7 +71,7 @@ export const IndustryPackDetails: React.FC<IndustryPackDetailsProps> = ({ indust
         )}
       </p>
 
-      <div className="overflow-hidden rounded-xl border border-hairline">
+      <div className="overflow-hidden rounded-xl border border-border">
         <AccordionItem
           icon={FileStack}
           title={t('settings.region.industry_core_documents', 'Jenis Dokumen Utama (Core Documents)')}
@@ -110,7 +110,7 @@ export const IndustryPackDetails: React.FC<IndustryPackDetailsProps> = ({ indust
                 <li key={d.key}>
                   {localize(d.label, language)}
                   {d.required && <span className="ml-1.5 text-xs font-semibold text-status-danger">({t('settings.region.dd_required', 'Wajib')})</span>}
-                  {d.expires && <span className="ml-1.5 text-xs text-ink-soft">· {t('settings.region.industry_expires', 'ada masa berlaku')}</span>}
+                  {d.expires && <span className="ml-1.5 text-xs text-muted-foreground">· {t('settings.region.industry_expires', 'ada masa berlaku')}</span>}
                 </li>
               ))}
             </ul>
@@ -127,7 +127,7 @@ export const IndustryPackDetails: React.FC<IndustryPackDetailsProps> = ({ indust
         >
           <p className={`${subtleClass} mb-1`}>
             {t('settings.region.industry_regulators', 'Regulator ({country})', { country: localizeName(country.name, language) })}:{' '}
-            <span className="text-ink">
+            <span className="text-foreground">
               {regulators.length ? regulators.join(', ') : t('settings.region.industry_regulators_none', 'belum ada regulator khusus di pack negara ini')}
             </span>
           </p>
@@ -162,11 +162,11 @@ export const IndustryPackDetails: React.FC<IndustryPackDetailsProps> = ({ indust
           title={t('settings.region.industry_clauses', 'Klausul Kritis & Rule Engine Logic')}
           summary={t('settings.region.industry_summary_rules', '{n} aturan', { n: industry.criticalClauses.length })}
         >
-          <dl className="grid gap-x-6 gap-y-2 text-sm md:grid-cols-2 ds-grid">
+          <dl className="grid gap-x-6 gap-y-2 text-sm md:grid-cols-2">
             {industry.criticalClauses.map((c) => (
               <div key={c.clause.en} className="min-w-0">
-                <dt className="font-medium text-ink">{localize(c.clause, language)}</dt>
-                <dd className="leading-relaxed text-ink">{localize(c.rule, language)}</dd>
+                <dt className="font-medium text-foreground">{localize(c.clause, language)}</dt>
+                <dd className="leading-relaxed text-foreground">{localize(c.rule, language)}</dd>
               </div>
             ))}
           </dl>
@@ -177,13 +177,13 @@ export const IndustryPackDetails: React.FC<IndustryPackDetailsProps> = ({ indust
           title={t('settings.region.industry_currency_tax', 'Default Currency & Tax Identifier')}
           summary={`${defaultCurrency} · ${country.indirectTaxName}`}
         >
-          <dl className="grid gap-x-6 gap-y-2 text-sm md:grid-cols-3 ds-grid">
+          <dl className="grid gap-x-6 gap-y-2 text-sm md:grid-cols-3">
             <div>
               <dt className={subtleClass}>{t('settings.region.default_currency', 'Default currency')}</dt>
-              <dd className="font-medium text-ink">
+              <dd className="font-medium text-foreground">
                 {defaultCurrency}
                 {industry.contractCurrency && (
-                  <span className="ml-1 font-normal text-ink-soft">
+                  <span className="ml-1 font-normal text-muted-foreground">
                     {t('settings.region.industry_contract_currency', '(konvensi kontrak industri: {currency})', { currency: industry.contractCurrency })}
                   </span>
                 )}
@@ -191,11 +191,11 @@ export const IndustryPackDetails: React.FC<IndustryPackDetailsProps> = ({ indust
             </div>
             <div>
               <dt className={subtleClass}>{t('settings.region.industry_indirect_tax', 'Pajak tidak langsung')}</dt>
-              <dd className="font-medium text-ink">{country.indirectTaxName}</dd>
+              <dd className="font-medium text-foreground">{country.indirectTaxName}</dd>
             </div>
             <div>
               <dt className={subtleClass}>{t('settings.region.industry_identifiers', 'Identifier pihak lawan')}</dt>
-              <dd className="font-medium text-ink">
+              <dd className="font-medium text-foreground">
                 {identifierSchemes.length ? identifierSchemes.map((s) => localizeName(s.label, language)).join(' · ') : '—'}
               </dd>
             </div>

@@ -1,163 +1,43 @@
+import * as React from 'react';
 import { Badge as ModuixBadge } from '@moduix/react-tailwind/badge';
-import * as React from "react";
-import { cn } from "./utils";
+import { cn } from './utils';
 
-export type BadgeVariant =
-  | "default"
-  | "success"
-  | "secondary"
-  | "destructive"
-  | "danger"
-  | "warning"
-  | "outline"
-  | "purple"
-  | "info"
-  | "neutral";
+export { BadgeDot, BadgeLabel } from '@moduix/react-tailwind/badge';
 
-export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  className?: string;
-  children?: React.ReactNode;
-  variant?: BadgeVariant;
-  size?: "sm" | "md";
+/** Product status tones. moduix Badge ships neutral variants only, so tones are consumer utilities. */
+export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'special' | 'finance' | 'neutral';
+
+const toneClasses: Record<StatusTone, string> = {
+  success: 'border-status-success-border bg-status-success-soft text-status-success',
+  warning: 'border-status-warning-border bg-status-warning-soft text-status-warning',
+  danger: 'border-status-danger-border bg-status-danger-soft text-status-danger',
+  info: 'border-status-info-border bg-status-info-soft text-status-info',
+  special: 'border-status-special-border bg-status-special-soft text-status-special',
+  finance: 'border-status-finance-border bg-status-finance-soft text-status-finance',
+  neutral: 'border-border bg-muted text-muted-foreground',
+};
+
+const statusWords: Array<[StatusTone, (s: string) => boolean]> = [
+  ['success', s => ['aktif', 'active', 'lengkap', 'complete', 'available', 'recommended', 'berjalan', 'signed', 'success', 'excellent', 'sangat baik', 'bhi', 'never'].includes(s)],
+  ['warning', s => ['akan berakhir', 'expiring', 'warning', 'belum lengkap', 'incomplete', 'missing', 'recommended with notes', 'review', 'fair', 'baik', 'moderate', 'rare', 'pending'].includes(s) || s.includes('hari lagi') || s.includes('days left')],
+  ['danger', s => ['expired', 'kadaluarsa', 'terminated', 'not recommended', 'inactive', 'nonaktif', 'ditolak', 'danger', 'kurang baik', 'frequent', 'expensive', 'delete'].includes(s)],
+  ['info', s => ['legal', 'good', 'info', 'selesai', 'cheap', 'bha', 'create', 'io', 'contract'].includes(s)],
+  ['special', s => ['admin', 'addendum', 'auth', 'add_user'].includes(s)],
+  ['finance', s => ['finance', 'spending', 'invoice'].includes(s)],
+];
+
+/** Maps a stored status label (any supported language) to its tone. */
+export function statusTone(status: string): StatusTone {
+  const s = (status || '').toLowerCase().trim();
+  return statusWords.find(([, match]) => match(s))?.[0] ?? 'neutral';
 }
 
-export function getStatusBadgeClass(status: string): string {
-  const s = (status || "").toLowerCase().trim();
-  
-  // Success / Aktif / Lengkap / Recommended / Berjalan / Signed / BHI
-  if (
-    s === "aktif" ||
-    s === "active" ||
-    s === "lengkap" ||
-    s === "complete" ||
-    s === "available" ||
-    s === "recommended" ||
-    s === "berjalan" ||
-    s === "signed" ||
-    s === "success" ||
-    s === "excellent" ||
-    s === "sangat baik" ||
-    s === "bhi" ||
-    s === "never"
-  ) {
-    return "ds-status-success";
-  }
-
-  // Warning / Akan Berakhir / Belum Lengkap / Recommended with notes / Review / Fair / Moderate / Rare / Sisa Waktu
-  if (
-    s === "akan berakhir" ||
-    s === "expiring" ||
-    s === "warning" ||
-    s === "belum lengkap" ||
-    s === "incomplete" ||
-    s === "missing" ||
-    s === "recommended with notes" ||
-    s === "review" ||
-    s === "fair" ||
-    s === "baik" ||
-    s === "moderate" ||
-    s === "rare" ||
-    s === "pending" ||
-    s.includes("hari lagi") ||
-    s.includes("days left")
-  ) {
-    return "ds-status-warning";
-  }
-
-  // Danger / Expired / Kadaluarsa / Terminated / Not Recommended / Inactive / Ditolak / Frequent
-  if (
-    s === "expired" ||
-    s === "kadaluarsa" ||
-    s === "terminated" ||
-    s === "not recommended" ||
-    s === "inactive" ||
-    s === "nonaktif" ||
-    s === "ditolak" ||
-    s === "danger" ||
-    s === "kurang baik" ||
-    s === "frequent" ||
-    s === "expensive" ||
-    s === "delete"
-  ) {
-    return "ds-status-danger";
-  }
-
-  // Legal / Good / Info / Selesai / BHA / Create / IO
-  if (
-    s === "legal" ||
-    s === "good" ||
-    s === "info" ||
-    s === "selesai" ||
-    s === "cheap" ||
-    s === "bha" ||
-    s === "create" ||
-    s === "io" ||
-    s === "contract"
-  ) {
-    return "ds-status-info";
-  }
-
-  // Admin / Addendum / Purple
-  if (
-    s === "admin" ||
-    s === "addendum" ||
-    s === "auth" ||
-    s === "add_user"
-  ) {
-    return "ds-status-special";
-  }
-
-  // Finance / Cyan
-  if (s === "finance" || s === "spending" || s === "invoice") {
-    return "ds-status-finance";
-  }
-
-  // Default / Neutral / Draft / Module / Update
-  return "ds-status-neutral";
+export interface BadgeProps extends React.ComponentPropsWithoutRef<typeof ModuixBadge> {
+  tone?: StatusTone;
 }
 
-function Badge({ className, variant = "default", size = "md", children, ...props }: BadgeProps) {
-  let variantClass = "";
-  switch (variant) {
-    case "success":
-    case "default":
-      variantClass = "ds-status-success";
-      break;
-    case "warning":
-      variantClass = "ds-status-warning";
-      break;
-    case "destructive":
-    case "danger":
-      variantClass = "ds-status-danger";
-      break;
-    case "info":
-      variantClass = "ds-status-info";
-      break;
-    case "purple":
-      variantClass = "ds-status-special";
-      break;
-    case "secondary":
-    case "neutral":
-    case "outline":
-    default:
-      variantClass = "ds-status-neutral";
-      break;
-  }
-
-  return (
-    <ModuixBadge variant="outline"
-      className={cn(
-        "ds-badge",
-        size === "sm" ? "px-2.5 py-0.5 text-xs" : "px-3 py-0.5 text-xs",
-        variantClass,
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </ModuixBadge>
-  );
-}
-
-export { Badge };
-
+/** moduix Badge with a product status tone. */
+export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(({ tone = 'neutral', className, ...props }, ref) => (
+  <ModuixBadge ref={ref} variant="outline" data-tone={tone} className={cn(toneClasses[tone], className)} {...props} />
+));
+Badge.displayName = 'Badge';

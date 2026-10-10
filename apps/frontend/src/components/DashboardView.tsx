@@ -18,7 +18,7 @@ import {
   canViewSpending,
 } from '../lib/rbacScoping';
 import { getSavedCategories } from '../lib/categoryUtils';
-import { getStatusBadgeClass } from '@legalio/ui-components/badge';
+import { Badge, statusTone } from '@legalio/ui-components/badge';
 import { spendingReportingAllocations } from '@legalio/shared/spendingAllocations';
 import { NewsTicker } from './NewsTicker';
 import { useDocumentList } from '../features/documents/useDocumentList';
@@ -54,6 +54,13 @@ import {
   Legend,
 } from 'recharts';
 
+import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
+import { Button } from '@legalio/ui-components/button';
+import { NativeSelect } from '@legalio/ui-components/native-select';
+import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { CardHeader, Card } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
+import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
 interface DashboardViewProps {
   contracts: Contract[];
   ios: InsertionOrder[];
@@ -217,11 +224,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const totalNilaiKontrak = contractTotalInCurrency(activeContracts, viewCurrency);
   return (
-    <div className="ds-page animate-in fade-in-50 duration-200">
+    <div className="flex flex-col gap-6 animate-in fade-in-50 duration-200">
       {noDepartmentAccess && (
-        <p role="status" className="ds-alert ds-status-warning border">
-          {t('tb.no_department_access', 'You are not assigned to a department in this organization, so no records are shown. Ask an administrator to assign one.')}
-        </p>
+        <Alert status="warning" role="status">
+          <AlertContent>{t('tb.no_department_access', 'You are not assigned to a department in this organization, so no records are shown. Ask an administrator to assign one.')}</AlertContent>
+        </Alert>
       )}
       <DashboardOverview
         greeting={getGreetingText()}
@@ -236,244 +243,222 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <NewsTicker />
 
       {/* Notice Period Tracker Table */}
-      <div className="bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
-        <div className="ds-section-header">
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border pb-4">
           <div className="flex items-center gap-3">
-            <div className="ds-icon-tile bg-status-danger-soft dark:bg-status-danger-soft/60 text-status-danger border border-status-danger-border dark:border-status-danger-border/30">
+            <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-status-danger-soft text-status-danger border border-status-danger-border">
               <AlertTriangle className="w-5 h-5 text-status-danger" />
             </div>
             <div>
-              <h3 className="ds-section-title">
+              <Heading as="h3" size="sm" weight="semibold">
                 {t('dashboard.expiring_table_title')}
-              </h3>
+              </Heading>
             </div>
           </div>
 
-        </div>
+        </CardHeader>
 
-        <div className="overflow-x-auto ds-table-surface" role="region" tabIndex={0} aria-label={t('dashboard.expiring_table_title')}>
-          <table className="ds-table dashboard-data-table dashboard-document-table w-full min-w-[760px] text-left text-xs">
-            <thead className="bg-surface dark:bg-surface-2/50">
-              <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
-                <th scope="col" className="pl-6 pr-2 py-4 w-12 text-left align-middle">
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('dashboard.expiring_table_title')}>
+          <Table className="dashboard-data-table dashboard-document-table w-full min-w-[760px] text-left">
+            <TableHeader>
+              <TableRow>
+                <TableColumnHeader scope="col" className="w-12 text-left align-middle">
                   <div className="flex items-center justify-start">
-                    <input
-                      type="checkbox"
-                      aria-label={t('dashboard.select_all_requiring_action', 'Select all documents requiring action')}
-                      className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                      disabled
-                    />
+                    <Checkbox aria-label={t('dashboard.select_all_requiring_action', 'Select all documents requiring action')} disabled><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
-                </th>
-                <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.doc_pending_col_name', 'Document Name')}</th>
-                <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.doc_pending_col_type', 'Type')}</th>
-                <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.partner', 'Partner')}</th>
-                <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.remaining_time', 'Sisa Waktu')}</th>
-                <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.end_date', 'Tanggal Berakhir')}</th>
-                <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
+                </TableColumnHeader>
+                <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_name', 'Document Name')}</TableColumnHeader>
+                <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_type', 'Type')}</TableColumnHeader>
+                <TableColumnHeader scope="col">{t('dashboard.partner', 'Partner')}</TableColumnHeader>
+                <TableColumnHeader scope="col">{t('dashboard.remaining_time', 'Sisa Waktu')}</TableColumnHeader>
+                <TableColumnHeader scope="col">{t('dashboard.end_date', 'Tanggal Berakhir')}</TableColumnHeader>
+                <TableColumnHeader scope="col" className="text-right w-20 align-middle">
                   <div className="flex items-center justify-end">{t('dashboard.action', 'Aksi')}</div>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-hairline">
+                </TableColumnHeader>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {requiringActionDocuments.length === 0 ? (
                 <TableEmptyState colSpan={7} />
               ) : (
                 requiringActionDocuments.map((document) => (
-                  <tr key={document.id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
-                    <td className="pl-6 pr-2 py-4 text-left align-middle">
+                  <TableRow key={document.id}>
+                    <TableCell className="text-left align-middle">
                       <div className="flex items-center justify-start">
-                        <input
-                          type="checkbox"
-                          aria-label={t('dashboard.select_requiring_action', 'Select {name}', { name: document.name })}
-                          className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                          disabled
-                        />
+                        <Checkbox aria-label={t('dashboard.select_requiring_action', 'Select {name}', { name: document.name })} disabled><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* 1. Document Name */}
-                    <td className="px-6 py-4 max-w-72 font-semibold text-ink">
+                    <TableCell className="max-w-72">
                       <span className="line-clamp-2" title={document.name}>{document.name}</span>
-                    </td>
+                    </TableCell>
 
                     {/* 2. Type */}
-                    <td className="px-6 py-4 text-ink max-w-72">
+                    <TableCell className="max-w-72">
                       {document.type}
-                    </td>
+                    </TableCell>
 
                     {/* 3. Partner */}
-                    <td className="px-6 py-4 text-ink whitespace-nowrap">
+                    <TableCell className="whitespace-nowrap">
                       {document.partner}
-                    </td>
+                    </TableCell>
 
                     {/* 4. Sisa Waktu */}
-                    <td className="px-6 py-4 text-ink whitespace-nowrap">
-                      <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap ${getStatusBadgeClass('Akan Berakhir')}`}>
+                    <TableCell className="whitespace-nowrap">
+                      <Badge tone={statusTone('Akan Berakhir')}>
                         <Clock className="w-3.5 h-3.5" />
                         <span>{document.remainingDays ?? Math.ceil((Date.parse(document.endDate) - Date.now()) / 86_400_000)} {t('dashboard.days_left', 'Days Left')}</span>
-                      </span>
-                    </td>
+                      </Badge>
+                    </TableCell>
 
                     {/* 5. Tanggal Berakhir */}
-                    <td className="px-6 py-4 text-ink whitespace-nowrap">
+                    <TableCell className="whitespace-nowrap">
                       {new Date(document.endDate).toLocaleDateString(getActiveFormattingLocale(), {
                         day: 'numeric',
                         month: 'short',
                         year: 'numeric',
                       })}
-                    </td>
+                    </TableCell>
 
                     {/* 6. Aksi */}
-                    <td className="pl-2 pr-6 py-4 text-right align-middle w-20">
-                      <button
+                    <TableCell className="text-right align-middle w-20">
+                      <Button variant="secondary" size="icon-md"
                         type="button"
                         onClick={document.onOpen}
                         aria-label={`${t('common.open', 'Open')} ${document.name}`}
-                        className="inline-flex size-10 items-center justify-center rounded-md text-ink-soft hover:bg-surface-2 hover:text-status-success dark:hover:bg-surface-2 dark:hover:text-status-success cursor-pointer"
                       >
                         <ArrowUpRight className="size-4" />
-                      </button>
-                    </td>
-                  </tr>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </TableBody>
+          </Table>
+        </TableScrollArea>
+      </Card>
 
       <RecentDocumentsTable contracts={scopedContracts} ios={scopedIOs} onNavigate={onNavigateTab} />
 
-      <div className="bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
-        <div className="ds-section-header">
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border pb-4">
           <div className="flex items-center gap-3">
-            <div className="ds-icon-tile bg-status-warning-soft dark:bg-status-warning-soft/60 text-status-warning border border-status-warning-border dark:border-status-warning-border/30">
+            <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-status-warning-soft text-status-warning border border-status-warning-border">
               <FileClock className="w-5 h-5 text-status-warning" />
             </div>
             <div>
-              <h3 className="ds-section-title">
+              <Heading as="h3" size="sm" weight="semibold">
                 {t('dashboard.pending_review_table_title', 'Dokumen Menunggu Review (Pending Review)')}
-              </h3>
+              </Heading>
             </div>
           </div>
 
-        </div>
+        </CardHeader>
 
-        <div className="overflow-x-auto ds-table-surface" role="region" tabIndex={0} aria-label={t('dashboard.pending_review_table_title')}>
-          <table className="ds-table dashboard-data-table w-full min-w-[760px] text-left text-xs">
-            <thead className="bg-surface dark:bg-surface-2/50">
-              <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
-                <th scope="col" className="pl-6 pr-2 py-4 w-12 text-left align-middle">
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('dashboard.pending_review_table_title')}>
+          <Table className="dashboard-data-table w-full min-w-[760px] text-left">
+            <TableHeader>
+              <TableRow>
+                <TableColumnHeader scope="col" className="w-12 text-left align-middle">
                   <div className="flex items-center justify-start">
-                    <input
-                      type="checkbox"
-                      aria-label={t('dashboard.pilih_semua_dokumen_pending_review', 'Pilih semua dokumen pending review')}
-                      className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                      disabled
-                    />
+                    <Checkbox aria-label={t('dashboard.pilih_semua_dokumen_pending_review', 'Pilih semua dokumen pending review')} disabled><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
-                </th>
-                <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.doc_pending_col_name', 'Nama Dokumen')}</th>
-                <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.doc_pending_col_type', 'Jenis')}</th>
-                <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.doc_pending_col_modified_by', 'Diubah Oleh')}</th>
-                <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.doc_pending_col_created_at', 'Dibuat')}</th>
-                <th scope="col" className="px-6 py-4 font-bold">{t('dashboard.doc_pending_col_modified_at', 'Terakhir Diubah')}</th>
-                <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
+                </TableColumnHeader>
+                <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_name', 'Nama Dokumen')}</TableColumnHeader>
+                <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_type', 'Jenis')}</TableColumnHeader>
+                <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_modified_by', 'Diubah Oleh')}</TableColumnHeader>
+                <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_created_at', 'Dibuat')}</TableColumnHeader>
+                <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_modified_at', 'Terakhir Diubah')}</TableColumnHeader>
+                <TableColumnHeader scope="col" className="text-right w-20 align-middle">
                   <div className="flex items-center justify-end">{t('dashboard.action', 'Aksi')}</div>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-hairline">
+                </TableColumnHeader>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {pendingReviewState === 'loading' ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-6 text-center text-ink-soft">
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center">
                     {t('common.loading', 'Memuat Data...')}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : pendingReviewDocs.length === 0 ? (
                 <TableEmptyState colSpan={7} />
               ) : (
                 pendingReviewDocs.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
-                    <td className="pl-6 pr-2 py-4 text-left align-middle">
+                  <TableRow key={doc.id}>
+                    <TableCell className="text-left align-middle">
                       <div className="flex items-center justify-start">
-                        <input
-                          type="checkbox"
-                          aria-label={t('dashboard.pilih_dokumen', 'Pilih dokumen {nama}', { nama: doc.name })}
-                          className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                          disabled
-                        />
+                        <Checkbox aria-label={t('dashboard.pilih_dokumen', 'Pilih dokumen {nama}', { nama: doc.name })} disabled><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* 1. Nama Dokumen */}
-                    <td className="px-6 py-4 font-semibold text-ink max-w-72">
+                    <TableCell className="max-w-72">
                       <span className="line-clamp-2" title={doc.name}>{doc.name}</span>
-                    </td>
+                    </TableCell>
 
                     {/* 2. Jenis */}
-                    <td className="px-6 py-4 text-ink whitespace-nowrap">
+                    <TableCell className="whitespace-nowrap">
                       {typeLabel(t, doc.type)}
-                    </td>
+                    </TableCell>
 
                     {/* 3. Diubah Oleh */}
-                    <td className="px-6 py-4 text-ink whitespace-nowrap">
+                    <TableCell className="whitespace-nowrap">
                       {doc.modified_by_name || '—'}
-                    </td>
+                    </TableCell>
 
                     {/* 4. Dibuat */}
-                    <td className="px-6 py-4 text-ink whitespace-nowrap">
+                    <TableCell className="whitespace-nowrap">
                       {formatDateTime(doc.created_at, language)}
-                    </td>
+                    </TableCell>
 
                     {/* 5. Terakhir Diubah */}
-                    <td className="px-6 py-4 text-ink whitespace-nowrap">
+                    <TableCell className="whitespace-nowrap">
                       {formatDateTime(doc.modified_at, language)}
-                    </td>
+                    </TableCell>
 
                     {/* 6. Aksi */}
-                    <td className="pl-2 pr-6 py-4 text-right align-middle w-20">
-                      <button
+                    <TableCell className="text-right align-middle w-20">
+                      <Button variant="secondary" size="icon-md"
                         type="button"
                         onClick={() => onNavigateTab('create-contract')}
                         aria-label={`${t('common.open', 'Open')} ${doc.name}`}
-                        className="inline-flex size-10 items-center justify-center rounded-md text-ink-soft hover:bg-surface-2 hover:text-status-success dark:hover:bg-surface-2 dark:hover:text-status-success cursor-pointer"
                       >
                         <ArrowUpRight className="size-4" />
-                      </button>
-                    </td>
-                  </tr>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </TableBody>
+          </Table>
+        </TableScrollArea>
+      </Card>
 
       {/* Stacked Spending Chart Card (Under Table); hidden with the spending module (PRD §4.5.3) */}
       {policy.settings.modules.spending && (
-      <div className="ds-panel min-w-0 p-4 sm:p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-hairline">
+      <Card className="min-w-0 p-4 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="ds-icon-tile bg-accent-soft text-accent-text border border-accent/30">
-              <DollarSign className="w-5 h-5 text-accent-text" />
+            <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-primary text-accent-foreground border border-primary/30">
+              <DollarSign className="w-5 h-5 text-accent-foreground" />
             </div>
             <div>
-              <h3 className="ds-section-title">
+              <Heading as="h3" size="sm" weight="semibold">
                 {t('dashboard.spending_title', 'Tren Spending')}
-              </h3>
+              </Heading>
             </div>
           </div>
 
           {/* Chart Filters */}
-          <div className="mobile-filter-grid flex w-full min-w-0 flex-nowrap items-center gap-2 sm:w-auto ds-grid">
+          <div className="mobile-filter-grid flex w-full min-w-0 flex-nowrap items-center gap-2 sm:w-auto">
             {/* 1. Year Filter */}
-            <select
+            <NativeSelect
               aria-label={t('ui.filter_year')}
               value={spendingFilterYear}
               onChange={(e) => setSpendingFilterYear(e.target.value)}
-              className="ds-input w-[92px] shrink-0 sm:w-auto"
+              className="shrink-0 sm:w-auto"
             >
               <option value="ALL">{t('dashboard.all_years', 'Semua Tahun')}</option>
               {availableSpendingYears.map((y) => (
@@ -481,14 +466,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {t('dashboard.year_prefix', 'Tahun')} {y}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
 
             {/* 2. Category Filter */}
             <AlphabeticalSelect
               aria-label={t('ui.filter_category')}
               value={spendingCategoryFilter}
               onChange={(e) => setSpendingCategoryFilter(e.target.value)}
-              className="ds-input min-w-0 flex-1 sm:w-48 sm:flex-none cursor-pointer truncate"
+              className="min-w-0 flex-1 sm:w-48 sm:flex-none cursor-pointer truncate"
             >
               <option value="ALL">{t('dashboard.all_categories', 'Semua Kategori')}</option>
               {categoryOptions.map((cat) => (
@@ -499,28 +484,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </AlphabeticalSelect>
 
             {/* 3. Currency Toggle */}
-            <div role="group" aria-label={t('settings.region.reporting_currency', 'Reporting currency')} className="ds-panel flex h-10 shrink-0 items-center p-0.75">
+            <Card role="group" aria-label={t('settings.region.reporting_currency', 'Reporting currency')} className="flex h-10 shrink-0 items-center p-0.75">
               {currencyViews.map((code) => (
                 <button
                   key={code}
                   type="button"
                   aria-pressed={viewCurrency === code}
                   onClick={() => setSpendingCurrencyView(code)}
-                  className={`ui-button ui-button-md cursor-pointer ds-button ds-button-md ds-button-default ${
-                    viewCurrency === code
-                      ? ''
-                      : ''
-                  }`}
+                  className={` cursor-pointer ${
+ viewCurrency === code
+ ? ''
+ : ''
+ }`}
                 >
                   {code}
                 </button>
               ))}
-            </div>
+            </Card>
           </div>
         </div>
 
         {/* Chart Visualization */}
-        <p className="text-sm text-ink">{t('ui.period_total')}: <strong className="tabular-nums">{formatView(spendingChart.total)}</strong> · {spendingFilterYear === 'ALL' ? t('dashboard.all_years') : spendingFilterYear} · {spendingCategoryFilter === 'ALL' ? t('dashboard.all_categories') : spendingCategoryFilter}</p>
+        <p className="text-sm text-foreground">{t('ui.period_total')}: <strong className="tabular-nums">{formatView(spendingChart.total)}</strong> · {spendingFilterYear === 'ALL' ? t('dashboard.all_years') : spendingFilterYear} · {spendingCategoryFilter === 'ALL' ? t('dashboard.all_categories') : spendingCategoryFilter}</p>
         {spendingChart.skipped > 0 && <p className="text-sm text-status-warning">{t('ui.skipped_dates', undefined, { count: spendingChart.skipped })}</p>}
         <div className="min-w-0 w-full" role="region" aria-label={t('dashboard.spending_title')}>
         <div className="w-full pt-2" style={stackKeys.length ? { height: 'clamp(240px, 28vw, 360px)' } : undefined}>
@@ -564,10 +549,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       const formattedTotal = formatView(total);
 
                       return (
-                        <div className="ds-panel p-3 text-xs text-ink min-w-42.5">
-                          <div className="font-extrabold pb-2 mb-2 border-b border-hairline text-ink flex justify-between items-center gap-2">
+                        <Card className="p-3 text-xs text-foreground min-w-42.5">
+                          <div className="font-extrabold pb-2 mb-2 border-b border-border text-foreground flex justify-between items-center gap-2">
                             <span>{formatChartMonth(String(label))}</span>
-                            <span className="text-accent-text font-black">({formattedTotal})</span>
+                            <span className="text-accent-foreground font-black">({formattedTotal})</span>
                           </div>
                           <div className="space-y-1.5">
                             {payload.map((entry: any, index: number) => {
@@ -579,14 +564,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                 <div key={`item-${index}`} className="flex items-center justify-between gap-3 text-[11px]">
                                   <div className="flex items-center gap-1.5 min-w-0">
                                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color || entry.fill }} />
-                                    <span className="text-ink-soft font-medium truncate">{entry.name}</span>
+                                    <span className="text-muted-foreground font-medium truncate">{entry.name}</span>
                                   </div>
-                                  <span className="font-bold text-ink shrink-0">{formattedVal}</span>
+                                  <span className="font-bold text-foreground shrink-0">{formattedVal}</span>
                                 </div>
                               );
                             })}
                           </div>
-                        </div>
+                        </Card>
                       );
                     }
                     return null;
@@ -613,7 +598,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
         </div>
         </div>
-      </div>
+      </Card>
       )}
     </div>
   );

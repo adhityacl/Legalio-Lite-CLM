@@ -14,6 +14,7 @@ import {
   type ParseErrorCode,
 } from '@legalio/shared/googleCredentialFiles';
 
+import { Alert, AlertContent } from '@legalio/ui-components/alert';
 interface GoogleCredentialsDialogProps {
   /** Element that opens the dialog (rendered through Dialog.Trigger asChild). */
   trigger: React.ReactElement;
@@ -137,20 +138,20 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
           upload(kind, e.dataTransfer.files[0]);
         }}
         className={`ds-upload space-y-2 ${
-          dragOver === kind ? 'border-status-success-border bg-status-success-soft dark:bg-status-success-soft/30' : 'border-hairline '
-        }`}
+ dragOver === kind ? 'border-status-success-border bg-status-success-soft ' : 'border-border '
+ }`}
       >
-        <h3 id={`${inputId}-title`} className="text-sm font-semibold text-ink flex items-center gap-2">
-          <FileJson className="w-4 h-4 text-ink-soft" aria-hidden />
+        <h3 id={`${inputId}-title`} className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <FileJson className="w-4 h-4 text-muted-foreground" aria-hidden />
           {isSa ? t('google_setup.sa_title', '1. Service Account (JSON)') : t('google_setup.oauth_title', '2. OAuth Client (JSON)')}
         </h3>
-        <p className="text-xs text-ink-soft">
+        <p className="text-xs text-muted-foreground">
           {isSa
             ? t('google_setup.sa_help', 'Google Cloud Console → IAM & Admin → Service Accounts → pilih akun → Keys → Add key → JSON. Dipakai untuk Google Drive & Sheets.')
             : t('google_setup.oauth_help', 'Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Download JSON. Dipakai untuk menghubungkan akun Google pengguna.')}
         </p>
 
-        <p className="text-xs flex items-start gap-1.5 text-ink">
+        <p className="text-xs flex items-start gap-1.5 text-foreground">
           {info.source ? (
             <CheckCircle2 className="w-4 h-4 shrink-0 text-status-success" aria-hidden />
           ) : (
@@ -179,18 +180,18 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
         </p>
 
         {isSa && info.source && (
-          <p className="text-xs text-ink-soft">
+          <p className="text-xs text-muted-foreground">
             {t('google_setup.sa_share_hint', 'Bagikan folder Drive dan spreadsheet ke email service account di atas sebagai Editor.')}
           </p>
         )}
         {originMissing && (
-          <p role="status" className="ds-alert ds-status-warning border">
-            {t(
+          <Alert status="warning" role="status">
+            <AlertContent>{t(
               'google_setup.origin_missing',
               'Origin aplikasi ini ({origin}) belum ada di "Authorized JavaScript origins" OAuth client (terdaftar: {list}). Tambahkan di Google Cloud Console, lalu unduh & unggah ulang file ini.',
               { origin, list: data.oauthClient.javascript_origins.join(', ') || '—' },
-            )}
-          </p>
+            )}</AlertContent>
+          </Alert>
         )}
 
         <div className="flex flex-wrap items-center gap-2">
@@ -208,7 +209,7 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
           />
           <label
             htmlFor={inputId}
-            className="inline-flex items-center gap-1.5 px-3 min-h-10 rounded-md bg-accent-strong hover:bg-[#05a847] text-white text-xs font-bold cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-focus-visible:ring-offset-2 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-3 min-h-10 rounded-md bg-primary hover:bg-[#05a847] text-white text-xs font-bold cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"
           >
             <Upload className="w-3.5 h-3.5" aria-hidden />
             {busy === kind
@@ -217,24 +218,24 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
                 ? t('google_setup.replace', 'Ganti file')
                 : t('google_setup.choose', 'Pilih file JSON')}
           </label>
-          <span className="text-xs text-ink-soft">{t('google_setup.drop_hint', 'atau seret file ke kotak ini')}</span>
+          <span className="text-xs text-muted-foreground">{t('google_setup.drop_hint', 'atau seret file ke kotak ini')}</span>
           {info.source === 'upload' && (
-            <button
+            <Button variant="ghost" size="icon-md"
               type="button"
               onClick={() => remove(kind)}
               disabled={busy !== null}
               aria-label={t('google_setup.reset', 'Reset file yang diunggah')}
               title={t('google_setup.reset', 'Reset file yang diunggah')}
-              className="ml-auto inline-flex items-center justify-center h-10 w-10 rounded-md text-status-danger hover:bg-status-danger-soft dark:hover:bg-status-danger-soft/40 disabled:opacity-50 cursor-pointer"
+              className="ml-auto text-destructive"
             >
               <RotateCcw className="w-4 h-4" aria-hidden />
-            </button>
+            </Button>
           )}
         </div>
         {errors[kind] && (
-          <p id={errorId} role="alert" className="ds-alert ds-status-danger border">
-            {errors[kind]}
-          </p>
+          <Alert status="error" id={errorId} role="alert">
+            <AlertContent>{errors[kind]}</AlertContent>
+          </Alert>
         )}
       </section>
     );
@@ -252,23 +253,22 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
     >
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-1000 bg-ink/60" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-1000 w-[calc(100%-2rem)] max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-surface p-6 shadow-xl">
+        <Dialog.Overlay className="fixed inset-0 z-1000 bg-foreground/60" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-1000 w-[calc(100%-2rem)] max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-card p-6 shadow-xl">
           <div className="mb-2 flex items-start justify-between gap-4">
-            <Dialog.Title className="ds-modal-title flex items-center gap-2">
+            <Dialog.Title className="flex items-center gap-2">
               {t('google_setup.title', 'Hubungkan Google')}
             </Dialog.Title>
             <Dialog.Close asChild>
-              <button
+              <Button variant="secondary" size="icon-md"
                 type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-md text-ink-soft hover:bg-surface-2 dark:hover:bg-surface-2"
                 aria-label={t('common.close', 'Tutup')}
               >
                 <X className="h-4 w-4" aria-hidden="true" />
-              </button>
+              </Button>
             </Dialog.Close>
           </div>
-          <Dialog.Description className="mb-4 text-sm text-ink-soft">
+          <Dialog.Description className="mb-4 text-sm text-muted-foreground">
             {t(
               'google_setup.description',
               'Unggah dua file JSON yang diekspor dari Google Cloud Console. File disimpan di server, menggantikan variabel GOOGLE_* di .env, dan isinya yang rahasia tidak pernah ditampilkan lagi.',
@@ -279,17 +279,17 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
             <div role="status" className="space-y-3">
               <span className="sr-only">{t('common.loading', 'Memuat…')}</span>
               {[0, 1].map((i) => (
-                <div key={i} className="h-36 rounded-xl bg-surface-2 animate-pulse motion-reduce:animate-none" />
+                <div key={i} className="h-36 rounded-xl bg-muted animate-pulse motion-reduce:animate-none" />
               ))}
             </div>
           )}
           {state.status === 'error' && (
-            <div role="alert" className="ds-alert ds-status-danger border">
-              <p>{state.message}</p>
-              <Button size="lg" type="button" variant="outline" onClick={load}>
+            <Alert status="error" role="alert">
+              <AlertContent><p>{state.message}</p>
+              <Button type="button" variant="outline" onClick={load}>
                 {t('common.retry', 'Coba lagi')}
-              </Button>
-            </div>
+              </Button></AlertContent>
+            </Alert>
           )}
           {state.status === 'ready' && (
             <div className="space-y-3">
@@ -300,7 +300,7 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
 
           <div className="flex justify-end pt-4">
             <Dialog.Close asChild>
-              <Button size="lg" type="button">
+              <Button type="button">
                 {t('google_setup.done', 'Selesai')}
               </Button>
             </Dialog.Close>

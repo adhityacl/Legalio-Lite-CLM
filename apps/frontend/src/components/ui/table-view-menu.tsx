@@ -1,28 +1,45 @@
 import React from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
-import { Popover, PopoverContent, PopoverTrigger } from '@legalio/ui-components/popover';
+import { Button } from '@legalio/ui-components/button';
+import {
+  Menu, MenuCheckboxItem, MenuContent, MenuItemGroup, MenuItemGroupLabel, MenuItemIndicator, MenuItemText, MenuPositioner, MenuTrigger, MenuViewport,
+} from '@legalio/ui-components/menu';
 
-/** Column preferences use native checkboxes inside a keyboard-accessible popover. */
-export function TableViewMenu({ children, label, title, className = '' }: {
-  children: React.ReactNode; label?: string; title?: string; className?: string;
+/** Column visibility menu (moduix Data Table block pattern). Children are TableViewOption items. */
+export function TableViewMenu({ children, label, title, heading, className }: {
+  children: React.ReactNode; label?: string; title?: string; heading?: string; className?: string;
 }) {
   const { t } = useLanguage();
   const buttonLabel = label || t('io.view', 'View');
   const description = title || t('io.view_settings', 'Pengaturan Tampilan Kolom');
-  return <div className={`relative flex-initial ${className}`}>
-    <Popover>
-      <PopoverTrigger asChild>
-        <button type="button" title={description}
-          className="ui-button ui-button-lg flex items-center justify-center cursor-pointer active:scale-[0.98] w-full ds-button ds-button-lg ds-button-outline">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-ink-soft" aria-hidden />
-          <span>{buttonLabel}</span>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={8} aria-label={description}
-        className="w-52 max-h-[var(--radix-popover-content-available-height)] overflow-y-auto rounded-2xl py-2 px-0 shadow-xl">
-        {children}
-      </PopoverContent>
-    </Popover>
-  </div>;
+  return (
+    <Menu closeOnSelect={false} positioning={{ placement: 'bottom-end', gutter: 8 }}>
+      <MenuTrigger asChild>
+        <Button variant="outline" title={description} className={className}>
+          <SlidersHorizontal aria-hidden="true" />
+          {buttonLabel}
+        </Button>
+      </MenuTrigger>
+      <MenuPositioner>
+        <MenuContent aria-label={description}>
+          <MenuViewport>
+            <MenuItemGroup>
+              <MenuItemGroupLabel>{heading || t('io.toggle_columns', 'Toggle Kolom')}</MenuItemGroupLabel>
+              {children}
+            </MenuItemGroup>
+          </MenuViewport>
+        </MenuContent>
+      </MenuPositioner>
+    </Menu>
+  );
+}
+
+export function TableViewOption({ value, checked, onToggle, children }: { value: string; checked: boolean; onToggle: () => void; children: React.ReactNode }) {
+  return (
+    <MenuCheckboxItem value={value} checked={checked} onCheckedChange={onToggle}>
+      <MenuItemIndicator />
+      <MenuItemText>{children}</MenuItemText>
+    </MenuCheckboxItem>
+  );
 }

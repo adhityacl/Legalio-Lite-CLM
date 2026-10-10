@@ -1,1 +1,1 @@
-export { Skeleton } from '@moduix/react-tailwind/skeleton';
+export * from '@moduix/react-tailwind/skeleton';

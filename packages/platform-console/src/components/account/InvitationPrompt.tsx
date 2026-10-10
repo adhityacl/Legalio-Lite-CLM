@@ -3,9 +3,11 @@ import { AlertCircle, CheckCircle2, Loader2, X } from 'lucide-react';
 import { useIdentity } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTenant } from '../../context/TenantContext';
-import { ModalFrame, ModalTitle } from '../ui/modal-frame';
+import { ModalFrame } from '../ui/modal-frame';
 import { Button } from '@legalio/ui-components/button';
 
+import { DialogHeader, DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
+import { Alert, AlertContent } from '@legalio/ui-components/alert';
 const KEY = 'pendingInvitation';
 
 /** Captures `?accept_invite=<token>` once and keeps it through sign-in (sessionStorage, this tab only). */
@@ -80,15 +82,15 @@ export const InvitationPrompt: React.FC = () => {
 
   return (
     <ModalFrame onClose={close} className="max-w-md">
-      <div className="ds-section-header">
-        <ModalTitle className="ds-modal-title flex items-center gap-2">{t('tb.invitation_title', 'Organization invitation')}</ModalTitle>
-        <Button type="button" variant="ghost" size="icon" onClick={close} aria-label={t('common.close', 'Close')}><X className="h-4 w-4" aria-hidden="true" /></Button>
-      </div>
+      <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
+        <DialogTitle className="flex items-center gap-2">{t('tb.invitation_title', 'Organization invitation')}</DialogTitle>
+        <DialogCloseIcon aria-label={t('common.close', 'Close')} />
+      </DialogHeader>
       <div className="flex flex-col gap-4 p-5 text-sm">
-        <p className="text-ink">
+        <p className="text-foreground">
           {t('tb.invitation_body', 'You are invited to join {org} as {role}.', { org: preview.organizationName, role: preview.tenantRole })}
         </p>
-        {preview.status !== 'pending' && <p role="alert" className="ds-alert ds-status-danger border">{t('tb.invitation_not_pending', 'This invitation can no longer be accepted.')}</p>}
+        {preview.status !== 'pending' && <Alert status="error" role="alert"><AlertContent>{t('tb.invitation_not_pending', 'This invitation can no longer be accepted.')}</AlertContent></Alert>}
         {state.kind === 'done' && <p role="status" className="flex items-center gap-2 text-status-success"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />{t('tb.invitation_accepted', 'You joined the organization.')}</p>}
         {state.kind === 'error' && (
           <p role="alert" className="flex items-start gap-2 text-status-danger">
@@ -100,11 +102,11 @@ export const InvitationPrompt: React.FC = () => {
         )}
         <div className="flex flex-wrap justify-end gap-2">
           {state.kind === 'done' ? (
-            <Button type="button" size="lg" onClick={close}>{t('tb.done', 'Done')}</Button>
+            <Button type="button" onClick={close}>{t('tb.done', 'Done')}</Button>
           ) : (
             <>
-              <Button type="button" size="lg" variant="outline" onClick={close}>{t('tb.not_now', 'Not now')}</Button>
-              <Button type="button" size="lg" onClick={accept} disabled={preview.status !== 'pending' || state.kind === 'busy'}>
+              <Button type="button" variant="outline" onClick={close}>{t('tb.not_now', 'Not now')}</Button>
+              <Button type="button" onClick={accept} disabled={preview.status !== 'pending' || state.kind === 'busy'}>
                 {state.kind === 'busy' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{t('tb.accept_invitation', 'Accept invitation')}
               </Button>
             </>

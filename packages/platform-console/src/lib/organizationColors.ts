@@ -98,32 +98,15 @@ export function organizationThemeTokens(color: string, dark: boolean): Record<st
   const softText = readableBackground(text, soft);
   const disabledBackground = scale?.[3] || mix(validColor, surface, 0.86);
   const disabledForeground = readableBackground(text, disabledBackground);
+  // moduix theme primitives (https://moduix.dev/docs/tokens); semantic aliases, sidebar and chart colors derive from them.
   return {
-    '--brand-primary': validColor,
-    '--line-brand-green': paletteSolid,
-    '--line-brand-green-hover': hover,
-    '--line-brand-green-light': soft,
-    '--line-brand-green-dark': softText,
-    '--line-brand-green-text': softText,
-    '--line-brand-green-strong': solid,
-    '--color-accent-strong-hover': hover,
-    '--line-on-accent': foreground,
-    '--line-on-accent-hover': foreground,
-    '--primary': solid,
-    '--primary-foreground': foreground,
+    '--moduix-primary': solid,
+    '--moduix-primary-foreground': foreground,
+    '--moduix-accent': soft,
+    '--moduix-accent-foreground': softText,
+    '--moduix-ring': scale?.[7] || solid,
     '--primary-hover': hover,
-    '--primary-hover-foreground': foreground,
     '--primary-disabled': disabledBackground,
     '--primary-disabled-foreground': disabledForeground,
-    '--accent': soft,
-    '--accent-foreground': softText,
-    '--ring': scale?.[7] || solid,
-    '--sidebar-primary': solid,
-    '--sidebar-primary-foreground': foreground,
-    '--sidebar-accent': soft,
-    '--sidebar-accent-foreground': softText,
-    '--sidebar-ring': scale?.[7] || solid,
-    '--chart-1': solid,
-    '--table-selected': soft,
   };
 }

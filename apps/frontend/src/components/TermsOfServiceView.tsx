@@ -10,7 +10,7 @@ interface TermsOfServiceViewProps {
 const ACCENT = {
   icon: <Scale aria-hidden="true" className="w-4 h-4 text-status-info" />,
   num: 'text-status-info ',
-  toc: 'bg-status-info-soft/70 dark:bg-status-info-soft/20 border-status-info-border dark:border-status-info-border/40',
+  toc: 'bg-status-info-soft/70  border-status-info-border ',
   tocTitle: 'text-status-info ',
   button: 'bg-status-info hover:bg-status-info',
   link: 'text-status-info ',

@@ -1,4 +1,4 @@
-import { ModalFrame, ModalTitle } from './ui/modal-frame';
+import { ModalFrame } from './ui/modal-frame';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { useLanguage } from '../context/LanguageContext';
 import React, { useState } from 'react';
@@ -7,6 +7,11 @@ import { GitCommit, Upload, X } from 'lucide-react';
 import { DateInput } from './DateInput';
 import { formatContractFileName, formatIOFileName } from '@legalio/shared/fileNaming';
 
+import { Button } from '@legalio/ui-components/button';
+import { Input } from '@legalio/ui-components/input';
+import { Textarea } from '@legalio/ui-components/textarea';
+import { DialogHeader, DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
 interface AmendmentModalProps {
   initialParent?: Contract | InsertionOrder;
   contracts: Contract[];
@@ -203,27 +208,21 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
     <ModalFrame onClose={onClose} className="max-w-4xl w-full max-h-[92dvh] flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div>
-            <ModalTitle className="ds-modal-title flex items-center gap-2">
-              <GitCommit className="w-5 h-5 text-accent-text" />
+            <DialogTitle className="flex items-center gap-2">
+              <GitCommit className="w-5 h-5 text-accent-foreground" />
               <span>{t('amendments.tambah_addendum_amendment_baru', 'Tambah Addendum / Amendment Baru')}</span>
-            </ModalTitle>
+            </DialogTitle>
           </div>
-          <button aria-label={t('common.close', 'Tutup')}
-            type="button"
-            onClick={onClose}
-            className="inline-flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink size-8 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1 text-ink">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ds-grid">
+          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1 text-foreground">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block font-bold text-ink mb-1.5 text-xs">{t('amendments.tipe_induk_perjanjian', 'Tipe Induk Perjanjian *')}</label>
+                <label className="block font-bold text-foreground mb-1.5 text-xs">{t('amendments.tipe_induk_perjanjian', 'Tipe Induk Perjanjian *')}</label>
                 <AlphabeticalSelect
                   value={parentType}
                   onChange={(e) => {
@@ -231,7 +230,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                     setParentType(val);
                     setParentId(val === 'Contract' ? contracts[0]?.contract_id || '' : ios[0]?.io_id || '');
                   }}
-                  className="ds-input w-full cursor-pointer"
+                  className="w-full cursor-pointer"
                 >
                   <option value="Contract">{t('amendments.kontrak_utama_master_contract', 'Kontrak Utama (Master Contract)')}</option>
                   <option value="IO">{t('import.type_io', 'Insertion Order (IO)')}</option>
@@ -239,11 +238,11 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold text-ink mb-1.5 text-xs">{t('amendments.pilih_perjanjian_induk', 'Pilih Perjanjian Induk *')}</label>
+                <label className="block font-bold text-foreground mb-1.5 text-xs">{t('amendments.pilih_perjanjian_induk', 'Pilih Perjanjian Induk *')}</label>
                 <AlphabeticalSelect
                   value={parentId}
                   onChange={(e) => setParentId(e.target.value)}
-                  className="ds-input w-full cursor-pointer"
+                  className="w-full cursor-pointer"
                 >
                   {parentType === 'Contract'
                     ? contracts.map((c) => (
@@ -260,30 +259,30 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ds-grid">
-              <div>
-                <label className="block font-bold text-ink mb-1.5 text-xs">{t('form.contract.nomor_addendum', 'Nomor Addendum *')}</label>
-                <input
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field>
+                <FieldLabel>{t('form.contract.nomor_addendum', 'Nomor Addendum *')}</FieldLabel>
+                <Input
                   type="text"
                   required
                   value={nomorAddendum}
                   onChange={(e) => setNomorAddendum(e.target.value)}
-                  className="ds-input w-full"
+                  className="w-full"
                 />
-              </div>
+              </Field>
 
-              <div>
-                <label className="block font-bold text-ink mb-1.5 text-xs">{t('amendments.tanggal_addendum', 'Tanggal Addendum *')}</label>
+              <Field>
+                <FieldLabel>{t('amendments.tanggal_addendum', 'Tanggal Addendum *')}</FieldLabel>
                 <DateInput
                   required
                   value={tanggalAddendum}
                   onChange={(val) => setTanggalAddendum(val)}
                 />
-              </div>
+              </Field>
             </div>
 
             <div>
-              <label className="block font-bold text-ink mb-1.5 text-xs">{t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')}</label>
+              <label className="block font-bold text-foreground mb-1.5 text-xs">{t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')}</label>
               <div className="flex flex-wrap gap-1.5">
                 {['Nilai Kontrak / IO', 'Jangka Waktu Periode', 'Ruang Lingkup / Deliverables', 'Syarat Pembayaran', 'Pihak Berwenang'].map(
                   (f) => (
@@ -291,10 +290,10 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                       key={f}
                       onClick={() => handleFieldToggle(f)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer select-none transition-all ${
-                        selectedFields.includes(f)
-                          ? 'bg-accent-soft text-accent-text border-accent/40 font-bold'
-                          : 'bg-canvas dark:bg-surface-2/80 text-ink-soft border-hairline hover:border-hairline dark:hover:border-hairline'
-                      }`}
+ selectedFields.includes(f)
+ ? 'bg-primary text-accent-foreground border-primary/40 font-bold'
+ : 'bg-background text-muted-foreground border-border hover:border-border '
+ }`}
                     >
                       {selectedFields.includes(f) ? '✓ ' : '+ '}
                       {f}
@@ -304,82 +303,79 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
               </div>
             </div>
 
-            <div>
-              <label className="block font-bold text-ink mb-1.5 text-xs">
+            <Field>
+              <FieldLabel>
                 {t('form.contract.track_change_summary', 'Ringkasan Detail Track-Change Perubahan * (Wajib)')}
-              </label>
-              <textarea
+              </FieldLabel>
+              <Textarea
                 required
                 rows={4}
                 placeholder={t('form.amendment.notes_ph', 'Jelaskan secara eksplisit nilai lama -> nilai baru, tanggal lama -> tanggal baru, atau perubahan pasal...')}
                 value={ringkasanPerubahan}
                 onChange={(e) => setRingkasanPerubahan(e.target.value)}
-                className="ds-input w-full"
+                className="w-full"
               />
-            </div>
+            </Field>
 
             <div>
-              <label className="block font-bold text-ink mb-1.5 text-xs">{t('amendments.file_dokumen_addendum_pdf_drive_upload', 'File Dokumen Addendum PDF (Drive Upload)')}</label>
+              <label className="block font-bold text-foreground mb-1.5 text-xs">{t('amendments.file_dokumen_addendum_pdf_drive_upload', 'File Dokumen Addendum PDF (Drive Upload)')}</label>
               <div className="ds-upload text-center">
-                <Upload className="w-6 h-6 text-accent-text mx-auto mb-1.5" />
-                <p className="text-xs font-bold text-ink">
+                <Upload className="w-6 h-6 text-accent-foreground mx-auto mb-1.5" />
+                <p className="text-xs font-bold text-foreground">
                   {fileName ? t('amendments.file_terpilih', 'File terpilih: {fileName}', { fileName }) : t('amendments.pilih_file_pdf_addendum', 'Pilih File PDF Addendum')}
                 </p>
                 <div className="mt-2.5 flex flex-wrap items-center justify-center gap-3">
                   {fileData && (
-                    <button
+                    <Button variant="ghost" size="sm"
                       type="button"
                       onClick={handleParseAmendment}
                       disabled={isParsing}
-                      className="flex items-center gap-1.5 px-3 min-h-8 bg-accent-soft text-accent-text hover:bg-accent/20 font-semibold text-xs rounded-md transition-all cursor-pointer disabled:opacity-50"
                     >
                       {isParsing ? t('amendments.parsing', 'Parsing...') : t('amendments.parse_file', 'Parse File')}
-                    </button>
+                    </Button>
                   )}
                   <input
                     type="file"
                     accept=".pdf"
                     onChange={handleFileChange}
-                    className="w-[220px] text-xs text-ink-soft file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer"
+                    className="w-[220px] text-xs text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-primary file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
                   />
                 </div>
               </div>
             </div>
 
             {parseSuccessMsg && (
-              <div className="p-3 bg-status-success-soft dark:bg-status-success-soft/40 border border-status-success-border text-status-success rounded-xl text-xs font-semibold flex items-center gap-2">
+              <div className="p-3 bg-status-success-soft border border-status-success-border text-status-success rounded-xl text-xs font-semibold flex items-center gap-2">
                 <span>{parseSuccessMsg}</span>
               </div>
             )}
 
             {error && (
-              <div className="p-3.5 bg-status-danger-soft dark:bg-status-danger-soft/40 border border-status-danger-border text-status-danger rounded-xl text-xs font-bold flex items-center gap-2">
+              <div className="p-3.5 bg-status-danger-soft border border-status-danger-border text-status-danger rounded-xl text-xs font-bold flex items-center gap-2">
                 <span>⚠️</span>
                 <span>{error}</span>
               </div>
             )}
           </div>
 
-          <div className="p-4 sm:p-5 bg-surface border-t border-hairline flex items-center justify-between gap-2 shrink-0">
-            <span className="text-xs text-ink-soft font-medium hidden sm:inline">
+          <div className="p-4 sm:p-5 bg-card border-t border-border flex items-center justify-between gap-2 shrink-0">
+            <span className="text-xs text-muted-foreground font-medium hidden sm:inline">
               {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
             </span>
             <div className="flex items-center gap-2 ml-auto">
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={onClose}
-                className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
               >
                 {t('eval.btn_cancel', 'Batal')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 disabled={submitting || !isFormValid}
                 title={!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : ''}
-                className="ui-button ui-button-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-default"
               >
                 {submitting ? t('eval.btn_saving', 'Menyimpan...') : t('amendments.simpan_track_change_addendum', 'Simpan Track-Change Addendum')}
-              </button>
+              </Button>
             </div>
           </div>
         </form>

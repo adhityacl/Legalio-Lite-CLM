@@ -1,5 +1,5 @@
-import { ModalFrame, ModalTitle } from './ui/modal-frame';
-import { TableViewMenu } from './ui/table-view-menu';
+import { ModalFrame } from './ui/modal-frame';
+import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import React, { useState, useEffect } from 'react';
 import { getActiveFormattingLocale } from '@legalio/shared/currencyUtils';
@@ -12,9 +12,17 @@ import { getAuthHeaders } from '../lib/apiFetch';
 import { useLanguage } from '../context/LanguageContext';
 import { ActionMenu } from './ui/action-menu';
 import { TablePagination } from './ui/TablePagination';
-import { getStatusBadgeClass } from '@legalio/ui-components/badge';
+import { Badge, statusTone } from '@legalio/ui-components/badge';
 import { TableEmptyState } from './ui/table-empty-state';
 
+import { Button } from '@legalio/ui-components/button';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
+import { NativeSelect } from '@legalio/ui-components/native-select';
+import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
+import { Card } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
+import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
+import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
 export const ActivityLogsView: React.FC = () => {
   const { user } = useAuth();
   const { activeTenantId } = useTenant();
@@ -79,8 +87,8 @@ export const ActivityLogsView: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) setSelectedRows(filteredLogs.map(item => item.id || ''));
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedRows(filteredLogs.map(item => item.id || ''));
     else setSelectedRows([]);
   };
 
@@ -100,52 +108,52 @@ export const ActivityLogsView: React.FC = () => {
     switch (action) {
       case 'LOGIN':
       case 'UPLOAD_SUCCESS':
-        return getStatusBadgeClass('Active');
+        return statusTone('Active');
       case 'LOGOUT':
-        return getStatusBadgeClass('Neutral');
+        return statusTone('Neutral');
       case 'CREATE':
-        return getStatusBadgeClass('Legal');
+        return statusTone('Legal');
       case 'UPDATE':
       case 'DD_UPDATE':
-        return getStatusBadgeClass('Expiring');
+        return statusTone('Expiring');
       case 'DELETE':
       case 'UPLOAD_FAILED':
       case 'SYSTEM_ERROR':
-        return getStatusBadgeClass('Expired');
+        return statusTone('Expired');
       case 'ADD_USER':
-        return getStatusBadgeClass('Admin');
+        return statusTone('Admin');
       default:
-        return getStatusBadgeClass('Neutral');
+        return statusTone('Neutral');
     }
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="ds-page-bar">
+      <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
         <div>
-          <h2 className="ds-page-heading">
+          <Heading as="h2" size="lg" weight="semibold">
             <span>{t('logs.title', 'Log Aktivitas Sesi System')}</span>
-          </h2>
+          </Heading>
         </div>
 
-        <button
+        <Button
           onClick={loadLogs}
           disabled={loading}
-          className="ui-button ui-button-lg mobile-page-action cursor-pointer flex items-center shrink-0 disabled:opacity-50 ds-button ds-button-lg ds-button-default"
+          className="mobile-page-action shrink-0"
         >
           <RefreshCw className={`w-4 h-4 text-white ${loading ? 'animate-spin' : ''}`} />
           <span>{t('logs.refresh_btn', 'Refresh Log')}</span>
-        </button>
-      </div>
+        </Button>
+      </Card>
 
       {/* Filter Bar with 3 Dropdowns */}
-      <div className="ds-panel p-6 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5">
-        <div className="mobile-filter-grid flex flex-1 flex-wrap items-center gap-2 w-full ds-grid">
+      <Card className="p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5">
+        <div className="mobile-filter-grid flex flex-1 flex-wrap items-center gap-2 w-full">
           {/* 1 Box Search */}
-          <div className="relative flex-1 min-w-[200px] md:max-w-xs">
-            <Search className="w-4 h-4 text-ink-soft absolute left-3 top-2.5" />
-            <input aria-label={t('logs.search_placeholder', 'Cari aktivitas, email, atau deskripsi...')}
+          <InputGroup className="relative flex-1 min-w-[200px] md:max-w-xs">
+            <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+            <InputGroupInput aria-label={t('logs.search_placeholder', 'Cari aktivitas, email, atau deskripsi...')}
               type="text"
               placeholder={t('logs.search_placeholder', 'Cari aktivitas, email, atau deskripsi...')}
               value={searchTerm}
@@ -153,9 +161,8 @@ export const ActivityLogsView: React.FC = () => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="ds-input w-full pl-9 pr-3"
             />
-          </div>
+          </InputGroup>
 
           {/* Filter 1: Modul */}
           <AlphabeticalSelect aria-label={t('logs.all_modules', 'Semua Modul')}
@@ -164,7 +171,7 @@ export const ActivityLogsView: React.FC = () => {
               setFilterModule(e.target.value);
               setCurrentPage(1);
             }}
-            className="ds-input flex-1 min-w-[140px] appearance-none pr-8"
+            className="flex-1 min-w-[140px] appearance-none pr-8"
           >
             <option value="ALL">{t('logs.all_modules', 'Semua Modul')}</option>
             {moduleOptions.map((mod) => (
@@ -181,7 +188,7 @@ export const ActivityLogsView: React.FC = () => {
               setSelectedAction(e.target.value);
               setCurrentPage(1);
             }}
-            className="ds-input flex-1 min-w-[140px] appearance-none pr-8"
+            className="flex-1 min-w-[140px] appearance-none pr-8"
           >
             <option value="ALL">{t('logs.all_actions', 'Semua Jenis Aksi')}</option>
             <option value="LOGIN">{t('logs.login', 'LOGIN')}</option>
@@ -196,24 +203,24 @@ export const ActivityLogsView: React.FC = () => {
           </AlphabeticalSelect>
 
           {/* Filter 3: Periode Waktu */}
-          <select aria-label={t('notifications.all_time_periods', 'Semua Periode Waktu')}
+          <NativeSelect aria-label={t('notifications.all_time_periods', 'Semua Periode Waktu')}
             value={selectedTimeRange}
             onChange={(e) => {
               setSelectedTimeRange(e.target.value);
               setCurrentPage(1);
             }}
-            className="ds-input flex-1 min-w-[140px] appearance-none pr-8"
+            className="flex-1 min-w-[140px]"
           >
             <option value="ALL">{t('notifications.all_time_periods', 'Semua Periode Waktu')}</option>
             <option value="TODAY">{t('notifications.time_today', 'Hari Ini (24 Jam Terakhir)')}</option>
             <option value="7_DAYS">{t('notifications.time_7_days', '7 Hari Terakhir')}</option>
             <option value="30_DAYS">{t('notifications.time_30_days', '30 Hari Terakhir')}</option>
-          </select>
+          </NativeSelect>
         </div>
 
         {/* View Toggle */}
         <TableViewMenu className="ml-auto" title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
-          <div className="px-3.5 py-1.5 text-xs font-bold text-ink-soft uppercase tracking-wider mb-1 border-b border-hairline">
+          <div className="px-3.5 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 border-b border-border">
             {t('io.toggle_columns', 'Toggle Kolom')}
           </div>
           {Object.keys(visibleColumns).map((col) => {
@@ -225,119 +232,99 @@ export const ActivityLogsView: React.FC = () => {
             else if (col === 'detail') label = 'Rincian Deskripsi';
 
             return (
-              <label key={col} className="flex items-center gap-2.5 px-3.5 py-1.5 hover:bg-surface cursor-pointer text-xs font-medium text-ink select-none">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns[col]}
-                  onChange={() => toggleColumnVisibility(col)}
-                  className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                />
-                <span className="capitalize">{label}</span>
-              </label>
+              <TableViewOption key={col} value={col} checked={visibleColumns[col]} onToggle={() => toggleColumnVisibility(col)}>{label}</TableViewOption>
             );
           })}
         </TableViewMenu>
-      </div>
+      </Card>
 
       {/* Table */}
-      <div className="ds-table-surface bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto ds-table-surface bg-surface">
-          <table className="ds-table w-full text-left border-collapse text-xs bg-surface">
-            <thead className="bg-surface dark:bg-surface-2/50">
-              <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
-                <th scope="col" className="pl-6 pr-2 py-4 w-12 text-left align-middle">
+      <Card className="overflow-hidden">
+        <TableScrollArea>
+          <Table className="w-full text-left">
+            <TableHeader>
+              <TableRow>
+                <TableColumnHeader scope="col" className="w-12 text-left align-middle">
                   <div className="flex items-center justify-start">
-                    <input
-                      type="checkbox"
-                      aria-label={t('logs.pilih_semua_log_aktivitas', 'Pilih semua log aktivitas')}
-                      onChange={handleSelectAll}
-                      checked={selectedRows.length > 0 && selectedRows.length === currentLogs.length}
-                      className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                    />
+                    <Checkbox checked={selectedRows.length > 0 && selectedRows.length === currentLogs.length} aria-label={t('logs.pilih_semua_log_aktivitas', 'Pilih semua log aktivitas')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
-                </th>
-                {visibleColumns.time && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('logs.col_time', 'Waktu')}</th>}
-                {visibleColumns.user && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('logs.col_user', 'Pengguna')}</th>}
-                {visibleColumns.action && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('logs.col_action', 'Jenis Aksi')}</th>}
-                {visibleColumns.module && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('logs.col_module', 'Modul')}</th>}
-                {visibleColumns.detail && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('logs.col_detail', 'Rincian Deskripsi')}</th>}
-                <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
+                </TableColumnHeader>
+                {visibleColumns.time && <TableColumnHeader scope="col" className="text-left align-middle">{t('logs.col_time', 'Waktu')}</TableColumnHeader>}
+                {visibleColumns.user && <TableColumnHeader scope="col" className="text-left align-middle">{t('logs.col_user', 'Pengguna')}</TableColumnHeader>}
+                {visibleColumns.action && <TableColumnHeader scope="col" className="text-left align-middle">{t('logs.col_action', 'Jenis Aksi')}</TableColumnHeader>}
+                {visibleColumns.module && <TableColumnHeader scope="col" className="text-left align-middle">{t('logs.col_module', 'Modul')}</TableColumnHeader>}
+                {visibleColumns.detail && <TableColumnHeader scope="col" className="text-left align-middle">{t('logs.col_detail', 'Rincian Deskripsi')}</TableColumnHeader>}
+                <TableColumnHeader scope="col" className="text-right w-20 align-middle">
                   <div className="flex items-center justify-end">{t('dashboard.action', 'Aksi')}</div>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-hairline">
+                </TableColumnHeader>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {loading ? (
-                <tr>
-                  <td colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} className="py-12 text-center text-ink-soft">
+                <TableRow>
+                  <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} className="text-center">
                     {t('logs.loading', 'Memuat log aktivitas...')}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : currentLogs.length === 0 ? (
                 <TableEmptyState colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} />
               ) : (
                 currentLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
-                    <td className="pl-6 pr-2 py-4 text-left align-middle">
+                  <TableRow key={log.id}>
+                    <TableCell className="text-left align-middle">
                       <div className="flex items-center justify-start">
-                        <input
-                          type="checkbox"
-                          aria-label={t('logs.pilih_log_oleh', 'Pilih log {actionType} oleh {userEmail}', { actionType: log.actionType, userEmail: log.userName || log.userEmail })}
-                          checked={selectedRows.includes(log.id || '')}
-                          onChange={() => handleSelectRow(log.id || '')}
-                          className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                        />
+                        <Checkbox aria-label={t('logs.pilih_log_oleh', 'Pilih log {actionType} oleh {userEmail}', { actionType: log.actionType, userEmail: log.userName || log.userEmail })} checked={selectedRows.includes(log.id || '')} onCheckedChange={() => handleSelectRow(log.id || '')}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* 1. Waktu */}
                     {visibleColumns.time && (
-                      <td className="py-4 px-4 text-xs font-semibold text-ink whitespace-nowrap text-left">
+                      <TableCell className="whitespace-nowrap text-left">
                         {new Date(log.timestamp).toLocaleString(getActiveFormattingLocale(), {
                           dateStyle: 'medium',
                           timeStyle: 'short',
                         })}
-                      </td>
+                      </TableCell>
                     )}
 
                     {/* 2. Pengguna */}
                     {visibleColumns.user && (
-                      <td className="py-4 px-4 text-xs font-normal text-ink whitespace-nowrap text-left">
+                      <TableCell className="whitespace-nowrap text-left">
                         {log.userName || log.userEmail}
-                      </td>
+                      </TableCell>
                     )}
 
                     {/* 3. Jenis Aksi */}
                     {visibleColumns.action && (
-                      <td className="py-4 px-4 text-left">
-                        <span
-                          className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap ${getActionBadge(
-                            log.actionType
-                          )}`}
+                      <TableCell className="text-left">
+                        <Badge
+                          tone={getActionBadge(
+ log.actionType
+ )}
                         >
                           {log.actionType}
-                        </span>
-                      </td>
+                        </Badge>
+                      </TableCell>
                     )}
 
                     {/* 4. Modul */}
                     {visibleColumns.module && (
-                      <td className="py-4 px-4 text-xs font-normal text-ink uppercase whitespace-nowrap text-left">
-                        <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center justify-center whitespace-nowrap shadow-2xs ${getStatusBadgeClass(log.module)}`}>
+                      <TableCell className="uppercase whitespace-nowrap text-left">
+                        <Badge tone={statusTone(log.module)}>
                           {log.module}
-                        </span>
-                      </td>
+                        </Badge>
+                      </TableCell>
                     )}
 
                     {/* 5. Rincian Deskripsi */}
                     {visibleColumns.detail && (
-                      <td className="py-4 px-4 max-w-sm text-left text-xs font-normal text-ink">
+                      <TableCell className="max-w-sm text-left">
                         <p className="line-clamp-1" title={log.description}>{log.description}</p>
-                      </td>
+                      </TableCell>
                     )}
 
                     {/* 6. Aksi */}
-                    <td className="pl-2 pr-6 py-4 text-right align-middle w-20">
+                    <TableCell className="text-right align-middle w-20">
                       <div className="flex items-center justify-end">
                         <ActionMenu
                           items={[
@@ -349,13 +336,13 @@ export const ActivityLogsView: React.FC = () => {
                           ]}
                         />
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableScrollArea>
 
         <TablePagination
           currentPage={currentPage}
@@ -367,30 +354,29 @@ export const ActivityLogsView: React.FC = () => {
             setCurrentPage(1);
           }}
         />
-      </div>
+      </Card>
 
       {/* Detail Modal */}
       {selectedLogForDetail && (
         <ModalFrame onClose={() => setSelectedLogForDetail(null)} className="max-w-lg w-full overflow-hidden">
 
-            <div className="ds-section-header">
+            <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
               <div>
-                <ModalTitle className="ds-modal-title flex items-center gap-2">{t('logs.rincian_log_aktivitas', 'Rincian Log Aktivitas')}</ModalTitle>
-                <p className="text-xs text-ink-soft mt-0.5">{t('logs.id', 'ID: {id}', { id: selectedLogForDetail.id })}</p>
+                <DialogTitle className="flex items-center gap-2">{t('logs.rincian_log_aktivitas', 'Rincian Log Aktivitas')}</DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('logs.id', 'ID: {id}', { id: selectedLogForDetail.id })}</p>
               </div>
-              <button aria-label={t('common.close', 'Tutup')}
+              <Button variant="ghost" aria-label={t('common.close', 'Tutup')}
                 onClick={() => setSelectedLogForDetail(null)}
-                className="text-ink-soft hover:text-ink-soft dark:hover:text-ink p-1 rounded-md transition-colors"
               >
                 ✕
-              </button>
-            </div>
+              </Button>
+            </DialogHeader>
 
             <div className="p-6 space-y-4 text-xs">
-              <div className="ds-panel grid grid-cols-2 gap-4 p-4 ds-grid">
+              <Card className="grid grid-cols-2 gap-4 p-4">
                 <div>
-                  <span className="text-ink-soft font-medium block mb-1">{t('notifications.col_time', 'Waktu')}</span>
-                  <span className="font-semibold text-ink">
+                  <span className="text-muted-foreground font-medium block mb-1">{t('notifications.col_time', 'Waktu')}</span>
+                  <span className="font-semibold text-foreground">
                     {new Date(selectedLogForDetail.timestamp).toLocaleString(getActiveFormattingLocale(), {
                       dateStyle: 'full',
                       timeStyle: 'medium',
@@ -398,47 +384,46 @@ export const ActivityLogsView: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="text-ink-soft font-medium block mb-1">{t('admin.generic_user', 'Pengguna')}</span>
-                  <span className="font-semibold text-ink">
+                  <span className="text-muted-foreground font-medium block mb-1">{t('admin.generic_user', 'Pengguna')}</span>
+                  <span className="font-semibold text-foreground">
                     {selectedLogForDetail.userName || selectedLogForDetail.userEmail} ({selectedLogForDetail.role})
                   </span>
                 </div>
                 <div>
-                  <span className="text-ink-soft font-medium block mb-1">{t('logs.col_action', 'Jenis Aksi')}</span>
-                  <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full border inline-block ${getActionBadge(selectedLogForDetail.actionType)}`}>
+                  <span className="text-muted-foreground font-medium block mb-1">{t('logs.col_action', 'Jenis Aksi')}</span>
+                  <Badge tone={getActionBadge(selectedLogForDetail.actionType)}>
                     {selectedLogForDetail.actionType}
-                  </span>
+                  </Badge>
                 </div>
                 <div>
-                  <span className="text-ink-soft font-medium block mb-1">{t('settings.region.modules', 'Modul')}</span>
-                  <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full border inline-block ${getStatusBadgeClass(selectedLogForDetail.module)}`}>
+                  <span className="text-muted-foreground font-medium block mb-1">{t('settings.region.modules', 'Modul')}</span>
+                  <Badge tone={statusTone(selectedLogForDetail.module)}>
                     {selectedLogForDetail.module}
-                  </span>
+                  </Badge>
                 </div>
-              </div>
+              </Card>
 
               <div>
-                <span className="text-ink-soft font-semibold block mb-1.5">{t('logs.deskripsi_detail_teknis', 'Deskripsi / Detail Teknis:')}</span>
-                <div className="p-3.5 bg-ink text-on-solid rounded-xl font-mono text-xs leading-relaxed wrap-break-word whitespace-pre-wrap max-h-48 overflow-y-auto">
+                <span className="text-muted-foreground font-semibold block mb-1.5">{t('logs.deskripsi_detail_teknis', 'Deskripsi / Detail Teknis:')}</span>
+                <div className="p-3.5 bg-foreground text-primary-foreground rounded-xl font-mono text-xs leading-relaxed wrap-break-word whitespace-pre-wrap max-h-48 overflow-y-auto">
                   {selectedLogForDetail.description}
                 </div>
               </div>
 
               {(selectedLogForDetail.ipAddress || selectedLogForDetail.userAgent) && (
-                <div className="pt-2 border-t border-hairline space-y-1 text-xs text-ink-soft">
+                <div className="pt-2 border-t border-border space-y-1 text-xs text-muted-foreground">
                   {selectedLogForDetail.ipAddress && <div><span className="font-semibold">{t('logs.ip_address', 'IP Address:')}</span> {selectedLogForDetail.ipAddress}</div>}
                   {selectedLogForDetail.userAgent && <div className="truncate"><span className="font-semibold">{t('logs.user_agent', 'User Agent:')}</span> {selectedLogForDetail.userAgent}</div>}
                 </div>
               )}
             </div>
 
-            <div className="p-4 bg-surface dark:bg-surface-2/50 border-t border-hairline flex justify-end">
-              <button
+            <div className="p-4 bg-card border-t border-border flex justify-end">
+              <Button variant="ghost" size="sm"
                 onClick={() => setSelectedLogForDetail(null)}
-                className="inline-flex items-center px-4 min-h-8 bg-surface-2 hover:bg-ink-faint dark:hover:bg-surface-2 text-ink rounded-md font-semibold text-xs transition-all cursor-pointer"
               >
                 {t('redline.close', 'Tutup')}
-              </button>
+              </Button>
             </div>
 
         </ModalFrame>

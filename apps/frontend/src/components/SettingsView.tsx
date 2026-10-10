@@ -13,6 +13,7 @@ import { OrganizationTab } from './settings/OrganizationTab';
 import { MembersAccessTab } from './settings/MembersAccessTab';
 import { IntegrationsTab } from './settings/IntegrationsTab';
 
+import { Heading } from '@legalio/ui-components/heading';
 /**
  * Tenant Settings (PRD §6.1): one screen, at most three tabs —
  * Organization, Members & Access, Integrations — filtered by the selected
@@ -62,18 +63,18 @@ export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
 
   return (
     <Tabs value={tab} onValueChange={(value) => void go(value)} id="settings" className="min-w-0 gap-5">
-      <header className="ds-card">
+      <header>
         <div className="ds-context-bar">
           <div className="flex min-w-0 items-center gap-3">
             <div className="ds-context-bar-icon">
               <Building2 className="h-4 w-4" aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <h2 className="ds-page-heading truncate">
+              <Heading as="h2" size="lg" weight="semibold" className="truncate">
                 {t('tb.settings_title', 'Settings — {org}', { org: orgName })}
-              </h2>
+              </Heading>
               {accessMode !== 'platform' && (
-                <p className="ds-page-subtitle truncate">
+                <p className="text-sm text-muted-foreground truncate">
                   {t('tb.role_in_org', 'Role in this organization: {role}', { role: roleLabel })}
                 </p>
               )}
@@ -85,7 +86,6 @@ export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
               size="sm"
               variant="ghost"
               onClick={async () => { if (await leaveOrganization()) setActiveTab('admin-system-organizations'); }}
-              className=""
               aria-label={t('tb.back_to_system_admin', 'Back to System Admin')}
               title={t('tb.back_to_system_admin', 'Back to System Admin')}
             >
@@ -97,7 +97,7 @@ export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
 
         <TabsList
           aria-label={t('tb.settings_sections', 'Settings sections')}
-          className="admin-tab-list flex h-auto w-full flex-wrap items-center justify-start gap-1 rounded-none bg-surface/70 px-3 py-2 text-ink-soft dark:bg-surface/30 sm:px-4"
+          className="admin-tab-list flex h-auto w-full flex-wrap items-center justify-start gap-1 rounded-none bg-card/70 px-3 py-2 text-muted-foreground sm:px-4"
         >
           {visible.map((item) => {
             const Icon = item.icon;
@@ -107,8 +107,8 @@ export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
                 key={item.id}
                 value={item.id}
                 className={buttonVariants('ghost', 'sm', isActive
-                  ? 'bg-surface dark:bg-surface-2 text-accent-text shadow-xs font-semibold hover:bg-surface dark:hover:bg-surface-2'
-                  : 'text-ink-soft hover:text-ink dark:hover:text-ink hover:bg-surface/60 dark:hover:bg-surface-2/60')}
+                  ? 'bg-card  text-accent-foreground shadow-xs font-semibold hover:bg-card '
+                  : 'text-muted-foreground hover:text-foreground  hover:bg-card/60 ')}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>{item.label}</span>

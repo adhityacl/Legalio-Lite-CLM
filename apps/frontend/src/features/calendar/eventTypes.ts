@@ -19,7 +19,7 @@ export const EVENT_TYPE_CONFIG: Record<EventType, { labelKey: string; dot: strin
   cancellation_notice: { labelKey: 'calendar.cancellation_notice', dot: 'bg-warning', chip: 'bg-warning-soft text-warning' },
   contract_end: { labelKey: 'calendar.contract_end', dot: 'bg-danger', chip: 'bg-danger-soft text-danger' },
   renewal: { labelKey: 'calendar.renewal', dot: 'bg-success', chip: 'bg-success-soft text-success' },
-  termination: { labelKey: 'calendar.termination', dot: 'bg-ink-soft', chip: 'bg-surface-2 text-ink' },
+  termination: { labelKey: 'calendar.termination', dot: 'bg-muted-foreground', chip: 'bg-muted text-foreground' },
   task: { labelKey: 'calendar.task', dot: 'text-finance', chip: 'bg-finance-soft text-finance' },
 };
 

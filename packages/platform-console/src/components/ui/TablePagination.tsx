@@ -1,11 +1,9 @@
 import React from 'react';
-import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { NativeSelect } from '@legalio/ui-components/native-select';
+import {
+  Pagination, PaginationFirstTrigger, PaginationItems, PaginationLastTrigger, PaginationNextTrigger, PaginationPrevTrigger,
+} from '@legalio/ui-components/pagination';
 
 export interface TablePaginationProps {
   currentPage: number;
@@ -17,106 +15,37 @@ export interface TablePaginationProps {
   className?: string;
 }
 
-// Same height as the rows-per-page select beside it (see docs/button-sizes.md).
-const pageButtonClass = 'ui-button ui-button-lg ui-button-icon border border-hairline  bg-surface  hover:bg-surface dark:hover:bg-surface-2/80 text-ink-soft  disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-2xs';
-
+/** Table footer: rows-per-page NativeSelect and moduix Pagination (Data Table block layout). */
 export const TablePagination: React.FC<TablePaginationProps> = ({
-  currentPage,
-  totalPages,
-  rowsPerPage,
-  onPageChange,
-  onRowsPerPageChange,
-  rowsPerPageOptions = [5, 10, 20, 50],
-  className = '',
+  currentPage, totalPages, rowsPerPage, onPageChange, onRowsPerPageChange, rowsPerPageOptions = [5, 10, 20, 50], className = '',
 }) => {
   const { t } = useLanguage();
-  const safeTotalPages = Math.max(1, totalPages || 1);
-  const safeCurrentPage = Math.min(Math.max(1, currentPage || 1), safeTotalPages);
-
+  const pages = Math.max(1, totalPages || 1);
+  const page = Math.min(Math.max(1, currentPage || 1), pages);
   return (
-    <div
-      className={`ds-table-pagination mobile-pagination p-4 sm:px-6 sm:py-3.5 border-t border-hairline bg-surface dark:bg-surface/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs select-none ${className}`}
-    >
-      {/* Left: Rows per page selector */}
-      <div className="flex items-center gap-2.5">
-        <div className="relative inline-flex items-center">
-          <select
-            aria-label={t('pagination.rows_per_page', 'Rows per page')}
-            value={rowsPerPage}
-            onChange={(e) => onRowsPerPageChange(Number(e.target.value))}
-            className="ds-input pl-3 pr-7 appearance-none"
-          >
-            {rowsPerPageOptions.map((opt) => (
-              <option
-                key={opt}
-                value={opt}
-                className="bg-surface text-ink"
-              >
-                {opt}
-              </option>
-            ))}
-          </select>
-        </div>
-        <span className="text-xs text-ink-soft font-medium">
-          {t('pagination.rows_per_page', 'Rows per page')}
-        </span>
+    <div className={`mobile-pagination flex flex-col items-center justify-between gap-4 border-t border-border px-4 py-3 sm:flex-row sm:px-6 ${className}`}>
+      <div className="flex items-center gap-2">
+        <NativeSelect
+          aria-label={t('pagination.rows_per_page', 'Rows per page')}
+          value={rowsPerPage}
+          onChange={e => onRowsPerPageChange(Number(e.target.value))}
+          controlProps={{ className: 'w-20' }}
+        >
+          {rowsPerPageOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+        </NativeSelect>
+        <span className="text-sm text-muted-foreground">{t('pagination.rows_per_page', 'Rows per page')}</span>
       </div>
-
-      {/* Right: Page indicator & 4 Nav buttons */}
-      <div className="flex items-center gap-4 sm:gap-6">
-        <span className="text-xs text-ink-soft font-medium">
-          {t('pagination.page', 'Page')} {safeCurrentPage} {t('pagination.of', 'of')} {safeTotalPages}
+      <div className="flex flex-wrap items-center justify-center gap-4">
+        <span className="text-sm text-muted-foreground">
+          {t('pagination.page', 'Page')} {page} {t('pagination.of', 'of')} {pages}
         </span>
-
-        <div className="flex items-center gap-1.5">
-          {/* First Page */}
-          <button
-            type="button"
-            onClick={() => onPageChange(1)}
-            disabled={safeCurrentPage <= 1}
-            className={pageButtonClass}
-            title={t('pagination.first_page', 'First Page')}
-            aria-label={t('pagination.first_page', 'First Page')}
-          >
-            <ChevronsLeft className="w-4 h-4" />
-          </button>
-
-          {/* Previous Page */}
-          <button
-            type="button"
-            onClick={() => onPageChange(Math.max(1, safeCurrentPage - 1))}
-            disabled={safeCurrentPage <= 1}
-            className={pageButtonClass}
-            title={t('pagination.prev_page', 'Previous Page')}
-            aria-label={t('pagination.prev_page', 'Previous Page')}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-
-          {/* Next Page */}
-          <button
-            type="button"
-            onClick={() => onPageChange(Math.min(safeTotalPages, safeCurrentPage + 1))}
-            disabled={safeCurrentPage >= safeTotalPages}
-            className={pageButtonClass}
-            title={t('pagination.next_page', 'Next Page')}
-            aria-label={t('pagination.next_page', 'Next Page')}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-
-          {/* Last Page */}
-          <button
-            type="button"
-            onClick={() => onPageChange(safeTotalPages)}
-            disabled={safeCurrentPage >= safeTotalPages}
-            className={pageButtonClass}
-            title={t('pagination.last_page', 'Last Page')}
-            aria-label={t('pagination.last_page', 'Last Page')}
-          >
-            <ChevronsRight className="w-4 h-4" />
-          </button>
-        </div>
+        <Pagination count={pages} pageSize={1} page={page} siblingCount={1} onPageChange={details => onPageChange(details.page)}>
+          <PaginationFirstTrigger aria-label={t('pagination.first_page', 'First Page')} title={t('pagination.first_page', 'First Page')} />
+          <PaginationPrevTrigger aria-label={t('pagination.prev_page', 'Previous Page')} title={t('pagination.prev_page', 'Previous Page')} />
+          <PaginationItems />
+          <PaginationNextTrigger aria-label={t('pagination.next_page', 'Next Page')} title={t('pagination.next_page', 'Next Page')} />
+          <PaginationLastTrigger aria-label={t('pagination.last_page', 'Last Page')} title={t('pagination.last_page', 'Last Page')} />
+        </Pagination>
       </div>
     </div>
   );

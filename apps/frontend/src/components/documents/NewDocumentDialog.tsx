@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FileText, Plus, Search, X } from 'lucide-react';
-import { ModalFrame, ModalTitle } from '../ui/modal-frame';
+import { ModalFrame } from '../ui/modal-frame';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTenantSettings } from '../../context/TenantSettingsContext';
 import { getAuthHeaders } from '../../lib/apiFetch';
@@ -12,6 +12,10 @@ import {
   MASTER_SERVICE_AGREEMENT_NAME,
 } from '@legalio/shared/data/masterServiceAgreementTemplate';
 
+import { Button } from '@legalio/ui-components/button';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
+import { DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
+import { Alert, AlertContent } from '@legalio/ui-components/alert';
 /** What the new document starts from; `null` means a blank document. */
 export type NewDocumentChoice = { name: string; contentId: string; customFields: any[] } | null;
 
@@ -81,83 +85,75 @@ export const NewDocumentDialog: React.FC<{
   return (
     <ModalFrame onClose={onClose} className="max-w-3xl">
       <div className="flex items-center justify-between gap-4 px-6 pt-5 pb-3">
-        <ModalTitle className="ds-modal-title flex items-center gap-2">
+        <DialogTitle className="flex items-center gap-2">
           {t('documents.new_dialog.title', 'Buat dokumen')}
-        </ModalTitle>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={t('common.close', 'Tutup')}
-          className="inline-flex size-10 items-center justify-center rounded-md text-ink-soft hover:bg-surface-2 dark:hover:bg-surface-2 cursor-pointer"
-        >
-          <X className="h-5 w-5" aria-hidden />
-        </button>
+        </DialogTitle>
+        <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
       </div>
 
       <div className="overflow-y-auto px-6 pb-6 space-y-5">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" aria-hidden />
-          <input
+        <InputGroup className="relative">
+          <InputGroupAddon><Search className="size-4" aria-hidden="true" aria-hidden /></InputGroupAddon>
+          <InputGroupInput
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('documents.new_dialog.search', 'Cari template...')}
             aria-label={t('documents.new_dialog.search', 'Cari template...')}
-            className="ds-input w-full pl-10 pr-3"
           />
-        </div>
+        </InputGroup>
 
         <section aria-labelledby="new-doc-scratch">
-          <h3 id="new-doc-scratch" className="mb-2 text-sm font-semibold text-ink">
+          <h3 id="new-doc-scratch" className="mb-2 text-sm font-semibold text-foreground">
             {t('documents.new_dialog.scratch', 'Mulai dari awal')}
           </h3>
-          <div className="ds-choice-grid">
-            <button
+          <div>
+            <Button variant="outline"
               type="button"
               onClick={() => onSelect(null)}
-              className={`${cardClass} border-dashed text-accent-text hover:border-accent hover:bg-accent-soft/40`}
+              className={`${cardClass} `}
             >
               <Plus className="h-5 w-5" aria-hidden />
               {t('documents.new_dialog.blank', 'Dokumen kosong')}
-            </button>
+            </Button>
           </div>
         </section>
 
         <section aria-labelledby="new-doc-templates">
-          <h3 id="new-doc-templates" className="mb-2 text-sm font-semibold text-ink">
+          <h3 id="new-doc-templates" className="mb-2 text-sm font-semibold text-foreground">
             {t('documents.new_dialog.templates', 'Template')}
           </h3>
           {visible.length === 0 ? (
-            <p className="text-sm text-ink-soft">{t('documents.new_dialog.no_match', 'Tidak ada template yang cocok.')}</p>
+            <p className="text-sm text-muted-foreground">{t('documents.new_dialog.no_match', 'Tidak ada template yang cocok.')}</p>
           ) : (
-            <div className="ds-choice-grid">
+            <div>
               {visible.map((tpl) => (
-                <button
+                <Button variant="outline"
                   key={tpl.id}
                   type="button"
                   onClick={() => onSelect(tpl.load())}
-                  className={`${cardClass} border border-hairline bg-surface dark:bg-surface-2/60 text-ink hover:border-accent hover:bg-surface dark:hover:bg-surface-2`}
+                  className={`${cardClass} `}
                 >
-                  <FileText className="h-7 w-7 text-accent-text" aria-hidden />
+                  <FileText className="h-7 w-7 text-accent-foreground" aria-hidden />
                   <span className="line-clamp-2">{tpl.name}</span>
-                  <span className="text-xs font-medium text-ink-soft">
+                  <span className="text-xs font-medium text-muted-foreground">
                     {tpl.builtIn
                       ? t('documents.new_dialog.built_in', 'Template bawaan')
                       : tpl.updatedAt
                         ? new Date(tpl.updatedAt).toLocaleDateString(dateLocale, { day: 'numeric', month: 'short', year: 'numeric' })
                         : ''}
                   </span>
-                </button>
+                </Button>
               ))}
             </div>
           )}
           {status === 'loading' && (
-            <p role="status" className="mt-3 text-xs text-ink-soft">{t('common.loading', 'Loading…')}</p>
+            <p role="status" className="mt-3 text-xs text-muted-foreground">{t('common.loading', 'Loading…')}</p>
           )}
           {status === 'error' && (
-            <p role="alert" className="ds-alert ds-status-danger border">
-              {t('documents.new_dialog.load_failed', 'Template organisasi gagal dimuat. Template bawaan tetap tersedia.')}
-            </p>
+            <Alert status="error" role="alert">
+              <AlertContent>{t('documents.new_dialog.load_failed', 'Template organisasi gagal dimuat. Template bawaan tetap tersedia.')}</AlertContent>
+            </Alert>
           )}
         </section>
       </div>

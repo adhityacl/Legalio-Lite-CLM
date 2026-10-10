@@ -1,7 +1,7 @@
-import { TableViewMenu } from './ui/table-view-menu';
+import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { downloadCsv } from '../lib/csv';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
-import { ModalFrame, ModalTitle } from './ui/modal-frame';
+import { ModalFrame } from './ui/modal-frame';
 import { formatBusinessDate } from '../lib/displayDate';
 import { FilterSummary } from './ui/filter-summary';
 import { TableEmptyState } from './ui/table-empty-state';
@@ -28,7 +28,7 @@ import { XCircle, Clock, Filter, ClipboardCheck,
 } from 'lucide-react';
 import { ActionMenu } from './ui/action-menu';
 import { TablePagination } from './ui/TablePagination';
-import { getStatusBadgeClass } from '@legalio/ui-components/badge';
+import { Badge, statusTone } from '@legalio/ui-components/badge';
 import { getSavedColumnPreferences, saveColumnPreferences } from '../lib/tablePreferences';
 import { getCachedAccessToken } from '../lib/googleAuthService';
 import { useLanguage } from '../context/LanguageContext';
@@ -36,6 +36,16 @@ import { useConfirm } from '../context/ConfirmDialogContext';
 import { useAlertToast } from '../context/AlertToastContext';
 import { usePermissions } from '../lib/permissions';
 
+import { TableColumnHeader, Table, TableHeader, TableRow, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
+import { Button } from '@legalio/ui-components/button';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
+import { NativeSelect } from '@legalio/ui-components/native-select';
+import { Textarea } from '@legalio/ui-components/textarea';
+import { Card } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
+import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
 interface PartnerEvaluationViewProps {
   partners: Partner[];
   contracts?: Contract[];
@@ -431,8 +441,8 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) setSelectedRows(sortedEvaluations.map(item => item.id || ''));
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedRows(sortedEvaluations.map(item => item.id || ''));
     else setSelectedRows([]);
   };
 
@@ -447,12 +457,12 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
   const getEvalBadgeClass = (status: string) => {
     switch (status) {
-      case 'Excellent': return 'bg-status-success-soft dark:bg-status-success-soft/30 text-status-success  border-status-success-border ';
-      case 'Good': return 'bg-status-info-soft dark:bg-status-info-soft/30 text-status-info  border-status-info-border ';
-      case 'Fair': return 'bg-status-warning-soft dark:bg-status-warning-soft/30 text-status-warning  border-status-warning-border ';
-      case 'Poor': return 'bg-status-danger-soft dark:bg-status-danger-soft/30 text-status-danger  border-status-danger-border ';
-      case 'Not reviewed': return 'bg-surface-2 text-ink-soft border-hairline  opacity-80';
-      default: return 'bg-surface-2 text-ink border-hairline ';
+      case 'Excellent': return 'bg-status-success-soft  text-status-success  border-status-success-border ';
+      case 'Good': return 'bg-status-info-soft  text-status-info  border-status-info-border ';
+      case 'Fair': return 'bg-status-warning-soft  text-status-warning  border-status-warning-border ';
+      case 'Poor': return 'bg-status-danger-soft  text-status-danger  border-status-danger-border ';
+      case 'Not reviewed': return 'bg-muted text-muted-foreground border-border  opacity-80';
+      default: return 'bg-muted text-foreground border-border ';
     }
   };
 
@@ -462,8 +472,8 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
       case 'Good': return 'bg-status-info';
       case 'Fair': return 'bg-status-warning';
       case 'Poor': return 'bg-status-danger';
-      case 'Not reviewed': return 'bg-ink-faint';
-      default: return 'bg-ink-faint';
+      case 'Not reviewed': return 'bg-muted-foreground';
+      default: return 'bg-muted-foreground';
     }
   };
 
@@ -534,73 +544,70 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
   const renderSortHeader = (label: string, field: SortField) => {
     const isSorted = sortField === field;
     return (
-      <th
+      <TableColumnHeader
         scope="col"
         aria-sort={isSorted ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className="p-4 text-xs font-bold text-ink text-left select-none align-middle"
+        className="text-left align-middle"
       >
-        <button
+        <Button variant="ghost" size="sm"
           type="button"
           onClick={() => handleSort(field)}
-          className="flex items-center gap-1.5 hover:text-ink dark:hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded-sm py-0.5"
           title={t('eval.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}
         >
           <span>{label}</span>
           {isSorted ? (
             sortOrder === 'asc' ? (
-              <ArrowUp className="w-3.5 h-3.5 text-accent-text shrink-0" />
+              <ArrowUp className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
             ) : (
-              <ArrowDown className="w-3.5 h-3.5 text-accent-text shrink-0" />
+              <ArrowDown className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
             )
           ) : (
-            <ArrowUpDown className="w-3.5 h-3.5 text-ink-soft shrink-0" />
+            <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
           )}
-        </button>
-      </th>
+        </Button>
+      </TableColumnHeader>
     );
   };
 
   return (
     <div className="space-y-6">
-      <div className="ds-page-bar">
+      <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
         <div>
-          <h2 className="ds-page-heading">
+          <Heading as="h2" size="lg" weight="semibold">
             <span>{t('eval.annual_title', 'Evaluasi Vendor Tahunan')}</span>
-          </h2>
+          </Heading>
         </div>
 
         <div className="mobile-page-actions flex items-center gap-2.5 shrink-0 flex-wrap">
           {hasPermission('export.csv') && (
-            <button
+            <Button variant="outline"
               onClick={handleExportCSV}
               disabled={sortedEvaluations.length === 0}
-              className="ui-button ui-button-lg cursor-pointer flex items-center disabled:opacity-50 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-outline"
               title={t('eval.export_csv', 'Ekspor CSV')}
             >
               <Download className="w-4 h-4" />
               <span>{t('eval.export_csv', 'Ekspor CSV')}</span>
-            </button>
+            </Button>
           )}
 
           {canCreateEvaluation && (
-            <button
+            <Button
               onClick={handleAddNew}
-              className="ui-button ui-button-lg cursor-pointer flex items-center ds-button ds-button-lg ds-button-default"
             >
-              <Plus className="w-4 h-4 text-white" />
+              <Plus className="w-4 h-4" />
               <span>{t('ui.add_evaluation')}</span>
-            </button>
+            </Button>
           )}
         </div>
-      </div>
+      </Card>
 
       {/* Filter Bar & View Toggle - Justified Responsive Grid/Flex */}
-      <div className="ds-panel p-4 sm:p-5 mb-6">
-        <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full ds-grid">
+      <Card className="p-4 sm:p-5">
+        <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
           {/* 1 Box Search */}
-          <div className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-            <Search className="w-4 h-4 text-ink-soft absolute left-3 top-2.5" />
-            <input
+          <InputGroup className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
+            <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+            <InputGroupInput
               type="text"
               placeholder={t('eval.search_placeholder', 'Cari vendor, reviewer, atau notes...')}
               aria-label={t('ui.search')}
@@ -609,25 +616,24 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="ds-input w-full pl-9 pr-3"
             />
-          </div>
+          </InputGroup>
 
           {/* Filter 1: Tahun Review */}
-          <select
+          <NativeSelect
             aria-label={t('ui.filter_year')}
               value={selectedYear}
             onChange={(e) => {
               setSelectedYear(e.target.value);
               setCurrentPage(1);
             }}
-            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
+            className="flex-1 min-w-[130px]"
           >
             <option value="2026">{t('eval.year_prefix', 'Tahun')} 2026</option>
             <option value="2025">{t('eval.year_prefix', 'Tahun')} 2025</option>
             <option value="2024">{t('eval.year_prefix', 'Tahun')} 2024</option>
             <option value="2023">{t('eval.year_prefix', 'Tahun')} 2023</option>
-          </select>
+          </NativeSelect>
 
           {/* Filter 2: Keputusan Rekomendasi */}
           <AlphabeticalSelect
@@ -637,7 +643,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               setSelectedEvaluationFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
+            className="flex-1 min-w-[130px] appearance-none pr-8"
           >
             <option value="ALL">{t('eval.all_decisions', 'Semua Keputusan')}</option>
             <option value="Recommended">{t('eval.decision_recommended', 'Lanjutkan Kerjasama')}</option>
@@ -654,7 +660,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               setSelectedObligationTarget(e.target.value);
               setCurrentPage(1);
             }}
-            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
+            className="flex-1 min-w-[130px] appearance-none pr-8"
           >
             <option value="ALL">{t('eval.all_obligation_targets', 'Semua Target Kewajiban')}</option>
             <option value="Sangat baik">{t('eval.opt_sangat_baik', 'Sangat baik')}</option>
@@ -664,7 +670,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
           {/* View Toggle */}
           <TableViewMenu title={t('eval.view_settings', 'Pengaturan Tampilan Kolom')} label={t('eval.view', 'View')}>
-            <div className="px-3.5 py-1.5 text-xs font-bold text-ink-soft uppercase tracking-wider mb-1 border-b border-hairline">
+            <div className="px-3.5 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 border-b border-border">
               {t('eval.toggle_columns', 'Toggle Kolom')}
             </div>
             {Object.keys(visibleColumns).map((col) => {
@@ -676,78 +682,64 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               else if (col === 'tanggal') label = t('eval.col_review_date', 'Tanggal Review');
 
               return (
-                <label key={col} className="flex items-center gap-2.5 px-3.5 py-1.5 hover:bg-surface dark:hover:bg-surface-2/50 cursor-pointer text-xs font-medium text-ink select-none">
-                  <input
-                    type="checkbox"
-                    checked={visibleColumns[col]}
-                    onChange={() => toggleColumnVisibility(col)}
-                    className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                  />
-                  <span className="capitalize">{label}</span>
-                </label>
+                <TableViewOption key={col} value={col} checked={visibleColumns[col]} onToggle={() => toggleColumnVisibility(col)}>{label}</TableViewOption>
               );
             })}
           </TableViewMenu>
       </div>
-    </div>
+    </Card>
 
-      <div className="ds-table-surface bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
+      <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_year'), value: selectedYear, active: selectedYear !== String(new Date().getFullYear()) }, { label: t('ui.filter_decision'), value: selectedEvaluationFilter, active: selectedEvaluationFilter !== 'ALL' }, { label: t('ui.filter_target'), value: selectedObligationTarget, active: selectedObligationTarget !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedYear(String(new Date().getFullYear())); setSelectedEvaluationFilter('ALL'); setSelectedObligationTarget('ALL'); }} />
-        <p className="mobile-table-hint px-4 py-2 text-xs text-ink-soft md:hidden">{t('ui.scroll_table')}</p>
-        <div className="data-table-scroll overflow-x-auto bg-surface" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
-          <table className="ds-table app-data-table w-full text-left border-collapse text-xs bg-surface">
-            <thead className="bg-surface dark:bg-surface-2/50">
-              <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
-                <th scope="col" className="pl-6 pr-2 py-4 w-12 text-left align-middle">
+        <p className="mobile-table-hint px-4 py-2 text-xs text-muted-foreground md:hidden">{t('ui.scroll_table')}</p>
+        <TableScrollArea className="data-table-scroll" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
+          <Table className="app-data-table w-full text-left">
+            <TableHeader>
+              <TableRow>
+                <TableColumnHeader scope="col" className="w-12 text-left align-middle">
                   <div className="flex items-center justify-start">
-                    <input
-                      type="checkbox"
-                      aria-label={t('eval.pilih_semua_evaluasi', 'Pilih semua evaluasi')}
-                      onChange={handleSelectAll}
-                      checked={selectedRows.length > 0 && selectedRows.length === currentEvaluations.length}
-                      className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                    />
+                    <Checkbox aria-label={t('eval.pilih_semua_evaluasi', 'Pilih semua evaluasi')} checked={selectedRows.length > 0 && selectedRows.length === currentEvaluations.length} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
-                </th>
+                </TableColumnHeader>
                 {visibleColumns.vendor && (
-                  <th scope="col" aria-sort={sortField === 'vendor' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'} className="p-4 text-xs font-bold text-ink text-left align-middle">
-                    <button type="button" onClick={() => handleSort('vendor')} className="flex items-center gap-1 cursor-pointer hover:text-ink dark:hover:text-white select-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded-sm py-0.5">
+                  <TableColumnHeader scope="col" aria-sort={sortField === 'vendor' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left align-middle">
+                    <Button variant="ghost" size="sm" type="button" onClick={() => handleSort('vendor')}>
                       <span>{t('eval.col_vendor', 'Partner')}</span>
-                      <ArrowUpDown className="w-3.5 h-3.5 text-ink-soft" />
-                    </button>
-                  </th>
+                      <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Button>
+                  </TableColumnHeader>
                 )}
-                {visibleColumns.target && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('eval.col_target', 'Target Kewajiban')}</th>}
+                {visibleColumns.target && <TableColumnHeader scope="col" className="text-left align-middle">{t('eval.col_target', 'Target Kewajiban')}</TableColumnHeader>}
                 {visibleColumns.skor && (
-                  <th scope="col" aria-sort={sortField === 'calculated_score' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'} className="p-4 text-xs font-bold text-ink text-left align-middle">
-                    <button type="button" onClick={() => handleSort('calculated_score')} className="flex items-center gap-1 cursor-pointer hover:text-ink dark:hover:text-white select-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded-sm py-0.5">
+                  <TableColumnHeader scope="col" aria-sort={sortField === 'calculated_score' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left align-middle">
+                    <Button variant="ghost" size="sm" type="button" onClick={() => handleSort('calculated_score')}>
                       <span>{t('eval.col_calculated_score', 'Skor')}</span>
-                      <ArrowUpDown className="w-3.5 h-3.5 text-ink-soft" />
-                    </button>
-                  </th>
+                      <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Button>
+                  </TableColumnHeader>
                 )}
                 {visibleColumns.hasil && (
-                  <th scope="col" aria-sort={sortField === 'final_eval' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'} className="p-4 text-xs font-bold text-ink text-left align-middle">
-                    <button type="button" onClick={() => handleSort('final_eval')} className="flex items-center gap-1 cursor-pointer hover:text-ink dark:hover:text-white select-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded-sm py-0.5">
+                  <TableColumnHeader scope="col" aria-sort={sortField === 'final_eval' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left align-middle">
+                    <Button variant="ghost" size="sm" type="button" onClick={() => handleSort('final_eval')}>
                       <span>{t('eval.col_recommendation', 'Hasil Rekomendasi')}</span>
-                      <ArrowUpDown className="w-3.5 h-3.5 text-ink-soft" />
-                    </button>
-                  </th>
+                      <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Button>
+                  </TableColumnHeader>
                 )}
                 {visibleColumns.tanggal && (
-                  <th scope="col" aria-sort={sortField === 'review_date' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'} className="p-4 text-xs font-bold text-ink text-left align-middle">
-                    <button type="button" onClick={() => handleSort('review_date')} className="flex items-center gap-1 cursor-pointer hover:text-ink dark:hover:text-white select-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded-sm py-0.5">
+                  <TableColumnHeader scope="col" aria-sort={sortField === 'review_date' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left align-middle">
+                    <Button variant="ghost" size="sm" type="button" onClick={() => handleSort('review_date')}>
                       <span>{t('eval.col_review_date', 'Tanggal Review')}</span>
-                      <ArrowUpDown className="w-3.5 h-3.5 text-ink-soft" />
-                    </button>
-                  </th>
+                      <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Button>
+                  </TableColumnHeader>
                 )}
-                <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
+                <TableColumnHeader scope="col" className="text-right w-20 align-middle">
                   <div className="flex items-center justify-end">{t('eval.col_action', 'Aksi')}</div>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-hairline">
+                </TableColumnHeader>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {currentEvaluations.length === 0 ? (
                 <TableEmptyState colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} />
               ) : (
@@ -764,97 +756,89 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                         );
 
                   return (
-                    <tr
+                    <TableRow
                       key={item.id}
-                      className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors"
                     >
-                      <td className="pl-6 pr-2 py-4 text-left align-middle">
+                      <TableCell className="text-left align-middle">
                         <div className="flex items-center justify-start">
-                          <input
-                            type="checkbox"
-                            aria-label={t('eval.pilih_evaluasi', 'Pilih evaluasi {supplier_name}', { supplier_name: item.supplier_name })}
-                            checked={selectedRows.includes(item.id)}
-                            onChange={() => handleSelectRow(item.id)}
-                            className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                          />
+                          <Checkbox aria-label={t('eval.pilih_evaluasi', 'Pilih evaluasi {supplier_name}', { supplier_name: item.supplier_name })} checked={selectedRows.includes(item.id)} onCheckedChange={() => handleSelectRow(item.id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                         </div>
-                      </td>
+                      </TableCell>
 
                       {/* 1. Vendor */}
                       {visibleColumns.vendor && (
-                        <td className="py-4 px-4 text-xs font-semibold text-ink text-left">
+                        <TableCell className="text-left">
                           {item.supplier_name}
-                        </td>
+                        </TableCell>
                       )}
 
                       {/* 2. Target Kewajiban */}
                       {visibleColumns.target && (
-                        <td className="py-4 px-4 text-xs font-normal text-ink text-left">
+                        <TableCell className="text-left">
                           {isNotReviewed ? '—' : item.obligation_target}
-                        </td>
+                        </TableCell>
                       )}
 
                       {/* 3. Skor */}
                       {visibleColumns.skor && (
-                        <td className="py-4 px-4 text-xs font-normal text-ink text-left">
+                        <TableCell className="text-left">
                           {isNotReviewed ? (
-                            <span className="text-ink-soft">—</span>
+                            <span className="text-muted-foreground">—</span>
                           ) : (
-                            <span className="font-semibold text-ink">{score} / 100</span>
+                            <span className="font-semibold text-foreground">{score} / 100</span>
                           )}
-                        </td>
+                        </TableCell>
                       )}
 
                       {/* 4. Hasil Rekomendasi */}
                       {visibleColumns.hasil && (
-                        <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
+                        <TableCell className="text-left whitespace-nowrap">
                           {item.final_evaluation === 'Recommended' && (
-                            <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap ${getStatusBadgeClass('Recommended')}`}>
-                              <CheckCircle2 className="w-3.5 h-3.5 text-accent-text" />
+                            <Badge tone={statusTone('Recommended')}>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-accent-foreground" />
                               <span>{t('eval.status_rec', 'Recommended')}</span>
-                            </span>
+                            </Badge>
                           )}
                           {item.final_evaluation === 'Recommended with notes' && (
-                            <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap ${getStatusBadgeClass('Recommended with notes')}`}>
+                            <Badge tone={statusTone('Recommended with notes')}>
                               <AlertCircle className="w-3.5 h-3.5 text-status-warning" />
                               <span>{t('eval.status_rec_notes', 'Recommended with notes')}</span>
-                            </span>
+                            </Badge>
                           )}
                           {item.final_evaluation === 'Not recommended' && (
-                            <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap ${getStatusBadgeClass('Not recommended')}`}>
+                            <Badge tone={statusTone('Not recommended')}>
                               <XCircle className="w-3.5 h-3.5 text-status-danger" />
                               <span>{t('eval.status_not_rec', 'Not recommended')}</span>
-                            </span>
+                            </Badge>
                           )}
                           {isNotReviewed && (
-                            <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap ${getStatusBadgeClass('Draft')}`}>
-                              <Clock className="w-3.5 h-3.5 text-ink-soft" />
+                            <Badge tone={statusTone('Draft')}>
+                              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                               <span>{t('eval.status_not_reviewed', 'Belum Dinilai')}</span>
-                            </span>
+                            </Badge>
                           )}
-                        </td>
+                        </TableCell>
                       )}
 
                       {/* 5. Tanggal Review */}
                       {visibleColumns.tanggal && (
-                        <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
+                        <TableCell className="text-left whitespace-nowrap">
                           {formatBusinessDate(item.review_date)}
-                        </td>
+                        </TableCell>
                       )}
 
                       {/* Actions */}
-                      <td className="pl-2 pr-6 py-4 text-right align-middle w-20">
+                      <TableCell className="text-right align-middle w-20">
                         <div className="flex items-center justify-end">
                           {isNotReviewed ? (
                             canCreateEvaluation && (
-                              <button
+                              <Button size="sm"
                                 onClick={() => handleInputNotReviewed(item)}
-                                className="px-3 min-h-8 bg-surface border border-hairline text-accent-text hover:bg-accent-soft rounded-md text-xs font-semibold transition-all inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
                                 title={`${t('eval.input_eval')} - ${item.supplier_name}`}
                               >
                                 <Plus className="w-3.5 h-3.5" />
                                 <span>{t('eval.input_eval')}</span>
-                              </button>
+                              </Button>
                             )
                           ) : (
                             <ActionMenu
@@ -880,14 +864,14 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                             />
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableScrollArea>
 
         <TablePagination
           currentPage={currentPage}
@@ -899,41 +883,41 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
             setCurrentPage(1);
           }}
         />
-      </div>
+      </Card>
 
       {/* FORM MODAL: Submit / Edit Evaluasi Tahunan Vendor */}
       {showFormModal && (
         <ModalFrame onClose={() => setShowFormModal(false)}>
 
             {/* Modal Header */}
-            <div className="ds-section-header">
+            <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
               <div className="flex items-center gap-2.5">
-                <ClipboardCheck className="w-5 h-5 text-accent-text" />
+                <ClipboardCheck className="w-5 h-5 text-accent-foreground" />
                 <div>
-                  <ModalTitle className="ds-modal-title flex items-center gap-2">
+                  <DialogTitle className="flex items-center gap-2">
                     {editingItem?.id && !editingItem.id.startsWith('NOT_REVIEWED')
                       ? t('eval.modal_title_edit', 'Edit Evaluasi Partner')
                       : t('eval.modal_title_add', 'Form Evaluasi Partner')}
-                  </ModalTitle>
+                  </DialogTitle>
                   {editingItem?.supplier_name && (
-                    <p className="text-xs text-ink-soft font-medium">{editingItem.supplier_name}</p>
+                    <p className="text-xs text-muted-foreground font-medium">{editingItem.supplier_name}</p>
                   )}
                 </div>
               </div>
-              <button
+              <Button variant="secondary" size="icon-md"
                 type="button"
                 onClick={() => setShowFormModal(false)}
-                aria-label={t('common.close')} className="min-w-10 min-h-10 inline-flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink p-1.5 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
+                aria-label={t('common.close')}
               >
                 <X className="w-5 h-5" />
-              </button>
-            </div>
+              </Button>
+            </DialogHeader>
 
             {/* Modal Form Body */}
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-              <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs text-ink">
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs text-foreground">
               {formError && (
-                <div className="p-3.5 bg-status-danger-soft dark:bg-status-danger-soft/40 border border-status-danger-border rounded-xl text-xs font-bold text-status-danger flex items-center gap-2">
+                <div className="p-3.5 bg-status-danger-soft border border-status-danger-border rounded-xl text-xs font-bold text-status-danger flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-status-danger shrink-0" />
                   <span>{formError}</span>
                 </div>
@@ -941,29 +925,29 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
               {/* BAGIAN 1: Informasi Dasar */}
               <div className="space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-hairline">
-                  <span className="w-6 h-6 rounded-full bg-accent-soft text-accent-text border border-accent/30 font-black text-xs flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-2 pb-2 border-b border-border">
+                  <span className="w-6 h-6 rounded-full bg-primary text-accent-foreground border border-primary/30 font-black text-xs flex items-center justify-center shrink-0">
                     1
                   </span>
-                  <h3 className="ds-section-title">{t('eval.section1')}</h3>
+                  <Heading as="h3" size="sm" weight="semibold">{t('eval.section1')}</Heading>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ds-grid">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Tanggal Review */}
-                  <div>
-                    <label htmlFor="partnerevaluationview-field-1" className="block text-xs font-bold text-ink mb-1">
+                  <Field>
+                    <FieldLabel htmlFor="partnerevaluationview-field-1">
                       {t('eval.review_date')} <span className="text-status-danger">*</span>
-                    </label>
+                    </FieldLabel>
                     <DateInput id="partnerevaluationview-field-1"
                       required
                       value={formData.review_date}
                       onChange={(val) => setFormData({ ...formData, review_date: val })}
                     />
-                  </div>
+                  </Field>
 
                   {/* Supplier Name (Dropdown Tersinkron) */}
                   <div>
-                    <label htmlFor="partnerevaluationview-field-2" className="block text-xs font-bold text-ink mb-1">
+                    <label htmlFor="partnerevaluationview-field-2" className="block text-xs font-bold text-foreground mb-1">
                       {t('eval.supplier_name')} <span className="text-status-danger">*</span>
                     </label>
                     {partners.length > 0 ? (
@@ -979,7 +963,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                             partner_id: found ? found.partner_id : '',
                           });
                         }}
-                        className="ds-input w-full"
+                        className="w-full"
                       >
                         <option value="" disabled>
                           {t('eval.select_partner_ph')}
@@ -991,7 +975,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                         ))}
                       </AlphabeticalSelect>
                     ) : (
-                      <div className="p-3 bg-status-warning-soft dark:bg-status-warning-soft/40 border border-status-warning-border rounded-xl text-xs font-bold text-status-warning">
+                      <div className="p-3 bg-status-warning-soft border border-status-warning-border rounded-xl text-xs font-bold text-status-warning">
                         {t('eval.no_partners_warning')}
                       </div>
                     )}
@@ -1001,21 +985,21 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
               {/* BAGIAN 2: Kriteria Penilaian */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-hairline">
+                <div className="flex items-center justify-between pb-2 border-b border-border">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-accent-soft text-accent-text border border-accent/30 font-black text-xs flex items-center justify-center shrink-0">
+                    <span className="w-6 h-6 rounded-full bg-primary text-accent-foreground border border-primary/30 font-black text-xs flex items-center justify-center shrink-0">
                       2
                     </span>
-                    <h3 className="ds-section-title">{t('eval.section2')}</h3>
+                    <Heading as="h3" size="sm" weight="semibold">{t('eval.section2')}</Heading>
                   </div>
                 </div>
 
                 {/* Obligation / Target */}
                 <div>
-                  <label className="block text-xs font-bold text-ink mb-1.5">
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
                     {t('eval.obligation_target')} <span className="text-status-danger">*</span>
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 ds-grid">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { value: 'Sangat baik', label: t('eval.opt_sangat_baik'), points: `30 ${t('eval.points')}` },
                       { value: 'Baik', label: t('eval.opt_baik'), points: `20 ${t('eval.points')}` },
@@ -1024,10 +1008,10 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                       <label
                         key={opt.value}
                         className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                          formData.obligation_target === opt.value
-                            ? 'bg-accent-soft border-accent text-ink font-bold shadow-2xs'
-                            : 'bg-canvas dark:bg-surface-2/80 border-hairline text-ink hover:bg-surface-2 dark:hover:bg-surface-2'
-                        }`}
+ formData.obligation_target === opt.value
+ ? 'bg-primary border-primary text-foreground font-bold shadow-2xs'
+ : 'bg-background border-border text-foreground hover:bg-muted '
+ }`}
                       >
                         <div className="flex items-center gap-2">
                           <input
@@ -1045,7 +1029,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                           />
                           <span className="text-xs">{opt.label}</span>
                         </div>
-                        <span className="text-xs font-bold text-accent-text bg-accent-soft border border-accent/30 px-2 py-0.5 rounded-md">
+                        <span className="text-xs font-bold text-accent-foreground bg-primary border border-primary/30 px-2 py-0.5 rounded-md">
                           {opt.points}
                         </span>
                       </label>
@@ -1055,10 +1039,10 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
                 {/* Incident Frequency */}
                 <div>
-                  <label className="block text-xs font-bold text-ink mb-1.5">
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
                     {t('eval.incident_freq')} <span className="text-status-danger">*</span>
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 ds-grid">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { value: 'Never', label: t('eval.opt_never'), points: `20 ${t('eval.points')}` },
                       { value: 'Rare', label: t('eval.opt_rare'), points: `15 ${t('eval.points')}` },
@@ -1067,10 +1051,10 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                       <label
                         key={opt.value}
                         className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                          formData.incident_frequency === opt.value
-                            ? 'bg-accent-soft border-accent text-ink font-bold shadow-2xs'
-                            : 'bg-canvas dark:bg-surface-2/80 border-hairline text-ink hover:bg-surface-2 dark:hover:bg-surface-2'
-                        }`}
+ formData.incident_frequency === opt.value
+ ? 'bg-primary border-primary text-foreground font-bold shadow-2xs'
+ : 'bg-background border-border text-foreground hover:bg-muted '
+ }`}
                       >
                         <div className="flex items-center gap-1.5">
                           <input
@@ -1088,7 +1072,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                           />
                           <span className="text-xs">{opt.label}</span>
                         </div>
-                        <span className="text-xs font-bold text-accent-text bg-accent-soft border border-accent/30 px-2 py-0.5 rounded-md">
+                        <span className="text-xs font-bold text-accent-foreground bg-primary border border-primary/30 px-2 py-0.5 rounded-md">
                           {opt.points}
                         </span>
                       </label>
@@ -1098,10 +1082,10 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
                 {/* Communication */}
                 <div>
-                  <label className="block text-xs font-bold text-ink mb-1.5">
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
                     {t('eval.communication')} <span className="text-status-danger">*</span>
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 ds-grid">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { value: 'Sangat baik', label: t('eval.opt_sangat_baik'), points: `20 ${t('eval.points')}` },
                       { value: 'Baik', label: t('eval.opt_baik'), points: `15 ${t('eval.points')}` },
@@ -1110,10 +1094,10 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                       <label
                         key={opt.value}
                         className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                          formData.communication === opt.value
-                            ? 'bg-accent-soft border-accent text-ink font-bold shadow-2xs'
-                            : 'bg-canvas dark:bg-surface-2/80 border-hairline text-ink hover:bg-surface-2 dark:hover:bg-surface-2'
-                        }`}
+ formData.communication === opt.value
+ ? 'bg-primary border-primary text-foreground font-bold shadow-2xs'
+ : 'bg-background border-border text-foreground hover:bg-muted '
+ }`}
                       >
                         <div className="flex items-center gap-2">
                           <input
@@ -1131,7 +1115,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                           />
                           <span className="text-xs">{opt.label}</span>
                         </div>
-                        <span className="text-xs font-bold text-accent-text bg-accent-soft border border-accent/30 px-2 py-0.5 rounded-md">
+                        <span className="text-xs font-bold text-accent-foreground bg-primary border border-primary/30 px-2 py-0.5 rounded-md">
                           {opt.points}
                         </span>
                       </label>
@@ -1141,10 +1125,10 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
                 {/* Pricing */}
                 <div>
-                  <label className="block text-xs font-bold text-ink mb-1.5">
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
                     {t('eval.pricing')} <span className="text-status-danger">*</span>
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 ds-grid">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { value: 'Cheap', label: t('eval.opt_cheap'), points: `30 ${t('eval.points')}` },
                       { value: 'Moderate', label: t('eval.opt_moderate'), points: `20 ${t('eval.points')}` },
@@ -1153,10 +1137,10 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                       <label
                         key={opt.value}
                         className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                          formData.pricing === opt.value
-                            ? 'bg-accent-soft border-accent text-ink font-bold shadow-2xs'
-                            : 'bg-canvas dark:bg-surface-2/80 border-hairline text-ink hover:bg-surface-2 dark:hover:bg-surface-2'
-                        }`}
+ formData.pricing === opt.value
+ ? 'bg-primary border-primary text-foreground font-bold shadow-2xs'
+ : 'bg-background border-border text-foreground hover:bg-muted '
+ }`}
                       >
                         <div className="flex items-center gap-1.5">
                           <input
@@ -1174,7 +1158,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                           />
                           <span className="text-xs">{opt.label}</span>
                         </div>
-                        <span className="text-xs font-bold text-accent-text bg-accent-soft border border-accent/30 px-2 py-0.5 rounded-md">
+                        <span className="text-xs font-bold text-accent-foreground bg-primary border border-primary/30 px-2 py-0.5 rounded-md">
                           {opt.points}
                         </span>
                       </label>
@@ -1185,91 +1169,91 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
               {/* BAGIAN 3: Evaluasi Akhir & Catatan */}
               <div className="space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-hairline">
-                  <span className="w-6 h-6 rounded-full bg-accent-soft text-accent-text border border-accent/30 font-black text-xs flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-2 pb-2 border-b border-border">
+                  <span className="w-6 h-6 rounded-full bg-primary text-accent-foreground border border-primary/30 font-black text-xs flex items-center justify-center shrink-0">
                     3
                   </span>
-                  <h3 className="ds-section-title">
+                  <Heading as="h3" size="sm" weight="semibold">
                     {t('eval.section3')}
-                  </h3>
+                  </Heading>
                 </div>
 
                 {/* Live Score Calculation Display */}
-                <div className="p-4 bg-accent-soft border border-accent/30 rounded-2xl space-y-3">
+                <div className="p-4 bg-primary border border-primary/30 rounded-2xl space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Calculator className="w-4 h-4 text-accent-text" />
-                      <span className="text-xs font-extrabold text-accent-text uppercase tracking-wider">
+                      <Calculator className="w-4 h-4 text-accent-foreground" />
+                      <span className="text-xs font-extrabold text-accent-foreground uppercase tracking-wider">
                         {t('eval.calc_score_breakdown')}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 bg-accent-strong text-white px-3 py-1 rounded-xl shadow-2xs">
+                    <div className="flex items-center gap-1 bg-primary text-white px-3 py-1 rounded-xl shadow-2xs">
                       <span className="text-xs font-semibold">{t('eval.total', 'Total:')}</span>
                       <span className="text-base font-black">{liveBreakdown.total}</span>
                       <span className="text-xs opacity-80">/ 100 {t('eval.points')}</span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs ds-grid">
-                    <div className="ds-panel p-2">
-                      <span className="text-ink-soft text-xs block font-medium">{t('eval.obligation_target_2', 'Obligation / Target')}</span>
-                      <span className="font-extrabold text-accent-text">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <Card className="p-2">
+                      <span className="text-muted-foreground text-xs block font-medium">{t('eval.obligation_target_2', 'Obligation / Target')}</span>
+                      <span className="font-extrabold text-accent-foreground">
                         {liveBreakdown.tScore} {t('eval.points')}
                       </span>
-                    </div>
-                    <div className="ds-panel p-2">
-                      <span className="text-ink-soft text-xs block font-medium">{t('eval.incident_freq_2', 'Incident Freq')}</span>
-                      <span className="font-extrabold text-accent-text">
+                    </Card>
+                    <Card className="p-2">
+                      <span className="text-muted-foreground text-xs block font-medium">{t('eval.incident_freq_2', 'Incident Freq')}</span>
+                      <span className="font-extrabold text-accent-foreground">
                         {liveBreakdown.fScore} {t('eval.points')}
                       </span>
-                    </div>
-                    <div className="ds-panel p-2">
-                      <span className="text-ink-soft text-xs block font-medium">{t('audit_col_evalCommunication', 'Communication')}</span>
-                      <span className="font-extrabold text-accent-text">
+                    </Card>
+                    <Card className="p-2">
+                      <span className="text-muted-foreground text-xs block font-medium">{t('audit_col_evalCommunication', 'Communication')}</span>
+                      <span className="font-extrabold text-accent-foreground">
                         {liveBreakdown.cScore} {t('eval.points')}
                       </span>
-                    </div>
-                    <div className="ds-panel p-2">
-                      <span className="text-ink-soft text-xs block font-medium">{t('eval.pricing_2', 'Pricing')}</span>
-                      <span className="font-extrabold text-accent-text">
+                    </Card>
+                    <Card className="p-2">
+                      <span className="text-muted-foreground text-xs block font-medium">{t('eval.pricing_2', 'Pricing')}</span>
+                      <span className="font-extrabold text-accent-foreground">
                         {liveBreakdown.pScore} {t('eval.points')}
                       </span>
-                    </div>
+                    </Card>
                   </div>
                 </div>
 
                 {/* Final Evaluation Option */}
                 <div>
-                  <label className="block text-xs font-bold text-ink mb-1.5">
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
                     {t('eval.col_final_eval')} <span className="text-status-danger">*</span>
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 ds-grid">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       {
                         value: 'Recommended',
                         label: t('eval.status_rec'),
                         desc: t('eval.opt_rec_desc'),
-                        activeClass: 'bg-accent-soft border-accent text-ink ',
+                        activeClass: 'bg-primary border-primary text-foreground ',
                       },
                       {
                         value: 'Recommended with notes',
                         label: t('eval.rec_with_notes'),
                         desc: t('eval.opt_rec_notes_desc'),
-                        activeClass: 'bg-status-warning-soft dark:bg-status-warning-soft/50 border-status-warning-border  text-ink ',
+                        activeClass: 'bg-status-warning-soft  border-status-warning-border  text-foreground ',
                       },
                       {
                         value: 'Not recommended',
                         label: t('eval.status_not_rec'),
                         desc: t('eval.opt_not_rec_desc'),
-                        activeClass: 'bg-status-danger-soft dark:bg-status-danger-soft/50 border-status-danger-border  text-ink ',
+                        activeClass: 'bg-status-danger-soft  border-status-danger-border  text-foreground ',
                       },
                     ].map((opt) => (
                       <label
                         key={opt.value}
                         className={`p-3 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
-                          formData.final_evaluation === opt.value
-                            ? `${opt.activeClass} font-bold shadow-2xs`
-                            : 'bg-canvas dark:bg-surface-2/80 border-hairline text-ink hover:bg-surface-2 dark:hover:bg-surface-2'
+ formData.final_evaluation === opt.value
+ ? `${opt.activeClass} font-bold shadow-2xs`
+                            : 'bg-background  border-border text-foreground hover:bg-muted '
                         }`}
                       >
                         <div className="flex items-center gap-2 mb-1">
@@ -1288,52 +1272,50 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                           />
                           <span className="text-xs">{opt.label}</span>
                         </div>
-                        <span className="text-xs text-ink-soft">{opt.desc}</span>
+                        <span className="text-xs text-muted-foreground">{opt.desc}</span>
                       </label>
                     ))}
                   </div>
                 </div>
 
                 {/* Notes / Alasan Evaluasi */}
-                <div>
-                  <label htmlFor="partnerevaluationview-field-3" className="block text-xs font-bold text-ink mb-1">
+                <Field>
+                  <FieldLabel htmlFor="partnerevaluationview-field-3">
                     {t('eval.notes_label')}
-                  </label>
-                  <textarea id="partnerevaluationview-field-3"
+                  </FieldLabel>
+                  <Textarea id="partnerevaluationview-field-3"
                     rows={4}
                     placeholder={t('eval.notes_ph')}
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    className="ds-input w-full"
+                    className="w-full"
                   />
-                </div>
+                </Field>
               </div>
               </div>
 
               {/* Modal Footer */}
-              <div className="p-4 sm:p-5 bg-surface border-t border-hairline flex items-center justify-between gap-2 shrink-0">
-                <span className="text-xs text-ink-soft font-medium hidden sm:inline">
+              <div className="p-4 sm:p-5 bg-card border-t border-border flex items-center justify-between gap-2 shrink-0">
+                <span className="text-xs text-muted-foreground font-medium hidden sm:inline">
                   {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
                 </span>
                 <div className="flex items-center gap-2 ml-auto">
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     onClick={() => setShowFormModal(false)}
-                    className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
                   >
                     {t('eval.btn_cancel')}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="ui-button ui-button-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-default"
                   >
                     {isSubmitting
                       ? t('eval.btn_saving')
                       : editingItem
                       ? t('eval.btn_update')
                       : t('eval.btn_submit')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </form>
@@ -1344,50 +1326,50 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
       {viewingDetailItem && (
         <ModalFrame onClose={() => setViewingDetailItem(null)}>
 
-            <div className="ds-section-header">
+            <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
               <div className="flex items-center gap-2.5">
-                <Building2 className="w-5 h-5 text-accent-text" />
+                <Building2 className="w-5 h-5 text-accent-foreground" />
                 <div>
-                  <ModalTitle className="ds-modal-title flex items-center gap-2">
+                  <DialogTitle className="flex items-center gap-2">
                     {t('eval.detail_modal_title', 'Laporan Evaluasi Partner')}
-                  </ModalTitle>
-                  <p className="text-xs text-ink-soft font-medium">{viewingDetailItem.supplier_name}</p>
+                  </DialogTitle>
+                  <p className="text-xs text-muted-foreground font-medium">{viewingDetailItem.supplier_name}</p>
                 </div>
               </div>
-              <button
+              <Button variant="secondary" size="icon-md"
                 type="button"
                 onClick={() => setViewingDetailItem(null)}
-                aria-label={t('common.close')} className="min-w-10 min-h-10 inline-flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink p-1.5 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
+                aria-label={t('common.close')}
               >
                 <X className="w-5 h-5" />
-              </button>
-            </div>
+              </Button>
+            </DialogHeader>
 
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs text-ink flex-1">
-              <div className="ds-panel grid grid-cols-2 gap-3 p-3.5 ds-grid">
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs text-foreground flex-1">
+              <Card className="grid grid-cols-2 gap-3 p-3.5">
                 <div>
-                  <span className="text-xs text-ink-soft font-bold uppercase block">
+                  <span className="text-xs text-muted-foreground font-bold uppercase block">
                     {t('eval.col_id_date')} {t('eval.id', 'ID')}
                   </span>
-                  <span className="font-mono font-bold text-ink">{viewingDetailItem.id}</span>
+                  <span className="font-mono font-bold text-foreground">{viewingDetailItem.id}</span>
                 </div>
                 <div>
-                  <span className="text-xs text-ink-soft font-bold uppercase block">
+                  <span className="text-xs text-muted-foreground font-bold uppercase block">
                     {t('eval.review_date')}
                   </span>
-                  <span className="font-bold text-ink">{formatBusinessDate(viewingDetailItem.review_date)}</span>
+                  <span className="font-bold text-foreground">{formatBusinessDate(viewingDetailItem.review_date)}</span>
                 </div>
-              </div>
+              </Card>
 
-              <div className="p-3 bg-accent-soft rounded-xl border border-accent/30 flex items-center justify-between">
+              <div className="p-3 bg-primary rounded-xl border border-primary/30 flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-accent-text font-bold uppercase block">
+                  <span className="text-xs text-accent-foreground font-bold uppercase block">
                     {t('eval.col_calculated_score')}
                   </span>
-                  <span className="text-xs text-accent-text font-semibold">{t('eval.auto_score_text')}</span>
+                  <span className="text-xs text-accent-foreground font-semibold">{t('eval.auto_score_text')}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-xl font-black text-accent-text">
+                  <span className="text-xl font-black text-accent-foreground">
                     {viewingDetailItem.calculated_score !== undefined
                       ? viewingDetailItem.calculated_score
                       : computeScoreFromFields(
@@ -1397,43 +1379,43 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                           viewingDetailItem.pricing
                         )}
                   </span>
-                  <span className="text-xs font-semibold text-accent-text"> / 100 {t('eval.points')}</span>
+                  <span className="text-xs font-semibold text-accent-foreground"> / 100 {t('eval.points')}</span>
                 </div>
               </div>
 
-              <div className="ds-panel space-y-2 p-3.5 text-xs">
-                <div className="flex justify-between pb-1.5 border-b border-hairline">
-                  <span className="text-ink-soft font-medium">{t('eval.obligation_target_2', 'Obligation / Target')}</span>
-                  <span className="font-bold text-ink">
+              <Card className="space-y-2 p-3.5 text-xs">
+                <div className="flex justify-between pb-1.5 border-b border-border">
+                  <span className="text-muted-foreground font-medium">{t('eval.obligation_target_2', 'Obligation / Target')}</span>
+                  <span className="font-bold text-foreground">
                     {viewingDetailItem.obligation_target}
                   </span>
                 </div>
-                <div className="flex justify-between pb-1.5 border-b border-hairline">
-                  <span className="text-ink-soft font-medium">{t('audit_col_evalIncident', 'Incident Frequency')}</span>
-                  <span className="font-bold text-ink">
+                <div className="flex justify-between pb-1.5 border-b border-border">
+                  <span className="text-muted-foreground font-medium">{t('audit_col_evalIncident', 'Incident Frequency')}</span>
+                  <span className="font-bold text-foreground">
                     {viewingDetailItem.incident_frequency}
                   </span>
                 </div>
-                <div className="flex justify-between pb-1.5 border-b border-hairline">
-                  <span className="text-ink-soft font-medium">{t('audit_col_evalCommunication', 'Communication')}</span>
-                  <span className="font-bold text-ink">
+                <div className="flex justify-between pb-1.5 border-b border-border">
+                  <span className="text-muted-foreground font-medium">{t('audit_col_evalCommunication', 'Communication')}</span>
+                  <span className="font-bold text-foreground">
                     {viewingDetailItem.communication}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-ink-soft font-medium">{t('eval.pricing_2', 'Pricing')}</span>
-                  <span className="font-bold text-ink">{viewingDetailItem.pricing}</span>
+                  <span className="text-muted-foreground font-medium">{t('eval.pricing_2', 'Pricing')}</span>
+                  <span className="font-bold text-foreground">{viewingDetailItem.pricing}</span>
                 </div>
-              </div>
+              </Card>
 
               <div className="pt-2">
-                <span className="text-xs text-ink-soft font-bold uppercase block mb-1">
+                <span className="text-xs text-muted-foreground font-bold uppercase block mb-1">
                   {t('eval.rec_result')}
                 </span>
                 <div className="font-bold">
                   {viewingDetailItem.final_evaluation === 'Recommended' && (
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-accent-soft text-accent-text border border-accent/30 inline-flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-accent-text" />
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-primary text-accent-foreground border border-primary/30 inline-flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-accent-foreground" />
                       <span>{t('eval.status_rec')}</span>
                     </span>
                   )}
@@ -1453,25 +1435,24 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               </div>
 
               {viewingDetailItem.notes && (
-                <div className="p-3 bg-canvas rounded-xl border border-hairline">
-                  <span className="text-xs text-ink-soft font-bold uppercase block mb-1">
+                <div className="p-3 bg-background rounded-xl border border-border">
+                  <span className="text-xs text-muted-foreground font-bold uppercase block mb-1">
                     {t('eval.notes_title')}
                   </span>
-                  <p className="text-xs text-ink whitespace-pre-wrap">
+                  <p className="text-xs text-foreground whitespace-pre-wrap">
                     {viewingDetailItem.notes}
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="p-4 sm:p-5 bg-canvas border-t border-hairline flex justify-end">
-              <button
+            <div className="p-4 sm:p-5 bg-background border-t border-border flex justify-end">
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => setViewingDetailItem(null)}
-                className="inline-flex items-center px-4 min-h-8 bg-ink hover:bg-ink text-white font-semibold rounded-md text-xs transition-colors cursor-pointer"
               >
                 {t('eval.btn_close')}
-              </button>
+              </Button>
             </div>
         </ModalFrame>
       )}

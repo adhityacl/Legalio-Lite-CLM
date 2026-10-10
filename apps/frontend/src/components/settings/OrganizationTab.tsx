@@ -11,22 +11,26 @@ import { buildDueDiligenceChecklist, getCountryPack, getIndustryPack, localize, 
 import { AlphabeticalDatalist, AlphabeticalSelect } from '../ui/alphabetical-select';
 import { Button } from '@legalio/ui-components/button';
 import { Skeleton } from '@legalio/ui-components/skeleton';
-import { ModalFrame, ModalTitle } from '../ui/modal-frame';
+import { ModalFrame } from '../ui/modal-frame';
 import { LogoUploadField } from './LogoUploadField';
 import { OrganizationColorPicker } from './OrganizationColorPicker';
 import { DueDiligenceChecklistEditor } from './DueDiligenceChecklistEditor';
 import { OrgApiError, orgApi, orgPath } from './orgApi';
 
 import type { OrganizationSettingsDto } from '@legalio/types/organizationSettings';
-import { fieldControlClass } from '@legalio/ui-components/input';
+import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Textarea } from '@legalio/ui-components/textarea';
+import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Field, FieldLabel, FieldHelperText, FieldErrorText } from '@legalio/ui-components/field';
+import { DialogTitle } from '@legalio/ui-components/dialog';
+import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
 export type { OrganizationSettingsDto } from '@legalio/types/organizationSettings';
 
 type SectionId = 'profile' | 'region' | 'contracts' | 'notifications';
 type SaveState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'saved' } | { kind: 'error'; message: string; conflict?: boolean };
 
-const fieldClass = fieldControlClass;
-const labelClass = 'mb-1.5 block text-sm font-medium text-ink ';
-const hintClass = 'mt-1.5 text-xs leading-relaxed text-ink-soft ';
+const labelClass = 'mb-1.5 block text-sm font-medium text-foreground ';
+const hintClass = 'mt-1.5 text-xs leading-relaxed text-muted-foreground ';
 
 function timezoneOptions(extra: string[]): string[] {
   let all: string[] = [];
@@ -115,10 +119,10 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
 
   if (settingsQuery.isError) {
     return (
-      <div role="alert" className="ds-alert ds-status-danger border flex flex-col items-start gap-3">
-        {t('tb.settings_load_error', 'Organization settings could not be loaded.')}
-        <Button type="button" variant="outline" size="sm" onClick={() => settingsQuery.refetch()}><RefreshCw className="h-4 w-4" aria-hidden="true" />{t('tb.retry', 'Retry')}</Button>
-      </div>
+      <Alert status="error" role="alert" className="flex flex-col items-start gap-3">
+        <AlertContent>{t('tb.settings_load_error', 'Organization settings could not be loaded.')}
+        <Button type="button" variant="outline" size="sm" onClick={() => settingsQuery.refetch()}><RefreshCw className="h-4 w-4" aria-hidden="true" />{t('tb.retry', 'Retry')}</Button></AlertContent>
+      </Alert>
     );
   }
   if (!data || !profile || !policy) {
@@ -159,7 +163,7 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
   const sectionShell = (id: SectionId, icon: React.ReactNode, title: string, description: string, body: React.ReactNode, onSubmit: () => void, valid = true) => {
     const state = saves[id];
     return (
-      <section className="rounded-2xl border border-hairline bg-surface shadow-sm">
+      <section className="rounded-2xl border border-border bg-card shadow-sm">
         <h3>
           <button
             type="button"
@@ -169,15 +173,15 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
             className="flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 rounded-md px-5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40"
           >
             <span className="flex items-center gap-3">
-              <span className="text-accent-text" aria-hidden="true">{icon}</span>
+              <span className="text-accent-foreground" aria-hidden="true">{icon}</span>
               <span>
-                <span className="block text-base font-semibold text-ink dark:text-white">{title}</span>
-                <span className="block text-sm font-normal text-ink-soft">{description}</span>
+                <span className="block text-base font-semibold text-foreground ">{title}</span>
+                <span className="block text-sm font-normal text-muted-foreground">{description}</span>
               </span>
             </span>
             <span className="flex items-center gap-2">
-              {dirty[id] && <span className="rounded-full bg-status-warning-soft px-2 py-0.5 text-xs font-semibold text-status-warning dark:bg-status-warning-soft/40">{t('tb.unsaved', 'Unsaved')}</span>}
-              <ChevronDown className={`h-5 w-5 text-ink-soft transition-transform ${open[id] ? 'rotate-180' : ''}`} aria-hidden="true" />
+              {dirty[id] && <span className="rounded-full bg-status-warning-soft px-2 py-0.5 text-xs font-semibold text-status-warning ">{t('tb.unsaved', 'Unsaved')}</span>}
+              <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${open[id] ? 'rotate-180' : ''}`} aria-hidden="true" />
             </span>
           </button>
         </h3>
@@ -187,14 +191,14 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
             noValidate
             aria-busy={state.kind === 'saving'}
             onSubmit={(event) => { event.preventDefault(); onSubmit(); }}
-            className="border-t border-hairline px-5 pb-5 pt-4"
+            className="border-t border-border px-5 pb-5 pt-4"
           >
             <fieldset disabled={!canEdit || state.kind === 'saving'} className="m-0 min-w-0 border-0 p-0">
               <legend className="sr-only">{title}</legend>
               {body}
             </fieldset>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Button type="submit" size="lg" disabled={!canEdit || !dirty[id] || !valid || state.kind === 'saving'}>
+              <Button type="submit" disabled={!canEdit || !dirty[id] || !valid || state.kind === 'saving'}>
                 {state.kind === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
                 {state.kind === 'saving' ? t('common.saving', 'Saving…') : t('tb.save_section', 'Save {section}', { section: title })}
               </Button>
@@ -232,30 +236,30 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
       {!canEdit && <p className="text-sm text-status-warning">{t('settings.region.admin_only', 'Only administrators can change organization settings.')}</p>}
 
       {sectionShell('profile', <Building2 className="h-5 w-5" />, t('tb.section_profile', 'Profile'), t('tb.section_profile_desc', 'Name, legal entity and brand of this organization.'), (
-        <div className="grid gap-4 md:grid-cols-2 ds-grid">
-          <div>
-            <label htmlFor={ids.name} className={labelClass}>{t('tb.org_name', 'Organization name')}</label>
-            <input id={ids.name} className={fieldClass} required maxLength={200} value={profile.name} aria-invalid={!profile.name.trim()} aria-describedby={!profile.name.trim() ? `${ids.name}-error` : undefined} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor={ids.name} className={labelClass}>{t('tb.org_name', 'Organization name')}</FieldLabel>
+            <Input id={ids.name} required maxLength={200} value={profile.name} aria-invalid={!profile.name.trim()} aria-describedby={!profile.name.trim() ? `${ids.name}-error` : undefined} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
             {!profile.name.trim() && <p id={`${ids.name}-error`} className="mt-1.5 text-xs text-status-danger">{t('tb.name_required', 'Enter the organization name.')}</p>}
-          </div>
-          <div>
-            <label htmlFor={ids.slug} className={labelClass}>{t('tb.slug', 'Slug')}</label>
-            <input id={ids.slug} className={fieldClass} value={data.slug} readOnly aria-describedby={`${ids.slug}-hint`} />
-            <p id={`${ids.slug}-hint`} className={hintClass}>{t('tb.slug_hint', 'Only a platform administrator can change the slug.')}</p>
-          </div>
-          <div>
-            <label htmlFor={ids.legal} className={labelClass}>{t('tb.legal_entity', 'Legal entity')}</label>
-            <input id={ids.legal} className={fieldClass} maxLength={200} value={profile.legalEntity} onChange={(e) => setProfile({ ...profile, legalEntity: e.target.value })} />
-          </div>
-          <div>
-            <label htmlFor={ids.brand} className={labelClass}>{t('tb.brand_name', 'Brand name')}</label>
-            <input id={ids.brand} className={fieldClass} maxLength={200} value={profile.brandName} onChange={(e) => setProfile({ ...profile, brandName: e.target.value })} />
-          </div>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={ids.slug} className={labelClass}>{t('tb.slug', 'Slug')}</FieldLabel>
+            <Input id={ids.slug} value={data.slug} readOnly aria-describedby={`${ids.slug}-hint`} />
+            <FieldHelperText id={`${ids.slug}-hint`} className={hintClass}>{t('tb.slug_hint', 'Only a platform administrator can change the slug.')}</FieldHelperText>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={ids.legal} className={labelClass}>{t('tb.legal_entity', 'Legal entity')}</FieldLabel>
+            <Input id={ids.legal} maxLength={200} value={profile.legalEntity} onChange={(e) => setProfile({ ...profile, legalEntity: e.target.value })} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={ids.brand} className={labelClass}>{t('tb.brand_name', 'Brand name')}</FieldLabel>
+            <Input id={ids.brand} maxLength={200} value={profile.brandName} onChange={(e) => setProfile({ ...profile, brandName: e.target.value })} />
+          </Field>
           <div>
             <span className={labelClass}>{t('admin.org_logo_label', 'Logo Organisasi / Workspace')}</span>
             <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-hairline bg-surface dark:bg-surface-2">
-                {profile.logoUrl ? <img src={profile.logoUrl} alt={profile.name} className="h-full w-full object-cover" /> : <Building2 className="h-6 w-6 text-accent-text" aria-hidden="true" />}
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-card ">
+                {profile.logoUrl ? <img src={profile.logoUrl} alt={profile.name} className="h-full w-full object-cover" /> : <Building2 className="h-6 w-6 text-accent-foreground" aria-hidden="true" />}
               </div>
               <Button id={ids.logo} type="button" variant="outline" disabled={!canEdit} onClick={() => { setDraftLogo(profile.logoUrl); setLogoDialogOpen(true); }}>{t('admin.logo_mode_upload', 'Unggah File Gambar')}</Button>
             </div>
@@ -272,10 +276,10 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
 
       {sectionShell('region', <Globe2 className="h-5 w-5" />, t('tb.section_region', 'Region and formatting'), t('tb.section_region_desc', 'Country and industry packs, currencies, time zone and generated-content language.'), (
         <div className="flex flex-col gap-4">
-          <div className="grid gap-4 md:grid-cols-2 ds-grid">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label htmlFor={ids.country} className={labelClass}>{t('settings.region.country', 'Country / jurisdiction pack')}</label>
-              <AlphabeticalSelect id={ids.country} className={fieldClass} value={policy.countryCode} onChange={(e) => {
+              <AlphabeticalSelect id={ids.country} value={policy.countryCode} onChange={(e) => {
                 const pack = countries.find((c) => c.code === e.target.value);
                 setPolicy({ ...policy, countryCode: e.target.value, defaultCurrency: pack?.defaultCurrency || policy.defaultCurrency, timezone: pack?.timezone || policy.timezone });
               }}>
@@ -284,7 +288,7 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
             </div>
             <div>
               <label htmlFor={ids.industry} className={labelClass}>{t('settings.region.industry', 'Industry pack')}</label>
-              <AlphabeticalSelect id={ids.industry} className={fieldClass} value={policy.industry} onChange={(e) => {
+              <AlphabeticalSelect id={ids.industry} value={policy.industry} onChange={(e) => {
                 const next = getIndustryPack(e.target.value);
                 const previous = getIndustryPack(policy.industry);
                 const revert = previous.contractCurrency && policy.defaultCurrency === previous.contractCurrency;
@@ -295,7 +299,7 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
             </div>
             <div>
               <label htmlFor={ids.language} className={labelClass}>{t('settings.region.language', 'Default language for e-mails and AI answers')}</label>
-              <AlphabeticalSelect id={ids.language} className={fieldClass} value={policy.language} onChange={(e) => setPolicyField('language', e.target.value as TenantSettings['language'])}>
+              <AlphabeticalSelect id={ids.language} value={policy.language} onChange={(e) => setPolicyField('language', e.target.value as TenantSettings['language'])}>
                 <option value="EN">{t('settings.english', 'English')}</option>
                 <option value="ID">{t('settings.bahasa_indonesia', 'Bahasa Indonesia')}</option>
                 <option value="ZH">{t('settings.chinese', '中文')}</option>
@@ -303,19 +307,19 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
             </div>
             <div>
               <label htmlFor={ids.timezone} className={labelClass}>{t('settings.region.timezone', 'Time zone')}</label>
-              <input id={ids.timezone} list={ids.tzList} className={fieldClass} value={policy.timezone} onChange={(e) => setPolicyField('timezone', e.target.value)} aria-describedby={`${ids.timezone}-hint`} />
+              <Input id={ids.timezone} list={ids.tzList} value={policy.timezone} onChange={(e) => setPolicyField('timezone', e.target.value)} aria-describedby={`${ids.timezone}-hint`} />
               <AlphabeticalDatalist id={ids.tzList}>{tzOptions.map((tz) => <option key={tz} value={tz} />)}</AlphabeticalDatalist>
               <p id={`${ids.timezone}-hint`} className={hintClass}>{t('settings.region.timezone_hint', 'IANA name, e.g. Asia/Singapore. Deadlines are calculated in this time zone.')}</p>
             </div>
             <div>
               <label htmlFor={ids.currency} className={labelClass}>{t('settings.region.default_currency', 'Default currency')}</label>
-              <AlphabeticalSelect id={ids.currency} className={fieldClass} value={policy.defaultCurrency} onChange={(e) => setPolicyField('defaultCurrency', e.target.value)}>
+              <AlphabeticalSelect id={ids.currency} value={policy.defaultCurrency} onChange={(e) => setPolicyField('defaultCurrency', e.target.value)}>
                 {SUPPORTED_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} — {currencyLabel(c.code, language)}</option>)}
               </AlphabeticalSelect>
             </div>
             <div>
               <label htmlFor={ids.reporting} className={labelClass}>{t('settings.region.reporting_currency', 'Reporting currency')}</label>
-              <AlphabeticalSelect id={ids.reporting} className={fieldClass} value={policy.reportingCurrency} onChange={(e) => setPolicyField('reportingCurrency', e.target.value)}>
+              <AlphabeticalSelect id={ids.reporting} value={policy.reportingCurrency} onChange={(e) => setPolicyField('reportingCurrency', e.target.value)}>
                 {SUPPORTED_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} — {currencyLabel(c.code, language)}</option>)}
               </AlphabeticalSelect>
             </div>
@@ -328,27 +332,27 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
 
       {sectionShell('contracts', <Scale className="h-5 w-5" />, t('tb.section_contracts', 'Contract and due diligence rules'), t('tb.section_contracts_desc', 'Warning window, governing law, dispute venue and the due-diligence checklist.'), (
         <div className="flex flex-col gap-4">
-          <div className="grid gap-4 md:grid-cols-2 ds-grid">
-            <div>
-              <label htmlFor={ids.expiry} className={labelClass}>{t('settings.region.expiry_days', 'Mark as "expiring soon" when this many days remain')}</label>
-              <input id={ids.expiry} type="number" min={1} max={730} className={fieldClass} value={policy.expiryWarningDays}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor={ids.expiry} className={labelClass}>{t('settings.region.expiry_days', 'Mark as "expiring soon" when this many days remain')}</FieldLabel>
+              <Input id={ids.expiry} type="number" min={1} max={730} value={policy.expiryWarningDays}
                 aria-invalid={!(policy.expiryWarningDays >= 1 && policy.expiryWarningDays <= 730)}
                 onChange={(e) => setPolicyField('expiryWarningDays', Math.trunc(Number(e.target.value)) || 0)} />
-            </div>
+            </Field>
             <div className="hidden md:block" />
-            <div>
-              <label htmlFor={ids.law} className={labelClass}>{t('settings.region.governing_law', 'Governing law')}</label>
-              <input id={ids.law} className={fieldClass} maxLength={2000} value={policy.governingLaw || ''} placeholder={packLaw} onChange={(e) => setPolicyField('governingLaw', e.target.value || undefined)} aria-describedby={`${ids.law}-hint`} />
-              <p id={`${ids.law}-hint`} className={hintClass}>{t('settings.region.pack_default', 'Pack default: {value}', { value: packLaw })}</p>
-            </div>
-            <div>
-              <label htmlFor={ids.venue} className={labelClass}>{t('settings.region.dispute_venue', 'Dispute resolution forum')}</label>
-              <input id={ids.venue} className={fieldClass} maxLength={2000} value={policy.disputeVenue || ''} placeholder={packVenue} onChange={(e) => setPolicyField('disputeVenue', e.target.value || undefined)} aria-describedby={`${ids.venue}-hint`} />
-              <p id={`${ids.venue}-hint`} className={hintClass}>{t('settings.region.pack_default', 'Pack default: {value}', { value: packVenue })}</p>
-            </div>
+            <Field>
+              <FieldLabel htmlFor={ids.law} className={labelClass}>{t('settings.region.governing_law', 'Governing law')}</FieldLabel>
+              <Input id={ids.law} maxLength={2000} value={policy.governingLaw || ''} placeholder={packLaw} onChange={(e) => setPolicyField('governingLaw', e.target.value || undefined)} aria-describedby={`${ids.law}-hint`} />
+              <FieldHelperText id={`${ids.law}-hint`} className={hintClass}>{t('settings.region.pack_default', 'Pack default: {value}', { value: packLaw })}</FieldHelperText>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={ids.venue} className={labelClass}>{t('settings.region.dispute_venue', 'Dispute resolution forum')}</FieldLabel>
+              <Input id={ids.venue} maxLength={2000} value={policy.disputeVenue || ''} placeholder={packVenue} onChange={(e) => setPolicyField('disputeVenue', e.target.value || undefined)} aria-describedby={`${ids.venue}-hint`} />
+              <FieldHelperText id={`${ids.venue}-hint`} className={hintClass}>{t('settings.region.pack_default', 'Pack default: {value}', { value: packVenue })}</FieldHelperText>
+            </Field>
           </div>
           <div>
-            <h4 className="mb-1 text-sm font-semibold text-ink dark:text-white">{t('settings.region.dd_title', 'Due-diligence checklist')}</h4>
+            <h4 className="mb-1 text-sm font-semibold text-foreground ">{t('settings.region.dd_title', 'Due-diligence checklist')}</h4>
             <p className={`${hintClass} mb-2`}>{t('settings.region.dd_desc', 'Items come from the core, country and industry packs. Mark items as required or hide them, and add your own.')}</p>
             <DueDiligenceChecklistEditor
               packItems={packChecklist}
@@ -369,37 +373,34 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
 
       {sectionShell('notifications', <Bell className="h-5 w-5" />, t('tb.section_notifications', 'Notifications and modules'), t('tb.section_notifications_desc', 'Reminder schedule, notification recipients and the modules available in this organization.'), (
         <div className="flex flex-col gap-4">
-          <div className="grid gap-4 md:grid-cols-2 ds-grid">
-            <div>
-              <label htmlFor={ids.reminders} className={labelClass}>{t('settings.region.reminders', 'Send reminders this many days before expiry')}</label>
-              <input id={ids.reminders} className={fieldClass} value={remindersText} inputMode="numeric" aria-invalid={!remindersValid} aria-describedby={`${ids.reminders}-hint`} onChange={(e) => setRemindersText(e.target.value)} />
-              <p id={`${ids.reminders}-hint`} className={remindersValid ? hintClass : 'mt-1.5 text-xs text-status-danger '}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor={ids.reminders} className={labelClass}>{t('settings.region.reminders', 'Send reminders this many days before expiry')}</FieldLabel>
+              <Input id={ids.reminders} value={remindersText} inputMode="numeric" aria-invalid={!remindersValid} aria-describedby={`${ids.reminders}-hint`} onChange={(e) => setRemindersText(e.target.value)} />
+              <FieldErrorText id={`${ids.reminders}-hint`} className={remindersValid ? hintClass : ''}>
                 {remindersValid ? t('settings.region.reminders_hint', 'Comma separated, e.g. 90, 60, 30, 14') : t('settings.region.invalid_reminders', 'Enter reminder days as whole numbers between 1 and 730.')}
-              </p>
-            </div>
-            <div>
-              <label htmlFor={ids.list} className={labelClass}>{t('tb.recipients', 'Notification recipients')}</label>
-              <textarea id={ids.list} rows={2} className={fieldClass} value={recipients.list} aria-invalid={!emailsValid} aria-describedby={`${ids.list}-hint`} onChange={(e) => setRecipients({ ...recipients, list: e.target.value })} />
-              <p id={`${ids.list}-hint`} className={hintClass}>{t('tb.recipients_hint', 'Separate addresses with commas. Up to 100.')}</p>
-            </div>
-            <div>
-              <label htmlFor={ids.legalEmail} className={labelClass}>{t('tb.legal_recipient', 'Contract reminders (legal) recipient')}</label>
-              <input id={ids.legalEmail} type="email" className={fieldClass} value={recipients.legal} onChange={(e) => setRecipients({ ...recipients, legal: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor={ids.financeEmail} className={labelClass}>{t('tb.finance_recipient', 'Commercial-document reminders (finance) recipient')}</label>
-              <input id={ids.financeEmail} type="email" className={fieldClass} value={recipients.finance} onChange={(e) => setRecipients({ ...recipients, finance: e.target.value })} />
-            </div>
+              </FieldErrorText>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={ids.list} className={labelClass}>{t('tb.recipients', 'Notification recipients')}</FieldLabel>
+              <Textarea id={ids.list} rows={2} value={recipients.list} aria-invalid={!emailsValid} aria-describedby={`${ids.list}-hint`} onChange={(e) => setRecipients({ ...recipients, list: e.target.value })} />
+              <FieldHelperText id={`${ids.list}-hint`} className={hintClass}>{t('tb.recipients_hint', 'Separate addresses with commas. Up to 100.')}</FieldHelperText>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={ids.legalEmail} className={labelClass}>{t('tb.legal_recipient', 'Contract reminders (legal) recipient')}</FieldLabel>
+              <Input id={ids.legalEmail} type="email" value={recipients.legal} onChange={(e) => setRecipients({ ...recipients, legal: e.target.value })} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={ids.financeEmail} className={labelClass}>{t('tb.finance_recipient', 'Commercial-document reminders (finance) recipient')}</FieldLabel>
+              <Input id={ids.financeEmail} type="email" value={recipients.finance} onChange={(e) => setRecipients({ ...recipients, finance: e.target.value })} />
+            </Field>
           </div>
-          {!emailsValid && <p role="alert" className="ds-alert ds-status-danger border">{t('tb.invalid_emails', 'One or more email addresses are not valid.')}</p>}
+          {!emailsValid && <Alert status="error" role="alert"><AlertContent>{t('tb.invalid_emails', 'One or more email addresses are not valid.')}</AlertContent></Alert>}
           <fieldset className="m-0 min-w-0 border-0 p-0">
-            <legend className="mb-2 text-sm font-semibold text-ink dark:text-white">{t('settings.region.modules', 'Modules')}</legend>
-            <div className="grid gap-1 md:grid-cols-2 ds-grid">
+            <legend className="mb-2 text-sm font-semibold text-foreground ">{t('settings.region.modules', 'Modules')}</legend>
+            <div className="grid gap-1 md:grid-cols-2">
               {moduleRows.map((row) => (
-                <label key={row.key} className="inline-flex min-h-10 items-center gap-3 text-sm text-ink">
-                  <input type="checkbox" className="h-4 w-4" checked={policy.modules[row.key]} onChange={(e) => setPolicyField('modules', { ...policy.modules, [row.key]: e.target.checked })} />
-                  {row.label}
-                </label>
+                <Checkbox checked={policy.modules[row.key]} onCheckedChange={(details) => setPolicyField('modules', { ...policy.modules, [row.key]: details.checked === true })}><CheckboxControl /><CheckboxLabel>{row.label}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
               ))}
             </div>
           </fieldset>
@@ -417,7 +418,7 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
       }), remindersValid && emailsValid)}
       {logoDialogOpen && (
         <ModalFrame onClose={() => setLogoDialogOpen(false)} className="w-full max-w-md p-5">
-          <ModalTitle className="ds-modal-title flex items-center gap-2">{t('admin.org_logo_label', 'Logo Organisasi / Workspace')}</ModalTitle>
+          <DialogTitle className="flex items-center gap-2">{t('admin.org_logo_label', 'Logo Organisasi / Workspace')}</DialogTitle>
           <LogoUploadField logo={draftLogo} name={profile.name} onChange={setDraftLogo} />
           <p className={hintClass}>{t('admin.logo_raster_type', 'PNG, JPG, WebP. Max 2 MB.')}</p>
           <div className="mt-5 flex justify-end gap-2">

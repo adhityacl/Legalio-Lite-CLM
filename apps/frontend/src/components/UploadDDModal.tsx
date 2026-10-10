@@ -1,4 +1,4 @@
-import { ModalFrame, ModalTitle } from './ui/modal-frame';
+import { ModalFrame } from './ui/modal-frame';
 import React, { useState, useRef } from 'react';
 import { getActiveFormattingLocale } from '@legalio/shared/currencyUtils';
 import { Upload, FileText, X, AlertCircle, Calendar, ExternalLink, Loader2, Trash2 } from 'lucide-react';
@@ -10,6 +10,11 @@ import { Partner, DDDokumenItem, DDFileItem } from '@legalio/types';
 import { formatDueDiligenceFileName } from '@legalio/shared/fileNaming';
 import { DateInput } from './DateInput';
 
+import { Button } from '@legalio/ui-components/button';
+import { Input } from '@legalio/ui-components/input';
+import { DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
+import { Card } from '@legalio/ui-components/card';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
 interface UploadDDModalProps {
   partner: Partner;
   docName: string;
@@ -197,34 +202,27 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
     <ModalFrame onClose={onClose} className="w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92dvh]">
 
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-hairline flex items-center justify-between bg-surface/50 dark:bg-surface-2/50 shrink-0">
+        <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-card/50 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="size-10 rounded-md bg-accent-soft border border-accent/30 flex items-center justify-center shrink-0 text-accent-text">
+            <div className="size-10 rounded-md bg-primary border border-primary/30 flex items-center justify-center shrink-0 text-accent-foreground">
               <Upload className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <ModalTitle className="ds-modal-title flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2">
                 {t('partners.upload_dd_modal_title', 'Upload Dokumen Due Diligence')}
-              </ModalTitle>
+              </DialogTitle>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs font-bold text-accent-text truncate">
+                <span className="text-xs font-bold text-accent-foreground truncate">
                   {displayName}
                 </span>
-                <span className="text-xs text-ink-soft">•</span>
-                <span className="text-xs text-ink-soft truncate font-medium">
+                <span className="text-xs text-muted-foreground">•</span>
+                <span className="text-xs text-muted-foreground truncate font-medium">
                   {partner.nama_partner}
                 </span>
               </div>
             </div>
           </div>
-          <button aria-label={t('common.close', 'Tutup')}
-            type="button"
-            onClick={onClose}
-            disabled={isUploading}
-            className="inline-flex items-center justify-center size-8 rounded-md text-ink-soft hover:text-ink-soft dark:hover:text-ink hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
         </div>
 
         {/* Content */}
@@ -233,24 +231,24 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
           {existingFiles.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-ink">
+                <span className="text-xs font-bold text-foreground">
                   {t('dd_upload.file_dokumen_terunggah', 'File Dokumen Terunggah ({existingFiles})', { existingFiles: existingFiles.length })}
                 </span>
-                <span className="text-xs text-ink-soft">{t('dd_upload.mendukung_multi_file_tahunan', 'Mendukung multi-file tahunan')}</span>
+                <span className="text-xs text-muted-foreground">{t('dd_upload.mendukung_multi_file_tahunan', 'Mendukung multi-file tahunan')}</span>
               </div>
               <div className="space-y-1.5 max-h-40 overflow-y-auto">
                 {existingFiles.map((f, idx) => (
-                  <div
+                  <Card
                     key={f.id || idx}
-                    className="ds-panel p-2.5 flex items-center justify-between gap-2"
+                    className="p-2.5 flex items-center justify-between gap-2"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <FileText className="w-4 h-4 text-accent-text shrink-0" />
+                      <FileText className="w-4 h-4 text-accent-foreground shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-ink truncate">
+                        <p className="text-xs font-semibold text-foreground truncate">
                           {f.fileName || `${docName}.pdf`}
                         </p>
-                        <p className="text-xs text-ink-soft">
+                        <p className="text-xs text-muted-foreground">
                           {f.year ? t('dd_upload.tahun', 'Tahun {year} • ', { year: f.year }) : ''}
                           {t('dd_upload.diunggah', 'Diunggah:')} {f.uploadedAt ? new Date(f.uploadedAt).toLocaleDateString(getActiveFormattingLocale()) : '-'}
                           {f.tanggalKadaluarsa ? t('dd_upload.exp', ' • Exp: {tanggalKadaluarsa}', { tanggalKadaluarsa: f.tanggalKadaluarsa }) : ''}
@@ -263,17 +261,16 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
                           href={f.linkDrive}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-2 py-1 bg-status-success-soft hover:bg-status-success-soft text-accent-text rounded-lg text-xs font-medium flex items-center gap-1 border border-status-success-border/30 transition-colors"
+                          className="px-2 py-1 bg-status-success-soft hover:bg-status-success-soft text-accent-foreground rounded-lg text-xs font-medium flex items-center gap-1 border border-status-success-border/30 transition-colors"
                         >
                           <ExternalLink className="w-3 h-3" />
                           <span>{t('settings.org_open_folder', 'Buka')}</span>
                         </a>
                       )}
-                      <button
+                      <Button variant="secondary"
                         type="button"
                         onClick={() => handleDeleteExistingFile(f.id)}
                         disabled={isDeletingFileId === f.id}
-                        className="p-1 text-ink-soft hover:text-status-danger rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors disabled:opacity-50"
                         title={t('dd_upload.hapus_file', 'Hapus File')}
                       >
                         {isDeletingFileId === f.id ? (
@@ -281,9 +278,9 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
                         ) : (
                           <Trash2 className="w-3.5 h-3.5" />
                         )}
-                      </button>
+                      </Button>
                     </div>
-                  </div>
+                  </Card>
                 ))}
               </div>
             </div>
@@ -291,7 +288,7 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
 
           {/* File Picker / Dropzone */}
           <div>
-            <label className="block text-xs font-bold text-ink mb-1.5">
+            <label className="block text-xs font-bold text-foreground mb-1.5">
               {t('dd_upload.pilih_file_dokumen_dd', 'Pilih File Dokumen DD *')}
             </label>
             <div
@@ -300,12 +297,12 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
               onDragLeave={handleDragLeave}
               onClick={() => fileInputRef.current?.click()}
               className={`ds-upload text-center cursor-pointer ${
-                isDragOver
-                  ? 'bg-status-success-soft/60 '
-                  : selectedFile
-                  ? 'bg-accent-soft/40 '
-                  : ''
-              }`}
+ isDragOver
+ ? 'bg-status-success-soft/60 '
+ : selectedFile
+ ? 'bg-primary/40 '
+ : ''
+ }`}
             >
               <input
                 ref={fileInputRef}
@@ -316,21 +313,21 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
               />
 
               {selectedFile ? (
-                <div className="ds-panel flex items-center justify-between gap-3 p-2.5">
+                <Card className="flex items-center justify-between gap-3 p-2.5">
                   <div className="flex items-center gap-2.5 min-w-0 text-left">
-                    <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent-text flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-primary text-accent-foreground flex items-center justify-center shrink-0">
                       <FileText className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-ink truncate">
+                      <p className="text-xs font-bold text-foreground truncate">
                         {selectedFile.name}
                       </p>
-                      <p className="text-xs text-ink-soft">
+                      <p className="text-xs text-muted-foreground">
                         {t('dd_upload.kb', '{value} KB', { value: (selectedFile.size / 1024).toFixed(1) })}
                       </p>
                     </div>
                   </div>
-                  <button aria-label={t('common.close', 'Tutup')}
+                  <Button variant="secondary" size="icon-sm" aria-label={t('common.close', 'Tutup')}
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -338,15 +335,14 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
                       setFileBase64('');
                       if (fileInputRef.current) fileInputRef.current.value = '';
                     }}
-                    className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-status-danger rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors"
                   >
                     <X className="w-4 h-4" />
-                  </button>
-                </div>
+                  </Button>
+                </Card>
               ) : (
                 <div className="space-y-1">
-                  <Upload className="w-6 h-6 text-accent-text mx-auto mb-1" />
-                  <p className="text-xs font-bold text-ink">
+                  <Upload className="w-6 h-6 text-accent-foreground mx-auto mb-1" />
+                  <p className="text-xs font-bold text-foreground">
                     {t('partners.drag_file', 'Pilih atau drag file dokumen ke sini')}
                   </p>
                 </div>
@@ -355,59 +351,57 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
           </div>
 
           {/* Metadata: Tahun / Periode & Expiry (Nomor Dokumen intentionally removed per request) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ds-grid">
-            <div>
-              <label className="block text-xs font-bold text-ink mb-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field>
+              <FieldLabel>
                 <span className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3 text-ink-soft" />
+                  <Calendar className="w-3 h-3 text-muted-foreground" />
                   {t('dd_upload.tahun_periode', 'Tahun / Periode')}
                 </span>
-              </label>
-              <input
+              </FieldLabel>
+              <Input
                 type="text"
                 value={tahunDokumen}
                 onChange={(e) => setTahunDokumen(e.target.value)}
                 placeholder={t('dd_upload.contoh_2026', 'contoh: 2026')}
-                className="ds-input w-full"
+                className="w-full"
               />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-ink mb-1">
+            </Field>
+            <Field>
+              <FieldLabel>
                 <span className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3 text-ink-soft" />
+                  <Calendar className="w-3 h-3 text-muted-foreground" />
                   {t('partners.expiry_date_label', 'Tanggal Kadaluarsa (Opsional)')}
                 </span>
-              </label>
+              </FieldLabel>
               <DateInput
                 value={tanggalKadaluarsa}
                 onChange={setTanggalKadaluarsa}
                 focusColor="emerald"
               />
-            </div>
+            </Field>
           </div>
 
           {/* Error Banner */}
           {error && (
-            <div className="p-3 bg-status-danger-soft dark:bg-status-danger-soft/40 border border-status-danger-border text-status-danger rounded-xl text-xs font-medium flex items-center gap-2">
+            <div className="p-3 bg-status-danger-soft border border-status-danger-border text-status-danger rounded-xl text-xs font-medium flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           {/* Footer Actions */}
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-hairline shrink-0">
-            <button
+          <div className="pt-2 flex items-center justify-end gap-2 border-t border-border shrink-0">
+            <Button variant="ghost"
               type="button"
               onClick={onClose}
               disabled={isUploading}
-              className="ui-button ui-button-lg cursor-pointer disabled:opacity-50 ds-button ds-button-lg ds-button-ghost"
             >
               {t('eval.btn_cancel', 'Batal')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={!selectedFile || isUploading}
-              className="ui-button ui-button-lg flex items-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-default"
             >
               {isUploading ? (
                 <>
@@ -420,7 +414,7 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
                   <span>{t('partners.upload_to_drive_btn', 'Upload ke Google Drive')}</span>
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </form>
 

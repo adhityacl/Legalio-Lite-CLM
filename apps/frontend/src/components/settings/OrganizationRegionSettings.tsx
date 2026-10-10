@@ -8,7 +8,11 @@ import { SUPPORTED_CURRENCIES, currencyLabel } from '@legalio/shared/currencyUti
 import { buildDueDiligenceChecklist, getCountryPack, getIndustryPack, localize, localizeName, type TenantSettings } from '@legalio/shared/policy';
 import { DueDiligenceChecklistEditor } from './DueDiligenceChecklistEditor';
 
-import { fieldControlClass } from '@legalio/ui-components/input';
+import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Button } from '@legalio/ui-components/button';
+import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Field, FieldLabel, FieldHelperText } from '@legalio/ui-components/field';
+import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
 type SaveStatus =
   | { kind: 'idle' }
   | { kind: 'saving' }
@@ -25,10 +29,9 @@ function timezoneOptions(extra: string[]): string[] {
   return Array.from(new Set([...extra, 'UTC', ...all])).sort();
 }
 
-const fieldClass = fieldControlClass;
-const labelClass = 'mb-1.5 block text-sm font-medium text-ink ';
-const hintClass = 'mt-1.5 text-xs leading-relaxed text-ink-soft ';
-const sectionClass = 'min-w-0 rounded-2xl border border-hairline bg-surface p-5 shadow-sm  ';
+const labelClass = 'mb-1.5 block text-sm font-medium text-foreground ';
+const hintClass = 'mt-1.5 text-xs leading-relaxed text-muted-foreground ';
+const sectionClass = 'min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm  ';
 /**
  * A native `<legend>` renders flush with its `<fieldset>`'s own border-box
  * top edge, ignoring the fieldset's padding — so a legend inside a
@@ -43,7 +46,7 @@ const sectionClass = 'min-w-0 rounded-2xl border border-hairline bg-surface p-5 
  */
 const fieldsetResetClass = 'min-w-0 border-0 p-0 m-0';
 const legendClass = 'sr-only';
-const sectionHeadingClass = 'mb-4 text-base font-semibold text-ink dark:text-white';
+const sectionHeadingClass = 'mb-4 text-base font-semibold text-foreground ';
 
 /**
  * Organization & region settings (PRD §2.1, §3.3.5): country and industry
@@ -133,9 +136,9 @@ export const OrganizationRegionSettings: React.FC = () => {
 
   if (status === 'error') {
     return (
-      <p role="alert" className="ds-alert ds-status-danger border">
-        {t('settings.region.load_error', 'Organization settings could not be loaded.')}
-      </p>
+      <Alert status="error" role="alert">
+        <AlertContent>{t('settings.region.load_error', 'Organization settings could not be loaded.')}</AlertContent>
+      </Alert>
     );
   }
 
@@ -150,11 +153,11 @@ export const OrganizationRegionSettings: React.FC = () => {
   return (
     <form onSubmit={submit} noValidate aria-busy={save.kind === 'saving' || status === 'loading'} className="flex min-w-0 flex-col gap-6">
       <div className={sectionClass}>
-        <h3 className="flex items-center gap-2 text-lg font-bold text-ink dark:text-white">
-          <Globe2 className="h-5 w-5 text-accent-text" aria-hidden="true" />
+        <h3 className="flex items-center gap-2 text-lg font-bold text-foreground ">
+          <Globe2 className="h-5 w-5 text-accent-foreground" aria-hidden="true" />
           {t('settings.region.title', 'Organization & region')}
         </h3>
-        <p className="mt-1 text-sm text-ink-soft">
+        <p className="mt-1 text-sm text-muted-foreground">
           {t('settings.region.subtitle', 'These settings drive due-diligence checklists, currencies, dates, reminders, contract templates and AI prompts for {org}.', { org: policy.tenantName || '—' })}
         </p>
         {!canEdit && <p className="mt-2 text-sm text-status-warning">{t('settings.region.admin_only', 'Only administrators can change organization settings.')}</p>}
@@ -164,22 +167,22 @@ export const OrganizationRegionSettings: React.FC = () => {
         <legend className={legendClass}>{t('settings.region.profile', 'Profile')}</legend>
         <div className={sectionClass}>
           <h3 className={sectionHeadingClass}>{t('settings.region.profile', 'Profile')}</h3>
-          <div className="grid gap-4 md:grid-cols-2 ds-grid">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label htmlFor={ids.country} className={labelClass}>{t('settings.region.country', 'Country / jurisdiction pack')}</label>
-              <AlphabeticalSelect id={ids.country} className={fieldClass} value={draft.countryCode} onChange={(e) => onCountryChange(e.target.value)}>
+              <AlphabeticalSelect id={ids.country} value={draft.countryCode} onChange={(e) => onCountryChange(e.target.value)}>
                 {countries.map((c) => <option key={c.code} value={c.code}>{localizeName(c.name, language)}</option>)}
               </AlphabeticalSelect>
             </div>
             <div>
               <label htmlFor={ids.industry} className={labelClass}>{t('settings.region.industry', 'Industry pack')}</label>
-              <AlphabeticalSelect id={ids.industry} className={fieldClass} value={draft.industry} onChange={(e) => onIndustryChange(e.target.value)}>
+              <AlphabeticalSelect id={ids.industry} value={draft.industry} onChange={(e) => onIndustryChange(e.target.value)}>
                 {industries.map((i) => <option key={i.key} value={i.key}>{localize(i.name, language)}</option>)}
               </AlphabeticalSelect>
             </div>
             <div>
               <label htmlFor={ids.language} className={labelClass}>{t('settings.region.language', 'Default language for e-mails and AI answers')}</label>
-              <AlphabeticalSelect id={ids.language} className={fieldClass} value={draft.language} onChange={(e) => update('language', e.target.value as 'EN' | 'ID' | 'ZH')}>
+              <AlphabeticalSelect id={ids.language} value={draft.language} onChange={(e) => update('language', e.target.value as 'EN' | 'ID' | 'ZH')}>
                 <option value="EN">{t('settings.english', 'English')}</option>
                 <option value="ID">{t('settings.bahasa_indonesia', 'Bahasa Indonesia')}</option>
                 <option value="ZH">{t('settings.chinese', '中文')}</option>
@@ -187,19 +190,19 @@ export const OrganizationRegionSettings: React.FC = () => {
             </div>
             <div>
               <label htmlFor={ids.timezone} className={labelClass}>{t('settings.region.timezone', 'Time zone')}</label>
-              <input id={ids.timezone} list={ids.tzList} className={fieldClass} value={draft.timezone} onChange={(e) => update('timezone', e.target.value)} aria-describedby={`${ids.timezone}-hint`} />
+              <Input id={ids.timezone} list={ids.tzList} value={draft.timezone} onChange={(e) => update('timezone', e.target.value)} aria-describedby={`${ids.timezone}-hint`} />
               <AlphabeticalDatalist id={ids.tzList}>{tzOptions.map((tz) => <option key={tz} value={tz} />)}</AlphabeticalDatalist>
               <p id={`${ids.timezone}-hint`} className={hintClass}>{t('settings.region.timezone_hint', 'IANA name, e.g. Asia/Singapore. Deadlines are calculated in this time zone.')}</p>
             </div>
             <div>
               <label htmlFor={ids.currency} className={labelClass}>{t('settings.region.default_currency', 'Default currency')}</label>
-              <AlphabeticalSelect id={ids.currency} className={fieldClass} value={draft.defaultCurrency} onChange={(e) => update('defaultCurrency', e.target.value)}>
+              <AlphabeticalSelect id={ids.currency} value={draft.defaultCurrency} onChange={(e) => update('defaultCurrency', e.target.value)}>
                 {SUPPORTED_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} — {currencyLabel(c.code, language)}</option>)}
               </AlphabeticalSelect>
             </div>
             <div>
               <label htmlFor={ids.reporting} className={labelClass}>{t('settings.region.reporting_currency', 'Reporting currency')}</label>
-              <AlphabeticalSelect id={ids.reporting} className={fieldClass} value={draft.reportingCurrency} onChange={(e) => update('reportingCurrency', e.target.value)}>
+              <AlphabeticalSelect id={ids.reporting} value={draft.reportingCurrency} onChange={(e) => update('reportingCurrency', e.target.value)}>
                 {SUPPORTED_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} — {currencyLabel(c.code, language)}</option>)}
               </AlphabeticalSelect>
             </div>
@@ -211,24 +214,23 @@ export const OrganizationRegionSettings: React.FC = () => {
         <legend className={legendClass}>{t('settings.region.lifecycle', 'Lifecycle & reminders')}</legend>
         <div className={sectionClass}>
           <h3 className={sectionHeadingClass}>{t('settings.region.lifecycle', 'Lifecycle & reminders')}</h3>
-          <div className="grid gap-4 md:grid-cols-2 ds-grid">
-            <div>
-              <label htmlFor={ids.expiry} className={labelClass}>{t('settings.region.expiry_days', 'Mark as "expiring soon" when this many days remain')}</label>
-              <input id={ids.expiry} type="number" min={1} max={730} className={fieldClass} value={draft.expiryWarningDays} onChange={(e) => update('expiryWarningDays', Number(e.target.value) || 1)} />
-            </div>
-            <div>
-              <label htmlFor={ids.reminders} className={labelClass}>{t('settings.region.reminders', 'Send reminders this many days before expiry')}</label>
-              <input
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor={ids.expiry} className={labelClass}>{t('settings.region.expiry_days', 'Mark as "expiring soon" when this many days remain')}</FieldLabel>
+              <Input id={ids.expiry} type="number" min={1} max={730} value={draft.expiryWarningDays} onChange={(e) => update('expiryWarningDays', Number(e.target.value) || 1)} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={ids.reminders} className={labelClass}>{t('settings.region.reminders', 'Send reminders this many days before expiry')}</FieldLabel>
+              <Input
                 id={ids.reminders}
-                className={fieldClass}
                 value={remindersText}
                 inputMode="numeric"
                 onChange={(e) => { setRemindersText(e.target.value); setSave({ kind: 'idle' }); }}
                 aria-invalid={!remindersValid}
                 aria-describedby={ids.remindersHint}
               />
-              <p id={ids.remindersHint} className={hintClass}>{t('settings.region.reminders_hint', 'Comma separated, e.g. 90, 60, 30, 14')}</p>
-            </div>
+              <FieldHelperText id={ids.remindersHint} className={hintClass}>{t('settings.region.reminders_hint', 'Comma separated, e.g. 90, 60, 30, 14')}</FieldHelperText>
+            </Field>
           </div>
         </div>
       </fieldset>
@@ -237,17 +239,17 @@ export const OrganizationRegionSettings: React.FC = () => {
         <legend className={legendClass}>{t('settings.region.legal_defaults', 'Contract defaults')}</legend>
         <div className={sectionClass}>
           <h3 className={sectionHeadingClass}>{t('settings.region.legal_defaults', 'Contract defaults')}</h3>
-          <div className="grid gap-4 md:grid-cols-2 ds-grid">
-            <div>
-              <label htmlFor={ids.law} className={labelClass}>{t('settings.region.governing_law', 'Governing law')}</label>
-              <input id={ids.law} className={fieldClass} value={draft.governingLaw || ''} placeholder={packLaw} onChange={(e) => update('governingLaw', e.target.value || undefined)} aria-describedby={`${ids.law}-hint`} />
-              <p id={`${ids.law}-hint`} className={hintClass}>{t('settings.region.pack_default', 'Pack default: {value}', { value: packLaw })}</p>
-            </div>
-            <div>
-              <label htmlFor={ids.venue} className={labelClass}>{t('settings.region.dispute_venue', 'Dispute resolution forum')}</label>
-              <input id={ids.venue} className={fieldClass} value={draft.disputeVenue || ''} placeholder={packVenue} onChange={(e) => update('disputeVenue', e.target.value || undefined)} aria-describedby={`${ids.venue}-hint`} />
-              <p id={`${ids.venue}-hint`} className={hintClass}>{t('settings.region.pack_default', 'Pack default: {value}', { value: packVenue })}</p>
-            </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor={ids.law} className={labelClass}>{t('settings.region.governing_law', 'Governing law')}</FieldLabel>
+              <Input id={ids.law} value={draft.governingLaw || ''} placeholder={packLaw} onChange={(e) => update('governingLaw', e.target.value || undefined)} aria-describedby={`${ids.law}-hint`} />
+              <FieldHelperText id={`${ids.law}-hint`} className={hintClass}>{t('settings.region.pack_default', 'Pack default: {value}', { value: packLaw })}</FieldHelperText>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={ids.venue} className={labelClass}>{t('settings.region.dispute_venue', 'Dispute resolution forum')}</FieldLabel>
+              <Input id={ids.venue} value={draft.disputeVenue || ''} placeholder={packVenue} onChange={(e) => update('disputeVenue', e.target.value || undefined)} aria-describedby={`${ids.venue}-hint`} />
+              <FieldHelperText id={`${ids.venue}-hint`} className={hintClass}>{t('settings.region.pack_default', 'Pack default: {value}', { value: packVenue })}</FieldHelperText>
+            </Field>
           </div>
         </div>
       </fieldset>
@@ -256,17 +258,9 @@ export const OrganizationRegionSettings: React.FC = () => {
         <legend className={legendClass}>{t('settings.region.modules', 'Modules')}</legend>
         <div className={sectionClass}>
           <h3 className={sectionHeadingClass}>{t('settings.region.modules', 'Modules')}</h3>
-          <div className="grid gap-1 md:grid-cols-2 ds-grid">
+          <div className="grid gap-1 md:grid-cols-2">
             {moduleRows.map((row) => (
-              <label key={row.key} className="inline-flex min-h-10 items-center gap-3 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={draft.modules[row.key]}
-                  onChange={(e) => update('modules', { ...draft.modules, [row.key]: e.target.checked })}
-                />
-                {row.label}
-              </label>
+              <Checkbox checked={draft.modules[row.key]} onCheckedChange={(details) => update('modules', { ...draft.modules, [row.key]: details.checked === true })}><CheckboxControl /><CheckboxLabel>{row.label}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
             ))}
           </div>
         </div>
@@ -288,16 +282,15 @@ export const OrganizationRegionSettings: React.FC = () => {
       </fieldset>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <button
+        <Button
           type="submit"
           disabled={!canEdit || save.kind === 'saving'}
-          className="ui-button ui-button-lg inline-flex cursor-pointer items-center justify-center disabled:cursor-not-allowed disabled:opacity-60 ds-button ds-button-lg ds-button-default"
         >
           {save.kind === 'saving'
             ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
             : <Save className="h-3.5 w-3.5" aria-hidden="true" />}
           {save.kind === 'saving' ? t('common.saving', 'Saving…') : t('settings.region.save', 'Save organization settings')}
-        </button>
+        </Button>
         <div aria-live="polite">
           {save.kind === 'saved' && (
             <p className="flex items-center gap-2 text-sm text-status-success">

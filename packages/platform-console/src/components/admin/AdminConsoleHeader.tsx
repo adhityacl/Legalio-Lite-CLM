@@ -16,6 +16,8 @@ import { usePermissions } from '../../lib/permissions';
 import { Button } from '@legalio/ui-components/button';
 import { Badge, type BadgeVariant } from '@legalio/ui-components/badge';
 
+import { Card } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
 interface AdminConsoleHeaderProps {
   area: 'system' | 'organization';
   activeTab: ConsoleDashboardTab;
@@ -84,18 +86,18 @@ export const AdminConsoleHeader: React.FC<AdminConsoleHeaderProps> = ({
   };
 
   return (
-    <div className="ds-card">
+    <Card>
       <div className="ds-context-bar">
         <div className="flex min-w-0 items-center gap-3">
           <div className="ds-context-bar-icon">
             {isSystemArea ? <Shield className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
           </div>
           <div className="min-w-0">
-            <h2 className="ds-page-heading">
+            <Heading as="h2" size="lg" weight="semibold">
               {isSystemArea ? t('admin.system_admin', 'System Admin') : t('admin.organization_admin', 'Organization Admin')}
-            </h2>
+            </Heading>
             {!isSystemArea && (
-              <p className="ds-page-subtitle truncate">
+              <p className="text-sm text-muted-foreground truncate">
                 {t('admin.active_organization_controls', 'Active organization controls')}
               </p>
             )}
@@ -106,13 +108,13 @@ export const AdminConsoleHeader: React.FC<AdminConsoleHeaderProps> = ({
           <Button
             type="button"
             variant="ghost"
-            size="icon"
+            size="icon-md"
             onClick={onRefresh}
             disabled={isRefreshing}
             aria-label={t('admin.refresh_btn', 'Segarkan Data')}
             title={t('admin.refresh_btn', 'Segarkan Data')}
           >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-accent-text' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-accent-foreground' : ''}`} />
           </Button>
         </div>
       </div>
@@ -120,7 +122,7 @@ export const AdminConsoleHeader: React.FC<AdminConsoleHeaderProps> = ({
       <div
         role="tablist"
         aria-label={isSystemArea ? t('admin.system_admin', 'System Admin') : t('admin.organization_admin', 'Organization Admin')}
-        className="admin-tab-list flex flex-wrap items-center gap-1 bg-surface/70 px-3 py-2 dark:bg-surface/30 sm:px-4"
+        className="admin-tab-list flex flex-wrap items-center gap-1 bg-card/70 px-3 py-2 sm:px-4"
       >
         {visibleNavItems.map((item, index) => {
           const Icon = item.icon;
@@ -147,7 +149,7 @@ export const AdminConsoleHeader: React.FC<AdminConsoleHeaderProps> = ({
               <Icon className="w-3.5 h-3.5 shrink-0" />
               <span>{item.label}</span>
               {typeof item.count === 'number' && (
-                <Badge variant={item.badgeVariant || (isActive ? 'success' : 'secondary')} size="sm" className="px-1.5 font-mono">
+                <Badge tone={item.badgeVariant || (isActive ? 'success' : 'neutral')} className="font-mono">
                   {item.count}
                 </Badge>
               )}
@@ -155,6 +157,6 @@ export const AdminConsoleHeader: React.FC<AdminConsoleHeaderProps> = ({
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 };

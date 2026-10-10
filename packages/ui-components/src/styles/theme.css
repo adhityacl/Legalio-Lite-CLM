@@ -1,0 +1,107 @@
+/*
+ * Legalio theme for moduix (https://moduix.dev/docs/tokens).
+ * Loaded after @moduix/react-tailwind/style.css. Only theme primitives are set here;
+ * moduix derives its semantic aliases, component sizes and Tailwind utilities from them.
+ * Dark values come from light-dark(), driven by data-moduix-color-scheme on <html>.
+ */
+:root {
+  /* Surfaces and text */
+  --moduix-background: light-dark(#f7f8fa, #0b101b);
+  --moduix-foreground: light-dark(#172033, #edf2fa);
+  --moduix-card: light-dark(#ffffff, #131d2e);
+  --moduix-card-foreground: light-dark(#172033, #edf2fa);
+  --moduix-popover: light-dark(#ffffff, #131d2e);
+  --moduix-popover-foreground: light-dark(#172033, #edf2fa);
+  --moduix-secondary: light-dark(#f1f4f8, #1c293d);
+  --moduix-secondary-foreground: light-dark(#172033, #edf2fa);
+  --moduix-muted: light-dark(#f1f4f8, #1c293d);
+  --moduix-muted-foreground: light-dark(#526176, #b4c1d4);
+
+  /* Action. Organizations override these at runtime (organizationThemeTokens). */
+  --moduix-primary: light-dark(#2653f6, #2653f6);
+  --moduix-primary-foreground: #ffffff;
+  --moduix-accent: light-dark(#eef2ff, #1c2c59);
+  --moduix-accent-foreground: light-dark(#1d3fc4, #a9bdff);
+  --moduix-ring: light-dark(#1d3fc4, #a9bdff);
+
+  /* Status */
+  --moduix-destructive: light-dark(#b42332, #ff9ca8);
+  --moduix-destructive-foreground: light-dark(#ffffff, #281019);
+  --moduix-success: light-dark(#16734c, #7bdfae);
+  --moduix-warning: light-dark(#92520b, #f6ca7b);
+
+  /* Lines and overlays */
+  --moduix-border: light-dark(#dce3ed, #33425a);
+  --moduix-input: light-dark(#9aa8bb, #657894);
+  --moduix-overlay: rgb(15 23 42 / 60%);
+
+  /* Navigation */
+  --moduix-sidebar: light-dark(#ffffff, #131d2e);
+  --moduix-sidebar-foreground: light-dark(#172033, #edf2fa);
+  --moduix-sidebar-primary: var(--moduix-primary);
+  --moduix-sidebar-primary-foreground: var(--moduix-primary-foreground);
+  --moduix-sidebar-accent: var(--moduix-accent);
+  --moduix-sidebar-accent-foreground: var(--moduix-accent-foreground);
+  --moduix-sidebar-border: var(--moduix-border);
+  --moduix-sidebar-ring: var(--moduix-ring);
+
+  /* Charts */
+  --moduix-chart-1: var(--moduix-primary);
+  --moduix-chart-2: light-dark(#2455ad, #a8c5ff);
+  --moduix-chart-3: light-dark(#92520b, #f6ca7b);
+  --moduix-chart-4: light-dark(#7042a6, #d2b4ff);
+  --moduix-chart-5: light-dark(#16734c, #7bdfae);
+
+  /* Typography */
+  --moduix-font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  --moduix-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Control scale: every button, input, select and trigger is 40px; popup rows are 32px. */
+  --moduix-size-xs: 24px;
+  --moduix-size-sm: 32px;
+  --moduix-size-md: 40px;
+  --moduix-size-lg: 40px;
+  --moduix-size-xl: 48px;
+
+  /* Product status palette (moduix ships destructive, success and warning only). */
+  --legalio-info: light-dark(#2455ad, #a8c5ff);
+  --legalio-info-soft: light-dark(#eff5ff, #1a2e50);
+  --legalio-info-border: light-dark(#b9cef4, #3f6094);
+  --legalio-special: light-dark(#7042a6, #d2b4ff);
+  --legalio-special-soft: light-dark(#f5effc, #312245);
+  --legalio-special-border: light-dark(#d7c3ef, #685085);
+  --legalio-finance: light-dark(#126579, #8fd6e5);
+  --legalio-finance-soft: light-dark(#edf9fc, #16313c);
+  --legalio-finance-border: light-dark(#aadbe5, #376774);
+  --legalio-success-soft: light-dark(#edf9f2, #143729);
+  --legalio-success-border: light-dark(#a5d9be, #2c6b4b);
+  --legalio-warning-soft: light-dark(#fff8e8, #3a2b19);
+  --legalio-warning-border: light-dark(#efd49a, #79572c);
+  --legalio-danger-soft: light-dark(#fff1f2, #3c1c28);
+  --legalio-danger-border: light-dark(#fecdd3, #793843);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --moduix-duration-fast: 0ms; --moduix-duration-normal: 0ms; --moduix-duration-slow: 0ms; --moduix-duration-slower: 0ms; }
+}
+
+@theme inline {
+  --color-status-success: var(--moduix-color-success);
+  --color-status-success-soft: var(--legalio-success-soft);
+  --color-status-success-border: var(--legalio-success-border);
+  --color-status-warning: var(--moduix-color-warning);
+  --color-status-warning-soft: var(--legalio-warning-soft);
+  --color-status-warning-border: var(--legalio-warning-border);
+  --color-status-danger: var(--moduix-color-destructive);
+  --color-status-danger-soft: var(--legalio-danger-soft);
+  --color-status-danger-border: var(--legalio-danger-border);
+  --color-status-info: var(--legalio-info);
+  --color-status-info-soft: var(--legalio-info-soft);
+  --color-status-info-border: var(--legalio-info-border);
+  --color-status-special: var(--legalio-special);
+  --color-status-special-soft: var(--legalio-special-soft);
+  --color-status-special-border: var(--legalio-special-border);
+  --color-status-finance: var(--legalio-finance);
+  --color-status-finance-soft: var(--legalio-finance-soft);
+  --color-status-finance-border: var(--legalio-finance-border);
+}

@@ -1,15 +1,15 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { AlertTriangle, Info } from 'lucide-react';
+import { Button } from '@legalio/ui-components/button';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@legalio/ui-components/alert-dialog';
+  Dialog,
+  DialogBackdrop,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogPositioner,
+  DialogTitle,
+} from '@legalio/ui-components/dialog';
 import { useLanguage } from './LanguageContext';
 
 export interface ConfirmOptions {
@@ -54,50 +54,36 @@ export const ConfirmDialogProvider: React.FC<{ children: React.ReactNode }> = ({
   return (
     <ConfirmDialogContext.Provider value={confirm}>
       {children}
-      <AlertDialog
+      <Dialog
+        role="alertdialog"
         open={open}
-        onOpenChange={(next) => {
-          if (!next) settle(false);
+        onOpenChange={(details) => {
+          if (!details.open) settle(false);
         }}
       >
-        <AlertDialogContent size="sm">
-          <AlertDialogHeader className="gap-2">
-            <div className="relative mb-1 flex h-16 w-16 items-center justify-center shrink-0">
-              <span
-                className={`absolute h-16 w-16 rounded-full ${
-                  isDanger ? 'bg-status-danger-soft dark:bg-status-danger-soft/30' : 'bg-surface-2 dark:bg-surface-2/60'
-                }`}
-              />
-              <span
-                className={`absolute h-10 w-10 rounded-full ${
-                  isDanger ? 'bg-status-danger-soft dark:bg-status-danger-soft/40' : 'bg-surface-2/80 dark:bg-surface-2/60'
-                }`}
-              />
-              <Icon
-                className={`relative h-6 w-6 ${isDanger ? 'text-status-danger ' : 'text-ink-soft dark:text-ink'}`}
-              />
-            </div>
-            <AlertDialogTitle className="text-center">
-              {options?.title || t('confirm.default_title', 'Konfirmasi')}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-center whitespace-pre-line">
-              {options?.description}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {/* Cancel is first in DOM so it receives default focus on open (safe default per UX Planet). */}
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => settle(false)}>
-              {options?.cancelLabel || t('confirm.cancel', 'Batal')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant={isDanger ? 'destructive' : 'default'}
-              onClick={() => settle(true)}
+        <DialogBackdrop />
+        <DialogPositioner>
+          <DialogContent className="flex flex-col items-center text-center">
+            <span
+              className={`mb-4 inline-flex size-12 items-center justify-center rounded-full ${isDanger ? 'bg-status-danger-soft text-status-danger' : 'bg-muted text-muted-foreground'}`}
+              aria-hidden="true"
             >
-              {options?.confirmLabel || t('confirm.continue', 'Lanjutkan')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <Icon className="size-6" />
+            </span>
+            <DialogTitle>{options?.title || t('confirm.default_title', 'Konfirmasi')}</DialogTitle>
+            <DialogDescription className="mt-2 whitespace-pre-line">{options?.description}</DialogDescription>
+            {/* Cancel is first in DOM so it receives default focus on open (safe default per UX Planet). */}
+            <DialogFooter className="w-full justify-center">
+              <Button variant="outline" onClick={() => settle(false)}>
+                {options?.cancelLabel || t('confirm.cancel', 'Batal')}
+              </Button>
+              <Button variant={isDanger ? 'destructive' : 'default'} onClick={() => settle(true)}>
+                {options?.confirmLabel || t('confirm.continue', 'Lanjutkan')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </DialogPositioner>
+      </Dialog>
     </ConfirmDialogContext.Provider>
   );
 };

@@ -48,7 +48,7 @@ export function DocumentCalendar({ events, loading, error, onRetry, initialView 
     {error && <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--destructive)]/30 bg-[var(--muted)] p-3 text-sm">
       <AlertCircle aria-hidden="true" className="size-5 text-[var(--destructive)]" />
       <span className="flex-1">{t('calendar.load_error')}</span>
-      {onRetry && <Button size="lg" type="button" variant="outline" disabled={loading} onClick={onRetry}>{t('calendar.retry')}</Button>}
+      {onRetry && <Button type="button" variant="outline" disabled={loading} onClick={onRetry}>{t('calendar.retry')}</Button>}
     </div>}
     {loading && <p role="status" className="sr-only">{t('calendar.loading')}</p>}
     <div aria-busy={loading || undefined}>

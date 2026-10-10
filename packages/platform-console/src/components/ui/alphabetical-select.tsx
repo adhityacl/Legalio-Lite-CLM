@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 
+import { NativeSelect } from '@legalio/ui-components/native-select';
 type OptionProps = {
   children?: React.ReactNode;
   value?: string | number | readonly string[];
@@ -45,7 +46,7 @@ export const AlphabeticalSelect = React.forwardRef<HTMLSelectElement, React.Sele
   ({ children, ...props }, ref) => {
     const { language } = useLanguage();
     const locale = language === 'ZH' ? 'zh-CN' : language === 'ID' ? 'id' : 'en';
-    return <select {...props} ref={ref}>{alphabeticalOptions(children, locale)}</select>;
+    return <NativeSelect {...props} ref={ref}>{alphabeticalOptions(children, locale)}</NativeSelect>;
   },
 );
 AlphabeticalSelect.displayName = 'AlphabeticalSelect';

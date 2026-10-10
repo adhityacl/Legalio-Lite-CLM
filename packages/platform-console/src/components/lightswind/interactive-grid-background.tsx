@@ -257,7 +257,7 @@ const InteractiveGridBackground: React.FC<InteractiveGridBackgroundProps> = ({
 
       {showFade && (
         <div
-          className="pointer-events-none absolute inset-0 bg-surface/80 dark:bg-surface/80"
+          className="pointer-events-none absolute inset-0 bg-card/80 "
           style={{
             maskImage: `radial-gradient(ellipse at center, transparent ${fadeIntensity}%, black)`,
             WebkitMaskImage: `radial-gradient(ellipse at center, transparent ${fadeIntensity}%, black)`,

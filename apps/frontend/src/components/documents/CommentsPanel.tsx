@@ -19,6 +19,9 @@ import {
 import { RelativeTime } from './RelativeTime';
 import { INPUT_CLASS } from './documentLabels';
 
+import { Textarea } from '@legalio/ui-components/textarea';
+import { Button } from '@legalio/ui-components/button';
+import { Alert, AlertContent } from '@legalio/ui-components/alert';
 interface CommentsPanelProps {
   editor: Editor | null;
   documentId: string | null;
@@ -40,12 +43,12 @@ interface Composer {
 }
 
 const SMALL_BUTTON =
-  'inline-flex items-center gap-1 px-2 min-h-10 sm:min-h-8 rounded-md text-xs font-bold border border-hairline  text-ink  hover:bg-surface-2 dark:hover:bg-surface-2 disabled:opacity-50 cursor-pointer';
+  'inline-flex items-center gap-1 px-2 min-h-10 sm:min-h-8 rounded-md text-xs font-bold border border-border  text-foreground  hover:bg-muted  disabled:opacity-50 cursor-pointer';
 const STATUS_BADGE: Record<CommentStatus, string> = {
-  open: 'bg-status-warning-soft text-status-warning border-status-warning-border dark:bg-status-warning-soft/50  ',
-  resolved: 'bg-surface-2 text-ink border-hairline   ',
-  accepted: 'bg-status-success-soft text-status-success border-status-success-border dark:bg-status-success-soft/50  ',
-  rejected: 'bg-status-danger-soft text-status-danger border-status-danger-border dark:bg-status-danger-soft/50  ',
+  open: 'bg-status-warning-soft text-status-warning border-status-warning-border   ',
+  resolved: 'bg-muted text-foreground border-border   ',
+  accepted: 'bg-status-success-soft text-status-success border-status-success-border   ',
+  rejected: 'bg-status-danger-soft text-status-danger border-status-danger-border   ',
 };
 
 export const CommentsPanel: React.FC<CommentsPanelProps> = ({
@@ -248,11 +251,11 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
     const isBusy = busy === comment.id || busy === 'bulk';
     const replies = repliesOf(comment.id);
     return (
-      <li key={comment.id} className="editor-panel-card p-4 rounded-xl border border-hairline bg-surface space-y-1.5 text-xs" aria-busy={isBusy}>
+      <li key={comment.id} className="editor-panel-card p-4 rounded-xl border border-border bg-card space-y-1.5 text-xs" aria-busy={isBusy}>
         <div className="flex items-start justify-between gap-2">
           <p className="text-xs">
-            <span className="font-bold text-ink dark:text-white">{comment.author_name || '—'}</span>{' '}
-            <span className="text-ink-soft">
+            <span className="font-bold text-foreground ">{comment.author_name || '—'}</span>{' '}
+            <span className="text-muted-foreground">
               · {isSuggestion ? t('documents.comments.suggestion', 'Usulan') : t('documents.comments.comment', 'Komentar')} ·{' '}
               <RelativeTime iso={comment.created_at} />
             </span>
@@ -264,7 +267,7 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
           <button
             type="button"
             onClick={() => jumpTo(comment)}
-            className="block w-full text-left border-l-2 border-status-warning-border pl-2 text-xs text-ink-soft hover:bg-surface dark:hover:bg-surface-2 rounded-r cursor-pointer"
+            className="block w-full text-left border-l-2 border-status-warning-border pl-2 text-xs text-muted-foreground hover:bg-card rounded-r cursor-pointer"
             title={t('documents.comments.jump', 'Lompat ke teks di dokumen')}
           >
             {isSuggestion ? <del className="text-status-danger">{comment.quote}</del> : <q>{comment.quote}</q>}
@@ -276,26 +279,26 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
             {comment.new_text ? (
               <ins className="text-status-success font-semibold">{comment.new_text}</ins>
             ) : (
-              <em className="text-ink-soft">{t('documents.comments.deletion', '(hapus teks)')}</em>
+              <em className="text-muted-foreground">{t('documents.comments.deletion', '(hapus teks)')}</em>
             )}
           </p>
         )}
-        {comment.body && <p className="whitespace-pre-wrap text-ink">{comment.body}</p>}
+        {comment.body && <p className="whitespace-pre-wrap text-foreground">{comment.body}</p>}
         {comment.resolved_at && (
-          <p className="text-xs text-ink-soft">
+          <p className="text-xs text-muted-foreground">
             {statusLabel(comment.status)} · {comment.resolved_by_name || '—'} · <RelativeTime iso={comment.resolved_at} />
           </p>
         )}
 
         {replies.length > 0 && (
-          <ul className="space-y-1 pl-3 border-l border-hairline">
+          <ul className="space-y-1 pl-3 border-l border-border">
             {replies.map((reply) => (
               <li key={reply.id} className="text-xs">
-                <span className="font-bold text-ink dark:text-white">{reply.author_name || '—'}</span>{' '}
-                <span className="text-ink-soft">
+                <span className="font-bold text-foreground ">{reply.author_name || '—'}</span>{' '}
+                <span className="text-muted-foreground">
                   · <RelativeTime iso={reply.created_at} />
                 </span>
-                <p className="whitespace-pre-wrap text-ink">{reply.body}</p>
+                <p className="whitespace-pre-wrap text-foreground">{reply.body}</p>
               </li>
             ))}
           </ul>
@@ -306,7 +309,7 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
             <label htmlFor={`${idPrefix}-reply-${comment.id}`} className="sr-only">
               {t('documents.comments.reply', 'Balas')}
             </label>
-            <textarea
+            <Textarea
               id={`${idPrefix}-reply-${comment.id}`}
               autoFocus
               rows={2}
@@ -315,12 +318,12 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
               className={INPUT_CLASS}
             />
             <div className="flex gap-1">
-              <button type="submit" disabled={isBusy || !replyTo.body.trim()} className={`${SMALL_BUTTON} theme-action border-transparent`}>
+              <Button type="submit" disabled={isBusy || !replyTo.body.trim()} className={`${SMALL_BUTTON} `}>
                 {t('documents.comments.send', 'Kirim')}
-              </button>
-              <button type="button" onClick={() => setReplyTo(null)} className={SMALL_BUTTON}>
+              </Button>
+              <Button variant="ghost" type="button" onClick={() => setReplyTo(null)} className={SMALL_BUTTON}>
                 {t('common.cancel', 'Batal')}
-              </button>
+              </Button>
             </div>
           </form>
         ) : (
@@ -329,27 +332,27 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
             <div className="flex flex-wrap gap-1">
               {comment.status === 'open' && isSuggestion && (
                 <>
-                  <button type="button" disabled={isBusy} onClick={() => act(comment, 'accept')} className={SMALL_BUTTON}>
+                  <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'accept')} className={SMALL_BUTTON}>
                     <Check className="w-3 h-3 text-status-success" aria-hidden /> {t('documents.comments.accept', 'Terima')}
-                  </button>
-                  <button type="button" disabled={isBusy} onClick={() => act(comment, 'reject')} className={SMALL_BUTTON}>
+                  </Button>
+                  <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'reject')} className={SMALL_BUTTON}>
                     <X className="w-3 h-3 text-status-danger" aria-hidden /> {t('documents.comments.reject', 'Tolak')}
-                  </button>
+                  </Button>
                 </>
               )}
               {comment.status === 'open' && !isSuggestion && (
-                <button type="button" disabled={isBusy} onClick={() => act(comment, 'resolve')} className={SMALL_BUTTON}>
+                <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'resolve')} className={SMALL_BUTTON}>
                   <CheckCheck className="w-3 h-3" aria-hidden /> {t('documents.comments.resolve', 'Selesaikan')}
-                </button>
+                </Button>
               )}
               {comment.status === 'resolved' && (
-                <button type="button" disabled={isBusy} onClick={() => act(comment, 'reopen')} className={SMALL_BUTTON}>
+                <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'reopen')} className={SMALL_BUTTON}>
                   <RotateCcw className="w-3 h-3" aria-hidden /> {t('documents.comments.reopen', 'Buka lagi')}
-                </button>
+                </Button>
               )}
-              <button type="button" onClick={() => setReplyTo({ id: comment.id, body: '' })} className={SMALL_BUTTON}>
+              <Button variant="ghost" type="button" onClick={() => setReplyTo({ id: comment.id, body: '' })} className={SMALL_BUTTON}>
                 {t('documents.comments.reply', 'Balas')}
-              </button>
+              </Button>
             </div>
           )
         )}
@@ -360,47 +363,47 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
   return (
     <div className="editor-comments space-y-4">
       {canEdit && !composer && (
-        <div className="editor-comment-actions grid grid-cols-2 gap-2 ds-grid">
-          <button type="button" onClick={() => startComposer('comment')} className={`${SMALL_BUTTON} justify-center`}>
+        <div className="editor-comment-actions grid grid-cols-2 gap-2">
+          <Button variant="ghost" type="button" onClick={() => startComposer('comment')} className={`${SMALL_BUTTON} `}>
             <MessageSquarePlus className="w-3.5 h-3.5" aria-hidden /> {t('documents.comments.add_comment', 'Komentar')}
-          </button>
-          <button type="button" onClick={() => startComposer('suggestion')} className={`${SMALL_BUTTON} justify-center`}>
+          </Button>
+          <Button variant="ghost" type="button" onClick={() => startComposer('suggestion')} className={`${SMALL_BUTTON} `}>
             <PenLine className="w-3.5 h-3.5" aria-hidden /> {t('documents.comments.add_suggestion', 'Usulkan Perubahan')}
-          </button>
-          <button
+          </Button>
+          <Button variant="outline"
             type="button"
             disabled={busy === 'ai-redline'}
             aria-busy={busy === 'ai-redline'}
             onClick={runAiRedlining}
-            className={`${SMALL_BUTTON} col-span-2 justify-center border-status-success-border text-status-success hover:bg-status-success-soft dark:hover:bg-status-success-soft/40`}
+            className={`${SMALL_BUTTON} col-span-2 `}
           >
             <AiIcon className={`w-3.5 h-3.5 ${busy === 'ai-redline' ? 'animate-pulse' : ''}`} />
             {busy === 'ai-redline' ? t('documents.comments.ai_redline_running', 'Meninjau dokumen…') : t('documents.comments.ai_redline', 'AI Redlining')}
-          </button>
+          </Button>
         </div>
       )}
 
       {composer && (
-        <form onSubmit={submitComposer} className="space-y-2 editor-panel-card p-4 rounded-xl border border-status-success-border bg-status-success-soft/30 dark:bg-status-success-soft/10" aria-busy={busy === 'composer'}>
-          <p className="text-xs font-bold text-ink">
+        <form onSubmit={submitComposer} className="space-y-2 editor-panel-card p-4 rounded-xl border border-status-success-border bg-status-success-soft/30 " aria-busy={busy === 'composer'}>
+          <p className="text-xs font-bold text-foreground">
             {composer.mode === 'suggestion' ? t('documents.comments.add_suggestion', 'Usulkan Perubahan') : t('documents.comments.add_comment', 'Komentar')}
           </p>
           {composer.range ? (
-            <blockquote className="border-l-2 border-status-warning-border pl-2 text-xs text-ink-soft line-clamp-3">{composer.range.text}</blockquote>
+            <blockquote className="border-l-2 border-status-warning-border pl-2 text-xs text-muted-foreground line-clamp-3">{composer.range.text}</blockquote>
           ) : (
-            <p className="text-xs text-ink-soft">{t('documents.comments.general', 'Komentar umum (tanpa teks terpilih).')}</p>
+            <p className="text-xs text-muted-foreground">{t('documents.comments.general', 'Komentar umum (tanpa teks terpilih).')}</p>
           )}
           {composer.mode === 'suggestion' && (
-            <label className="block space-y-1 text-xs font-semibold text-ink-soft">
+            <label className="block space-y-1 text-xs font-semibold text-muted-foreground">
               <span>{t('documents.comments.replace_with', 'Ganti menjadi (kosongkan untuk menghapus)')}</span>
-              <textarea rows={2} value={composer.newText} onChange={(e) => setComposer({ ...composer, newText: e.target.value })} className={INPUT_CLASS} />
+              <Textarea rows={2} value={composer.newText} onChange={(e) => setComposer({ ...composer, newText: e.target.value })} className={INPUT_CLASS} />
             </label>
           )}
-          <label className="block space-y-1 text-xs font-semibold text-ink-soft">
+          <label className="block space-y-1 text-xs font-semibold text-muted-foreground">
             <span>
               {composer.mode === 'suggestion' ? t('documents.comments.reason', 'Alasan (opsional)') : t('documents.comments.comment_text', 'Komentar')}
             </span>
-            <textarea
+            <Textarea
               autoFocus={composer.mode === 'comment'}
               required={composer.mode === 'comment'}
               rows={3}
@@ -410,12 +413,12 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
             />
           </label>
           <div className="flex gap-1">
-            <button type="submit" disabled={busy === 'composer'} className={`${SMALL_BUTTON} theme-action border-transparent`}>
+            <Button type="submit" disabled={busy === 'composer'} className={`${SMALL_BUTTON} `}>
               {busy === 'composer' ? t('common.saving', 'Menyimpan…') : t('documents.comments.send', 'Kirim')}
-            </button>
-            <button type="button" onClick={() => setComposer(null)} className={SMALL_BUTTON}>
+            </Button>
+            <Button variant="ghost" type="button" onClick={() => setComposer(null)} className={SMALL_BUTTON}>
               {t('common.cancel', 'Batal')}
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -424,27 +427,27 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
         <div role="status" className="space-y-2">
           <span className="sr-only">{t('common.loading', 'Memuat…')}</span>
           {[0, 1].map((i) => (
-            <div key={i} className="h-24 rounded-lg bg-surface-2 animate-pulse motion-reduce:animate-none" />
+            <div key={i} className="h-24 rounded-lg bg-muted animate-pulse motion-reduce:animate-none" />
           ))}
         </div>
       )}
 
       {state.status === 'error' && (
-        <div role="alert" className="ds-alert ds-status-danger border">
-          <p>{state.message}</p>
-          <button type="button" onClick={reload} className={SMALL_BUTTON}>
+        <Alert status="error" role="alert">
+          <AlertContent><p>{state.message}</p>
+          <Button variant="ghost" type="button" onClick={reload} className={SMALL_BUTTON}>
             <RefreshCw className="w-3 h-3" aria-hidden /> {t('common.retry', 'Coba lagi')}
-          </button>
-        </div>
+          </Button></AlertContent>
+        </Alert>
       )}
 
       {state.status === 'ready' && (
         <>
-          <section aria-labelledby={`${idPrefix}-summary`} className="ds-panel editor-panel-card p-4 space-y-2">
-            <h3 id={`${idPrefix}-summary`} className="text-xs font-bold text-ink">
+          <section aria-labelledby={`${idPrefix}-summary`} className="editor-panel-card p-4 space-y-2">
+            <h3 id={`${idPrefix}-summary`} className="text-xs font-bold text-foreground">
               {t('documents.comments.summary', 'Ringkasan Perubahan')}
             </h3>
-            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-ink ds-grid">
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-foreground">
               <dt>{t('documents.comments.total', 'Total')}</dt>
               <dd className="text-right font-bold">{topLevel.length}</dd>
               <dt>{statusLabel('open')}</dt>
@@ -457,24 +460,24 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
               <dd className="text-right font-bold">{count('resolved')}</dd>
             </dl>
             {canEdit && openSuggestions.length > 1 && (
-              <div className="grid grid-cols-2 gap-1 ds-grid">
-                <button type="button" disabled={busy === 'bulk'} onClick={() => bulk('accept')} className={`${SMALL_BUTTON} justify-center`}>
+              <div className="grid grid-cols-2 gap-1">
+                <Button variant="ghost" type="button" disabled={busy === 'bulk'} onClick={() => bulk('accept')} className={`${SMALL_BUTTON} `}>
                   <Check className="w-3 h-3 text-status-success" aria-hidden /> {t('documents.comments.accept_all', 'Terima Semua')}
-                </button>
-                <button type="button" disabled={busy === 'bulk'} onClick={() => bulk('reject')} className={`${SMALL_BUTTON} justify-center`}>
+                </Button>
+                <Button variant="ghost" type="button" disabled={busy === 'bulk'} onClick={() => bulk('reject')} className={`${SMALL_BUTTON} `}>
                   <X className="w-3 h-3 text-status-danger" aria-hidden /> {t('documents.comments.reject_all', 'Tolak Semua')}
-                </button>
+                </Button>
               </div>
             )}
             {documentId && (
-              <button type="button" onClick={() => onExportRedline(comments)} className={`${SMALL_BUTTON} w-full justify-center`}>
+              <Button variant="ghost" type="button" onClick={() => onExportRedline(comments)} className={`${SMALL_BUTTON} w-full`}>
                 <FileDown className="w-3 h-3" aria-hidden /> {t('documents.comments.export_redline', 'Unduh dengan Redline (.doc)')}
-              </button>
+              </Button>
             )}
           </section>
 
           {open.length === 0 ? (
-            <p className="text-xs text-ink-soft editor-panel-empty text-center py-8 border border-dashed border-hairline rounded-lg">
+            <p className="text-xs text-muted-foreground editor-panel-empty text-center py-8 border border-dashed border-border rounded-lg">
               {t('documents.comments.empty', 'Tidak ada komentar atau usulan terbuka.')}
             </p>
           ) : (
@@ -485,38 +488,36 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
 
           {closed.length > 0 && (
             <div className="space-y-2">
-              <button
+              <Button variant="link" size="sm"
                 type="button"
                 onClick={() => setShowClosed((v) => !v)}
                 aria-expanded={showClosed}
-                className="text-xs font-semibold text-ink-soft underline cursor-pointer min-h-8"
               >
                 {showClosed
                   ? t('documents.comments.hide_closed', 'Sembunyikan yang selesai')
                   : t('documents.comments.show_closed', 'Tampilkan yang selesai ({n})', { n: closed.length })}
-              </button>
+              </Button>
               {showClosed && <ul className="space-y-2 opacity-90">{closed.map(renderCard)}</ul>}
             </div>
           )}
 
           {topLevel.length > 0 && (
-            <section className="space-y-1.5 pt-2 border-t border-hairline">
-              <button
+            <section className="space-y-1.5 pt-2 border-t border-border">
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => setShowTimeline((v) => !v)}
                 aria-expanded={showTimeline}
-                className="text-xs font-semibold text-ink flex items-center gap-1.5 cursor-pointer min-h-8"
               >
-                <History className="w-3.5 h-3.5 text-ink-soft" aria-hidden />
+                <History className="w-3.5 h-3.5 text-muted-foreground" aria-hidden />
                 {t('documents.comments.timeline', 'Riwayat Redline')}
-              </button>
+              </Button>
               {showTimeline && (
-                <ol className="space-y-1 text-xs text-ink-soft">
+                <ol className="space-y-1 text-xs text-muted-foreground">
                   {[...topLevel]
                     .sort((a, b) => (b.resolved_at ?? b.created_at).localeCompare(a.resolved_at ?? a.created_at))
                     .map((c) => (
                       <li key={c.id}>
-                        <strong className="text-ink">{c.author_name || '—'}</strong>:{' '}
+                        <strong className="text-foreground">{c.author_name || '—'}</strong>:{' '}
                         {c.comment_type === 'suggestion'
                           ? `“${c.quote}” → “${c.new_text ?? ''}”`
                           : c.body.slice(0, 80)}{' '}

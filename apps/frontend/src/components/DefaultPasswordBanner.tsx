@@ -7,6 +7,7 @@ import { Input } from '@legalio/ui-components/input';
 import { Label } from '@legalio/ui-components/label';
 import { GoogleCredentialsDialog } from './settings/GoogleCredentialsDialog';
 
+import { Alert, AlertContent } from '@legalio/ui-components/alert';
 interface DefaultPasswordBannerProps {
   /** Opens the user administration screen, for changing other accounts. */
   onOpenSecurity: () => void;
@@ -95,7 +96,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
   return (
     <div
       role={passwordActive ? 'alert' : 'status'}
-      className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-status-warning-border/60 bg-status-warning-soft p-3 text-status-warning dark:border-status-warning-border/50 dark:bg-status-warning-soft/40"
+      className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-status-warning-border/60 bg-status-warning-soft p-3 text-status-warning "
     >
       <ShieldAlert className="h-5 w-5 shrink-0" aria-hidden="true" />
       {passwordActive ? (
@@ -120,28 +121,27 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
         {passwordActive && (
           <Dialog.Root open={open} onOpenChange={(value) => { setOpen(value); if (!value) setState({ kind: 'idle' }); }}>
             <Dialog.Trigger asChild>
-              <Button type="button" size="lg">
+              <Button type="button">
                 {t('security.change_password', 'Change password')}
               </Button>
             </Dialog.Trigger>
             <Dialog.Portal>
-              <Dialog.Overlay className="fixed inset-0 z-1000 bg-ink/60" />
-              <Dialog.Content className="fixed left-1/2 top-1/2 z-1001 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-surface p-6 shadow-xl">
+              <Dialog.Overlay className="fixed inset-0 z-1000 bg-foreground/60" />
+              <Dialog.Content className="fixed left-1/2 top-1/2 z-1001 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-card p-6 shadow-xl">
                 <div className="mb-4 flex items-start justify-between gap-4">
-                  <Dialog.Title className="ds-modal-title flex items-center gap-2">
+                  <Dialog.Title className="flex items-center gap-2">
                     {t('security.change_password', 'Change password')}
                   </Dialog.Title>
                   <Dialog.Close asChild>
-                    <button
+                    <Button variant="secondary" size="icon-md"
                       type="button"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-md text-ink-soft hover:bg-surface-2 dark:hover:bg-surface-2"
                       aria-label={t('common.close', 'Close')}
                     >
                       <X className="h-4 w-4" aria-hidden="true" />
-                    </button>
+                    </Button>
                   </Dialog.Close>
                 </div>
-                <Dialog.Description className="mb-4 text-sm text-ink-soft">
+                <Dialog.Description className="mb-4 text-sm text-muted-foreground">
                   {t('security.change_password_desc', 'Other sessions will be signed out after the change.')}
                 </Dialog.Description>
                 <form onSubmit={submit} noValidate aria-busy={state.kind === 'saving'} className="space-y-3">
@@ -165,17 +165,17 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
                     </div>
                   ))}
                   {hasError && (
-                    <p id={errorId} role="alert" className="ds-alert ds-status-danger border">
-                      {state.message}
-                    </p>
+                    <Alert status="error" id={errorId} role="alert">
+                      <AlertContent>{state.message}</AlertContent>
+                    </Alert>
                   )}
                   <div className="flex justify-end gap-2 pt-2">
                     <Dialog.Close asChild>
-                      <Button size="lg" type="button" variant="outline">
+                      <Button type="button" variant="outline">
                         {t('common.cancel', 'Cancel')}
                       </Button>
                     </Dialog.Close>
-                    <Button size="lg" type="submit" disabled={state.kind === 'saving'}>
+                    <Button type="submit" disabled={state.kind === 'saving'}>
                       {state.kind === 'saving' ? t('common.saving', 'Saving…') : t('security.save_password', 'Save password')}
                     </Button>
                   </div>
@@ -184,14 +184,14 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
             </Dialog.Portal>
           </Dialog.Root>
         )}
-        {passwordActive && <Button type="button" size="lg" onClick={onOpenSecurity}>
+        {passwordActive && <Button type="button" onClick={onOpenSecurity}>
           {t('security.manage_users', 'Manage users')}
         </Button>}
         {googleIncomplete && showGoogleSetup && (
           <GoogleCredentialsDialog
             onClose={refresh}
             trigger={
-              <Button type="button" size="lg">
+              <Button type="button">
                 {t('google_setup.button', 'Hubungkan Google')}
               </Button>
             }

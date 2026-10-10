@@ -4,6 +4,8 @@ import { Calendar as CalendarIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@legalio/ui-components/popover';
 import { Calendar } from '@legalio/ui-components/calendar';
 
+import { Input } from '@legalio/ui-components/input';
+import { Button } from '@legalio/ui-components/button';
 export interface DateInputProps {
   value: string; // ISO format YYYY-MM-DD or DD/MM/YYYY
   onChange: (isoDate: string) => void;
@@ -152,10 +154,10 @@ export const DateInput: React.FC<DateInputProps> = ({
 
   const focusBorderClass =
     focusColor === 'emerald'
-      ? 'focus-within:border-accent focus:border-accent'
+      ? 'focus-within:border-primary focus:border-primary'
       : focusColor === 'slate'
-      ? 'focus-within:border-hairline focus:border-hairline'
-      : 'focus-within:border-accent focus:border-accent';
+      ? 'focus-within:border-border focus:border-border'
+      : 'focus-within:border-primary focus:border-primary';
 
   const selectedDate = isoToDate(formatDdMmYyyyToIso(value) || value);
   const minDate = min ? isoToDate(min) : undefined;
@@ -163,7 +165,7 @@ export const DateInput: React.FC<DateInputProps> = ({
 
   return (
     <div className={`relative flex items-center ${className}`}>
-      <input
+      <Input
         type="text"
         id={id}
         name={name}
@@ -174,21 +176,21 @@ export const DateInput: React.FC<DateInputProps> = ({
         onChange={handleTextChange}
         onBlur={handleBlur}
         maxLength={10}
-        className={`ds-input w-full pl-3 pr-9 ${focusBorderClass}  ${
-          disabled ? 'opacity-60 cursor-not-allowed' : ''
-        }`}
+        className={`w-full pl-3 pr-9 ${focusBorderClass} ${
+ disabled ? '' : ''
+ }`}
       />
       <Popover open={popoverOpen} onOpenChange={(open) => !disabled && setPopoverOpen(open)}>
         <PopoverTrigger asChild>
-          <button
+          <Button variant="ghost" size="icon-md"
             type="button"
             disabled={disabled}
             title={t('common.buka_kalender', 'Buka Kalender')}
             aria-label={t('common.buka_kalender', 'Buka Kalender')}
-            className="absolute right-2.5 text-ink-soft hover:text-accent-text transition-colors cursor-pointer disabled:cursor-not-allowed p-0.5"
+            className="absolute right-2.5"
           >
             <CalendarIcon className="w-4 h-4" />
-          </button>
+          </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar

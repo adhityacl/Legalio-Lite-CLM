@@ -1,5 +1,5 @@
 import { AlphabeticalSelect } from './ui/alphabetical-select';
-import { ModalFrame, ModalTitle } from './ui/modal-frame';
+import { ModalFrame } from './ui/modal-frame';
 import React, { useState, useEffect } from 'react';
 import { useTenantSettings } from '../context/TenantSettingsContext';
 import { InsertionOrder, Contract, Partner, PricingModel, ChargingType, PRICING_MODELS } from '@legalio/types';
@@ -9,6 +9,11 @@ import { DateInput } from './DateInput';
 import { SUPPORTED_CURRENCIES, currencyLabel, formatMoney, fetchHistoricalRate, getDefaultUsdRate } from '@legalio/shared/currencyUtils';
 import { formatIOFileName } from '@legalio/shared/fileNaming';
 
+import { Button } from '@legalio/ui-components/button';
+import { Input } from '@legalio/ui-components/input';
+import { Textarea } from '@legalio/ui-components/textarea';
+import { DialogHeader, DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
 interface IOModalProps {
   ioToEdit?: InsertionOrder | null;
   contracts: Contract[];
@@ -364,39 +369,32 @@ export const IOModal: React.FC<IOModalProps> = ({
   return (
     <ModalFrame onClose={onClose}>
         {/* Header */}
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div>
-            <ModalTitle className="ds-modal-title flex items-center gap-2">
-              <FileSpreadsheet className="w-5 h-5 text-accent-text" />
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5 text-accent-foreground" />
               <span>
                 {ioToEdit?.io_id
                   ? t('form.io.title_edit', 'Edit Insertion Order')
                   : t('form.io.title_add', 'Tambah Insertion Order Baru')}
               </span>
-            </ModalTitle>
+            </DialogTitle>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t('common.close', 'Close')}
-            className="min-w-10 min-h-10 flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink p-1.5 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          <DialogCloseIcon aria-label={t('common.close', 'Close')} />
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-sm flex-1 text-ink">
+          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-sm flex-1 text-foreground">
             {/* Row 1: Partner & Induk Kontrak */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ds-grid">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label htmlFor="IOModal-field-1" className="block font-bold text-ink mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-1" className="block font-bold text-foreground mb-1.5 text-sm">
                   {t('form.io.partner_media', 'Partner / Media Vendor *')}
                 </label>
                 <AlphabeticalSelect id="IOModal-field-1"
                   value={partnerId}
                   onChange={(e) => handlePartnerChange(e.target.value)}
-                  className="ds-input w-full cursor-pointer"
+                  className="w-full cursor-pointer"
                 >
                   <option value="">{t('io.pilih_partner_vendor', '-- Pilih Partner / Vendor --')}</option>
                   {partners.map((p) => (
@@ -408,13 +406,13 @@ export const IOModal: React.FC<IOModalProps> = ({
               </div>
 
               <div>
-                <label htmlFor="IOModal-field-2" className="block font-bold text-ink mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-2" className="block font-bold text-foreground mb-1.5 text-sm">
                   {t('form.io.select_master', 'Pilih Induk Kontrak (Opsional)')}
                 </label>
                 <AlphabeticalSelect id="IOModal-field-2"
                   value={contractId}
                   onChange={(e) => handleContractChange(e.target.value)}
-                  className="ds-input w-full cursor-pointer"
+                  className="w-full cursor-pointer"
                 >
                   <option value="">{t('form.io.standalone_opt', '-- IO Standalone (Tanpa Kontrak Induk) --')}</option>
                   {availableContracts.map((c) => (
@@ -427,42 +425,42 @@ export const IOModal: React.FC<IOModalProps> = ({
             </div>
 
             {/* Row 2: Nomor IO & Kanal Media */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ds-grid">
-              <div>
-                <label htmlFor="IOModal-field-3" className="block font-bold text-ink mb-1.5 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field>
+                <FieldLabel htmlFor="IOModal-field-3">
                   {t('form.io.nomor_io', 'Nomor IO *')}
-                </label>
-                <input id="IOModal-field-3"
+                </FieldLabel>
+                <Input id="IOModal-field-3"
                   type="text"
                   required
                   placeholder={t('form.io.nomor_io_ph', 'contoh: IO/DETIK/2026/012')}
                   value={nomorIO}
                   onChange={(e) => setNomorIO(e.target.value)}
-                  className="ds-input w-full"
+                  className="w-full"
                 />
-              </div>
+              </Field>
 
-              <div>
-                <label htmlFor="IOModal-field-4" className="block font-bold text-ink mb-1.5 text-sm">
+              <Field>
+                <FieldLabel htmlFor="IOModal-field-4">
                   {t('form.io.kanal_media', 'Kanal Media / Placement *')}
-                </label>
-                <input id="IOModal-field-4"
+                </FieldLabel>
+                <Input id="IOModal-field-4"
                   type="text"
                   required
                   placeholder={t('form.io.kanal_ph', 'contoh: Homepage Masthead & Instagram Live Session')}
                   value={kanalMedia}
                   onChange={(e) => setKanalMedia(e.target.value)}
-                  className="ds-input w-full"
+                  className="w-full"
                 />
-              </div>
+              </Field>
             </div>
 
             {/* Row 3: Judul Insertion Order / Campaign */}
-            <div>
-              <label htmlFor="IOModal-field-5" className="block font-bold text-ink mb-1.5 text-sm">
+            <Field>
+              <FieldLabel htmlFor="IOModal-field-5">
                 {t('form.io.judul_campaign', 'Judul Insertion Order / Campaign *')}
-              </label>
-              <input id="IOModal-field-5"
+              </FieldLabel>
+              <Input id="IOModal-field-5"
                 type="text"
                 required
                 placeholder={t('form.io.judul_ph', 'contoh: PT Telkomsel_IO_Digital Banner & Social Media_2026-08-01')}
@@ -471,20 +469,20 @@ export const IOModal: React.FC<IOModalProps> = ({
                   setJudulIO(e.target.value);
                   setIsAutoTitle(false);
                 }}
-                className="ds-input w-full"
+                className="w-full"
               />
-            </div>
+            </Field>
 
             {/* Row 4: Pricing Model & Charging Type */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ds-grid">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label htmlFor="IOModal-field-6" className="block font-bold text-ink mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-6" className="block font-bold text-foreground mb-1.5 text-sm">
                   {t('form.io.pricing_model', 'Pricing Model *')}
                 </label>
                 <AlphabeticalSelect id="IOModal-field-6"
                   value={pricingModelSelect}
                   onChange={(e) => setPricingModelSelect(e.target.value)}
-                  className="ds-input w-full cursor-pointer"
+                  className="w-full cursor-pointer"
                 >
                   {PRICING_MODELS.map((model) => <option key={model} value={model}>{model}</option>)}
                   {isInitialCustom && !STANDARD_PRICING_MODELS.includes(initialPricingModel) && (
@@ -495,26 +493,26 @@ export const IOModal: React.FC<IOModalProps> = ({
 
                 {pricingModelSelect === '__CUSTOM__' && (
                   <div className="mt-2">
-                    <input
+                    <Input
                       type="text"
                       required
                       placeholder={t('form.io.pricing_model_custom_ph', 'Ketik nama pricing model baru (misal: CPV, Hybrid)...')}
                       value={customPricingModel}
                       onChange={(e) => setCustomPricingModel(e.target.value)}
-                      className="ds-input w-full"
+                      className="w-full"
                     />
                   </div>
                 )}
               </div>
 
               <div>
-                <label htmlFor="IOModal-field-7" className="block font-bold text-ink mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-7" className="block font-bold text-foreground mb-1.5 text-sm">
                   {t('form.io.charging_type', 'Skema Penagihan (Charging Type) *')}
                 </label>
                 <AlphabeticalSelect id="IOModal-field-7"
                   value={chargingType}
                   onChange={(e) => setChargingType(e.target.value as ChargingType)}
-                  className="ds-input w-full cursor-pointer"
+                  className="w-full cursor-pointer"
                 >
                   <option value="Prepaid">{t('io.prepaid_bayar_di_awal', 'Prepaid (Bayar di Awal)')}</option>
                   <option value="Postpaid">{t('io.postpaid_bayar_di_akhir_periode', 'Postpaid (Bayar di Akhir Periode)')}</option>
@@ -523,39 +521,39 @@ export const IOModal: React.FC<IOModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ds-grid">
-              <div>
-                <label htmlFor="IOModal-field-8" className="block font-bold text-ink mb-1.5 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field>
+                <FieldLabel htmlFor="IOModal-field-8">
                   {t('form.io.tanggal_mulai', 'Tanggal Mulai *')}
-                </label>
+                </FieldLabel>
                 <DateInput id="IOModal-field-8"
                   required
                   focusColor="emerald"
                   value={tanggalMulai}
                   onChange={(val) => setTanggalMulai(val)}
                 />
-              </div>
+              </Field>
 
-              <div>
-                <label htmlFor="IOModal-field-9" className="block font-bold text-ink mb-1.5 text-sm">
+              <Field>
+                <FieldLabel htmlFor="IOModal-field-9">
                   {t('form.io.tanggal_selesai', 'Tanggal Selesai *')}
-                </label>
+                </FieldLabel>
                 <DateInput id="IOModal-field-9"
                   required
                   focusColor="emerald"
                   value={tanggalBerakhir}
                   onChange={(val) => setTanggalBerakhir(val)}
                 />
-              </div>
+              </Field>
 
               <div>
-                <label htmlFor="IOModal-field-10" className="block font-bold text-ink mb-1.5 text-sm">
+                <label htmlFor="IOModal-field-10" className="block font-bold text-foreground mb-1.5 text-sm">
                   {t('form.io.currency', 'Mata Uang')}
                 </label>
                 <AlphabeticalSelect id="IOModal-field-10"
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
-                  className="ds-input w-full"
+                  className="w-full"
                 >
                   {SUPPORTED_CURRENCIES.map((c) => (
                     <option key={c.code} value={c.code}>
@@ -565,122 +563,119 @@ export const IOModal: React.FC<IOModalProps> = ({
                 </AlphabeticalSelect>
               </div>
 
-              <div>
-                <label htmlFor="IOModal-field-11" className="block font-bold text-ink mb-1.5 text-sm">
+              <Field>
+                <FieldLabel htmlFor="IOModal-field-11">
                   {t('form.io.nilai_io', 'Nilai IO *')}
-                </label>
-                <input id="IOModal-field-11"
+                </FieldLabel>
+                <Input id="IOModal-field-11"
                   type="number"
                   required
                   value={nilaiIO}
                   onChange={(e) => setNilaiIO(Number(e.target.value))}
-                  className="ds-input w-full"
+                  className="w-full"
                 />
-              </div>
+              </Field>
             </div>
 
             {/* USD Conversion Info Banner */}
-            <div className="bg-accent/5 border border-accent/20 rounded-xl p-3 text-sm flex flex-wrap items-center justify-between gap-2">
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-sm flex flex-wrap items-center justify-between gap-2">
               <div>
-                <span className="font-semibold text-ink">{t('io.estimasi_konversi_usd_kurs', 'Estimasi Konversi USD (Kurs {tanggalMulai}):', { tanggalMulai })}</span>
-                <span className="ml-2 font-bold text-accent-text">
+                <span className="font-semibold text-foreground">{t('io.estimasi_konversi_usd_kurs', 'Estimasi Konversi USD (Kurs {tanggalMulai}):', { tanggalMulai })}</span>
+                <span className="ml-2 font-bold text-accent-foreground">
                   {formatMoney(estimatedUsd, 'USD')}
                 </span>
               </div>
-              <span className="text-xs text-ink-soft italic">
+              <span className="text-xs text-muted-foreground italic">
                 {currency === 'USD' ? t('io.sama_mata_uang_usd', 'Sama (Mata uang USD)') : t('io.1_usd', '1 {currency} ≈ {value} USD', { currency, value: historicalRate.toFixed(8) })}
               </span>
             </div>
 
-            <div>
-              <label htmlFor="IOModal-field-12" className="block font-bold text-ink text-sm mb-1.5">
+            <Field>
+              <FieldLabel htmlFor="IOModal-field-12">
                 {t('form.io.deliverables', 'Rincian Terstruktur Deliverables *')}
-              </label>
-              <textarea id="IOModal-field-12"
+              </FieldLabel>
+              <Textarea id="IOModal-field-12"
                 required
                 rows={6}
                 placeholder={t('form.io.deliverables_ph', 'Sebutkan detail garansi impresi, kuota SMS, tayangan banner, atau jumlah artikel...')}
                 value={deliverables}
                 onChange={(e) => setDeliverables(e.target.value)}
-                className="ds-input w-full max-h-[600px] resize-y"
+                className="w-full resize-y"
               />
-            </div>
+            </Field>
 
             {/* File Upload Area */}
             <div>
-              <label htmlFor="IOModal-field-13" className="block font-bold text-ink mb-1.5 text-sm">
+              <label htmlFor="IOModal-field-13" className="block font-bold text-foreground mb-1.5 text-sm">
                 {t('form.io.upload_label', 'Dokumen Asli IO (Drive PDF Upload)')}
               </label>
               <div className="ds-upload text-center">
-                <Upload className="w-6 h-6 text-accent-text mx-auto mb-1.5" />
+                <Upload className="w-6 h-6 text-accent-foreground mx-auto mb-1.5" />
                 {fileData || fileName ? (
                   <div className="space-y-1">
-                    <p className="text-sm font-bold text-ink">
-                      {t('io.file_terpilih', '📄 File terpilih:')} <span className="font-normal font-mono text-ink dark:text-white">{rawFileName || fileName}</span>
+                    <p className="text-sm font-bold text-foreground">
+                      {t('io.file_terpilih', '📄 File terpilih:')} <span className="font-normal font-mono text-foreground ">{rawFileName || fileName}</span>
                     </p>
                   </div>
                 ) : (
-                  <p className="text-sm font-bold text-ink">
+                  <p className="text-sm font-bold text-foreground">
                     {t('form.io.select_pdf', 'Pilih atau Drag Dokumen Insertion Order ke sini')}
                   </p>
                 )}
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
                   {fileData && (
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       onClick={handleParseIO}
                       disabled={isParsing}
-                      className="flex items-center gap-1.5 px-4 min-h-10 bg-accent-soft text-accent-text hover:bg-accent/20 font-semibold text-sm rounded-md transition-all cursor-pointer disabled:opacity-50"
                     >
                       {isParsing ? t('io.parsing', 'Parsing...') : t('io.parse_file', 'Parse File')}
-                    </button>
+                    </Button>
                   )}
                   <input id="IOModal-field-13"
                     type="file"
                     accept=".pdf"
                     onChange={handleFileChange}
-                    className="w-[220px] text-sm text-ink-soft file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer"
+                    className="w-[220px] text-sm text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-primary file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
                   />
                 </div>
               </div>
             </div>
 
             {parseSuccessMsg && (
-              <div className="p-3 bg-status-success-soft dark:bg-status-success-soft/40 border border-status-success-border text-status-success rounded-xl text-sm font-semibold flex items-center gap-2">
+              <div className="p-3 bg-status-success-soft border border-status-success-border text-status-success rounded-xl text-sm font-semibold flex items-center gap-2">
                 <span>{parseSuccessMsg}</span>
               </div>
             )}
 
             {error && (
-              <div className="p-3.5 bg-status-danger-soft dark:bg-status-danger-soft/40 border border-status-danger-border text-status-danger rounded-xl text-sm font-bold flex items-center gap-2">
+              <div className="p-3.5 bg-status-danger-soft border border-status-danger-border text-status-danger rounded-xl text-sm font-bold flex items-center gap-2">
                 <span>⚠️</span>
                 <span>{error}</span>
               </div>
             )}
           </div>
 
-          <div className="p-4 sm:p-5 bg-surface border-t border-hairline flex items-center justify-between gap-2 shrink-0">
-            <span className="text-xs text-ink-soft font-medium hidden sm:inline">
+          <div className="p-4 sm:p-5 bg-card border-t border-border flex items-center justify-between gap-2 shrink-0">
+            <span className="text-xs text-muted-foreground font-medium hidden sm:inline">
               {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
             </span>
             <div className="flex items-center gap-2 ml-auto">
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={onClose}
-                className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
               >
                 {t('form.common.cancel', 'Batal')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 disabled={submitting || !isFormValid}
                 title={!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : ''}
-                className="ui-button ui-button-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-default"
               >
                 {submitting
                   ? t('form.io.saving_btn', 'Menyimpan IO...')
                   : t('form.io.save_btn', 'Simpan Insertion Order')}
-              </button>
+              </Button>
             </div>
           </div>
         </form>

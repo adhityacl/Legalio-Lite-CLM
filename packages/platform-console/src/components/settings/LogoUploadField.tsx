@@ -3,6 +3,9 @@ import { Link2, Trash2, Upload } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAlertToast } from '../../context/AlertToastContext';
 
+import { Button } from '@legalio/ui-components/button';
+import { Input } from '@legalio/ui-components/input';
+import { Card } from '@legalio/ui-components/card';
 // Logo upload helper component
 interface LogoUploadFieldProps {
   logo: string;
@@ -78,25 +81,24 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="block text-xs font-medium text-ink">
+        <label className="block text-xs font-medium text-foreground">
           {label || t('admin.org_logo_label', 'Logo Organisasi / Workspace')}
         </label>
-        <button
+        <Button variant="link" size="sm"
           type="button"
           onClick={() => setIsUrlMode(!isUrlMode)}
-          className="text-xs text-accent-text hover:underline flex items-center gap-1 cursor-pointer"
         >
           <Link2 className="w-3 h-3" />
           {isUrlMode
             ? t('admin.logo_mode_upload', 'Unggah File Gambar')
             : t('admin.logo_mode_url', 'Gunakan URL Gambar')}
-        </button>
+        </Button>
       </div>
 
-      <div className="ds-panel flex items-center gap-3.5 p-2">
+      <Card className="flex items-center gap-3.5 p-2">
         {/* Preview Container */}
         <div className="relative shrink-0 group">
-          <div className="w-14 h-14 rounded-full border border-hairline bg-surface flex items-center justify-center overflow-hidden shadow-xs">
+          <div className="w-14 h-14 rounded-full border border-border bg-card flex items-center justify-center overflow-hidden shadow-xs">
             {logo ? (
               <img
                 src={logo}
@@ -127,16 +129,16 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
         {/* Input / Dropzone Area */}
         <div className="flex-1 min-w-0">
           {!isUrlMode ? (
-            <div
+            <Card
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onClick={() => fileInputRef.current?.click()}
-              className={`ds-panel flex min-h-14 items-center justify-center p-2.5 text-center cursor-pointer transition-colors ${
-                isDragging
-                  ? 'bg-accent-soft'
-                  : ''
-              }`}
+              className={` flex min-h-14 items-center justify-center p-2.5 text-center cursor-pointer transition-colors ${
+ isDragging
+ ? 'bg-accent'
+ : ''
+ }`}
             >
               <input
                 ref={fileInputRef}
@@ -146,33 +148,32 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
                 onChange={(e) => handleFileChange(e.target.files?.[0])}
                 className="hidden"
               />
-              <div className="flex items-center justify-center gap-1.5 text-xs text-ink-soft font-medium">
-                <Upload className="w-3.5 h-3.5 text-accent-text" />
+              <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground font-medium">
+                <Upload className="w-3.5 h-3.5 text-accent-foreground" />
                 <span>{t('admin.logo_upload_cta', 'Pilih atau Tarik Logo')}</span>
               </div>
-            </div>
+            </Card>
           ) : (
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <input aria-label={t('admin.org_logo_label', 'Logo Organisasi / Workspace')}
+                <Input aria-label={t('admin.org_logo_label', 'Logo Organisasi / Workspace')}
                   type="url"
                   placeholder="https://example.com/logo.png"
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
-                  className="ds-input flex-1"
+                  className="flex-1"
                 />
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={handleApplyUrl}
-                  className="theme-action ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
                 >
                   {t('admin.btn_apply', 'Terapkan')}
-                </button>
+                </Button>
               </div>
             </div>
           )}
         </div>
-      </div>
+      </Card>
     </div>
   );
 };

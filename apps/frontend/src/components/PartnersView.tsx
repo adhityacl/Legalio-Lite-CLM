@@ -1,5 +1,5 @@
-import { ModalFrame, ModalTitle } from './ui/modal-frame';
-import { TableViewMenu } from './ui/table-view-menu';
+import { ModalFrame } from './ui/modal-frame';
+import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { FilterSummary } from './ui/filter-summary';
 import { TableEmptyState } from './ui/table-empty-state';
@@ -51,12 +51,19 @@ import {
 import { PartnerEvaluationView } from './PartnerEvaluationView';
 import { TablePagination } from './ui/TablePagination';
 import { ActionMenu } from './ui/action-menu';
-import { getStatusBadgeClass } from '@legalio/ui-components/badge';
+import { Badge, statusTone } from '@legalio/ui-components/badge';
 import { getSavedColumnPreferences, saveColumnPreferences } from '../lib/tablePreferences';
 import { UploadDDModal } from './UploadDDModal';
 import { getAuthHeaders } from '../lib/apiFetch';
 import { usePermissions } from '../lib/permissions';
 
+import { TableColumnHeader, Table, TableHeader, TableRow, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
+import { Button } from '@legalio/ui-components/button';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
+import { Card } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
+import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
+import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
 export function getValidPartnerTags(tags?: string[]): string[] {
   if (!tags || !Array.isArray(tags)) return ['Advertising'];
   const valid = tags.filter((t) => t && typeof t === 'string' && !/^\d{4}-\d{2}-\d{2}/.test(t.trim()));
@@ -251,8 +258,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) setSelectedRows(sortedPartners.map(item => item.partner_id));
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedRows(sortedPartners.map(item => item.partner_id));
     else setSelectedRows([]);
   };
 
@@ -266,35 +273,34 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   const currentPartners = sortedPartners.slice(indexOfFirst, indexOfLast);
 
   const getDDStatusBadge = (status: Partner['status_dd']) => {
-    return getStatusBadgeClass(status);
+    return statusTone(status);
   };
 
   const renderSortHeader = (label: string, field: SortField) => {
     const isSorted = sortField === field;
     return (
-      <th
+      <TableColumnHeader
         scope="col"
         aria-sort={isSorted ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className="p-4 text-xs font-bold text-ink text-left select-none align-middle"
+        className="text-left align-middle"
       >
-        <button
+        <Button variant="ghost" size="sm"
           type="button"
           onClick={() => handleSort(field)}
-          className="flex items-center gap-1.5 hover:text-ink dark:hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded-sm py-0.5"
           title={t('partners.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}
         >
           <span>{label}</span>
           {isSorted ? (
             sortOrder === 'asc' ? (
-              <ArrowUp className="w-3.5 h-3.5 text-accent-text shrink-0" />
+              <ArrowUp className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
             ) : (
-              <ArrowDown className="w-3.5 h-3.5 text-accent-text shrink-0" />
+              <ArrowDown className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
             )
           ) : (
-            <ArrowUpDown className="w-3.5 h-3.5 text-ink-soft shrink-0" />
+            <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
           )}
-        </button>
-      </th>
+        </Button>
+      </TableColumnHeader>
     );
   };
 
@@ -406,45 +412,43 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
       ) : (
         <>
           {/* Header */}
-          <div className="ds-page-bar">
+          <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
             <div>
-              <h2 className="ds-page-heading">
+              <Heading as="h2" size="lg" weight="semibold">
                 <span>{t('partners.header_title', 'Manajemen Partner')}</span>
-              </h2>
+              </Heading>
             </div>
 
             <div className="mobile-page-actions flex flex-wrap items-center gap-2.5 shrink-0">
               {hasPermission('export.csv') && (
-                <button
+                <Button variant="outline"
                   onClick={handleExportCSV}
                   disabled={filteredPartners.length === 0}
-                  className="ui-button ui-button-lg cursor-pointer flex items-center disabled:opacity-50 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-outline"
                   title={t('contracts.export_csv', 'Ekspor CSV')}
                 >
                   <Download className="w-4 h-4" />
                   <span>{t('contracts.export_csv', 'Ekspor CSV')}</span>
-                </button>
+                </Button>
               )}
 
               {canCreatePartner(user) && (
-                <button
+                <Button
                   onClick={onAddPartner}
-                  className="ui-button ui-button-lg cursor-pointer flex items-center ds-button ds-button-lg ds-button-default"
                 >
-                  <Plus className="w-4 h-4 text-white" />
+                  <Plus className="w-4 h-4" />
                   <span>{t('ui.add_partner')}</span>
-                </button>
+                </Button>
               )}
             </div>
-          </div>
+          </Card>
 
           {/* Filter Bar & View Toggle - Justified Responsive Grid/Flex */}
-          <div className="ds-panel p-4 sm:p-5 mb-6">
-            <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full ds-grid">
+          <Card className="p-4 sm:p-5">
+            <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
               {/* Search Input */}
-              <div className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-                <Search className="w-4 h-4 text-ink-soft absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
+              <InputGroup className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
+                <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+                <InputGroupInput
                   type="text"
                   placeholder={t('partners.search_placeholder')}
                   aria-label={t('ui.search')}
@@ -453,9 +457,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                     setSearchTerm(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="ds-input w-full pl-9 pr-3"
                 />
-              </div>
+              </InputGroup>
 
               {/* Partner Status Filter (Aktif / Nonaktif) */}
               <AlphabeticalSelect
@@ -465,7 +468,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setSelectedPartnerStatus(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
+                className="flex-1 min-w-[130px] appearance-none pr-8"
               >
                 <option value="ALL">{t('partners.all_status')}</option>
                 <option value="Active">{t('partners.active')}</option>
@@ -480,7 +483,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setSelectedDDStatus(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
+                className="flex-1 min-w-[130px] appearance-none pr-8"
               >
                 <option value="ALL">{t('partners.all_dd_status')}</option>
                 <option value="Complete">{t('partners.dd_complete')}</option>
@@ -496,7 +499,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setSelectedBadanHukum(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
+                className="flex-1 min-w-[130px] appearance-none pr-8"
               >
                 <option value="ALL">{t('partners.all_legal_entity')}</option>
                 <option value="DOMESTIC">{t('partners.domestic', 'Domestic')}</option>
@@ -508,7 +511,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
               {/* Column Toggle */}
               <TableViewMenu title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
-                <div className="px-3.5 py-1.5 text-xs font-bold text-ink-soft uppercase tracking-wider mb-1 border-b border-hairline">
+                <div className="px-3.5 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 border-b border-border">
                   {t('io.toggle_columns', 'Toggle Kolom')}
                 </div>
                 {Object.keys(visibleColumns).map((col) => {
@@ -524,57 +527,43 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   else if (col === 'due_diligence') label = t('partners.col_dd_status', 'Status Due Diligence');
 
                   return (
-                    <label key={col} className="flex items-center gap-2.5 px-3.5 py-1.5 hover:bg-surface dark:hover:bg-surface-2/50 cursor-pointer text-xs font-medium text-ink select-none">
-                      <input
-                        type="checkbox"
-                        checked={visibleColumns[col]}
-                        onChange={() => toggleColumnVisibility(col)}
-                        className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                      />
-                      <span className="capitalize">{label}</span>
-                    </label>
+                    <TableViewOption key={col} value={col} checked={visibleColumns[col]} onToggle={() => toggleColumnVisibility(col)}>{label}</TableViewOption>
                   );
                 })}
               </TableViewMenu>
           </div>
-        </div>
+        </Card>
 
           {/* Partners List: TABLE VIEW */}
-          <div className="ds-table-surface bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
+          <Card className="overflow-hidden">
               <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_dd'), value: selectedDDStatus, active: selectedDDStatus !== 'ALL' }, { label: t('ui.filter_country'), value: selectedBadanHukum, active: selectedBadanHukum !== 'ALL' }, { label: t('ui.filter_status'), value: selectedPartnerStatus, active: selectedPartnerStatus !== 'ALL' }, { label: t('ui.filter_department'), value: selectedDepartment, active: selectedDepartment !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedDDStatus('ALL'); setSelectedBadanHukum('ALL'); setSelectedPartnerStatus('ALL'); setSelectedDepartment('ALL'); }} />
-        <p className="mobile-table-hint px-4 py-2 text-xs text-ink-soft md:hidden">{t('ui.scroll_table')}</p>
-        <div className="data-table-scroll overflow-x-auto bg-surface" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
-                <table className="ds-table app-data-table w-full text-left border-collapse text-xs bg-surface">
-                  <thead className="bg-surface dark:bg-surface-2/50">
-                    <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
-                      <th scope="col" className="pl-6 pr-2 py-4 w-12 text-left align-middle">
+        <p className="mobile-table-hint px-4 py-2 text-xs text-muted-foreground md:hidden">{t('ui.scroll_table')}</p>
+        <TableScrollArea className="data-table-scroll" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
+                <Table className="app-data-table w-full text-left">
+                  <TableHeader>
+                    <TableRow>
+                      <TableColumnHeader scope="col" className="w-12 text-left align-middle">
                         <div className="flex items-center justify-start">
-                          <input
-                            type="checkbox"
-                            onChange={handleSelectAll}
-                            checked={selectedRows.length > 0 && selectedRows.length === currentPartners.length}
-                            aria-label={t('partners.select_all', 'Pilih semua partner')}
-                            className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                          />
+                          <Checkbox checked={selectedRows.length > 0 && selectedRows.length === currentPartners.length} aria-label={t('partners.select_all', 'Pilih semua partner')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                         </div>
-                      </th>
+                      </TableColumnHeader>
                       {visibleColumns.nama_partner && renderSortHeader(t('partners.col_name', 'Nama Partner'), 'name')}
                       {visibleColumns.channel && renderSortHeader(t('partners.col_channel', 'Nama Channel'), 'channel')}
-                      {visibleColumns.badan_hukum && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('partners.col_entity', 'Badan Hukum')}</th>}
+                      {visibleColumns.badan_hukum && <TableColumnHeader scope="col" className="text-left align-middle">{t('partners.col_entity', 'Badan Hukum')}</TableColumnHeader>}
                       {visibleColumns.kategori && renderSortHeader(t('partners.col_category', 'Kategori Kerjasama'), 'tags')}
                       {visibleColumns.pic && renderSortHeader(t('partners.col_pic', 'PIC Partner'), 'pic')}
-                      {visibleColumns.email && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('partners.col_email', 'Email')}</th>}
-                      {visibleColumns.telepon && <th scope="col" className="p-4 text-xs font-bold text-ink text-left align-middle">{t('partners.col_phone', 'Telepon')}</th>}
+                      {visibleColumns.email && <TableColumnHeader scope="col" className="text-left align-middle">{t('partners.col_email', 'Email')}</TableColumnHeader>}
+                      {visibleColumns.telepon && <TableColumnHeader scope="col" className="text-left align-middle">{t('partners.col_phone', 'Telepon')}</TableColumnHeader>}
                       {visibleColumns.status && renderSortHeader(t('partners.col_status', 'Status Partner'), 'status')}
                       {visibleColumns.due_diligence && renderSortHeader(t('partners.col_dd_status', 'Status DD'), 'status_dd')}
-                      <th data-actions="true" scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
+                      <TableColumnHeader data-actions="true" scope="col" className="text-right w-20 align-middle">
                         <div className="flex items-center justify-end">
                           {t('partners.col_action', 'Aksi')}
                         </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-hairline">
+                      </TableColumnHeader>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {currentPartners.length === 0 ? (
                       <TableEmptyState colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} />
                     ) : (
@@ -582,47 +571,41 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                         const pStatus = getPartnerStatus(partner.partner_id);
 
                         return (
-                          <tr key={partner.partner_id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
-                            <td className="pl-6 pr-2 py-4 text-left align-middle">
+                          <TableRow key={partner.partner_id}>
+                            <TableCell className="text-left align-middle">
                               <div className="flex items-center justify-start">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedRows.includes(partner.partner_id)}
-                                  onChange={() => handleSelectRow(partner.partner_id)}
-                                  aria-label={t('partners.pilih', 'Pilih {nama_partner}', { nama_partner: partner.nama_partner })}
-                                  className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                                />
+                                <Checkbox checked={selectedRows.includes(partner.partner_id)} aria-label={t('partners.pilih', 'Pilih {nama_partner}', { nama_partner: partner.nama_partner })} onCheckedChange={() => handleSelectRow(partner.partner_id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                               </div>
-                            </td>
+                            </TableCell>
 
                             {/* 1. Nama Partner */}
                             {visibleColumns.nama_partner && (
-                              <td className="py-4 px-4 text-xs font-semibold text-ink text-left">
+                              <TableCell className="text-left">
                                 {partner.nama_partner}
-                              </td>
+                              </TableCell>
                             )}
 
                             {visibleColumns.channel && (
-                              <td className="py-4 px-4 text-xs font-normal text-ink text-left">
+                              <TableCell className="text-left">
                                 {partner.codename || '—'}
-                              </td>
+                              </TableCell>
                             )}
 
                             {/* 2. Country */}
                             {visibleColumns.badan_hukum && (
-                              <td className="py-4 px-4 text-xs font-normal text-ink text-left">
-                                <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center justify-center whitespace-nowrap shadow-2xs ${getStatusBadgeClass(partnerCountry(partner) === homeCountry ? 'BHI' : 'BHA')}`}>
+                              <TableCell className="text-left">
+                                <Badge tone={statusTone(partnerCountry(partner) === homeCountry ? 'BHI' : 'BHA')}>
                                   {partnerCountry(partner) || '—'}
-                                </span>
-                              </td>
+                                </Badge>
+                              </TableCell>
                             )}
 
                             {visibleColumns.kategori && (
-                              <td className="py-4 px-4 text-xs font-normal text-ink text-left">
+                              <TableCell className="text-left">
                                 {getValidPartnerTags(partner.tags).length > 0 ? (
                                   <div className="flex flex-wrap gap-1">
                                     {getValidPartnerTags(partner.tags).map((tag) => (
-                                      <span key={tag} className="px-2 py-0.5 rounded-full border border-hairline bg-surface whitespace-nowrap">
+                                      <span key={tag} className="px-2 py-0.5 rounded-full border border-border bg-card whitespace-nowrap">
                                         {tag}
                                       </span>
                                     ))}
@@ -630,75 +613,75 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                 ) : (
                                   '—'
                                 )}
-                              </td>
+                              </TableCell>
                             )}
 
                             {/* 3. PIC Partner */}
                             {visibleColumns.pic && (
-                              <td className="py-4 px-4 text-xs font-normal text-ink text-left">
+                              <TableCell className="text-left">
                                 {partner.nama_pic || partner.pic_partner || '-'}
-                              </td>
+                              </TableCell>
                             )}
 
                             {visibleColumns.email && (
-                              <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
+                              <TableCell className="text-left whitespace-nowrap">
                                 {partner.email_pic ? (
-                                  <a href={`mailto:${partner.email_pic}`} className="hover:underline hover:text-accent-text">
+                                  <a href={`mailto:${partner.email_pic}`} className="hover:underline hover:text-accent-foreground">
                                     {partner.email_pic}
                                   </a>
                                 ) : (
                                   '—'
                                 )}
-                              </td>
+                              </TableCell>
                             )}
 
                             {visibleColumns.telepon && (
-                              <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
+                              <TableCell className="text-left whitespace-nowrap">
                                 {partner.telepon_pic ? (
-                                  <a href={`tel:${partner.telepon_pic.replace(/[^\d+]/g, '')}`} className="hover:underline hover:text-accent-text">
+                                  <a href={`tel:${partner.telepon_pic.replace(/[^\d+]/g, '')}`} className="hover:underline hover:text-accent-foreground">
                                     {partner.telepon_pic}
                                   </a>
                                 ) : (
                                   '—'
                                 )}
-                              </td>
+                              </TableCell>
                             )}
 
                             {/* 4. Status Partner */}
                             {visibleColumns.status && (
-                              <td className="py-4 px-4 text-xs font-normal text-ink text-left">
+                              <TableCell className="text-left">
                                 {pStatus === 'Active' ? (
-                                  <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap ${getStatusBadgeClass('Aktif')}`}>
+                                  <Badge tone={statusTone('Aktif')}>
                                     <span>{t('status.aktif', 'Aktif')}</span>
-                                  </span>
+                                  </Badge>
                                 ) : (
-                                  <span className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap ${getStatusBadgeClass('Inactive')}`}>
+                                  <Badge tone={statusTone('Inactive')}>
                                     <span>{t('status.nonaktif', 'Nonaktif')}</span>
-                                  </span>
+                                  </Badge>
                                 )}
-                              </td>
+                              </TableCell>
                             )}
 
                             {/* 5. Status Due Diligence */}
                             {visibleColumns.due_diligence && (
-                              <td className="py-4 px-4 text-xs font-normal text-ink text-left">
+                              <TableCell className="text-left">
                                 <button
                                   onClick={() => setSelectedPartnerDetail(partner)}
                                   className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center gap-1.5 transition-all hover:scale-105 hover:shadow-xs cursor-pointer ${getDDStatusBadge(
-                                    partner.status_dd
-                                  )}`}
+ partner.status_dd
+ )}`}
                                   title={t('partners.klik_untuk_audit_checklist_due_diligence', 'Klik untuk Audit Checklist Due Diligence')}
                                 >
-                                  {partner.status_dd === 'Complete' && <CheckCircle2 className="w-3.5 h-3.5 text-accent-text" />}
+                                  {partner.status_dd === 'Complete' && <CheckCircle2 className="w-3.5 h-3.5 text-accent-foreground" />}
                                   {partner.status_dd === 'Incomplete' && <Clock className="w-3.5 h-3.5 text-status-warning" />}
                                   {partner.status_dd === 'Expired' && <AlertTriangle className="w-3.5 h-3.5 text-status-danger" />}
                                   <span>{t(DD_STATUS_LABEL_KEY[partner.status_dd] || 'status.dd_incomplete', partner.status_dd)}</span>
                                 </button>
-                              </td>
+                              </TableCell>
                             )}
 
                             {/* Aksi */}
-                            <td data-actions="true" className="pl-2 pr-6 py-4 text-right align-middle w-20">
+                            <TableCell data-actions="true" className="text-right align-middle w-20">
                               <div className="flex items-center justify-end">
                                 <ActionMenu
                                   items={[
@@ -730,14 +713,14 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                   ]}
                                 />
                               </div>
-                            </td>
-                          </tr>
+                            </TableCell>
+                          </TableRow>
                         );
                       })
                     )}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </TableScrollArea>
 
               <TablePagination
                 currentPage={currentPage}
@@ -749,54 +732,53 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setCurrentPage(1);
                 }}
               />
-            </div>
+            </Card>
 
       {/* Due Diligence Audit Modal */}
       {selectedPartnerDetail && (
         <ModalFrame onClose={() => setSelectedPartnerDetail(null)} className="max-w-4xl w-full max-h-[92dvh] flex flex-col overflow-hidden">
 
             {/* Header */}
-            <div className="ds-section-header">
+            <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
               <div>
-                <ModalTitle className="ds-modal-title flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-accent-text" />
+                <DialogTitle className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-accent-foreground" />
                   <span>{selectedPartnerDetail.nama_partner}</span>
-                </ModalTitle>
-                <p className="text-xs text-ink-soft mt-0.5">
-                  {t('partners.status_dd', 'Status DD:')} <strong className="text-ink">{selectedPartnerDetail.status_dd}</strong> {t('partners.pic', '• PIC: {pic_partner}', { pic_partner: selectedPartnerDetail.pic_partner })}
+                </DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {t('partners.status_dd', 'Status DD:')} <strong className="text-foreground">{selectedPartnerDetail.status_dd}</strong> {t('partners.pic', '• PIC: {pic_partner}', { pic_partner: selectedPartnerDetail.pic_partner })}
                 </p>
               </div>
 
-              <button aria-label={t('common.close', 'Tutup')}
+              <Button variant="secondary" size="icon-sm" aria-label={t('common.close', 'Tutup')}
                 type="button"
                 onClick={() => setSelectedPartnerDetail(null)}
-                className="inline-flex items-center justify-center text-ink-soft hover:text-ink size-8 rounded-md hover:bg-surface-2 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
-              </button>
-            </div>
+              </Button>
+            </DialogHeader>
 
             <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1">
               {/* Due Diligence Narrative Profile */}
               {selectedPartnerDetail.catatan && (
-                <div className="ds-panel p-4 space-y-1.5">
-                  <h4 className="text-xs font-bold text-accent-text flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-accent-text" />
+                <Card className="p-4 space-y-1.5">
+                  <h4 className="text-xs font-bold text-accent-foreground flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-accent-foreground" />
                     <span>{t('partners.profil_due_diligence_operasional_vendor_senior', 'Profil Due Diligence & Operasional Vendor (Senior Risk Analyst)')}</span>
                   </h4>
-                  <p className="text-xs text-ink leading-relaxed font-medium">
+                  <p className="text-xs text-foreground leading-relaxed font-medium">
                     {selectedPartnerDetail.catatan}
                   </p>
-                </div>
+                </Card>
               )}
 
               {/* Checklist Items List with Upload Trigger */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-ink">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
                     {t('partners.req_docs_title', 'Dokumen Due Diligence')}
                   </h4>
-                  <span className="text-xs text-ink-soft font-medium">
+                  <span className="text-xs text-muted-foreground font-medium">
                     {t('partners.nda_bersifat_wajib_dokumen_lain_opsional', '* NDA bersifat Wajib, dokumen lain Opsional')}
                   </span>
                 </div>
@@ -819,21 +801,21 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                     : [];
 
                   return (
-                    <div
+                    <Card
                       key={doc.nama}
-                      className="ds-panel p-3.5 sm:p-4 space-y-3"
+                      className="p-3.5 sm:p-4 space-y-3"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-center flex-wrap gap-2">
-                          <span className="font-bold text-xs text-ink">{displayName}</span>
+                          <span className="font-bold text-xs text-foreground">{displayName}</span>
 
                           {/* Wajib / Opsional Pill Badge (Refined) */}
                           {doc.wajib ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border border-status-danger-border/40 bg-status-danger/10 dark:bg-status-danger-soft/40 text-status-danger uppercase tracking-wide">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border border-status-danger-border/40 bg-status-danger/10 text-status-danger uppercase tracking-wide">
                               {t('settings.region.dd_required', 'Wajib')}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border border-hairline bg-surface-2 dark:bg-surface-2/80 text-ink-soft uppercase tracking-wide">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border border-border bg-muted text-muted-foreground uppercase tracking-wide">
                               {t('contract_creator.optional_badge', 'Opsional')}
                             </span>
                           )}
@@ -841,19 +823,19 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                           {/* Status Ada / Belum / Kadaluarsa Pill Badge */}
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                              doc.status === 'Available'
-                                ? 'border-status-success-border/40 bg-status-success/10 dark:bg-status-success-soft/50 text-status-success '
-                                : doc.status === 'Expired'
-                                ? 'border-status-danger-border/40 bg-status-danger/10 dark:bg-status-danger-soft/50 text-status-danger '
-                                : 'border-status-warning-border/40 bg-status-warning/10 dark:bg-status-warning-soft/50 text-status-warning '
-                            }`}
+ doc.status === 'Available'
+ ? 'border-status-success-border/40 bg-status-success/10 text-status-success '
+ : doc.status === 'Expired'
+ ? 'border-status-danger-border/40 bg-status-danger/10 text-status-danger '
+ : 'border-status-warning-border/40 bg-status-warning/10 text-status-warning '
+ }`}
                           >
                             {t(DOC_STATUS_LABEL_KEY[doc.status] || 'status.doc_missing', doc.status)}
                           </span>
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
-                          <button
+                          <Button variant="ghost" size="sm"
                             type="button"
                             onClick={() => {
                               setUploadModalState({
@@ -861,25 +843,24 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                 docName: doc.nama,
                               });
                             }}
-                            className="px-3 min-h-8 bg-accent-strong hover:bg-accent-strong-hover text-white rounded-md text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                           >
                             <Upload className="w-3 h-3" />
                             <span>{t('partners.upload_file', 'Upload File')}</span>
-                          </button>
+                          </Button>
                         </div>
                       </div>
 
                       {/* Multiple Files list for this DD Requirement */}
                       {docFiles.length > 0 && (
-                        <div className="pt-2.5 border-t border-hairline dark:border-hairline/80 space-y-1.5">
+                        <div className="pt-2.5 border-t border-border space-y-1.5">
                           {docFiles.map((f, fIdx) => (
-                            <div
+                            <Card
                               key={f.id || fIdx}
-                              className="ds-panel px-3 py-2 flex items-center justify-between gap-2"
+                              className="px-3 py-2 flex items-center justify-between gap-2"
                             >
                               <div className="flex items-center gap-2 min-w-0">
-                                <FileText className="w-3.5 h-3.5 text-accent-text shrink-0" />
-                                <span className="text-xs font-medium text-ink truncate">
+                                <FileText className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
+                                <span className="text-xs font-medium text-foreground truncate">
                                   {f.fileName || `${doc.nama}.pdf`}
                                 </span>
                               </div>
@@ -890,41 +871,40 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                     href={f.linkDrive}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-2.5 py-1 bg-status-success-soft hover:bg-status-success-soft text-accent-text rounded-sm text-xs font-medium transition-colors flex items-center gap-1 border border-status-success-border/30"
+                                    className="px-2.5 py-1 bg-status-success-soft hover:bg-status-success-soft text-accent-foreground rounded-sm text-xs font-medium transition-colors flex items-center gap-1 border border-status-success-border/30"
                                   >
                                     <ExternalLink className="w-3 h-3" />
                                     <span>{t('partners.view_file', 'Lihat File')}</span>
                                   </a>
                                 )}
                                 {isLegal && (
-                                  <button
+                                  <Button variant="ghost" size="icon-sm"
                                     type="button"
                                     onClick={() => handleDeleteDDFile(selectedPartnerDetail.partner_id, doc.nama, f.id, displayName)}
-                                    className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-status-danger rounded-sm transition-colors cursor-pointer"
+                                    className="text-destructive"
                                     title={t('partners.hapus_file_ini', 'Hapus file ini')}
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                                  </Button>
                                 )}
                               </div>
-                            </div>
+                            </Card>
                           ))}
                         </div>
                       )}
-                    </div>
+                    </Card>
                   );
                 })}
               </div>
             </div>
 
-            <div className="p-4 sm:p-5 bg-canvas border-t border-hairline flex justify-end shrink-0">
-              <button
+            <div className="p-4 sm:p-5 bg-background border-t border-border flex justify-end shrink-0">
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => setSelectedPartnerDetail(null)}
-                className="inline-flex items-center px-4 min-h-8 bg-ink hover:bg-ink text-white font-semibold rounded-md text-xs transition-colors cursor-pointer"
               >
                 {t('partners.audit_done')}
-              </button>
+              </Button>
             </div>
 
         </ModalFrame>

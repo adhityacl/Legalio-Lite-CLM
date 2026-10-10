@@ -1,4 +1,4 @@
-import { ModalFrame, ModalTitle } from './ui/modal-frame';
+import { ModalFrame } from './ui/modal-frame';
 import React, { useState, useEffect, useCallback } from 'react';
 import { getActiveFormattingLocale } from '@legalio/shared/currencyUtils';
 import { Contract, RedlineAnalysisData } from '@legalio/types';
@@ -22,6 +22,7 @@ import { Button } from '@legalio/ui-components/button';
 import { Badge } from '@legalio/ui-components/badge';
 import { Card } from '@legalio/ui-components/card';
 
+import { DialogTitle } from '@legalio/ui-components/dialog';
 interface ContractRedliningModalProps {
   isOpen: boolean;
   contract: Contract | null;
@@ -150,31 +151,31 @@ export const ContractRedliningModal: React.FC<ContractRedliningModalProps> = ({
   if (!isOpen || !contract) return null;
 
   const getRiskScoreColor = (score: number) => {
-    if (score <= 25) return 'text-status-success  border-status-success-border bg-status-success-soft dark:bg-status-success-soft/40';
-    if (score <= 55) return 'text-status-warning  border-status-warning-border bg-status-warning-soft dark:bg-status-warning-soft/40';
-    if (score <= 75) return 'text-status-warning  border-status-warning-border bg-status-warning-soft dark:bg-status-warning-soft/40';
-    return 'text-status-danger  border-status-danger-border bg-status-danger-soft dark:bg-status-danger-soft/40';
+    if (score <= 25) return 'text-status-success  border-status-success-border bg-status-success-soft ';
+    if (score <= 55) return 'text-status-warning  border-status-warning-border bg-status-warning-soft ';
+    if (score <= 75) return 'text-status-warning  border-status-warning-border bg-status-warning-soft ';
+    return 'text-status-danger  border-status-danger-border bg-status-danger-soft ';
   };
 
   const getRiskLevelBadge = (level: string) => {
     switch (level) {
       case 'LOW':
         return (
-          <Badge variant="success" className="bg-status-success-soft dark:bg-status-success-soft/50 text-status-success border-status-success-border px-3 py-1 font-bold text-xs gap-1.5">
+          <Badge tone="success" className="gap-1.5">
             <ShieldCheck className="size-3.5" />
             {t('redline.risk_level_low', 'Risiko Rendah (Aman)')}
           </Badge>
         );
       case 'MEDIUM':
         return (
-          <Badge variant="warning" className="bg-status-warning-soft dark:bg-status-warning-soft/50 text-status-warning border-status-warning-border px-3 py-1 font-bold text-xs gap-1.5">
+          <Badge tone="warning" className="gap-1.5">
             <AlertTriangle className="size-3.5" />
             {t('redline.risk_level_medium', 'Risiko Sedang (Perlu Penyesuaian)')}
           </Badge>
         );
       case 'HIGH':
         return (
-          <Badge variant="warning" className="bg-status-warning-soft dark:bg-status-warning-soft/50 text-status-warning border-status-warning-border px-3 py-1 font-bold text-xs gap-1.5">
+          <Badge tone="warning" className="gap-1.5">
             <ShieldAlert className="size-3.5" />
             {t('redline.risk_level_high', 'Risiko Tinggi (Klausul Perlu Diwaspadai)')}
           </Badge>
@@ -182,7 +183,7 @@ export const ContractRedliningModal: React.FC<ContractRedliningModalProps> = ({
       case 'CRITICAL':
       default:
         return (
-          <Badge variant="danger" className="bg-status-danger-soft dark:bg-status-danger-soft/50 text-status-danger border-status-danger-border px-3 py-1 font-bold text-xs gap-1.5">
+          <Badge tone="danger" className="gap-1.5">
             <AlertCircle className="size-3.5" />
             {t('redline.risk_level_critical', 'Risiko Kritis (Wajib Negosiasi Ulang)')}
           </Badge>
@@ -193,14 +194,14 @@ export const ContractRedliningModal: React.FC<ContractRedliningModalProps> = ({
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
       case 'LOW':
-        return <Badge variant="success" className="bg-status-success-soft text-status-success dark:bg-status-success-soft/40 border-status-success-border text-xs">{t('redline.low_risk', 'Low Risk')}</Badge>;
+        return <Badge tone="success">{t('redline.low_risk', 'Low Risk')}</Badge>;
       case 'MEDIUM':
-        return <Badge variant="warning" className="bg-status-warning-soft text-status-warning dark:bg-status-warning-soft/40 border-status-warning-border text-xs">{t('redline.medium_risk', 'Medium Risk')}</Badge>;
+        return <Badge tone="warning">{t('redline.medium_risk', 'Medium Risk')}</Badge>;
       case 'HIGH':
-        return <Badge variant="warning" className="bg-status-warning-soft text-status-warning dark:bg-status-warning-soft/40 border-status-warning-border text-xs">{t('redline.high_risk', 'High Risk')}</Badge>;
+        return <Badge tone="warning">{t('redline.high_risk', 'High Risk')}</Badge>;
       case 'CRITICAL':
       default:
-        return <Badge variant="danger" className="bg-status-danger-soft text-status-danger dark:bg-status-danger-soft/40 border-status-danger-border text-xs">{t('redline.filter_critical', 'Critical')}</Badge>;
+        return <Badge tone="danger">{t('redline.filter_critical', 'Critical')}</Badge>;
     }
   };
 
@@ -252,21 +253,21 @@ ${analysis.analyzedClauses
     <ModalFrame onClose={onClose} className="w-full max-w-5xl max-h-[92dvh] flex flex-col overflow-hidden">
 
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-hairline flex items-center justify-between bg-gradient-to-r from-emerald-50/60 via-transparent to-transparent dark:from-emerald-950/20">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-gradient-to-r from-emerald-50/60 via-transparent to-transparent ">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-md bg-accent/10 text-accent-text flex items-center justify-center border border-accent/20 shadow-xs">
+            <div className="size-10 rounded-md bg-primary/10 text-accent-foreground flex items-center justify-center border border-primary/20 shadow-xs">
               <Scale className="size-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <ModalTitle className="ds-modal-title flex items-center gap-2">
+                <DialogTitle className="flex items-center gap-2">
                   {t('redline.modal_title', 'Analisis Risiko & Kepatuhan Klausul Kontrak (Redlining)')}
-                </ModalTitle>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-status-success-soft text-status-success dark:bg-status-success-soft/60 tracking-wide">
+                </DialogTitle>
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-status-success-soft text-status-success tracking-wide">
                   {t('redline.badge_audit', 'Audit Kepatuhan Klausul')}
                 </span>
                 {analysis && !loading && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full bg-surface-2 text-ink-soft border border-hairline">
+                  <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
                     <CheckCircle2 className="size-3 text-status-success shrink-0" />
                     {analyzedAt
                       ? `${t('redline.saved_indicator', 'Hasil Tersimpan')} • ${new Date(analyzedAt).toLocaleDateString(getActiveFormattingLocale(), {
@@ -278,14 +279,14 @@ ${analysis.analyzedClauses
                   </span>
                 )}
               </div>
-              <p className="text-xs text-ink-soft mt-0.5">
-                <span className="font-semibold text-ink">{contract.nomor_kontrak}</span> • {contract.judul_kontrak} ({contract.partner_nama || t('redline.vendor', 'Vendor')})
+              <p className="text-xs text-muted-foreground mt-0.5">
+                <span className="font-semibold text-foreground">{contract.nomor_kontrak}</span> • {contract.judul_kontrak} ({contract.partner_nama || t('redline.vendor', 'Vendor')})
               </p>
             </div>
           </div>
           <button aria-label={t('common.close', 'Tutup')}
             onClick={onClose}
-            className="size-8 rounded-full flex items-center justify-center text-ink-soft hover:text-ink-soft hover:bg-surface-2 dark:hover:bg-surface-2 cursor-pointer transition-colors"
+            className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-muted-foreground hover:bg-muted cursor-pointer transition-colors"
           >
             <X className="size-5" />
           </button>
@@ -296,20 +297,20 @@ ${analysis.analyzedClauses
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 space-y-4">
               <div className="relative">
-                <div className="size-16 rounded-full border-4 border-accent/20 border-t-accent-strong animate-spin" />
-                <Scale className="size-6 text-accent-text absolute inset-0 m-auto" />
+                <div className="size-16 rounded-full border-4 border-primary/20 border-t-accent-strong animate-spin" />
+                <Scale className="size-6 text-accent-foreground absolute inset-0 m-auto" />
               </div>
               <div className="text-center space-y-1">
-                <p className="font-bold text-ink text-sm">
+                <p className="font-bold text-foreground text-sm">
                   {t('redline.analyzing', 'Menganalisis Kontrak & Memeriksa Risiko...')}
                 </p>
-                <p className="text-xs text-ink-soft max-w-sm">
+                <p className="text-xs text-muted-foreground max-w-sm">
                   {t('redline.analyzing_desc', 'Sistem membedah klausul, menakar liabilitas hukum, dan menyiapkan rekomendasi redline...')}
                 </p>
               </div>
             </div>
           ) : error ? (
-            <div className="p-6 rounded-2xl bg-status-danger-soft dark:bg-status-danger-soft/30 border border-status-danger-border text-center space-y-3 my-6">
+            <div className="p-6 rounded-2xl bg-status-danger-soft border border-status-danger-border text-center space-y-3 my-6">
               <AlertCircle className="size-8 text-status-danger mx-auto" />
               <div>
                 <p className="font-bold text-status-danger text-sm">{t('redline.analisis_gagal', 'Analisis Gagal')}</p>
@@ -319,7 +320,6 @@ ${analysis.analyzedClauses
                 variant="outline"
                 size="sm"
                 onClick={() => executeAnalysis(true)}
-                className="cursor-pointer"
               >
                 <RotateCw className="size-3.5 mr-1.5" />
                 {t('redline.coba_lagi', 'Coba Lagi')}
@@ -328,36 +328,36 @@ ${analysis.analyzedClauses
           ) : analysis ? (
             <>
               {/* TOP SUMMARY CARDS */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 ds-grid">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                 {/* Score Card */}
-                <div className="ds-panel md:col-span-4 p-5 flex flex-col justify-between">
+                <Card className="md:col-span-4 p-5 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-ink-soft">
+                      <span className="text-xs font-semibold text-muted-foreground">
                         {t('redline.risk_score', 'Skor Risiko Hukum')}
                       </span>
-                      <Scale className="size-4 text-ink-soft" />
+                      <Scale className="size-4 text-muted-foreground" />
                     </div>
                     <div className="flex items-baseline gap-2 mt-2">
-                      <span className={`text-4xl font-extrabold tracking-tight ${getRiskScoreColor(analysis.overallRiskScore).split('  ')[0]}`}>
+                      <span className={`text-4xl font-extrabold tracking-tight ${getRiskScoreColor(analysis.overallRiskScore).split(' ')[0]}`}>
                         {analysis.overallRiskScore}
                       </span>
-                      <span className="text-xs font-semibold text-ink-soft">/ 100</span>
+                      <span className="text-xs font-semibold text-muted-foreground">/ 100</span>
                     </div>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-hairline dark:border-hairline/60">
+                  <div className="mt-4 pt-3 border-t border-border ">
                     {getRiskLevelBadge(analysis.riskLevel)}
                   </div>
-                </div>
+                </Card>
 
                 {/* Executive Summary Card */}
-                <div className="ds-panel md:col-span-8 p-5 flex flex-col justify-between">
+                <Card className="md:col-span-8 p-5 flex flex-col justify-between">
                   <div>
-                    <span className="text-xs font-semibold text-ink-soft flex items-center gap-1.5">
-                      <Info className="size-3.5 text-accent-text" />
+                    <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                      <Info className="size-3.5 text-accent-foreground" />
                       {t('redline.executive_summary', 'Ringkasan Eksekutif Legal')}
                     </span>
-                    <p className="text-xs text-ink mt-2 leading-relaxed line-clamp-4">
+                    <p className="text-xs text-foreground mt-2 leading-relaxed line-clamp-4">
                       {analysis.executiveSummary}
                     </p>
                   </div>
@@ -366,56 +366,56 @@ ${analysis.analyzedClauses
                       {analysis.keyFindings.slice(0, 3).map((finding, idx) => (
                         <span
                           key={idx}
-                          className="text-xs px-2.5 py-1 rounded-lg bg-surface border border-hairline text-ink font-medium"
+                          className="text-xs px-2.5 py-1 rounded-lg bg-card border border-border text-foreground font-medium"
                         >
                           ⚠️ {finding}
                         </span>
                       ))}
                     </div>
                   )}
-                </div>
+                </Card>
               </div>
 
               {/* TABS HEADER */}
-              <div className="flex items-center justify-between border-b border-hairline pb-2">
+              <div className="flex items-center justify-between border-b border-border pb-2">
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button size="sm"
                     onClick={() => setActiveTab('clauses')}
-                    className={`inline-flex items-center px-3 min-h-8 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                      activeTab === 'clauses'
-                        ? 'bg-accent-strong text-white shadow-xs'
-                        : 'text-ink-soft hover:bg-surface-2 dark:hover:bg-surface-2'
-                    }`}
+                    className={` ${
+ activeTab === 'clauses'
+ ? ''
+ : ' '
+ }`}
                   >
                     {t('redline.tab_clauses', 'Analisis Klausul & Redlining')} ({analysis.analyzedClauses?.length || 0})
-                  </button>
-                  <button
+                  </Button>
+                  <Button size="sm"
                     onClick={() => setActiveTab('summary')}
-                    className={`inline-flex items-center px-3 min-h-8 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                      activeTab === 'summary'
-                        ? 'bg-accent-strong text-white shadow-xs'
-                        : 'text-ink-soft hover:bg-surface-2 dark:hover:bg-surface-2'
-                    }`}
+                    className={` ${
+ activeTab === 'summary'
+ ? ''
+ : ' '
+ }`}
                   >
                     {t('redline.tab_summary', 'Kepatuhan Regulasi & Standar OJK')} ({analysis.complianceChecklist?.length || 0})
-                  </button>
+                  </Button>
                 </div>
 
                 {activeTab === 'clauses' && (
                   <div className="flex items-center gap-1">
-                    <SlidersHorizontal className="size-3 text-ink-soft mr-1" />
+                    <SlidersHorizontal className="size-3 text-muted-foreground mr-1" />
                     {['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map((lvl) => (
-                      <button
+                      <Button variant="secondary" size="sm"
                         key={lvl}
                         onClick={() => setSeverityFilter(lvl)}
-                        className={`inline-flex items-center px-2 min-h-8 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                          severityFilter === lvl
-                            ? 'bg-ink text-white '
-                            : 'text-ink-soft hover:bg-surface-2 dark:hover:bg-surface-2'
-                        }`}
+                        className={` ${
+ severityFilter === lvl
+ ? ' '
+ : ' '
+ }`}
                       >
                         {lvl === 'ALL' ? t('redline.filter_all', 'Semua') : lvl}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
@@ -425,7 +425,7 @@ ${analysis.analyzedClauses
               {activeTab === 'clauses' && (
                 <div className="space-y-4">
                   {filteredClauses.length === 0 ? (
-                    <div className="text-center py-10 text-ink-soft text-xs">
+                    <div className="text-center py-10 text-muted-foreground text-xs">
                       {t('redline.tidak_ada_klausul_dengan_tingkat_risiko', 'Tidak ada klausul dengan tingkat risiko \'{severityFilter}\'.', { severityFilter })}
                     </div>
                   ) : (
@@ -438,10 +438,10 @@ ${analysis.analyzedClauses
                           {/* Clause Header */}
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-ink dark:text-white text-xs">
+                              <span className="font-bold text-foreground text-xs">
                                 {idx + 1}. {clause.clauseTitle}
                               </span>
-                              <span className="text-xs text-ink-soft px-2 py-0.5 rounded-md bg-surface-2 font-medium">
+                              <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-md bg-muted font-medium">
                                 {clause.riskCategory}
                               </span>
                             </div>
@@ -449,12 +449,12 @@ ${analysis.analyzedClauses
                           </div>
 
                           {/* Original / Issue Box */}
-                          <div className="p-3 rounded-xl bg-status-danger-soft/70 dark:bg-status-danger-soft/20 border border-status-danger-border/60 dark:border-status-danger-border/40 text-xs">
+                          <div className="p-3 rounded-xl bg-status-danger-soft/70 border border-status-danger-border/60 text-xs">
                             <p className="font-semibold text-status-danger text-xs mb-1 flex items-center gap-1">
                               <AlertTriangle className="size-3 text-status-danger" />
                               {t('redline.original_issue', 'Klausul Asal / Masalah Teridentifikasi')}
                             </p>
-                            <p className="text-ink leading-relaxed font-mono text-xs">
+                            <p className="text-foreground leading-relaxed font-mono text-xs">
                               {clause.originalTextOrIssue}
                             </p>
                             <p className="text-status-danger text-xs mt-2 italic">
@@ -463,7 +463,7 @@ ${analysis.analyzedClauses
                           </div>
 
                           {/* Recommended Redline Box */}
-                          <div className="p-3.5 rounded-xl bg-status-success-soft/70 dark:bg-status-success-soft/20 border border-status-success-border/60 dark:border-status-success-border/40 text-xs relative group">
+                          <div className="p-3.5 rounded-xl bg-status-success-soft/70 border border-status-success-border/60 text-xs relative group">
                             <div className="flex items-center justify-between mb-1">
                               <p className="font-semibold text-status-success text-xs flex items-center gap-1">
                                 <AiIcon className="size-3 text-status-success" />
@@ -473,7 +473,6 @@ ${analysis.analyzedClauses
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleCopyClause(clause.recommendedRedline, idx)}
-                                className="text-xs cursor-pointer"
                               >
                                 {copiedClauseIdx === idx ? (
                                   <>
@@ -488,10 +487,10 @@ ${analysis.analyzedClauses
                                 )}
                               </Button>
                             </div>
-                            <p className="text-ink leading-relaxed font-medium text-xs bg-surface p-2.5 rounded-lg border border-status-success-border dark:border-status-success-border/50">
+                            <p className="text-foreground leading-relaxed font-medium text-xs bg-card p-2.5 rounded-lg border border-status-success-border ">
                               "{clause.recommendedRedline}"
                             </p>
-                            <p className="text-xs text-ink-soft mt-2">
+                            <p className="text-xs text-muted-foreground mt-2">
                               <strong>{t('redline.pertimbangan', 'Pertimbangan:')}</strong> {clause.legalRationale}
                             </p>
                           </div>
@@ -505,47 +504,47 @@ ${analysis.analyzedClauses
               {/* TAB 2: COMPLIANCE CHECKLIST (INCL. OJK REGULATIONS) */}
               {activeTab === 'summary' && (
                 <div className="space-y-4">
-                  <div className="p-3.5 rounded-2xl bg-status-info-soft/70 dark:bg-status-info-soft/30 border border-status-info-border/80 dark:border-status-info-border/60 flex items-start gap-2.5 text-xs text-status-info">
+                  <div className="p-3.5 rounded-2xl bg-status-info-soft/70 border border-status-info-border/80 flex items-start gap-2.5 text-xs text-status-info">
                     <Info className="size-4 text-status-info shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold">{t('redline.standar_kepatuhan_ojk_regulasi_finansial_korpora', 'Standar Kepatuhan OJK & Regulasi Finansial / Korporasi')}</p>
-                      <p className="text-xs text-status-info/80 dark:text-status-info/80 mt-0.5">
+                      <p className="text-xs text-status-info/80 mt-0.5">
                         {t('redline.daftar_periksa_ini_mencakup_pojk_kerja', 'Daftar periksa ini mencakup POJK Kerja Sama Pihak Ketiga, POJK Tata Kelola TI, Hak Audit Regulator OJK, serta kepatuhan UU PDP & KUHPerdata.')}
                       </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ds-grid">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {analysis.complianceChecklist?.map((item, idx) => {
                       const isOjkItem = item.item.toUpperCase().includes('OJK') || item.item.toUpperCase().includes('POJK') || item.item.toUpperCase().includes('REGULATOR');
                       return (
-                        <div
+                        <Card
                           key={idx}
-                          className="ds-panel p-4 flex items-start gap-3 relative overflow-hidden"
+                          className="p-4 flex items-start gap-3 relative overflow-hidden"
                         >
                           {item.status === 'COMPLIANT' ? (
-                            <div className="size-7 rounded-xl bg-status-success-soft dark:bg-status-success-soft/60 text-status-success flex items-center justify-center shrink-0 mt-0.5">
+                            <div className="size-7 rounded-xl bg-status-success-soft text-status-success flex items-center justify-center shrink-0 mt-0.5">
                               <CheckCircle2 className="size-4" />
                             </div>
                           ) : item.status === 'NEEDS_REVIEW' ? (
-                            <div className="size-7 rounded-xl bg-status-warning-soft dark:bg-status-warning-soft/60 text-status-warning flex items-center justify-center shrink-0 mt-0.5">
+                            <div className="size-7 rounded-xl bg-status-warning-soft text-status-warning flex items-center justify-center shrink-0 mt-0.5">
                               <AlertTriangle className="size-4" />
                             </div>
                           ) : (
-                            <div className="size-7 rounded-xl bg-status-danger-soft dark:bg-status-danger-soft/60 text-status-danger flex items-center justify-center shrink-0 mt-0.5">
+                            <div className="size-7 rounded-xl bg-status-danger-soft text-status-danger flex items-center justify-center shrink-0 mt-0.5">
                               <AlertCircle className="size-4" />
                             </div>
                           )}
                           <div className="space-y-1.5 flex-1">
                             <div className="flex items-center justify-between gap-2">
-                              <p className="font-bold text-ink dark:text-white text-xs">{item.item}</p>
+                              <p className="font-bold text-foreground text-xs">{item.item}</p>
                               {isOjkItem && (
-                                <Badge variant="info" className="bg-status-info-soft text-status-info dark:bg-status-info-soft/60 border-status-info-border text-xs font-bold shrink-0">
+                                <Badge tone="info" className="shrink-0">
                                   {t('redline.ojk_standard', 'OJK Standard')}
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-xs text-ink-soft leading-relaxed">{item.notes}</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed">{item.notes}</p>
                             <div>
                               {item.status === 'COMPLIANT' ? (
                                 <span className="inline-flex items-center text-xs font-bold text-status-success">
@@ -562,18 +561,18 @@ ${analysis.analyzedClauses
                               )}
                             </div>
                           </div>
-                        </div>
+                        </Card>
                       );
                     })}
                   </div>
 
                   {/* Key Findings List */}
-                  <div className="p-4 rounded-2xl bg-status-warning-soft/50 dark:bg-status-warning-soft/20 border border-status-warning-border dark:border-status-warning-border/40 space-y-2">
+                  <div className="p-4 rounded-2xl bg-status-warning-soft/50 border border-status-warning-border space-y-2">
                     <p className="font-bold text-status-warning text-xs flex items-center gap-1.5">
                       <AlertTriangle className="size-3.5 text-status-warning" />
                       {t('redline.key_findings', 'Temuan Risiko Utama')}
                     </p>
-                    <ul className="space-y-1.5 text-xs text-ink list-disc list-inside">
+                    <ul className="space-y-1.5 text-xs text-foreground list-disc list-inside">
                       {analysis.keyFindings?.map((finding, idx) => (
                         <li key={idx} className="leading-relaxed">
                           {finding}
@@ -588,14 +587,13 @@ ${analysis.analyzedClauses
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3.5 border-t border-hairline flex items-center justify-between bg-surface/50 dark:bg-surface/50">
+        <div className="px-6 py-3.5 border-t border-border flex items-center justify-between bg-card/50 ">
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => executeAnalysis(true)}
               disabled={loading}
-              className="text-xs cursor-pointer"
             >
               <RotateCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
               <span>{t('redline.reanalyze', 'Analisis Ulang')}</span>
@@ -606,7 +604,6 @@ ${analysis.analyzedClauses
                 variant="outline"
                 size="sm"
                 onClick={handleCopyFullReport}
-                className="text-xs cursor-pointer"
               >
                 {copiedFull ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
                 <span>{copiedFull ? t('redline.copied', 'Tersalin!') : t('redline.copy_full_report', 'Salin Seluruh Laporan')}</span>
@@ -617,7 +614,6 @@ ${analysis.analyzedClauses
           <Button
             size="sm"
             onClick={onClose}
-            className="text-xs cursor-pointer"
           >
             {t('redline.close', 'Tutup')}
           </Button>

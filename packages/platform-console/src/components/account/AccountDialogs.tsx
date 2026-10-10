@@ -4,20 +4,24 @@ import { authClient } from '../../lib/auth-client';
 import { useIdentity } from '../../context/AuthContext';
 import { LANGUAGE_OPTIONS, useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
-import { ModalFrame, ModalTitle } from '../ui/modal-frame';
+import { ModalFrame } from '../ui/modal-frame';
 import { Button } from '@legalio/ui-components/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 
-import { fieldControlClass } from '@legalio/ui-components/input';
-const fieldClass = fieldControlClass;
+import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Textarea } from '@legalio/ui-components/textarea';
+import { CardHeader } from '@legalio/ui-components/card';
+import { DialogTitle } from '@legalio/ui-components/dialog';
+import { Field, FieldLabel, FieldHelperText } from '@legalio/ui-components/field';
+import { Alert, AlertContent } from '@legalio/ui-components/alert';
 
 const Header: React.FC<{ title: string; onClose: () => void }> = ({ title, onClose }) => {
   const { t } = useLanguage();
   return (
-    <div className="ds-section-header">
-      <ModalTitle className="ds-modal-title flex items-center gap-2">{title}</ModalTitle>
-      <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label={t('common.close', 'Close')}><X className="h-4 w-4" aria-hidden="true" /></Button>
-    </div>
+    <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border pb-4">
+      <DialogTitle className="flex items-center gap-2">{title}</DialogTitle>
+      <Button type="button" variant="ghost" size="icon-md" onClick={onClose} aria-label={t('common.close', 'Close')}><X className="h-4 w-4" aria-hidden="true" /></Button>
+    </CardHeader>
   );
 };
 
@@ -30,28 +34,28 @@ export const PreferencesDialog: React.FC<{ onClose: () => void }> = ({ onClose }
       <Header title={t('tb.preferences', 'Preferences')} onClose={onClose} />
       <div className="flex flex-col gap-5 overflow-y-auto p-5">
         <fieldset className="m-0 border-0 p-0">
-          <legend className="mb-2 text-sm font-semibold text-ink dark:text-white">{t('tb.theme', 'Theme')}</legend>
-          <div className="grid grid-cols-2 gap-2 ds-grid">
+          <legend className="mb-2 text-sm font-semibold text-foreground ">{t('tb.theme', 'Theme')}</legend>
+          <div className="grid grid-cols-2 gap-2">
             {([['light', t('tb.theme_light', 'Light'), Sun], ['dark', t('tb.theme_dark', 'Dark'), Moon]] as const).map(([value, label, Icon]) => (
               <button key={value} type="button" aria-pressed={theme === value} onClick={() => setTheme(value)}
-                className={`flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 ${theme === value ? 'border-accent bg-accent/10 text-accent-strong dark:text-accent' : 'border-hairline text-ink '}`}>
+                className={`flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 ${theme === value ? 'border-primary bg-primary/10 text-accent-foreground ' : 'border-border text-foreground '}`}>
                 <Icon className="h-4 w-4" aria-hidden="true" />{label}
               </button>
             ))}
           </div>
         </fieldset>
         <fieldset className="m-0 border-0 p-0">
-          <legend className="mb-2 text-sm font-semibold text-ink dark:text-white">{t('tb.ui_language', 'Interface language')}</legend>
-          <div className="grid gap-2 ds-grid">
+          <legend className="mb-2 text-sm font-semibold text-foreground ">{t('tb.ui_language', 'Interface language')}</legend>
+          <div className="grid gap-2">
             {LANGUAGE_OPTIONS.map((option) => (
               <button key={option.code} type="button" lang={option.htmlLang} aria-pressed={language === option.code} onClick={() => setLanguage(option.code)}
-                className={`flex min-h-10 cursor-pointer items-center justify-between rounded-md border px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 ${language === option.code ? 'border-accent bg-accent/10 text-accent-strong dark:text-accent' : 'border-hairline text-ink '}`}>
+                className={`flex min-h-10 cursor-pointer items-center justify-between rounded-md border px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 ${language === option.code ? 'border-primary bg-primary/10 text-accent-foreground ' : 'border-border text-foreground '}`}>
                 {option.nativeName}{language === option.code && <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
               </button>
             ))}
           </div>
         </fieldset>
-        <p className="text-xs text-ink-soft">{t('tb.preferences_local', 'These preferences apply to your account in this browser only.')}</p>
+        <p className="text-xs text-muted-foreground">{t('tb.preferences_local', 'These preferences apply to your account in this browser only.')}</p>
       </div>
     </ModalFrame>
   );
@@ -168,14 +172,14 @@ export const AccountProfileDialog: React.FC<{ onClose: () => void }> = ({ onClos
       <Header title={t('tb.account_profile', 'Account Profile')} onClose={onClose} />
       <div className="min-h-0 overflow-y-auto p-5 sm:p-6">
         <Tabs value={tab} onValueChange={setTab} className="gap-8">
-          <TabsList aria-label={t('tb.account_profile', 'Account Profile')} className="h-auto w-full rounded-2xl bg-surface-2 p-1">
+          <TabsList aria-label={t('tb.account_profile', 'Account Profile')} className="h-auto w-full rounded-2xl bg-muted p-1">
             <TabsTrigger value="profile" className="min-h-10 flex-1 rounded-md">{t('tb.profile_tab', 'Profile')}</TabsTrigger>
             <TabsTrigger value="security" className="min-h-10 flex-1 rounded-md">{t('tb.security_tab', 'Security')}</TabsTrigger>
           </TabsList>
           <TabsContent value="profile">
         <form onSubmit={saveProfile} aria-label={t('tb.profile_details', 'Profile details')} className="flex flex-col gap-6">
           <div className="flex items-center gap-5">
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface text-lg font-medium text-ink">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-card text-lg font-medium text-foreground">
                 {image ? <img src={image} alt={t('tb.profile_photo', 'Profile photo')} className="h-full w-full object-cover" /> : [firstName, lastName].map(part => part.trim().charAt(0).toUpperCase()).join('') || (identity?.email || '?').charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0 space-y-2">
@@ -189,38 +193,38 @@ export const AccountProfileDialog: React.FC<{ onClose: () => void }> = ({ onClos
                   className="hidden"
                   onChange={(event) => { selectImage(event.target.files?.[0]); event.target.value = ''; }}
                 />
-                <Button type="button" variant="outline" size="lg" disabled={profileState.kind === 'saving'} onClick={() => fileInputRef.current?.click()}>
+                <Button type="button" variant="outline" disabled={profileState.kind === 'saving'} onClick={() => fileInputRef.current?.click()}>
                   {t('tb.upload_photo', 'Upload photo')}
                 </Button>
                 {image && (
-                  <Button type="button" variant="ghost" size="lg" disabled={profileState.kind === 'saving'} onClick={() => { setImage(''); setProfileState({ kind: 'idle' }); if (fileInputRef.current) fileInputRef.current.value = ''; }}>
+                  <Button type="button" variant="ghost" disabled={profileState.kind === 'saving'} onClick={() => { setImage(''); setProfileState({ kind: 'idle' }); if (fileInputRef.current) fileInputRef.current.value = ''; }}>
                     <Trash2 className="h-4 w-4" aria-hidden="true" />{t('tb.remove_photo', 'Remove')}
                   </Button>
                 )}
                 </div>
-                <p className="text-xs text-ink-soft">{t('tb.profile_photo_hint', 'JPG, GIF or PNG. Max 800 KB.')}</p>
+                <p className="text-xs text-muted-foreground">{t('tb.profile_photo_hint', 'JPG, GIF or PNG. Max 800 KB.')}</p>
               </div>
           </div>
-          <div className="grid gap-6 sm:grid-cols-2 ds-grid">
-            <div>
-              <label htmlFor={ids.first} className="mb-1.5 block text-sm text-ink-soft">{t('tb.first_name', 'First Name')}</label>
-              <input id={ids.first} type="text" autoComplete="given-name" maxLength={100} required disabled={profileState.kind === 'saving'} className={fieldClass} value={firstName} onChange={event => { setFirstName(event.target.value); setProfileState({ kind: 'idle' }); }} />
-            </div>
-            <div>
-              <label htmlFor={ids.last} className="mb-1.5 block text-sm text-ink-soft">{t('tb.last_name', 'Last Name')}</label>
-              <input id={ids.last} type="text" autoComplete="family-name" maxLength={100} disabled={profileState.kind === 'saving'} className={fieldClass} value={lastName} onChange={event => { setLastName(event.target.value); setProfileState({ kind: 'idle' }); }} />
-            </div>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor={ids.first}>{t('tb.first_name', 'First Name')}</FieldLabel>
+              <Input id={ids.first} type="text" autoComplete="given-name" maxLength={100} required disabled={profileState.kind === 'saving'} value={firstName} onChange={event => { setFirstName(event.target.value); setProfileState({ kind: 'idle' }); }} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={ids.last}>{t('tb.last_name', 'Last Name')}</FieldLabel>
+              <Input id={ids.last} type="text" autoComplete="family-name" maxLength={100} disabled={profileState.kind === 'saving'} value={lastName} onChange={event => { setLastName(event.target.value); setProfileState({ kind: 'idle' }); }} />
+            </Field>
           </div>
-          <div>
-            <label htmlFor={ids.email} className="mb-1.5 block text-sm text-ink-soft">{t('tb.profile_email', 'Email')}</label>
-            <input id={ids.email} type="email" autoComplete="email" readOnly className={`ds-input${fieldClass}  `} value={identity?.email || ''} />
-          </div>
-          <div>
-            <label htmlFor={ids.bio} className="mb-1.5 block text-sm text-ink-soft">{t('tb.profile_bio', 'Bio')}</label>
-            <textarea id={ids.bio} rows={3} maxLength={500} disabled={profileState.kind === 'saving'} className={`ds-input${fieldClass} resize-y`} value={bio} placeholder={t('tb.profile_bio_placeholder', 'Tell us about yourself')} onChange={event => { setBio(event.target.value); setProfileState({ kind: 'idle' }); }} />
-          </div>
+          <Field>
+            <FieldLabel htmlFor={ids.email}>{t('tb.profile_email', 'Email')}</FieldLabel>
+            <Input id={ids.email} type="email" autoComplete="email" readOnly className={``} value={identity?.email || ''} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={ids.bio}>{t('tb.profile_bio', 'Bio')}</FieldLabel>
+            <Textarea id={ids.bio} rows={3} maxLength={500} disabled={profileState.kind === 'saving'} className={`resize-y`} value={bio} placeholder={t('tb.profile_bio_placeholder', 'Tell us about yourself')} onChange={event => { setBio(event.target.value); setProfileState({ kind: 'idle' }); }} />
+          </Field>
           <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" size="lg" className="w-full" disabled={!firstName.trim() || profileState.kind === 'saving'}>
+            <Button type="submit" className="w-full" disabled={!firstName.trim() || profileState.kind === 'saving'}>
               {profileState.kind === 'saving' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{t('tb.save_profile', 'Save profile')}
             </Button>
             <span aria-live="polite">{profileState.kind === 'saved' && <span className="flex items-center gap-2 text-sm text-status-success"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />{t('tb.profile_saved', 'Profile updated.')}</span>}</span>
@@ -231,24 +235,24 @@ export const AccountProfileDialog: React.FC<{ onClose: () => void }> = ({ onClos
           <TabsContent value="security" className="space-y-6">
         {hasPassword ? (
           <form onSubmit={changePassword} aria-label={t('tb.change_password', 'Change password')} className="flex flex-col gap-8">
-            <div className="grid gap-6 ds-grid">
-              <div>
-                <label htmlFor={ids.current} className="mb-1.5 block text-sm font-medium text-ink">{t('tb.current_password', 'Current password')}</label>
-                <input id={ids.current} type="password" autoComplete="current-password" required disabled={state.kind === 'saving'} placeholder={t('tb.current_password_placeholder', 'Enter current password')} className={fieldClass} value={current} onChange={(e) => { setCurrent(e.target.value); setState({ kind: 'idle' }); }} />
-              </div>
-              <div>
-                <label htmlFor={ids.next} className="mb-1.5 block text-sm font-medium text-ink">{t('tb.new_password', 'New password')}</label>
-                <input id={ids.next} type="password" autoComplete="new-password" required minLength={8} disabled={state.kind === 'saving'} placeholder={t('tb.new_password_placeholder', 'Enter new password')} className={fieldClass} value={next} aria-invalid={next.length > 0 && next.length < 8} aria-describedby={`${ids.next}-hint`} onChange={(e) => { setNext(e.target.value); setState({ kind: 'idle' }); }} />
-                <p id={`${ids.next}-hint`} className="mt-1.5 text-xs text-ink-soft">{t('tb.password_hint', 'At least 8 characters.')}</p>
-              </div>
-              <div>
-                <label htmlFor={ids.confirm} className="mb-1.5 block text-sm font-medium text-ink">{t('tb.confirm_password', 'Confirm Password')}</label>
-                <input id={ids.confirm} type="password" autoComplete="new-password" required disabled={state.kind === 'saving'} placeholder={t('tb.confirm_password_placeholder', 'Confirm new password')} className={fieldClass} value={confirm} aria-invalid={confirm.length > 0 && confirm !== next} aria-describedby={confirm.length > 0 && confirm !== next ? `${ids.confirm}-error` : undefined} onChange={event => { setConfirm(event.target.value); setState({ kind: 'idle' }); }} />
+            <div className="grid gap-6">
+              <Field>
+                <FieldLabel htmlFor={ids.current}>{t('tb.current_password', 'Current password')}</FieldLabel>
+                <Input id={ids.current} type="password" autoComplete="current-password" required disabled={state.kind === 'saving'} placeholder={t('tb.current_password_placeholder', 'Enter current password')} value={current} onChange={(e) => { setCurrent(e.target.value); setState({ kind: 'idle' }); }} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={ids.next}>{t('tb.new_password', 'New password')}</FieldLabel>
+                <Input id={ids.next} type="password" autoComplete="new-password" required minLength={8} disabled={state.kind === 'saving'} placeholder={t('tb.new_password_placeholder', 'Enter new password')} value={next} aria-invalid={next.length > 0 && next.length < 8} aria-describedby={`${ids.next}-hint`} onChange={(e) => { setNext(e.target.value); setState({ kind: 'idle' }); }} />
+                <FieldHelperText id={`${ids.next}-hint`}>{t('tb.password_hint', 'At least 8 characters.')}</FieldHelperText>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={ids.confirm}>{t('tb.confirm_password', 'Confirm Password')}</FieldLabel>
+                <Input id={ids.confirm} type="password" autoComplete="new-password" required disabled={state.kind === 'saving'} placeholder={t('tb.confirm_password_placeholder', 'Confirm new password')} value={confirm} aria-invalid={confirm.length > 0 && confirm !== next} aria-describedby={confirm.length > 0 && confirm !== next ? `${ids.confirm}-error` : undefined} onChange={event => { setConfirm(event.target.value); setState({ kind: 'idle' }); }} />
                 {confirm.length > 0 && confirm !== next && <p id={`${ids.confirm}-error`} className="mt-1.5 text-xs text-status-danger">{t('tb.password_mismatch', 'Passwords do not match.')}</p>}
-              </div>
+              </Field>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Button type="submit" size="lg" className="w-full" disabled={!current || next.length < 8 || next !== confirm || state.kind === 'saving'}>
+              <Button type="submit" className="w-full" disabled={!current || next.length < 8 || next !== confirm || state.kind === 'saving'}>
                 {state.kind === 'saving' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{t('tb.update_password', 'Update Password')}
               </Button>
               <span aria-live="polite">{state.kind === 'saved' && <span className="flex items-center gap-2 text-sm text-status-success"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />{t('tb.password_changed', 'Password changed.')}</span>}</span>
@@ -256,22 +260,22 @@ export const AccountProfileDialog: React.FC<{ onClose: () => void }> = ({ onClos
             </div>
           </form>
         ) : (
-          <p className="text-sm text-ink">{t('tb.no_password', 'This account signs in with an identity provider and has no password to change here.')}</p>
+          <p className="text-sm text-foreground">{t('tb.no_password', 'This account signs in with an identity provider and has no password to change here.')}</p>
         )}
-        <details className="rounded-xl border border-hairline p-3">
-          <summary className="cursor-pointer text-sm font-medium text-ink-soft">{t('tb.your_sessions', 'Your sessions')}</summary>
-          <p className="my-3 text-xs text-ink-soft">
+        <details className="rounded-xl border border-border p-3">
+          <summary className="cursor-pointer text-sm font-medium text-muted-foreground">{t('tb.your_sessions', 'Your sessions')}</summary>
+          <p className="my-3 text-xs text-muted-foreground">
             {t('tb.sign_in_method', 'Sign-in method')}: {(identity?.signInMethods || []).map(m => m === 'password' ? t('tb.method_password', 'Email and password') : m === 'google' ? 'Google' : m).join(', ') || '—'}
           </p>
-          {sessionsError && <p role="alert" className="ds-alert ds-status-danger border">{t('tb.sessions_load_error', 'Sessions could not be loaded.')}</p>}
-          <ul className="divide-y divide-hairline rounded-xl border border-hairline">
+          {sessionsError && <Alert status="error" role="alert"><AlertContent>{t('tb.sessions_load_error', 'Sessions could not be loaded.')}</AlertContent></Alert>}
+          <ul className="divide-y divide-border rounded-xl border border-border">
             {(sessions || []).map((s) => (
               <li key={s.id} className="flex min-h-12 items-center justify-between gap-3 px-3 py-2 text-sm">
                 <span className="flex min-w-0 items-center gap-2">
-                  <Monitor className="h-4 w-4 shrink-0 text-ink-soft" aria-hidden="true" />
+                  <Monitor className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   <span className="min-w-0">
-                    <span className="block truncate text-ink">{s.userAgent || t('tb.unknown_device', 'Unknown device')}</span>
-                    <span className="block text-xs text-ink-soft">{new Date(s.updatedAt || s.createdAt).toLocaleString()}{s.current ? ` · ${t('tb.this_session', 'This session')}` : ''}</span>
+                    <span className="block truncate text-foreground">{s.userAgent || t('tb.unknown_device', 'Unknown device')}</span>
+                    <span className="block text-xs text-muted-foreground">{new Date(s.updatedAt || s.createdAt).toLocaleString()}{s.current ? ` · ${t('tb.this_session', 'This session')}` : ''}</span>
                   </span>
                 </span>
                 {!s.current && <Button type="button" variant="ghost" size="sm" onClick={() => revoke(s.id)}><LogOut className="h-4 w-4" aria-hidden="true" />{t('tb.sign_out_session', 'Sign out')}</Button>}

@@ -4,6 +4,7 @@ import { useIdentity } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import { useLanguage } from '../context/LanguageContext';
 
+import { Card } from '@legalio/ui-components/card';
 export interface WorkspaceItem {
   id: string;
   name: string;
@@ -15,10 +16,10 @@ export interface WorkspaceItem {
 
 const BADGE_COLOR_PALETTES = [
   'bg-status-success text-white',
-  'bg-ink  text-white',
+  'bg-foreground  text-white',
   'bg-status-info text-white',
   'bg-status-finance text-white',
-  'bg-ink text-white',
+  'bg-foreground text-white',
   'bg-status-special text-white',
 ];
 
@@ -119,11 +120,11 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
         }}
         aria-expanded={canSwitch ? isOpen : false}
         aria-haspopup={canSwitch ? "listbox" : false}
-        className={`w-full flex items-center gap-2.5 p-1.5 rounded-md transition-colors text-left group focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none ${
-          canSwitch
-            ? 'hover:bg-surface-2 dark:hover:bg-surface-2 cursor-pointer'
-            : 'cursor-default select-none'
-        }  ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+        className={`w-full flex items-center gap-2.5 p-1.5 rounded-md transition-colors text-left group focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none ${
+ canSwitch
+ ? 'hover:bg-muted cursor-pointer'
+ : 'cursor-default select-none'
+ } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
         title={
           canSwitch
             ? currentWorkspace.name
@@ -134,10 +135,10 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
           {/* Workspace Monogram / Logo Icon */}
           <div
             className={`w-10 h-10 rounded-full ${
-              currentWorkspace.logoUrl
-                ? 'bg-surface border border-hairline '
-                : 'bg-accent-strong text-white shadow-2xs'
-            } flex items-center justify-center font-bold text-sm shrink-0 select-none overflow-hidden transition-transform`}
+ currentWorkspace.logoUrl
+ ? 'bg-card border border-border '
+ : 'bg-primary text-white shadow-2xs'
+ } flex items-center justify-center font-bold text-sm shrink-0 select-none overflow-hidden transition-transform`}
           >
             {currentWorkspace.logoUrl ? (
               <img
@@ -155,10 +156,10 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
 
           {!isCollapsed && (
             <div className="min-w-0 flex-1">
-              <span className="block font-semibold text-xs text-ink tracking-tight truncate leading-tight">
+              <span className="block font-semibold text-xs text-foreground tracking-tight truncate leading-tight">
                 {currentWorkspace.name}
               </span>
-              <span className="block text-xs text-ink-soft truncate">
+              <span className="block text-xs text-muted-foreground truncate">
                 {isPlatform ? t('nav.system_admin', 'System Admin') : t('workspace.workspace', 'Workspace')}
               </span>
             </div>
@@ -167,27 +168,27 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
 
         {!isCollapsed && canSwitch && (
           <ChevronsUpDown
-            className={`w-4 h-4 text-ink-soft shrink-0 group-hover:text-ink dark:group-hover:text-ink transition-colors ${
-              isOpen ? 'text-ink ' : ''
-            }`}
+            className={`w-4 h-4 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors ${
+ isOpen ? 'text-foreground ' : ''
+ }`}
           />
         )}
       </button>
 
       {/* Popover Dropdown Menu */}
       {isOpen && canSwitch && (
-        <div
+        <Card
           role="listbox"
           aria-label={t('workspace.pilih_ruang_kerja', 'Pilih Ruang Kerja')}
-          className={`ds-panel absolute z-50 mt-1.5 ${
-            isCollapsed ? 'left-14 top-0' : 'left-0 right-0'
-          } min-w-[240px] p-1.5 animate-in fade-in zoom-in-95 duration-150`}
+          className={` absolute z-50 mt-1.5 ${
+ isCollapsed ? 'left-14 top-0' : 'left-0 right-0'
+ } min-w-[240px] p-1.5 animate-in fade-in zoom-in-95 duration-150`}
           style={{ transformOrigin: 'top left' }}
         >
           {/* Popover Header */}
-          <div className="px-3 py-2 border-b border-hairline mb-1 flex items-center gap-1.5">
-            <Building2 className="w-3.5 h-3.5 text-ink-soft" />
-            <p className="text-xs font-semibold text-ink-soft tracking-tight">
+          <div className="px-3 py-2 border-b border-border mb-1 flex items-center gap-1.5">
+            <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+            <p className="text-xs font-semibold text-muted-foreground tracking-tight">
               {t('workspace.switch_title', 'Pilih Ruang Kerja:')}
             </p>
           </div>
@@ -203,18 +204,18 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
                   role="option"
                   aria-selected={isSelected}
                   onClick={() => handleSelect(workspace.id)}
-                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-xs transition-colors cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-                    isSelected
-                      ? 'bg-surface-2 text-ink dark:text-white font-semibold'
-                      : 'text-ink hover:bg-surface dark:hover:bg-surface-2/60 hover:text-ink dark:hover:text-white'
-                  }`}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-xs transition-colors cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+ isSelected
+ ? 'bg-muted text-foreground font-semibold'
+ : 'text-foreground hover:bg-card hover:text-foreground '
+ }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0 pr-2">
                     <div
                       className={`w-7 h-7 rounded-full ${
-                        workspace.logoUrl
-                          ? 'bg-surface border border-hairline '
-                          : `${isSelected ? 'bg-accent-strong text-white' : workspace.badgeClass} shadow-2xs`
+ workspace.logoUrl
+ ? 'bg-card border border-border '
+ : `${isSelected ? 'bg-primary text-white' : workspace.badgeClass} shadow-2xs`
                       } flex items-center justify-center font-bold text-xs shrink-0 select-none overflow-hidden`}
                     >
                       {workspace.logoUrl ? (
@@ -234,13 +235,13 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
                   </div>
 
                   {isSelected && (
-                    <Check className="w-4 h-4 text-accent-text shrink-0 stroke-[2.5]" />
+                    <Check className="w-4 h-4 text-accent-foreground shrink-0 stroke-[2.5]" />
                   )}
                 </button>
               );
             })}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

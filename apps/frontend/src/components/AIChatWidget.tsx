@@ -4,6 +4,10 @@ import ReactMarkdown from 'react-markdown';
 import { AiIcon } from './icons/AiIcon';
 import { useLanguage } from '../context/LanguageContext';
 
+import { Button } from '@legalio/ui-components/button';
+import { Table, TableColumnHeader, TableCell, TableScrollArea } from '@legalio/ui-components/table';
+import { Input } from '@legalio/ui-components/input';
+import { Card } from '@legalio/ui-components/card';
 interface Message {
   id: string;
   role: 'user' | 'ai';
@@ -183,14 +187,14 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
     <div className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6 z-30">
       {/* Chat Window */}
       {isOpen && (
-        <div
-          className="absolute bottom-16 right-0 w-[calc(100vw-1.5rem)] sm:w-[410px] bg-surface rounded-2xl shadow-2xl border border-hairline flex flex-col overflow-hidden animate-in transform origin-bottom-right"
+        <Card
+          className="absolute bottom-16 right-0 w-[calc(100vw-1.5rem)] sm:w-[410px] flex flex-col overflow-hidden animate-in transform origin-bottom-right"
           style={{ height: '520px', maxHeight: 'calc(100dvh - 6rem)' }}
         >
           {/* Header */}
-          <div className="bg-accent-strong px-4 py-3 text-white flex justify-between items-center shadow-md z-10 select-none">
+          <div className="bg-primary px-4 py-3 text-white flex justify-between items-center shadow-md z-10 select-none">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 bg-surface/20 rounded-lg flex items-center justify-center">
+              <div className="p-1.5 bg-card/20 rounded-lg flex items-center justify-center">
                 <AiIcon size={18} className="text-white" />
               </div>
               <div>
@@ -200,49 +204,47 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <button
+              <Button variant="ghost" size="icon-sm"
                 type="button"
                 onClick={handleResetSession}
-                className="inline-flex items-center justify-center size-8 hover:bg-surface/20 rounded-md transition-colors text-white"
                 title={t('ai_chat.reset_sesi_percakapan_hapus_konteks', 'Reset Sesi Percakapan (Hapus Konteks)')}
               >
                 <RotateCcw size={15} />
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost" size="icon-sm"
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="inline-flex items-center justify-center size-8 hover:bg-surface/20 rounded-md transition-colors text-white"
                 title={t('ai_chat.tutup_chat', 'Tutup Chat')}
               >
                 <X size={17} />
-              </button>
+              </Button>
             </div>
           </div>
 
           {/* Message Area */}
-          <div className="flex-1 overflow-y-auto p-4 bg-surface flex flex-col gap-3">
+          <div className="flex-1 overflow-y-auto p-4 bg-card flex flex-col gap-3">
             {messages.map((msg) => (
               <div
                 key={msg.id}
                 className={`flex gap-2.5 max-w-[88%] ${
-                  msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'
-                }`}
+ msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'
+ }`}
               >
                 <div
                   className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs ${
-                    msg.role === 'user'
-                      ? 'bg-accent-strong text-white'
-                      : 'bg-surface shadow-xs text-accent-text border border-hairline '
-                  }`}
+ msg.role === 'user'
+ ? 'bg-primary text-white'
+ : 'bg-card shadow-xs text-accent-foreground border border-border '
+ }`}
                 >
                   {msg.role === 'user' ? <User size={14} /> : <AiIcon size={14} />}
                 </div>
-                <div
-                  className={`ds-panel p-3 text-xs leading-relaxed ${
-                    msg.role === 'user'
-                      ? 'bg-accent-strong text-white'
-                      : 'text-ink'
-                  }`}
+                <Card
+                  className={` p-3 text-xs leading-relaxed ${
+ msg.role === 'user'
+ ? 'bg-primary text-white'
+ : 'text-foreground'
+ }`}
                 >
                   {msg.role === 'user' ? (
                     <div className="whitespace-pre-wrap font-medium">{msg.text}</div>
@@ -254,7 +256,7 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
                           ol: ({ node, ...props }) => <ol className="list-decimal pl-4 my-1 space-y-0.5" {...props} />,
                           li: ({ node, ...props }) => <li className="my-0.5" {...props} />,
                           p: ({ node, ...props }) => <p className="mb-1.5 last:mb-0" {...props} />,
-                          strong: ({ node, ...props }) => <strong className="font-bold text-ink dark:text-white" {...props} />,
+                          strong: ({ node, ...props }) => <strong className="font-bold text-foreground " {...props} />,
                           a: ({ node, ...props }) => (
                             <a
                               className="underline text-status-success hover:opacity-80"
@@ -263,56 +265,56 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
                               {...props}
                             />
                           ),
-                          h1: ({ node, ...props }) => <h1 className="text-sm font-bold mb-1 mt-2 text-ink dark:text-white" {...props} />,
-                          h2: ({ node, ...props }) => <h2 className="text-xs font-bold mb-1 mt-2 text-ink dark:text-white" {...props} />,
-                          h3: ({ node, ...props }) => <h3 className="text-xs font-bold mb-1 mt-1.5 text-ink dark:text-white" {...props} />,
+                          h1: ({ node, ...props }) => <h1 className="text-sm font-bold mb-1 mt-2 text-foreground " {...props} />,
+                          h2: ({ node, ...props }) => <h2 className="text-xs font-bold mb-1 mt-2 text-foreground " {...props} />,
+                          h3: ({ node, ...props }) => <h3 className="text-xs font-bold mb-1 mt-1.5 text-foreground " {...props} />,
                           table: ({ node, ...props }) => (
-                            <div className="ds-table-surface overflow-x-auto my-2 border border-hairline rounded-lg">
-                              <table className="ds-table min-w-full divide-y divide-hairline text-xs" {...props} />
-                            </div>
+                            <TableScrollArea>
+                              <Table className="min-w-full" {...props} />
+                            </TableScrollArea>
                           ),
-                          th: ({ node, ...props }) => <th className="px-2 py-1 bg-surface-2 font-bold text-left" {...props} />,
-                          td: ({ node, ...props }) => <td className="px-2 py-1 border-t border-hairline" {...props} />
+                          th: ({ node, ...props }) => <TableColumnHeader className="text-left" {...props} />,
+                          td: ({ node, ...props }) => <TableCell {...props} />
                         }}
                       >
                         {displayText(msg)}
                       </ReactMarkdown>
-                      <button
+                      <Button variant="secondary" size="sm"
                         type="button"
                         onClick={() => handleCopy(msg)}
                         aria-label={copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}
                         title={copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}
-                        className="mt-1.5 inline-flex min-h-7 items-center gap-1 rounded-md px-1.5 text-xs font-semibold text-ink-soft hover:bg-surface-2 hover:text-ink dark:hover:bg-surface-2 dark:hover:text-ink cursor-pointer transition-colors"
+                        className="mt-1.5"
                       >
                         {copiedId === msg.id ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
                         <span aria-live="polite">{copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin')}</span>
-                      </button>
+                      </Button>
                     </div>
                   )}
-                </div>
+                </Card>
               </div>
             ))}
 
             {/* Suggested Prompts if starting fresh */}
             {isInitialOnly && (
-              <div className="flex gap-2.5 self-start w-full mt-2 pt-3 border-t border-hairline">
+              <div className="flex gap-2.5 self-start w-full mt-2 pt-3 border-t border-border">
                 <div className="shrink-0 w-7 h-7 flex items-center justify-center text-status-success">
                   <AiIcon size={16} />
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col gap-2">
-                  <p className="text-xs font-bold text-ink-soft flex items-center h-7">
+                  <p className="text-xs font-bold text-muted-foreground flex items-center h-7">
                     {t('ai_chat.saran_pertanyaan', 'Saran Pertanyaan:')}
                   </p>
                   <div className="flex flex-col gap-1.5">
                     {SUGGESTED_PROMPTS.map(([key, fallback]) => t(key, fallback)).map((prompt) => (
-                      <button
+                      <Button variant="outline" size="sm"
                         key={prompt}
                         type="button"
                         onClick={() => handleSend(prompt)}
-                        className="text-left text-xs text-ink bg-surface dark:bg-surface-2/80 hover:bg-status-success-soft dark:hover:bg-status-success-soft/40 border border-hairline hover:border-status-success-border p-2.5 rounded-md transition-all cursor-pointer shadow-2xs"
+                        className="text-left"
                       >
                         {prompt}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -321,39 +323,38 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
 
             {isLoading && (
               <div className="flex gap-2.5 self-start max-w-[85%]">
-                <div className="shrink-0 w-7 h-7 rounded-full bg-surface shadow-xs border border-hairline flex items-center justify-center text-accent-text">
+                <div className="shrink-0 w-7 h-7 rounded-full bg-card shadow-xs border border-border flex items-center justify-center text-accent-foreground">
                   <Loader2 size={14} className="animate-spin" />
                 </div>
-                <div className="ds-panel p-3 text-xs text-ink-soft font-medium">
+                <Card className="p-3 text-xs text-muted-foreground font-medium">
                   <span>{t('ai_chat.menganalisis_data_konteks_sesi', 'Menganalisis data & konteks sesi...')}</span>
-                </div>
+                </Card>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Input Area */}
-          <div className="p-3 bg-surface border-t border-hairline">
+          <div className="p-3 bg-card border-t border-border">
             <form onSubmit={(e) => handleSend(undefined, e)} className="flex items-center gap-2">
-              <input aria-label={t('ai_chat.tanya_seputar_data_atau_lanjutkan_konteks', 'Tanya seputar data atau lanjutkan konteks...')}
+              <Input aria-label={t('ai_chat.tanya_seputar_data_atau_lanjutkan_konteks', 'Tanya seputar data atau lanjutkan konteks...')}
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={t('ai_chat.tanya_seputar_data_atau_lanjutkan_konteks', 'Tanya seputar data atau lanjutkan konteks...')}
-                className="ds-input flex-1 dark:placeholder-slate-500"
+                className="flex-1"
                 disabled={isLoading}
               />
-              <button
+              <Button size="icon-md"
                 type="submit"
                 disabled={!input.trim() || isLoading}
-                className="ui-button ui-button-lg ui-button-icon disabled:opacity-50 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-default"
                 title={t('ai_chat.kirim_pesan', 'Kirim Pesan')}
               >
                 <Send size={15} />
-              </button>
+              </Button>
             </form>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Toggle Button */}
@@ -361,8 +362,8 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
         aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
         className={`w-13 h-13 rounded-full shadow-xl flex items-center justify-center transition-colors duration-150 cursor-pointer ${
-          isOpen ? 'bg-accent-strong-hover' : 'bg-accent-strong hover:bg-accent-strong-hover'
-        }`}
+ isOpen ? 'bg-primary/90' : 'bg-primary hover:bg-primary/90'
+ }`}
         title={isOpen ? t('ai_chat.tutup_ai_assistant', 'Tutup AI Assistant') : t('ai_chat.buka_asisten_ai_silegal', 'Buka Asisten AI Legalio')}
       >
         <MessageSquare size={22} className="text-white" />

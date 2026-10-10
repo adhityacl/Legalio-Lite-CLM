@@ -5,6 +5,8 @@ import { BubbleMenu } from '@tiptap/react/menus';
 import { CellSelection, TableMap } from '@tiptap/pm/tables';
 import { GripVertical, GripHorizontal, Combine, SplitSquareHorizontal, Trash2, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 
+import { Button } from '@legalio/ui-components/button';
+import { Card } from '@legalio/ui-components/card';
 interface HandleRect {
   top: number;
   left: number;
@@ -128,7 +130,7 @@ export const TableSelectionOverlay: React.FC<{
   return (
     <>
       {rowHandle && (
-        <button
+        <Button variant="secondary" size="icon-md"
           type="button"
           contentEditable={false}
           onMouseDown={(e) => e.preventDefault()}
@@ -138,13 +140,13 @@ export const TableSelectionOverlay: React.FC<{
           }
           title={t('editor.pilih_seluruh_baris', 'Pilih seluruh baris')}
           style={{ top: rowHandle.top, left: rowHandle.left - 18, height: Math.max(rowHandle.height, 16) }}
-          className="absolute w-4 flex items-center justify-center rounded-md bg-surface-2 text-ink-soft hover:bg-status-success-soft dark:hover:bg-status-success-soft/60 hover:text-status-success dark:hover:text-status-success z-20 cursor-pointer transition-colors"
+          className="absolute z-20"
         >
           <GripVertical className="w-3 h-3" />
-        </button>
+        </Button>
       )}
       {colHandle && (
-        <button
+        <Button variant="secondary" size="icon-md"
           type="button"
           contentEditable={false}
           onMouseDown={(e) => e.preventDefault()}
@@ -154,10 +156,10 @@ export const TableSelectionOverlay: React.FC<{
           }
           title={t('editor.pilih_seluruh_kolom', 'Pilih seluruh kolom')}
           style={{ top: colHandle.top - 16, left: colHandle.left, width: Math.max(colHandle.width, 16) }}
-          className="absolute h-4 flex items-center justify-center rounded-md bg-surface-2 text-ink-soft hover:bg-status-success-soft dark:hover:bg-status-success-soft/60 hover:text-status-success dark:hover:text-status-success z-20 cursor-pointer transition-colors"
+          className="absolute z-20"
         >
           <GripHorizontal className="w-3 h-3" />
-        </button>
+        </Button>
       )}
 
       <BubbleMenu
@@ -166,54 +168,49 @@ export const TableSelectionOverlay: React.FC<{
         shouldShow={({ state }) => state.selection instanceof CellSelection}
         options={{ placement: 'top', offset: 8 }}
       >
-        <div className="ds-panel flex items-center gap-0.5 p-1">
-          <button
+        <Card className="flex items-center gap-0.5 p-1">
+          <Button variant="secondary" size="icon-sm"
             type="button"
             disabled={!editor.can().mergeCells()}
             onClick={() => editor.chain().focus().mergeCells().run()}
             title={t('editor.gabung_sel', 'Gabung Sel')}
-            className="inline-flex items-center justify-center size-8 rounded-md text-ink-soft dark:text-ink hover:bg-surface-2 dark:hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <Combine className="w-3.5 h-3.5" />
-          </button>
-          <button
+          </Button>
+          <Button variant="secondary" size="icon-sm"
             type="button"
             disabled={!editor.can().splitCell()}
             onClick={() => editor.chain().focus().splitCell().run()}
             title={t('editor.pisah_sel', 'Pisah Sel')}
-            className="inline-flex items-center justify-center size-8 rounded-md text-ink-soft dark:text-ink hover:bg-surface-2 dark:hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <SplitSquareHorizontal className="w-3.5 h-3.5" />
-          </button>
+          </Button>
 
-          <div className="w-px self-stretch bg-surface-2 mx-0.5" />
+          <div className="w-px self-stretch bg-muted mx-0.5" />
 
-          <button
+          <Button variant="secondary" size="icon-sm"
             type="button"
             onClick={() => editor.chain().focus().setCellAttribute('align', 'left').run()}
             title={t('editor.rata_kiri', 'Rata Kiri')}
-            className="inline-flex items-center justify-center size-8 rounded-md text-ink-soft dark:text-ink hover:bg-surface-2 dark:hover:bg-surface-2"
           >
             <AlignLeft className="w-3.5 h-3.5" />
-          </button>
-          <button
+          </Button>
+          <Button variant="secondary" size="icon-sm"
             type="button"
             onClick={() => editor.chain().focus().setCellAttribute('align', 'center').run()}
             title={t('editor.rata_tengah', 'Rata Tengah')}
-            className="inline-flex items-center justify-center size-8 rounded-md text-ink-soft dark:text-ink hover:bg-surface-2 dark:hover:bg-surface-2"
           >
             <AlignCenter className="w-3.5 h-3.5" />
-          </button>
-          <button
+          </Button>
+          <Button variant="secondary" size="icon-sm"
             type="button"
             onClick={() => editor.chain().focus().setCellAttribute('align', 'right').run()}
             title={t('editor.rata_kanan', 'Rata Kanan')}
-            className="inline-flex items-center justify-center size-8 rounded-md text-ink-soft dark:text-ink hover:bg-surface-2 dark:hover:bg-surface-2"
           >
             <AlignRight className="w-3.5 h-3.5" />
-          </button>
+          </Button>
 
-          <div className="w-px self-stretch bg-surface-2 mx-0.5" />
+          <div className="w-px self-stretch bg-muted mx-0.5" />
 
           <div className="flex items-center gap-1 px-1">
             {['transparent', '#f1f5f9', '#fee2e2', '#fef9c3', '#dcfce7', '#dbeafe', '#ede9fe'].map((color) => (
@@ -228,23 +225,23 @@ export const TableSelectionOverlay: React.FC<{
                     .setCellAttribute('backgroundColor', color === 'transparent' ? null : color)
                     .run()
                 }
-                className="w-4 h-4 rounded-full border border-hairline shrink-0"
+                className="w-4 h-4 rounded-full border border-border shrink-0"
                 style={{ backgroundColor: color }}
               />
             ))}
           </div>
 
-          <div className="w-px self-stretch bg-surface-2 mx-0.5" />
+          <div className="w-px self-stretch bg-muted mx-0.5" />
 
-          <button
+          <Button variant="ghost" size="icon-sm"
             type="button"
             onClick={() => editor.chain().focus().deleteRow().run()}
             title={t('editor.hapus_baris', 'Hapus Baris')}
-            className="inline-flex items-center justify-center size-8 rounded-md text-status-danger hover:bg-status-danger-soft dark:hover:bg-status-danger-soft/30"
+            className="text-destructive"
           >
             <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
+          </Button>
+        </Card>
       </BubbleMenu>
     </>
   );

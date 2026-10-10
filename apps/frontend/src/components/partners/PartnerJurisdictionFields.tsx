@@ -6,7 +6,8 @@ import { useTenantSettings } from '../../context/TenantSettingsContext';
 import type { PartyIdentifier } from '@legalio/types';
 import { localizeName } from '@legalio/shared/policy';
 
-import { fieldControlClass } from '@legalio/ui-components/input';
+import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Button } from '@legalio/ui-components/button';
 export interface PartnerJurisdictionFieldsProps {
   country: string;
   entityType: string;
@@ -16,8 +17,7 @@ export interface PartnerJurisdictionFieldsProps {
   onIdentifiersChange: (next: PartyIdentifier[]) => void;
 }
 
-const fieldClass = fieldControlClass;
-const labelClass = 'block font-bold text-ink  mb-1.5 text-xs';
+const labelClass = 'block font-bold text-foreground  mb-1.5 text-xs';
 
 /**
  * Country of incorporation, legal form and identifiers for a counterparty
@@ -54,10 +54,10 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 ds-grid">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor={countryId} className={labelClass}>{t('form.partner.country', 'Country of incorporation')}</label>
-          <AlphabeticalSelect id={countryId} className={`ds-input${fieldClass} cursor-pointer`} value={country} onChange={(e) => onCountryChange(e.target.value)}>
+          <AlphabeticalSelect id={countryId} className={`cursor-pointer`} value={country} onChange={(e) => onCountryChange(e.target.value)}>
             <option value="">{t('form.partner.country_unknown', 'Unknown / not stated')}</option>
             {countries.filter((c) => c.code !== 'INTL').map((c) => (
               <option key={c.code} value={c.code}>{localizeName(c.name, language)}</option>
@@ -66,10 +66,9 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
         </div>
         <div>
           <label htmlFor={entityId} className={labelClass}>{t('form.partner.entity_type', 'Legal form')}</label>
-          <input
+          <Input
             id={entityId}
             list={formsListId}
-            className={fieldClass}
             value={entityType}
             placeholder={t('form.partner.entity_type_ph', 'e.g. Private Limited, Sendirian Berhad')}
             onChange={(e) => onEntityTypeChange(e.target.value)}
@@ -82,7 +81,7 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
 
       <fieldset>
         <legend className={labelClass}>{t('form.partner.identifiers', 'Registration & tax identifiers')}</legend>
-        <p className="mb-2 text-xs text-ink-soft">
+        <p className="mb-2 text-xs text-muted-foreground">
           {t('form.partner.identifiers_hint', 'Stored as entered. Format hints come from the selected country pack.')}
         </p>
         <ul className="space-y-2">
@@ -90,43 +89,42 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
             const scheme = schemes.find((s) => s.key === item.scheme);
             const schemeLabel = (scheme && localizeName(scheme.label, language)) || t('form.partner.identifier_other', 'Other identifier');
             return (
-              <li key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto] ds-grid">
+              <li key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
                 <AlphabeticalSelect
                   aria-label={t('form.partner.identifier_scheme', 'Identifier type')}
-                  className={`ds-input${fieldClass} cursor-pointer`}
+                  className={`cursor-pointer`}
                   value={item.scheme}
                   onChange={(e) => updateIdentifier(index, { scheme: e.target.value })}
                 >
                   {schemes.map((s) => <option key={s.key} value={s.key}>{localizeName(s.label, language)}</option>)}
                   <option value="other">{t('form.partner.identifier_other', 'Other identifier')}</option>
                 </AlphabeticalSelect>
-                <input
+                <Input
                   aria-label={`${t('form.partner.identifier_value', 'Identifier value')}: ${schemeLabel}`}
-                  className={fieldClass}
                   value={item.value}
                   placeholder={scheme?.example || ''}
                   onChange={(e) => updateIdentifier(index, { value: e.target.value, country: item.country || country })}
                 />
-                <button
+                <Button variant="ghost" size="icon-md"
                   type="button"
                   onClick={() => onIdentifiersChange(identifiers.filter((_, i) => i !== index))}
-                  className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md text-status-danger hover:bg-status-danger-soft dark:hover:bg-status-danger-soft/40"
+                  className="text-destructive"
                   aria-label={`${t('form.partner.identifier_remove', 'Remove identifier')}: ${schemeLabel}`}
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </button>
+                </Button>
               </li>
             );
           })}
         </ul>
-        <button
+        <Button variant="outline"
           type="button"
           onClick={addIdentifier}
-          className="ui-button ui-button-md mt-2 inline-flex items-center ds-button ds-button-md ds-button-outline"
+          className="mt-2"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           {t('form.partner.identifier_add', 'Add identifier')}
-        </button>
+        </Button>
       </fieldset>
     </div>
   );

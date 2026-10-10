@@ -1,11 +1,42 @@
 import React from 'react';
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@moduix/react-tailwind/card';
+import { Field, FieldErrorText, FieldHelperText, FieldLabel } from '@moduix/react-tailwind/field';
 import { cn } from './utils';
-export function PageHeader({ title, description, icon, actions }: { title: React.ReactNode; description?: React.ReactNode; icon?: React.ReactNode; actions?: React.ReactNode }) {
-  return <header className="ds-page-header"><div><h2 className="ds-page-heading">{icon}{title}</h2>{description && <p className="ds-page-description">{description}</p>}</div>{actions && <div className="ds-toolbar">{actions}</div>}</header>;
+
+/** Page header block: one moduix Card per page, title on the start side, page actions on the end side. */
+export function PageHeader({ title, description, actions, className }: {
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  actions?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card className={className}>
+      <CardHeader className="items-center pb-6">
+        <CardTitle asChild className="text-xl"><h2>{title}</h2></CardTitle>
+        {description && <CardDescription>{description}</CardDescription>}
+        {actions && <CardAction className="flex-wrap self-center">{actions}</CardAction>}
+      </CardHeader>
+    </Card>
+  );
 }
-export function FormField({ id, label, help, children }: { id: string; label: React.ReactNode; help?: React.ReactNode; children: React.ReactNode }) {
-  return <div className="ds-field"><label htmlFor={id} className="ds-field-label">{label}</label>{children}{help && <p id={`${id}-help`} className="ds-field-help">{help}</p>}</div>;
-}
-export function TableFrame({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('ds-table-frame', className)} {...props} />;
+
+/** Labelled form field block; the control is passed as children and inherits the field context. */
+export function FormField({ label, help, error, required, invalid, className, children }: {
+  label: React.ReactNode;
+  help?: React.ReactNode;
+  error?: React.ReactNode;
+  required?: boolean;
+  invalid?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Field required={required} invalid={invalid ?? Boolean(error)} className={cn('min-w-0', className)}>
+      <FieldLabel>{label}</FieldLabel>
+      {children}
+      {help && <FieldHelperText>{help}</FieldHelperText>}
+      {error && <FieldErrorText>{error}</FieldErrorText>}
+    </Field>
+  );
 }

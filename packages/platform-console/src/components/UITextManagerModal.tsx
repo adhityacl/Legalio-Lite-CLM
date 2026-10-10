@@ -1,13 +1,19 @@
-import { ModalFrame, ModalTitle } from './ui/modal-frame';
+import { ModalFrame } from './ui/modal-frame';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import React, { useRef, useState } from 'react';
 import { LANGUAGE_OPTIONS, useLanguage, type Language } from '../context/LanguageContext';
 import { useConfirm } from '../context/ConfirmDialogContext';
 import { AlertCircle, Check, Download, Edit2, FileSpreadsheet, Languages, RotateCcw, Search, Sparkles, Upload, X } from 'lucide-react';
 import { TablePagination } from './ui/TablePagination';
-import { getStatusBadgeClass } from '@legalio/ui-components/badge';
+import { Badge, statusTone } from '@legalio/ui-components/badge';
 import { TableEmptyState } from './ui/table-empty-state';
 
+import { Input } from '@legalio/ui-components/input';
+import { Button } from '@legalio/ui-components/button';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
+import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell } from '@legalio/ui-components/table';
+import { DialogHeader, DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
+import { Card } from '@legalio/ui-components/card';
 interface UITextManagerModalProps {
   isOpen?: boolean;
   onClose: () => void;
@@ -118,25 +124,25 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
           <label className="sr-only" htmlFor={`ui-text-${key}-${lang}`}>
             {t('ui_text.edit_in', 'Edit dalam {lang}', { lang: languageName(lang) })}
           </label>
-          <input
+          <Input
             id={`ui-text-${key}-${lang}`}
             type="text"
             lang={LANGUAGE_OPTIONS.find((o) => o.code === lang)?.htmlLang}
             value={editing.value}
             onChange={(e) => setEditing({ ...editing, value: e.target.value })}
             onKeyDown={(e) => e.key === 'Escape' && setEditing(null)}
-            className="ds-input w-full"
+            className="w-full"
             autoFocus
           />
-          <button
+          <Button size="icon-md"
             type="submit"
             disabled={translationsBusy}
             aria-busy={translationsBusy}
-            className="ui-button ui-button-lg ui-button-icon cursor-pointer shrink-0 ds-button ds-button-lg ds-button-default"
+            className="shrink-0"
             aria-label={t('common.save', 'Simpan')}
           >
             <Check className="w-3.5 h-3.5" aria-hidden />
-          </button>
+          </Button>
         </form>
       );
     }
@@ -144,20 +150,20 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
       <div className="flex items-center justify-between gap-1 group">
         <span
           lang={LANGUAGE_OPTIONS.find((o) => o.code === lang)?.htmlLang}
-          className={custom ? 'font-medium text-accent-text ' : 'text-ink '}
+          className={custom ? 'font-medium text-accent-foreground ' : 'text-foreground '}
         >
           {valueOf(key, lang) || <em className="text-status-danger not-italic">{t('ui_text.missing', '(belum diterjemahkan)')}</em>}
         </span>
-        <button
+        <Button variant="ghost" size="icon-sm"
           type="button"
           onClick={() => setEditing({ key, lang, value: valueOf(key, lang) })}
           disabled={translationsBusy}
-          className="inline-flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-ink-soft hover:text-accent-text size-8 cursor-pointer transition-opacity shrink-0"
+          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
           aria-label={t('ui_text.edit_in', 'Edit dalam {lang}', { lang: languageName(lang) })}
           title={t('ui_text.edit_in', 'Edit dalam {lang}', { lang: languageName(lang) })}
         >
           <Edit2 className="w-3 h-3" aria-hidden />
-        </button>
+        </Button>
       </div>
     );
   };
@@ -165,63 +171,53 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
   return (
     <ModalFrame onClose={onClose} className="max-w-6xl w-full max-h-[92vh] flex flex-col overflow-hidden">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex flex-wrap items-center gap-2">
-            <ModalTitle className="ds-modal-title flex items-center gap-2">
-              <FileSpreadsheet className="w-5 h-5 text-accent-text" aria-hidden />
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5 text-accent-foreground" aria-hidden />
               <span>{t('ui_text.title', 'Struktur Teks UI & Ekspor / Impor CSV')}</span>
-            </ModalTitle>
+            </DialogTitle>
             {totalCustomCount > 0 && (
-              <span className="text-xs font-bold text-status-success bg-status-success-soft dark:bg-status-success-soft/60 px-2 py-0.5 rounded-sm border border-status-success-border flex items-center gap-1">
+              <span className="text-xs font-bold text-status-success bg-status-success-soft px-2 py-0.5 rounded-sm border border-status-success-border flex items-center gap-1">
                 <Sparkles className="w-3 h-3" aria-hidden />
                 {t('ui_text.custom_active', '{n} teks kustom aktif', { n: totalCustomCount })}
               </span>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t('common.close', 'Tutup')}
-            className="inline-flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink size-8 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" aria-hidden />
-          </button>
-        </div>
+          <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
+        </DialogHeader>
 
-        <div className="mobile-controls-bar p-4 bg-surface dark:bg-surface-2/60 border-b border-hairline flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div className="mobile-controls-bar p-4 bg-card border-b border-border flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="mobile-page-actions flex flex-wrap items-center gap-2">
-            <button
+            <Button variant="outline"
               type="button"
               onClick={exportToCSV}
               disabled={translationsBusy}
-              className="ui-button ui-button-lg inline-flex items-center cursor-pointer ds-button ds-button-lg ds-button-outline"
             >
-              <Download className="w-4 h-4 text-accent-text" aria-hidden />
+              <Download className="w-4 h-4 text-accent-foreground" aria-hidden />
               <span>{t('ui_text.export', 'Ekspor CSV')}</span>
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={translationsBusy}
-              className="theme-action ui-button ui-button-lg inline-flex items-center cursor-pointer ds-button ds-button-lg ds-button-ghost"
             >
               <Upload className="w-4 h-4" aria-hidden />
               <span>{t('ui_text.import', 'Unggah CSV Hasil Revisi')}</span>
-            </button>
+            </Button>
             <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".csv" className="hidden" />
             {totalCustomCount > 0 && (
-              <button
+              <Button variant="destructive"
                 type="button"
                 onClick={handleReset}
                 disabled={translationsBusy}
-                className="ui-button ui-button-lg inline-flex items-center cursor-pointer ds-button ds-button-lg ds-button-destructive"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-status-danger" aria-hidden />
                 <span>{t('ui_text.reset_to_default', 'Kembalikan ke Bawaan')}</span>
-              </button>
+              </Button>
             )}
           </div>
-          <div className="text-xs text-ink-soft font-medium flex items-center gap-1">
+          <div className="text-xs text-muted-foreground font-medium flex items-center gap-1">
             <Languages className="w-4 h-4 text-status-success" aria-hidden />
             <span>{t('ui_text.total_keys', 'Total key teks: {n}', { n: allKeys.length })}</span>
           </div>
@@ -233,10 +229,10 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
           <div
             role={notice.type === 'error' ? 'alert' : 'status'}
             className={`px-6 py-3 border-b text-xs font-semibold flex items-center justify-between ${
-              notice.type === 'success'
-                ? 'bg-status-success-soft dark:bg-status-success-soft/40 border-status-success-border text-status-success '
-                : 'bg-status-danger-soft dark:bg-status-danger-soft/40 border-status-danger-border text-status-danger '
-            }`}
+ notice.type === 'success'
+ ? 'bg-status-success-soft border-status-success-border text-status-success '
+ : 'bg-status-danger-soft border-status-danger-border text-status-danger '
+ }`}
           >
             <div className="flex items-center gap-2">
               {notice.type === 'success' ? (
@@ -246,21 +242,20 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
               )}
               <span>{notice.message}</span>
             </div>
-            <button
+            <Button variant="ghost" size="icon-sm"
               type="button"
               onClick={() => setNotice(null)}
               aria-label={t('common.close', 'Tutup')}
-              className="text-ink-soft hover:text-ink-soft dark:hover:text-ink cursor-pointer text-xs"
             >
               <X className="w-3.5 h-3.5" aria-hidden />
-            </button>
+            </Button>
           </div>
         )}
 
-        <div className="p-4 border-b border-hairline bg-surface grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0 ds-grid">
-          <div className="sm:col-span-2 relative">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-ink-soft" aria-hidden />
-            <input
+        <div className="p-4 border-b border-border bg-card grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
+          <InputGroup className="sm:col-span-2 relative">
+            <InputGroupAddon><Search className="size-4" aria-hidden="true" aria-hidden /></InputGroupAddon>
+            <InputGroupInput
               type="search"
               aria-label={t('settings.search_ui_text', 'Cari kata kunci, ID key, atau teks UI...')}
               placeholder={t('settings.search_ui_text', 'Cari kata kunci, ID key, atau teks UI...')}
@@ -269,9 +264,8 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="ds-input w-full pl-9 pr-4"
             />
-          </div>
+          </InputGroup>
           <AlphabeticalSelect
             aria-label={t('ui_text.module_filter', 'Filter modul')}
             value={selectedModule}
@@ -279,7 +273,7 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
               setSelectedModule(e.target.value);
               setCurrentPage(1);
             }}
-            className="ds-input w-full"
+            className="w-full"
           >
             <option value="ALL">{t('ui_text.all_modules', 'Semua modul ({n})', { n: allKeys.length })}</option>
             {modules.map((mod) => (
@@ -290,49 +284,49 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
           </AlphabeticalSelect>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-surface dark:bg-surface/60">
-          <div className="ds-table-surface bg-surface border border-hairline rounded-xl overflow-x-auto shadow-xs">
-            <table className="ds-table w-full text-left text-xs border-collapse">
-              <thead className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink">
-                <tr>
-                  <th scope="col" className="p-4 w-1/5">{t('ui_text.col_key', 'Key teks')}</th>
-                  <th scope="col" className="p-4 w-1/8">{t('ui_text.col_module', 'Modul')}</th>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-card ">
+          <Card className="overflow-x-auto">
+            <Table className="w-full text-left">
+              <TableHeader>
+                <TableRow>
+                  <TableColumnHeader scope="col" className="w-1/5">{t('ui_text.col_key', 'Key teks')}</TableColumnHeader>
+                  <TableColumnHeader scope="col" className="w-1/8">{t('ui_text.col_module', 'Modul')}</TableColumnHeader>
                   {CODES.map((code) => (
-                    <th key={code} scope="col" className="p-4 w-1/5">
+                    <TableColumnHeader key={code} scope="col" className="w-1/5">
                       {languageName(code)} ({LANGUAGE_OPTIONS.find((o) => o.code === code)?.label})
-                    </th>
+                    </TableColumnHeader>
                   ))}
-                  <th scope="col" className="p-4 text-center w-20">{t('ui_text.col_status', 'Status')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline text-ink">
+                  <TableColumnHeader scope="col" className="text-center w-20">{t('ui_text.col_status', 'Status')}</TableColumnHeader>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {filteredKeys.length === 0 ? (
                   <TableEmptyState colSpan={CODES.length + 3} />
                 ) : (
                   currentKeys.map((key) => {
                     const isCustom = CODES.some((code) => customTranslations[code]?.[key]);
                     return (
-                      <tr key={key} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors align-top">
-                        <td className="py-4 px-4 text-xs font-normal text-ink break-all">{key}</td>
-                        <td className="py-4 px-4 text-left">
-                          <span className={`${BADGE}  ${getStatusBadgeClass('Neutral')}`}>{moduleLabel(moduleOf(key))}</span>
-                        </td>
+                      <TableRow key={key} className="align-top">
+                        <TableCell>{key}</TableCell>
+                        <TableCell className="text-left">
+                          <Badge tone={statusTone('Neutral')}>{moduleLabel(moduleOf(key))}</Badge>
+                        </TableCell>
                         {CODES.map((code) => (
-                          <td key={code} className="py-4 px-4 text-xs font-normal text-ink">
+                          <TableCell key={code}>
                             {renderCell(key, code)}
-                          </td>
+                          </TableCell>
                         ))}
-                        <td className="py-4 px-4 text-center whitespace-nowrap">
-                          <span className={`${BADGE}  ${getStatusBadgeClass(isCustom ? 'Aktif' : 'Neutral')}`}>
+                        <TableCell className="text-center whitespace-nowrap">
+                          <Badge tone={statusTone(isCustom ? 'Aktif' : 'Neutral')}>
                             {isCustom ? t('ui_text.status_custom', 'Kustom') : t('ui_text.status_default', 'Bawaan')}
-                          </span>
-                        </td>
-                      </tr>
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
                     );
                   })
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
             <TablePagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -343,23 +337,23 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
                 setCurrentPage(1);
               }}
             />
-          </div>
+          </Card>
         </div>
 
-        <div className="p-4 sm:p-5 bg-surface border-t border-hairline flex items-center justify-between gap-3 shrink-0">
-          <p className="text-xs text-ink-soft">
+        <div className="p-4 sm:p-5 bg-card border-t border-border flex items-center justify-between gap-3 shrink-0">
+          <p className="text-xs text-muted-foreground">
             {t(
               'ui_text.hint',
               'Petunjuk: ekspor CSV untuk mengunduh semua teks (Indonesia, Inggris, Mandarin), edit di Excel / Google Sheets, lalu unggah kembali file CSV tersebut di sini.',
             )}
           </p>
-          <button
+          <Button variant="ghost" size="sm"
             type="button"
             onClick={onClose}
-            className="inline-flex items-center px-4 min-h-8 bg-ink hover:bg-ink dark:bg-surface-2 dark:hover:bg-surface-2 text-white font-semibold text-xs rounded-md cursor-pointer transition-colors shrink-0"
+            className="shrink-0"
           >
             {t('ui_text.done', 'Selesai & Tutup')}
-          </button>
+          </Button>
         </div>
 
     </ModalFrame>

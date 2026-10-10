@@ -3,6 +3,10 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { localize, type DueDiligenceOverride, type DueDiligenceRequirement } from '@legalio/shared/policy';
 
+import { Button } from '@legalio/ui-components/button';
+import { Input } from '@legalio/ui-components/input';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
 export interface DueDiligenceChecklistEditorProps {
   /** Pack-provided items (core + country + industry), as returned by the server. */
   packItems: Array<DueDiligenceRequirement & { disabled?: boolean }>;
@@ -62,8 +66,8 @@ export const DueDiligenceChecklistEditor: React.FC<DueDiligenceChecklistEditorPr
     onChange({ overrides, customItems: customItems.filter((item) => item.key !== key) });
   };
 
-  const rowClass = 'flex flex-col gap-2 border-b border-hairline py-3 last:border-b-0  sm:flex-row sm:items-center';
-  const toggleClass = 'inline-flex min-h-10 items-center gap-2 text-sm text-ink ';
+  const rowClass = 'flex flex-col gap-2 border-b border-border py-3 last:border-b-0  sm:flex-row sm:items-center';
+  const toggleClass = 'inline-flex min-h-10 items-center gap-2 text-sm text-foreground ';
 
   return (
     <div>
@@ -75,72 +79,45 @@ export const DueDiligenceChecklistEditor: React.FC<DueDiligenceChecklistEditorPr
           return (
             <li key={item.key} className={rowClass}>
               <div className="min-w-0 flex-1">
-                <span className={`wrap-break-word text-sm font-medium ${hidden ? 'text-ink-soft line-through' : 'text-ink '}`}>
+                <span className={`wrap-break-word text-sm font-medium ${hidden ? 'text-muted-foreground line-through' : 'text-foreground '}`}>
                   {localize(item.label, language)}
                 </span>
-                <span className="ml-2 rounded-full border border-hairline px-2 py-0.5 text-xs text-ink-soft">
+                <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
                   {t(SOURCE_KEY[item.source || 'core'] || SOURCE_KEY.core, item.source || 'core')}
                 </span>
               </div>
-              <label className={`${toggleClass} shrink-0`}>
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={required}
-                  disabled={disabled || hidden}
-                  onChange={(e) => setOverride(item.key, { required: e.target.checked })}
-                />
-                {t('settings.region.dd_required', 'Required')}
-              </label>
-              <label className={`${toggleClass} shrink-0`}>
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={hidden}
-                  disabled={disabled}
-                  onChange={(e) => setOverride(item.key, { disabled: e.target.checked })}
-                />
-                {t('settings.region.dd_hidden', 'Hidden')}
-              </label>
+              <Checkbox checked={required} disabled={disabled || hidden} onCheckedChange={(details) => setOverride(item.key, { required: details.checked === true })}><CheckboxControl /><CheckboxLabel>{t('settings.region.dd_required', 'Required')}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
+              <Checkbox checked={hidden} disabled={disabled} onCheckedChange={(details) => setOverride(item.key, { disabled: details.checked === true })}><CheckboxControl /><CheckboxLabel>{t('settings.region.dd_hidden', 'Hidden')}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
             </li>
           );
         })}
         {customItems.map((item) => (
           <li key={item.key} className={rowClass}>
             <div className="min-w-0 flex-1">
-              <span className="wrap-break-word text-sm font-medium text-ink">{localize(item.label, language)}</span>
-              <span className="ml-2 rounded-full border border-hairline px-2 py-0.5 text-xs text-ink-soft">
+              <span className="wrap-break-word text-sm font-medium text-foreground">{localize(item.label, language)}</span>
+              <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
                 {t('settings.region.dd_source_tenant', 'Custom')}
               </span>
             </div>
-            <label className={`${toggleClass} shrink-0`}>
-              <input
-                type="checkbox"
-                className="h-4 w-4"
-                checked={item.required}
-                disabled={disabled}
-                onChange={(e) => updateCustom(item.key, { required: e.target.checked })}
-              />
-              {t('settings.region.dd_required', 'Required')}
-            </label>
-            <button
+            <Checkbox checked={item.required} disabled={disabled} onCheckedChange={(details) => updateCustom(item.key, { required: details.checked === true })}><CheckboxControl /><CheckboxLabel>{t('settings.region.dd_required', 'Required')}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
+            <Button variant="ghost" size="icon-md"
               type="button"
               onClick={() => removeCustom(item.key)}
               disabled={disabled}
-              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md text-status-danger hover:bg-status-danger-soft dark:hover:bg-status-danger-soft/40"
+              className="text-destructive"
               aria-label={`${t('settings.region.dd_remove', 'Remove item')}: ${localize(item.label, language)}`}
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
-            </button>
+            </Button>
           </li>
         ))}
       </ul>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-        <div className="flex-1">
-          <label htmlFor={newLabelId} className="mb-1 block text-sm font-medium text-ink">
+        <Field className="flex-1">
+          <FieldLabel htmlFor={newLabelId}>
             {t('settings.region.dd_new_label', 'New item name')}
-          </label>
-          <input
+          </FieldLabel>
+          <Input
             id={newLabelId}
             type="text"
             value={newLabel}
@@ -152,18 +129,17 @@ export const DueDiligenceChecklistEditor: React.FC<DueDiligenceChecklistEditorPr
                 addCustom();
               }
             }}
-            className="ds-input w-full"
+            className="w-full"
           />
-        </div>
-        <button
+        </Field>
+        <Button variant="outline"
           type="button"
           onClick={addCustom}
           disabled={disabled || !newLabel.trim()}
-          className="ui-button ui-button-lg disabled:opacity-50 ds-button ds-button-lg ds-button-outline"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           {t('settings.region.dd_add', 'Add checklist item')}
-        </button>
+        </Button>
       </div>
     </div>
   );

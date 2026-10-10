@@ -15,6 +15,9 @@ import {
 import { ConsoleOrganization } from './types';
 import { useLanguage } from '../../context/LanguageContext';
 
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
+import { Button } from '@legalio/ui-components/button';
+import { Card } from '@legalio/ui-components/card';
 interface AdminOrganizationsTabProps {
   organizations: ConsoleOrganization[];
   activeOrg: ConsoleOrganization | null;
@@ -45,47 +48,45 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
   return (
     <div className="space-y-4">
       {/* Controls Bar */}
-      <div className="ds-panel mobile-controls-bar flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4">
-        <div className="relative flex-1 min-w-[220px] max-w-md">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-          <input aria-label={t('admin.org_search_ph', 'Cari nama atau slug organisasi...')}
+      <Card className="mobile-controls-bar flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4">
+        <InputGroup className="relative flex-1 min-w-[220px] max-w-md">
+          <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+          <InputGroupInput aria-label={t('admin.org_search_ph', 'Cari nama atau slug organisasi...')}
             type="text"
             placeholder={t('admin.org_search_ph', 'Cari nama atau slug organisasi...')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="ds-input w-full pl-9 pr-3"
           />
-        </div>
+        </InputGroup>
 
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={onOpenCreateOrg}
-          className="theme-action ui-button ui-button-lg ds-button ds-button-lg ds-button-ghost"
         >
           <Plus className="w-4 h-4" />
           <span>{t('admin.btn_create_org', 'Buat Organisasi Baru')}</span>
-        </button>
-      </div>
+        </Button>
+      </Card>
 
       {/* Organizations Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ds-grid">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredOrgs.map((org) => {
           const isActive = activeOrg?.id === org.id;
 
           return (
-            <div
+            <Card
               key={org.id}
-              className={`ds-panel p-5 transition-all flex flex-col justify-between overflow-hidden relative ${
-                isActive
-                  ? 'ring-1 ring-accent/20 bg-accent-soft'
-                  : ''
-              }`}
+              className={` p-5 transition-all flex flex-col justify-between overflow-hidden relative ${
+ isActive
+ ? 'ring-1 ring-ring/20 bg-accent'
+ : ''
+ }`}
             >
               <div className="min-w-0">
                 {/* Header info */}
                 <div className="flex items-start justify-between gap-2.5 mb-3">
                   <div className="flex items-start gap-3 min-w-0 flex-1">
-                    <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center text-ink font-bold text-base shrink-0 border border-hairline overflow-hidden shadow-2xs mt-0.5">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-base shrink-0 border border-border overflow-hidden shadow-2xs mt-0.5">
                       {org.logo && org.logo !== '/favicon.png' ? (
                         <img
                           src={org.logo}
@@ -100,14 +101,14 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold text-ink text-sm truncate" title={org.name || ''}>
+                      <h3 className="font-semibold text-foreground text-sm truncate" title={org.name || ''}>
                         {org.name || t('documents.info.organization', 'Organisasi')}
                       </h3>
-                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-mono text-ink-soft mt-1">
+                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-mono text-muted-foreground mt-1">
                         <span className="truncate max-w-[120px]" title={`@${org.slug}`}>@{org.slug}</span>
-                        <span className="text-on-solid select-none">•</span>
+                        <span className="text-primary-foreground select-none">•</span>
                         <span
-                          className="text-xs bg-surface-2 dark:bg-surface-2/80 px-1.5 py-0.5 rounded-sm border border-hairline/80 dark:border-hairline/60 text-ink-soft font-mono inline-block max-w-full truncate"
+                          className="text-xs bg-muted px-1.5 py-0.5 rounded-sm border border-border/80 text-muted-foreground font-mono inline-block max-w-full truncate"
                           title={org.id}
                         >
                           {t('admin.id_2', 'ID: {id}', { id: org.id })}
@@ -125,21 +126,21 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
                 </div>
 
                 {/* Metrics pill */}
-                <div className="grid grid-cols-2 gap-2 mb-4 p-2.5 rounded-lg bg-surface dark:bg-surface-2/60 text-xs ds-grid">
+                <div className="grid grid-cols-2 gap-2 mb-4 p-2.5 rounded-lg bg-card text-xs">
                   <div className="flex items-center gap-2">
-                    <Layers className="w-3.5 h-3.5 text-ink-soft" />
+                    <Layers className="w-3.5 h-3.5 text-muted-foreground" />
                     <div>
-                      <div className="text-xs text-ink-soft uppercase">{t('admin.org_departments', 'Departemen')}</div>
-                      <div className="font-semibold text-ink font-mono">
+                      <div className="text-xs text-muted-foreground uppercase">{t('admin.org_departments', 'Departemen')}</div>
+                      <div className="font-semibold text-foreground font-mono">
                         {org.teamCount ?? 0} {t('admin.teams', 'Teams')}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-3.5 h-3.5 text-ink-soft" />
+                    <ShieldCheck className="w-3.5 h-3.5 text-muted-foreground" />
                     <div>
-                      <div className="text-xs text-ink-soft uppercase">{t('admin.org_currency', 'Mata Uang')}</div>
-                      <div className="font-semibold text-ink font-mono">
+                      <div className="text-xs text-muted-foreground uppercase">{t('admin.org_currency', 'Mata Uang')}</div>
+                      <div className="font-semibold text-foreground font-mono">
                         {org.metadata?.settings?.defaultCurrency || org.metadata?.currency || '—'}
                       </div>
                     </div>
@@ -147,25 +148,24 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
                 </div>
 
                 {/* Storage structure info */}
-                <div className="text-xs text-ink-soft flex items-center gap-1.5 mb-4">
-                  <FolderTree className="w-3.5 h-3.5 text-accent-text" />
+                <div className="text-xs text-muted-foreground flex items-center gap-1.5 mb-4">
+                  <FolderTree className="w-3.5 h-3.5 text-accent-foreground" />
                   <span>{t('admin.org_folder_iso', 'Isolasi Folder')}: <strong>{t('admin.vendors_4', '/{name}/[Vendors]', { name: org.name })}</strong></span>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-3 border-t border-hairline flex items-center justify-between gap-2">
+              <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
-                  <button
+                  <Button variant="secondary" size="sm"
                     type="button"
                     onClick={() => onOpenEditOrg(org)}
-                    className="px-3 min-h-8 rounded-md text-xs font-semibold text-ink-soft hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <Edit2 className="w-3 h-3" />
                     <span>{t('admin.btn_edit', 'Edit')}</span>
-                  </button>
+                  </Button>
 
-                  <button
+                  <Button variant="ghost" size="sm"
                     type="button"
                     onClick={() => onDeleteOrg(org)}
                     disabled={isActive || Boolean(org.metadata?.isDefault)}
@@ -176,28 +176,28 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
                         ? t('admin.cant_delete_active_org', 'Beralih ke organisasi lain terlebih dahulu sebelum menghapus.')
                         : t('admin.btn_delete_org', 'Hapus Organisasi')
                     }
-                    className={`px-3 min-h-8 rounded-md text-xs font-semibold transition-colors flex items-center gap-1.5 ${
-                      isActive || Boolean(org.metadata?.isDefault)
-                        ? 'text-ink-soft opacity-40 cursor-not-allowed'
-                        : 'text-status-danger hover:bg-status-danger-soft dark:hover:bg-status-danger-soft/40 hover:text-status-danger dark:hover:text-status-danger cursor-pointer'
-                    }`}
+                    className={ /*extra*/` ${
+ isActive || Boolean(org.metadata?.isDefault)
+ ? ''
+ : ''
+ }`}
                   >
                     <Trash2 className="w-3 h-3" />
                     <span>{t('admin.btn_delete', 'Hapus')}</span>
-                  </button>
+                  </Button>
                 </div>
 
                 {onSelectOrg && (
-                  <button
+                  <Button variant="outline" size="sm"
                     type="button"
                     onClick={() => onSelectOrg(org)}
-                    className="inline-flex items-center theme-soft px-3 min-h-8 rounded-md text-xs font-semibold hover:bg-accent-soft border transition-colors cursor-pointer"
+                    className="theme-soft"
                   >
                     {t('tb.manage_organization', 'Manage organization')}
-                  </button>
+                  </Button>
                 )}
               </div>
-            </div>
+            </Card>
           );
         })}
       </div>

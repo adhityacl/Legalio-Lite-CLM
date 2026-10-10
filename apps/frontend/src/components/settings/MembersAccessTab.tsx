@@ -9,12 +9,19 @@ import { usePermissions, type TenantRole } from '../../lib/permissions';
 import { Button } from '@legalio/ui-components/button';
 import { Badge } from '@legalio/ui-components/badge';
 import { Skeleton } from '@legalio/ui-components/skeleton';
-import { ModalFrame, ModalTitle } from '../ui/modal-frame';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@legalio/ui-components/table';
+import { ModalFrame } from '../ui/modal-frame';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableScrollArea } from '@legalio/ui-components/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 import { OrgApiError, orgApi, orgPath } from './orgApi';
 
-import { fieldControlClass } from '@legalio/ui-components/input';
+import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
+import { NativeSelect } from '@legalio/ui-components/native-select';
+import { Card, CardHeader } from '@legalio/ui-components/card';
+import { DialogTitle } from '@legalio/ui-components/dialog';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
 const LazyActivityLogsView = lazy(() => import('../ActivityLogsView').then((m) => ({ default: m.ActivityLogsView })));
 
 interface Member { id: string; userId: string; name: string; email: string; tenantRole: TenantRole; status: 'active' | 'suspended'; departmentIds: string[]; createdAt: string }
@@ -26,8 +33,7 @@ type Filter = 'active' | 'suspended' | 'pending';
 const PAGE_SIZE = 25;
 const RANK: Record<TenantRole, number> = { admin: 4, manager: 3, editor: 2, viewer: 1 };
 
-const fieldClass = fieldControlClass;
-const labelClass = 'mb-1.5 block text-sm font-medium text-ink ';
+const labelClass = 'mb-1.5 block text-sm font-medium text-foreground ';
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
@@ -35,14 +41,11 @@ const errorText = (err: unknown) => (err instanceof Error ? err.message : String
 const DepartmentPicker: React.FC<{ departments: Department[]; value: string[]; onChange: (ids: string[]) => void; disabled?: boolean; legend: string; 'aria-describedby'?: string }> = ({ departments, value, onChange, disabled, legend, 'aria-describedby': ariaDescribedby }) => (
   <fieldset className="m-0 min-w-0 border-0 p-0" disabled={disabled} aria-describedby={ariaDescribedby}>
     <legend className={labelClass}>{legend}</legend>
-    <div className="grid max-h-48 gap-1 overflow-y-auto rounded-xl border border-hairline p-2 sm:grid-cols-2 ds-grid">
+    <div className="grid max-h-48 gap-1 overflow-y-auto rounded-xl border border-border p-2 sm:grid-cols-2">
       {departments.map((d) => (
-        <label key={d.id} className="inline-flex min-h-10 items-center gap-2 rounded-md px-2 text-sm text-ink hover:bg-surface dark:hover:bg-surface-2">
-          <input type="checkbox" className="h-4 w-4" checked={value.includes(d.id)} onChange={(e) => onChange(e.target.checked ? [...value, d.id] : value.filter((id) => id !== d.id))} />
-          {d.name}
-        </label>
+        <Checkbox checked={value.includes(d.id)} onCheckedChange={(details) => onChange(details.checked === true ? [...value, d.id] : value.filter((id) => id !== d.id))}><CheckboxControl /><CheckboxLabel>{d.name}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
       ))}
-      {departments.length === 0 && <p className="p-2 text-sm text-ink-soft">—</p>}
+      {departments.length === 0 && <p className="p-2 text-sm text-muted-foreground">—</p>}
     </div>
   </fieldset>
 );
@@ -170,43 +173,42 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <div className="ds-panel mobile-controls-bar flex flex-col items-stretch justify-between gap-3 p-4 lg:flex-row lg:items-center">
+      <Card className="mobile-controls-bar flex flex-col items-stretch justify-between gap-3 p-4 lg:flex-row lg:items-center">
         <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-          <div
+          <Card
             role="group"
             aria-label={t('tb.member_status_filter', 'Member status')}
-            className="ds-panel flex h-10 shrink-0 items-center p-0.75"
+            className="flex h-10 shrink-0 items-center p-0.75"
           >
             {([['active', t('tb.filter_active', 'Active')], ['suspended', t('tb.filter_suspended', 'Suspended')], ...(can('tenant.invitation.read') ? [['pending', t('tb.filter_pending', 'Pending')]] : [])] as Array<[Filter, string]>).map(([value, label]) => (
               <button key={value} type="button" aria-pressed={filter === value} onClick={() => { setFilter(value); setPage(0); }}
-                className={`ui-button ui-button-md cursor-pointer ds-button ds-button-md ds-button-default ${filter === value ? 'theme-action' : ' '}`}>
+                className={` cursor-pointer ${filter === value ? '' : ' '}`}>
                 {label}
               </button>
             ))}
-          </div>
-          <div className="relative min-w-55 max-w-md flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-soft" aria-hidden="true" />
-            <input
+          </Card>
+          <InputGroup className="relative min-w-55 max-w-md flex-1">
+            <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+            <InputGroupInput
               id={searchId}
               type="search"
               aria-label={t('tb.search_members', 'Search members')}
               placeholder={t('tb.search_members', 'Search members...')}
-              className="ds-input w-full pl-9 pr-3"
               value={search}
               maxLength={200}
               onChange={(e) => setSearch(e.target.value)}
             />
-          </div>
+          </InputGroup>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          {can('tenant.audit.read') && <Button type="button" size="lg" variant="outline" onClick={() => setDialog({ kind: 'history' })}><History className="h-4 w-4" aria-hidden="true" />{t('tb.history', 'History')}</Button>}
-          {can('department.view') && <Button type="button" size="lg" variant="outline" onClick={() => setDialog({ kind: 'departments' })}><Layers className="h-4 w-4" aria-hidden="true" />{t('tb.departments', 'Departments')}</Button>}
-          {(myRole === 'admin' || isPlatform) && <Button type="button" size="lg" variant="outline" onClick={() => setDialog({ kind: 'invite', codeOnly: true })}><KeyRound className="h-4 w-4" aria-hidden="true" />{t('onboarding.generate_code', 'Generate invite code')}</Button>}
-          {can('tenant.member.invite') && <Button type="button" size="lg" onClick={() => setDialog({ kind: 'invite' })}><Mail className="h-4 w-4" aria-hidden="true" />{t('tb.invite_member', 'Invite member')}</Button>}
+          {can('tenant.audit.read') && <Button type="button" variant="outline" onClick={() => setDialog({ kind: 'history' })}><History className="h-4 w-4" aria-hidden="true" />{t('tb.history', 'History')}</Button>}
+          {can('department.view') && <Button type="button" variant="outline" onClick={() => setDialog({ kind: 'departments' })}><Layers className="h-4 w-4" aria-hidden="true" />{t('tb.departments', 'Departments')}</Button>}
+          {(myRole === 'admin' || isPlatform) && <Button type="button" variant="outline" onClick={() => setDialog({ kind: 'invite', codeOnly: true })}><KeyRound className="h-4 w-4" aria-hidden="true" />{t('onboarding.generate_code', 'Generate invite code')}</Button>}
+          {can('tenant.member.invite') && <Button type="button" onClick={() => setDialog({ kind: 'invite' })}><Mail className="h-4 w-4" aria-hidden="true" />{t('tb.invite_member', 'Invite member')}</Button>}
         </div>
-      </div>
+      </Card>
 
-      <div className="ds-table-surface overflow-hidden rounded-2xl border border-hairline bg-surface shadow-sm">
+      <Card className="overflow-hidden">
         {failed ? (
           <div role="alert" className="flex flex-col items-start gap-3 p-5 text-sm text-status-danger">
             {t('tb.members_load_error', 'Members could not be loaded.')}
@@ -215,7 +217,7 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
         ) : loading ? (
           <div className="space-y-2 p-4" aria-busy="true"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
         ) : filter === 'pending' ? (
-          <div className="overflow-x-auto ds-table-surface">
+          <TableScrollArea>
             <Table>
               <TableHeader><TableRow>
                 <TableHead>{t('tb.col_email', 'Email')}</TableHead><TableHead>{t('tb.col_role', 'Role')}</TableHead>
@@ -238,13 +240,13 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
                   </TableRow>
                 ))}
                 {(invitationsQuery.data?.invitations || []).length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="py-8 text-center text-ink-soft">{t('tb.no_invitations', 'No pending invitations.')}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">{t('tb.no_invitations', 'No pending invitations.')}</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
-          </div>
+          </TableScrollArea>
         ) : (
-          <div className="overflow-x-auto ds-table-surface">
+          <TableScrollArea>
             <Table>
               <TableHeader><TableRow>
                 <TableHead>{t('tb.col_name', 'Name')}</TableHead><TableHead>{t('tb.col_email', 'Email')}</TableHead><TableHead>{t('tb.col_role', 'Role')}</TableHead>
@@ -256,11 +258,11 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
                   const manage = canManage(m);
                   return (
                     <TableRow key={m.id}>
-                      <TableCell className="font-medium">{m.name || '—'}{m.userId === identity?.id && <span className="ml-2 text-xs text-ink-soft">({t('tb.you', 'you')})</span>}</TableCell>
+                      <TableCell className="font-medium">{m.name || '—'}{m.userId === identity?.id && <span className="ml-2 text-xs text-muted-foreground">({t('tb.you', 'you')})</span>}</TableCell>
                       <TableCell>{m.email}</TableCell>
                       <TableCell>{roleLabel(m.tenantRole)}</TableCell>
                       <TableCell>{m.tenantRole === 'admin' ? t('tb.all_departments', 'All departments') : names(m.departmentIds)}</TableCell>
-                      <TableCell><Badge variant={m.status === 'active' ? 'success' : 'warning'}>{m.status === 'active' ? t('tb.status_active', 'Active') : t('tb.status_suspended', 'Suspended')}</Badge></TableCell>
+                      <TableCell><Badge tone={m.status === 'active' ? 'success' : 'warning'}>{m.status === 'active' ? t('tb.status_active', 'Active') : t('tb.status_suspended', 'Suspended')}</Badge></TableCell>
                       <TableCell className="text-right">
                         {manage ? (
                           <div className="flex justify-end gap-1">
@@ -272,28 +274,28 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
                               : <Button type="button" variant="ghost" size="sm" onClick={() => setStatus(m, 'active')} aria-label={t('tb.reactivate_for', 'Reactivate membership of {name}', { name: m.name || m.email })}><UserCheck className="h-4 w-4" aria-hidden="true" /></Button>)}
                             {can('tenant.member.remove') && <Button type="button" variant="ghost" size="sm" onClick={() => remove(m)} aria-label={t('tb.remove_for', 'Remove membership of {name}', { name: m.name || m.email })}><UserMinus className="h-4 w-4" aria-hidden="true" /></Button>}
                           </div>
-                        ) : <MoreHorizontal className="ml-auto h-4 w-4 text-on-solid" aria-hidden="true" />}
+                        ) : <MoreHorizontal className="ml-auto h-4 w-4 text-primary-foreground" aria-hidden="true" />}
                       </TableCell>
                     </TableRow>
                   );
                 })}
                 {(membersQuery.data?.members || []).length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-ink-soft">{t('tb.no_members', 'No members match this view.')}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">{t('tb.no_members', 'No members match this view.')}</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
-          </div>
+          </TableScrollArea>
         )}
         {pages > 1 && (
-          <div className="ds-table-pagination flex items-center justify-between gap-3 border-t border-hairline px-4 py-3 text-sm">
-            <span className="text-ink-soft">{t('tb.page_of', 'Page {page} of {pages}', { page: page + 1, pages })}</span>
+          <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm">
+            <span className="text-muted-foreground">{t('tb.page_of', 'Page {page} of {pages}', { page: page + 1, pages })}</span>
             <div className="flex gap-2">
               <Button type="button" variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>{t('tb.previous', 'Previous')}</Button>
               <Button type="button" variant="outline" size="sm" disabled={page + 1 >= pages} onClick={() => setPage((p) => p + 1)}>{t('tb.next', 'Next')}</Button>
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
       {dialog?.kind === 'invite' && (
         <InviteDialog codeOnly={dialog.codeOnly} organizationId={organizationId} departments={departments} assignable={caps.assignableTenantRoles} roleLabel={roleLabel}
@@ -317,10 +319,10 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
 const DialogHeader: React.FC<{ title: string; onClose: () => void }> = ({ title, onClose }) => {
   const { t } = useLanguage();
   return (
-    <div className="ds-section-header">
-      <ModalTitle className="ds-modal-title flex items-center gap-2">{title}</ModalTitle>
-      <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label={t('common.close', 'Close')}><X className="h-4 w-4" aria-hidden="true" /></Button>
-    </div>
+    <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border pb-4">
+      <DialogTitle className="flex items-center gap-2">{title}</DialogTitle>
+      <Button type="button" variant="ghost" size="icon-md" onClick={onClose} aria-label={t('common.close', 'Close')}><X className="h-4 w-4" aria-hidden="true" /></Button>
+    </CardHeader>
   );
 };
 
@@ -356,27 +358,27 @@ const InviteDialog: React.FC<{
     <ModalFrame onClose={onClose} className="max-w-xl">
       <DialogHeader title={codeOnly ? t('onboarding.generate_code', 'Generate invite code') : t('tb.invite_member', 'Invite member')} onClose={onClose} />
       <form onSubmit={submit} noValidate className="flex flex-col gap-4 overflow-y-auto p-5">
-        {!codeOnly && <div>
-          <label htmlFor={ids.email} className={labelClass}>{t('tb.col_email', 'Email')}</label>
-          <input id={ids.email} type="email" autoComplete="off" className={fieldClass} value={email} aria-invalid={email.length > 0 && !emailValid} aria-describedby={email.length > 0 && !emailValid ? `${ids.email}-error` : undefined} onChange={(e) => setEmail(e.target.value)} />
+        {!codeOnly && <Field>
+          <FieldLabel htmlFor={ids.email} className={labelClass}>{t('tb.col_email', 'Email')}</FieldLabel>
+          <Input id={ids.email} type="email" autoComplete="off" value={email} aria-invalid={email.length > 0 && !emailValid} aria-describedby={email.length > 0 && !emailValid ? `${ids.email}-error` : undefined} onChange={(e) => setEmail(e.target.value)} />
           {email.length > 0 && !emailValid && <p id={`${ids.email}-error`} className="mt-1.5 text-xs text-status-danger">{t('tb.invalid_email', 'Enter a valid email address.')}</p>}
-        </div>}
-        <div>
-          <label htmlFor={ids.role} className={labelClass}>{t('tb.col_role', 'Role')}</label>
-          <select id={ids.role} className={fieldClass} value={role} onChange={(e) => setRole(e.target.value as TenantRole)}>
+        </Field>}
+        <Field>
+          <FieldLabel htmlFor={ids.role} className={labelClass}>{t('tb.col_role', 'Role')}</FieldLabel>
+          <NativeSelect id={ids.role} value={role} onChange={(e) => setRole(e.target.value as TenantRole)}>
             {assignable.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
-          </select>
-        </div>
+          </NativeSelect>
+        </Field>
         {role !== 'admin' && (
           <div>
             <DepartmentPicker departments={departments} value={departmentIds} onChange={setDepartmentIds} legend={t('tb.col_departments', 'Departments')} aria-describedby={!deptValid ? `invite-dept-error` : undefined} />
-            {!deptValid && <p id="invite-dept-error" className="mt-1.5 text-xs text-ink-soft">{t('tb.department_required', 'Choose at least one department.')}</p>}
+            {!deptValid && <p id="invite-dept-error" className="mt-1.5 text-xs text-muted-foreground">{t('tb.department_required', 'Choose at least one department.')}</p>}
           </div>
         )}
         {error && <p role="alert" className="flex items-center gap-2 text-sm text-status-danger"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
         <div className="flex justify-end gap-2">
-          <Button type="button" size="lg" variant="outline" onClick={onClose}>{t('tb.cancel', 'Cancel')}</Button>
-          <Button type="submit" size="lg" disabled={busy || !emailValid || !deptValid}>{busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Mail className="h-4 w-4" aria-hidden="true" />}{codeOnly ? t('onboarding.generate_code', 'Generate invite code') : t('tb.send_invitation', 'Send invitation')}</Button>
+          <Button type="button" variant="outline" onClick={onClose}>{t('tb.cancel', 'Cancel')}</Button>
+          <Button type="submit" disabled={busy || !emailValid || !deptValid}>{busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Mail className="h-4 w-4" aria-hidden="true" />}{codeOnly ? t('onboarding.generate_code', 'Generate invite code') : t('tb.send_invitation', 'Send invitation')}</Button>
         </div>
       </form>
     </ModalFrame>
@@ -391,17 +393,17 @@ const InviteLinkDialog: React.FC<{ url: string; code?: string; expiresAt?: strin
     <ModalFrame onClose={onClose} className="max-w-xl">
       <DialogHeader title={code ? t('onboarding.code_created', 'Invite code created') : t('tb.invitation_not_sent_title', 'Invitation created; email not sent')} onClose={onClose} />
       <div className="flex flex-col gap-3 p-5">
-        <p className="text-sm text-ink">{code ? t('onboarding.code_hint', 'Share this code with an approved account. It expires in 24 hours and can be used once.') : t('tb.invitation_not_sent', 'The invitation is saved, but no email was delivered. Share this link with the invited person yourself.')}</p>
+        <p className="text-sm text-foreground">{code ? t('onboarding.code_hint', 'Share this code with an approved account. It expires in 24 hours and can be used once.') : t('tb.invitation_not_sent', 'The invitation is saved, but no email was delivered. Share this link with the invited person yourself.')}</p>
         <label htmlFor={id} className={labelClass}>{code ? t('onboarding.invite_code', 'Invite code') : t('tb.invitation_link', 'Invitation link')}</label>
-        <div className="flex items-center rounded-xl border border-hairline bg-surface pr-1 focus-within:border-accent">
-          <input id={id} readOnly className="min-h-10 min-w-0 flex-1 rounded-md bg-transparent px-3 py-2.5 font-mono text-xs text-ink focus:outline-none" value={code || url} onFocus={(e) => e.currentTarget.select()} />
+        <div className="flex items-center rounded-xl border border-border bg-card pr-1 focus-within:border-primary">
+          <input id={id} readOnly className="min-h-10 min-w-0 flex-1 rounded-md bg-transparent px-3 py-2.5 font-mono text-xs text-foreground focus:outline-none" value={code || url} onFocus={(e) => e.currentTarget.select()} />
           <Button type="button" variant="ghost" className="shrink-0" aria-live="polite" onClick={async () => { await navigator.clipboard?.writeText(code || url).catch(() => {}); setCopied(true); }}>
             <Copy className="h-4 w-4" aria-hidden="true" />{copied ? t('tb.copied', 'Copied') : code ? t('onboarding.copy_code', 'Copy code') : t('tb.copy_link', 'Copy link')}
           </Button>
         </div>
-        {expiresAt && <p className="text-sm text-ink-soft">{t('tb.col_expires', 'Expires')}: {new Date(expiresAt).toLocaleString()}</p>}
+        {expiresAt && <p className="text-sm text-muted-foreground">{t('tb.col_expires', 'Expires')}: {new Date(expiresAt).toLocaleString()}</p>}
         <div className="flex justify-end gap-2">
-          <Button type="button" size="lg" onClick={onClose}>{t('tb.done', 'Done')}</Button>
+          <Button type="button" onClick={onClose}>{t('tb.done', 'Done')}</Button>
         </div>
       </div>
     </ModalFrame>
@@ -445,13 +447,13 @@ const EditMemberDialog: React.FC<{
     <ModalFrame onClose={onClose} className="max-w-xl">
       <DialogHeader title={t('tb.edit_access_for', 'Edit access for {name}', { name: member.name || member.email })} onClose={onClose} />
       <form onSubmit={submit} noValidate className="flex flex-col gap-4 overflow-y-auto p-5">
-        <div>
-          <label htmlFor={roleId} className={labelClass}>{t('tb.col_role', 'Role')}</label>
-          <select id={roleId} className={fieldClass} value={role} disabled={!canRole} onChange={(e) => setRole(e.target.value as TenantRole)}>
+        <Field>
+          <FieldLabel htmlFor={roleId} className={labelClass}>{t('tb.col_role', 'Role')}</FieldLabel>
+          <NativeSelect id={roleId} value={role} disabled={!canRole} onChange={(e) => setRole(e.target.value as TenantRole)}>
             {roles.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
-          </select>
-          {role === 'admin' && member.tenantRole !== 'admin' && <p className="mt-1.5 text-xs text-ink-soft">{t('tb.admin_drops_departments', 'Administrators cover the whole organization; department assignments are removed.')}</p>}
-        </div>
+          </NativeSelect>
+          {role === 'admin' && member.tenantRole !== 'admin' && <p className="mt-1.5 text-xs text-muted-foreground">{t('tb.admin_drops_departments', 'Administrators cover the whole organization; department assignments are removed.')}</p>}
+        </Field>
         {role !== 'admin' && (
           <div>
             <DepartmentPicker departments={departments} value={departmentIds} onChange={setDepartmentIds} disabled={!canDepartments} legend={t('tb.col_departments', 'Departments')} aria-describedby={needsDepartments ? `edit-dept-error` : undefined} />
@@ -460,8 +462,8 @@ const EditMemberDialog: React.FC<{
         )}
         {error && <p role="alert" className="flex items-center gap-2 text-sm text-status-danger"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
         <div className="flex justify-end gap-2">
-          <Button type="button" size="lg" variant="outline" onClick={onClose}>{t('tb.cancel', 'Cancel')}</Button>
-          <Button type="submit" size="lg" disabled={busy || needsDepartments}>{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{t('tb.save', 'Save')}</Button>
+          <Button type="button" variant="outline" onClick={onClose}>{t('tb.cancel', 'Cancel')}</Button>
+          <Button type="submit" disabled={busy || needsDepartments}>{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{t('tb.save', 'Save')}</Button>
         </div>
       </form>
     </ModalFrame>
@@ -497,31 +499,31 @@ const DepartmentsDialog: React.FC<{ organizationId: string; departments: Departm
     <ModalFrame onClose={onClose} className="max-w-xl">
       <DialogHeader title={t('tb.departments', 'Departments')} onClose={onClose} />
       <div className="flex flex-col gap-4 overflow-y-auto p-5">
-        {!hasPermission('department.create') && <p className="text-sm text-ink-soft">{t('tb.departments_readonly', 'You can see your assigned departments. Only administrators can change them.')}</p>}
+        {!hasPermission('department.create') && <p className="text-sm text-muted-foreground">{t('tb.departments_readonly', 'You can see your assigned departments. Only administrators can change them.')}</p>}
         {hasPermission('department.create') && (
           <form className="flex items-end gap-2" onSubmit={async (e) => { e.preventDefault(); if (name.trim() && (await act(() => orgApi(orgPath(organizationId, '/departments'), { method: 'POST', body: { name: name.trim() } })))) setName(''); }}>
-            <div className="min-w-0 flex-1">
-              <label htmlFor={newId} className={labelClass}>{t('tb.new_department', 'New department')}</label>
-              <input id={newId} className={fieldClass} maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <Button type="submit" size="lg" disabled={busy || !name.trim()}><Plus className="h-4 w-4" aria-hidden="true" />{t('tb.add', 'Add')}</Button>
+            <Field className="min-w-0 flex-1">
+              <FieldLabel htmlFor={newId} className={labelClass}>{t('tb.new_department', 'New department')}</FieldLabel>
+              <Input id={newId} maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
+            </Field>
+            <Button type="submit" disabled={busy || !name.trim()}><Plus className="h-4 w-4" aria-hidden="true" />{t('tb.add', 'Add')}</Button>
           </form>
         )}
         {error && <p role="alert" className="flex items-center gap-2 text-sm text-status-danger"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
         {loading ? <Skeleton className="h-24 w-full" /> : (
-          <ul className="divide-y divide-hairline rounded-xl border border-hairline">
+          <ul className="divide-y divide-border rounded-xl border border-border">
             {departments.map((d) => (
               <li key={d.id} className="flex min-h-12 items-center justify-between gap-2 px-3 py-1.5">
                 {editing?.id === d.id ? (
                   <form className="flex flex-1 items-center gap-2" onSubmit={async (e) => { e.preventDefault(); if (await act(() => orgApi(orgPath(organizationId, `/departments/${d.id}`), { method: 'PATCH', body: { name: editing.name.trim() } }))) setEditing(null); }}>
                     <label className="sr-only" htmlFor={`rename-${d.id}`}>{t('tb.department_name', 'Department name')}</label>
-                    <input id={`rename-${d.id}`} autoFocus className={fieldClass} maxLength={100} value={editing.name} onChange={(e) => setEditing({ id: d.id, name: e.target.value })} />
+                    <Input id={`rename-${d.id}`} autoFocus maxLength={100} value={editing.name} onChange={(e) => setEditing({ id: d.id, name: e.target.value })} />
                     <Button type="submit" size="sm" disabled={busy || !editing.name.trim()}>{t('tb.save', 'Save')}</Button>
                     <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(null)}>{t('tb.cancel', 'Cancel')}</Button>
                   </form>
                 ) : (
                   <>
-                    <span className="text-sm text-ink">{d.name}</span>
+                    <span className="text-sm text-foreground">{d.name}</span>
                     <span className="flex gap-1">
                       {hasPermission('department.edit') && <Button type="button" variant="ghost" size="sm" onClick={() => setEditing({ id: d.id, name: d.name })} aria-label={t('tb.rename_department', 'Rename {name}', { name: d.name })}><Pencil className="h-4 w-4" aria-hidden="true" /></Button>}
                       {hasPermission('department.delete') && (
@@ -535,7 +537,7 @@ const DepartmentsDialog: React.FC<{ organizationId: string; departments: Departm
                 )}
               </li>
             ))}
-            {departments.length === 0 && <li className="px-3 py-4 text-sm text-ink-soft">{t('tb.no_departments', 'No departments yet.')}</li>}
+            {departments.length === 0 && <li className="px-3 py-4 text-sm text-muted-foreground">{t('tb.no_departments', 'No departments yet.')}</li>}
           </ul>
         )}
       </div>
@@ -565,9 +567,9 @@ const HistoryDialog: React.FC<{ organizationId: string; onClose: () => void }> =
           </TabsList>
           <TabsContent value="admin" className="pt-3">
             {audit.isError ? (
-              <div role="alert" className="ds-alert ds-status-danger border">{t('tb.history_load_error', 'History could not be loaded.')}</div>
+              <Alert status="error" role="alert"><AlertContent>{t('tb.history_load_error', 'History could not be loaded.')}</AlertContent></Alert>
             ) : audit.isLoading ? <Skeleton className="h-32 w-full" /> : (
-              <div className="overflow-x-auto ds-table-surface">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader><TableRow>
                     <TableHead>{t('tb.col_when', 'When')}</TableHead><TableHead>{t('tb.col_actor', 'By')}</TableHead>
@@ -577,16 +579,16 @@ const HistoryDialog: React.FC<{ organizationId: string; onClose: () => void }> =
                     {(audit.data?.events || []).map((e) => (
                       <TableRow key={e.id}>
                         <TableCell className="whitespace-nowrap">{new Date(e.createdAt).toLocaleString()}</TableCell>
-                        <TableCell>{e.actorName || '—'}{e.accessMode === 'platform' && <span className="ml-1 text-xs text-ink-soft">({t('tb.platform_admin_short', 'platform')})</span>}</TableCell>
+                        <TableCell>{e.actorName || '—'}{e.accessMode === 'platform' && <span className="ml-1 text-xs text-muted-foreground">({t('tb.platform_admin_short', 'platform')})</span>}</TableCell>
                         <TableCell className="font-mono text-xs">{e.action}</TableCell>
                         <TableCell className="text-xs">{e.changedFields.join(', ') || '—'}</TableCell>
                       </TableRow>
                     ))}
-                    {(audit.data?.events || []).length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-ink-soft">{t('tb.no_history', 'No administrative changes yet.')}</TableCell></TableRow>}
+                    {(audit.data?.events || []).length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-muted-foreground">{t('tb.no_history', 'No administrative changes yet.')}</TableCell></TableRow>}
                   </TableBody>
                 </Table>
                 {pages > 1 && (
-                  <div className="ds-table-pagination flex justify-end gap-2 pt-3">
+                  <div className="flex justify-end gap-2 pt-3">
                     <Button type="button" variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>{t('tb.previous', 'Previous')}</Button>
                     <Button type="button" variant="outline" size="sm" disabled={page + 1 >= pages} onClick={() => setPage((p) => p + 1)}>{t('tb.next', 'Next')}</Button>
                   </div>

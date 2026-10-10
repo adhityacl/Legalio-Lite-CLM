@@ -10,6 +10,7 @@ import { Label } from '@legalio/ui-components/label';
 import { Alert, AlertDescription } from '@legalio/ui-components/alert';
 import { capturePendingInvitation, loadInvitationPreview, type InvitationPreview } from './account/InvitationPrompt';
 
+import { Card } from '@legalio/ui-components/card';
 interface SignInFormProps {
   allowRegistration?: boolean;
   onOpenPrivacyPolicy?: () => void;
@@ -169,7 +170,6 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
             </p>
             <Button
               variant="link"
-              className="text-sm"
               onClick={() => {
                 setRegistrationSuccess(false);
                 setIsRegister(false);
@@ -230,7 +230,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
                 <Label htmlFor="signin-name">{t('login.fullname_label')}</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                  <Input id="signin-name" type="text" required value={name} onChange={(e) => setName(e.target.value)} className="ds-input pl-9" placeholder={t('login.fullname_placeholder')} />
+                  <Input id="signin-name" type="text" required value={name} onChange={(e) => setName(e.target.value)} className="pl-9" placeholder={t('login.fullname_placeholder')} />
                 </div>
               </div>
             )}
@@ -239,7 +239,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
               <Label htmlFor="signin-email">{t('login.email_label')}</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                <Input id="signin-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="ds-input pl-9" placeholder={t('login.email_placeholder')} />
+                <Input id="signin-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="pl-9" placeholder={t('login.email_placeholder')} />
               </div>
             </div>
 
@@ -255,13 +255,13 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
                   autoComplete={setupMode ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="ds-input pl-9"
+                  className="pl-9"
                   placeholder="••••••••"
                 />
               </div>
             </div>
 
-            <Button type="submit" size="lg" disabled={loading || (!allowRegistration && !statusReady)} className="w-full mt-2">
+            <Button type="submit" disabled={loading || (!allowRegistration && !statusReady)} className="w-full mt-2">
               {loading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : setupMode ? (
@@ -290,7 +290,6 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
               <Button
                 type="button"
                 variant="outline"
-                size="lg"
                 onClick={handleGoogleSignIn}
                 disabled={loading || (!allowRegistration && !statusReady)}
                 className="w-full"
@@ -308,7 +307,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
                 <Button
                   type="button"
                   variant="link"
-                  className="max-w-full whitespace-normal text-sm"
+                  className="max-w-full"
                   onClick={() => {
                     setIsRegister(!isRegister);
                     setError('');
@@ -329,10 +328,10 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
 
 /** Same pill/segmented control as the in-app Header, so language switching looks the same before and after login. */
 const LanguageSwitcher: React.FC<{ language: Language; setLanguage: (lang: Language) => void; t: (k: string, d?: string) => string }> = ({ language, setLanguage, t }) => (
-  <div
+  <Card
     role="group"
     aria-label={t('header.switch_language', 'Pilih bahasa')}
-    className="ds-panel flex items-center p-0.5 text-xs font-semibold"
+    className="flex items-center p-0.5 text-xs font-semibold"
   >
     {LANGUAGE_OPTIONS.map((option) => (
       <button
@@ -340,11 +339,11 @@ const LanguageSwitcher: React.FC<{ language: Language; setLanguage: (lang: Langu
         type="button"
         lang={option.htmlLang}
         onClick={() => setLanguage(option.code)}
-        className={`min-w-10 min-h-10 px-2.5 py-1.5 rounded-full transition-all cursor-pointer text-xs font-bold flex items-center justify-center focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none ${
-          language === option.code
-            ? 'bg-accent-strong text-white shadow-2xs'
-            : 'text-ink-soft hover:text-ink dark:hover:text-ink'
-        }`}
+        className={`min-w-10 min-h-10 px-2.5 py-1.5 rounded-full transition-all cursor-pointer text-xs font-bold flex items-center justify-center focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none ${
+ language === option.code
+ ? 'bg-primary text-white shadow-2xs'
+ : 'text-muted-foreground hover:text-foreground '
+ }`}
         title={option.nativeName}
         aria-label={option.nativeName}
         aria-pressed={language === option.code}
@@ -352,19 +351,19 @@ const LanguageSwitcher: React.FC<{ language: Language; setLanguage: (lang: Langu
         {option.label}
       </button>
     ))}
-  </div>
+  </Card>
 );
 
 const LegalFooter: React.FC<{ onOpenPrivacy: (e: React.MouseEvent) => void; onOpenTerms: (e: React.MouseEvent) => void; t: (k: string, d?: string) => string }> = ({ onOpenPrivacy, onOpenTerms, t }) => (
   <div className="mt-6 text-center">
     <p className="flex flex-wrap items-center justify-center gap-x-1 text-xs text-[var(--muted-foreground)]">
-      <button type="button" onClick={onOpenPrivacy} className="hover:text-[var(--foreground)] hover:underline transition-colors cursor-pointer">
+      <Button variant="link" type="button" onClick={onOpenPrivacy}>
         {t('footer.privacy_policy', 'Privacy Policy')}
-      </button>
+      </Button>
       <span>{t('login.footer_and', 'and')}</span>
-      <button type="button" onClick={onOpenTerms} className="hover:text-[var(--foreground)] hover:underline transition-colors cursor-pointer">
+      <Button variant="link" type="button" onClick={onOpenTerms}>
         {t('footer.terms_of_service', 'Terms of Service')}
-      </button>
+      </Button>
       <span>{t('login.footer_apply', 'apply')}</span>
     </p>
   </div>

@@ -1,5 +1,5 @@
 import { useDocumentList } from '../../features/documents/useDocumentList';
-import { TableViewMenu } from '../ui/table-view-menu';
+import { TableViewMenu, TableViewOption } from '../ui/table-view-menu';
 import { AlphabeticalSelect } from '../ui/alphabetical-select';
 import { TableEmptyState } from '../ui/table-empty-state';
 import React, { useEffect, useRef, useState } from 'react';
@@ -35,6 +35,11 @@ import { ActionMenu, type ActionMenuItem } from '../ui/action-menu';
 import { TablePagination } from '../ui/TablePagination';
 import { INPUT_CLASS, statusBadgeClass, statusLabel, typeBadgeClass, typeLabel } from './documentLabels';
 
+import { TableColumnHeader, Table, TableHeader, TableRow, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
+import { Button } from '@legalio/ui-components/button';
+import { Input } from '@legalio/ui-components/input';
+import { Card } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
 interface DocumentExplorerProps {
   canEdit: boolean;
   canDelete: boolean;
@@ -190,67 +195,66 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
   const sortHeader = (sortKey: DocumentSortKey, label: string, className = 'p-4') => {
     const active = sort.key === sortKey;
     return (
-      <th
+      <TableColumnHeader
         key={sortKey}
         scope="col"
         aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className={`${className} text-xs font-bold text-ink text-left select-none align-middle`}
+        className={`${className} text-left align-middle`}
       >
-        <button
+        <Button variant="ghost" size="sm"
           type="button"
           onClick={() => toggleSort(sortKey)}
-          className="flex items-center gap-1.5 hover:text-ink dark:hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded-sm py-0.5"
         >
           <span>{label}</span>
           {active ? (
             sort.dir === 'asc' ? (
-              <ArrowUp className="w-3.5 h-3.5 text-accent-text shrink-0" aria-hidden />
+              <ArrowUp className="w-3.5 h-3.5 text-accent-foreground shrink-0" aria-hidden />
             ) : (
-              <ArrowDown className="w-3.5 h-3.5 text-accent-text shrink-0" aria-hidden />
+              <ArrowDown className="w-3.5 h-3.5 text-accent-foreground shrink-0" aria-hidden />
             )
           ) : (
-            <ArrowUpDown className="w-3.5 h-3.5 text-ink-soft shrink-0" aria-hidden />
+            <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
           )}
-        </button>
-      </th>
+        </Button>
+      </TableColumnHeader>
     );
   };
 
   return (
     <section className="w-full min-w-0 bg-transparent" aria-labelledby="document-explorer-heading">
       <div className="w-full space-y-6">
-        <div className="ds-page-bar">
+        <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
           <div>
-            <h2 id="document-explorer-heading" ref={headingRef} tabIndex={-1} className="ds-page-heading">
+            <Heading as="h2" size="lg" weight="semibold" id="document-explorer-heading" ref={headingRef} tabIndex={-1}>
               {t('documents.explorer.title', 'Dokumen Saya')}
-            </h2>
+            </Heading>
           </div>
           {canEdit && (
-            <button
+            <Button
               type="button"
               onClick={onCreate}
-              className="ui-button ui-button-lg mobile-page-action inline-flex w-fit items-center cursor-pointer ds-button ds-button-lg ds-button-default"
+              className="mobile-page-action"
             >
               <FilePlus2 className="w-4 h-4" aria-hidden />
               <span>{t('documents.explorer.new', 'Dokumen Baru')}</span>
-            </button>
+            </Button>
           )}
-        </div>
+        </Card>
 
-        <div className="ds-panel p-4 sm:p-5">
-          <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full ds-grid">
+        <Card className="p-4 sm:p-5">
+          <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
             <div className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-              <Search className="w-4 h-4 text-ink-soft absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
+              <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
               <label htmlFor="document-search" className="sr-only">
                 {t('documents.explorer.search_label', 'Search Document')}
               </label>
-              <input
+              <Input
                 id="document-search"
                 type="search"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder={t('documents.explorer.search_placeholder', 'Search Documents…')}
-                className="ds-input w-full pl-9 pr-3"
+                className="w-full pl-9 pr-3"
               />
             </div>
             <label htmlFor="document-status-filter" className="sr-only">
@@ -260,7 +264,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               id="document-status-filter"
               value={filters.status}
               onChange={(e) => updateFilter('status', e.target.value)}
-              className="ds-input min-w-[130px] flex-1 cursor-pointer"
+              className="min-w-[130px] flex-1 cursor-pointer"
             >
               <option value="">{t('documents.filter.status_active', 'Semua status aktif')}</option>
               {DOCUMENT_STATUSES.map((s) => (
@@ -278,7 +282,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               id="document-type-filter"
               value={filters.type}
               onChange={(e) => updateFilter('type', e.target.value)}
-              className="ds-input min-w-[130px] flex-1 cursor-pointer"
+              className="min-w-[130px] flex-1 cursor-pointer"
             >
               <option value="">{t('documents.filter.type_all', 'All Document Types')}</option>
               {DOCUMENT_TYPES.map((type) => (
@@ -295,7 +299,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               id="document-creator-filter"
               value={filters.created_by}
               onChange={(e) => updateFilter('created_by', e.target.value)}
-              className="ds-input min-w-[130px] flex-1 cursor-pointer"
+              className="min-w-[130px] flex-1 cursor-pointer"
             >
               <option value="">{t('documents.filter.created_by_all', 'All Creators')}</option>
               {(data?.creators ?? []).map((creator) => (
@@ -306,7 +310,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
             </AlphabeticalSelect>
 
             <TableViewMenu label={t('documents.filter.view', 'View')}>
-              <div className="mb-1 border-b border-hairline px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-ink-soft">
+              <div className="mb-1 border-b border-border px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 {t('documents.filter.toggle_columns', 'Toggle Columns')}
               </div>
               {([
@@ -317,33 +321,25 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                 ['createdBy', t('documents.field.created_by', 'Created by')],
                 ['size', t('documents.field.size', 'Size')],
               ] as const).map(([column, label]) => (
-                <label key={column} className="flex cursor-pointer items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-ink hover:bg-surface dark:hover:bg-surface-2">
-                  <input
-                    type="checkbox"
-                    checked={visibleColumns[column]}
-                    onChange={() => toggleColumnVisibility(column)}
-                    className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                  />
-                  <span>{label}</span>
-                </label>
+                <TableViewOption key={column} value={column} checked={visibleColumns[column]} onToggle={() => toggleColumnVisibility(column)}>{label}</TableViewOption>
               ))}
             </TableViewMenu>
           </div>
-        </div>
+        </Card>
 
         <section
-          className="ds-table-surface bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden"
+          className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden"
           aria-busy={isFetching}
           aria-live="polite"
         >
           {state.status === 'loading' && (
-            <div className="divide-y divide-hairline" role="status">
+            <div className="divide-y divide-border" role="status">
               <span className="sr-only">{t('common.loading', 'Memuat…')}</span>
               {Array.from({ length: 6 }, (_, i) => (
                 <div key={i} className="h-14 px-3 flex items-center gap-3 animate-pulse motion-reduce:animate-none">
-                  <div className="h-3 w-1/3 rounded-sm bg-surface-2" />
-                  <div className="h-3 w-16 rounded-sm bg-surface-2" />
-                  <div className="h-3 w-20 rounded-sm bg-surface-2 ml-auto" />
+                  <div className="h-3 w-1/3 rounded-sm bg-muted" />
+                  <div className="h-3 w-16 rounded-sm bg-muted" />
+                  <div className="h-3 w-20 rounded-sm bg-muted ml-auto" />
                 </div>
               ))}
             </div>
@@ -354,25 +350,24 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               <p className="text-sm font-semibold text-status-danger">
                 {t('documents.explorer.load_failed', 'Gagal memuat daftar dokumen.')}
               </p>
-              <p className="text-xs text-ink-soft">{state.message}</p>
-              <button
+              <p className="text-xs text-muted-foreground">{state.message}</p>
+              <Button variant="ghost"
                 type="button"
                 onClick={reload}
-                className="inline-flex items-center gap-1.5 px-4 min-h-10 rounded-md bg-ink text-white text-sm font-semibold cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" aria-hidden />
                 {t('common.retry', 'Coba lagi')}
-              </button>
+              </Button>
             </div>
           )}
 
           {data && (
             <>
-              <div className="relative overflow-x-auto bg-surface">
-                <table className="ds-table app-data-table document-data-table w-full text-left border-collapse text-xs bg-surface">
+              <TableScrollArea>
+                <Table className="app-data-table w-full text-left">
                   <caption className="sr-only">{t('documents.explorer.title', 'Dokumen Saya')}</caption>
-                  <thead className="bg-surface dark:bg-surface-2/50">
-                    <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
+                  <TableHeader>
+                    <TableRow>
                       {sortHeader('name', t('documents.field.name', 'Nama'), 'pl-6 pr-4 py-4')}
                       {visibleColumns.type && sortHeader('type', t('documents.field.type', 'Jenis'), 'p-4 hidden md:table-cell')}
                       {visibleColumns.status && sortHeader('status', t('documents.field.status', 'Status'))}
@@ -380,22 +375,22 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                       {visibleColumns.modified && sortHeader('modified_at', t('documents.field.modified', 'Diubah'))}
                       {visibleColumns.createdBy && sortHeader('created_by', t('documents.field.created_by', 'Dibuat oleh'), 'p-4 hidden md:table-cell')}
                       {visibleColumns.size && sortHeader('file_size', t('documents.field.size', 'Ukuran'), 'p-4 hidden lg:table-cell')}
-                      <th scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
+                      <TableColumnHeader scope="col" className="text-right w-20 align-middle">
                         <div className="flex items-center justify-end">{t('documents.field.actions', 'Aksi')}</div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-hairline">
+                      </TableColumnHeader>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {data.documents.length === 0 ? (
                       <TableEmptyState
                         colSpan={Object.values(visibleColumns).filter(Boolean).length + 2}
                         message={t('documents.explorer.empty', 'Belum ada dokumen tersimpan.')}
                       />
                     ) : data.documents.map((doc) => (
-                      <tr key={doc.id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
-                        <td className="pl-6 pr-4 py-4 text-xs text-left align-middle max-w-[320px]">
+                      <TableRow key={doc.id}>
+                        <TableCell className="text-left align-middle max-w-[320px]">
                           {renaming?.id === doc.id ? (
-                            <input
+                            <Input
                               autoFocus
                               aria-label={t('documents.action.rename', 'Ganti nama')}
                               value={renaming.value}
@@ -411,42 +406,42 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                             <button
                               type="button"
                               onClick={() => onOpen(doc.id)}
-                              className="font-semibold text-left text-ink hover:text-accent-text truncate block max-w-full cursor-pointer transition-colors"
+                              className="font-semibold text-left text-foreground hover:text-accent-foreground truncate block max-w-full cursor-pointer transition-colors"
                               title={doc.name}
                             >
                               {doc.name}
                             </button>
                           )}
-                          <span className="text-xs text-ink-soft">v{doc.current_version}</span>
-                        </td>
-                        {visibleColumns.type && <td className="py-4 px-4 text-xs text-left align-middle hidden md:table-cell">
+                          <span className="text-xs text-muted-foreground">v{doc.current_version}</span>
+                        </TableCell>
+                        {visibleColumns.type && <TableCell className="text-left align-middle hidden md:table-cell">
                           <span className={typeBadgeClass(doc.type)}>{typeLabel(t, doc.type)}</span>
-                        </td>}
-                        {visibleColumns.status && <td className="py-4 px-4 text-xs text-left align-middle">
+                        </TableCell>}
+                        {visibleColumns.status && <TableCell className="text-left align-middle">
                           <span className={statusBadgeClass(doc.status)}>{statusLabel(t, doc.status)}</span>
-                        </td>}
-                        {visibleColumns.created && <td className="py-4 px-4 text-xs font-normal text-ink text-left align-middle whitespace-nowrap hidden lg:table-cell">
+                        </TableCell>}
+                        {visibleColumns.created && <TableCell className="text-left align-middle whitespace-nowrap hidden lg:table-cell">
                           <RelativeTime iso={doc.created_at} />
-                        </td>}
-                        {visibleColumns.modified && <td className="py-4 px-4 text-xs font-normal text-ink text-left align-middle whitespace-nowrap">
+                        </TableCell>}
+                        {visibleColumns.modified && <TableCell className="text-left align-middle whitespace-nowrap">
                           <RelativeTime iso={doc.modified_at} />
-                        </td>}
-                        {visibleColumns.createdBy && <td className="py-4 px-4 text-xs font-normal text-ink text-left align-middle hidden md:table-cell">
+                        </TableCell>}
+                        {visibleColumns.createdBy && <TableCell className="text-left align-middle hidden md:table-cell">
                           {doc.created_by_name || '—'}
-                        </td>}
-                        {visibleColumns.size && <td className="py-4 px-4 text-xs font-normal text-ink text-left align-middle whitespace-nowrap hidden lg:table-cell">
+                        </TableCell>}
+                        {visibleColumns.size && <TableCell className="text-left align-middle whitespace-nowrap hidden lg:table-cell">
                           {formatBytes(doc.file_size)}
-                        </td>}
-                        <td className="pl-2 pr-6 py-4 text-right align-middle w-20">
+                        </TableCell>}
+                        <TableCell className="text-right align-middle w-20">
                           <div className="flex items-center justify-end">
                             <ActionMenu items={rowActions(doc)} title={`${t('documents.field.actions', 'Aksi')}: ${doc.name}`} />
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </TableScrollArea>
 
               {data.total > 0 && <TablePagination
                 currentPage={data.page}

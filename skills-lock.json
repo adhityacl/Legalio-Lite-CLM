@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "moduix": {
+      "source": "Blinks44/moduix",
+      "sourceType": "github",
+      "skillPath": "skills/moduix/SKILL.md",
+      "computedHash": "594e493972110529d085d3b5075f03974b2e5186e240813f218593386e92d214"
+    }
+  }
+}

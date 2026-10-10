@@ -1,4 +1,4 @@
-import { ModalFrame, ModalTitle } from '../ui/modal-frame';
+import { ModalFrame } from '../ui/modal-frame';
 import { LogoUploadField } from '../settings/LogoUploadField';
 export { LogoUploadField } from '../settings/LogoUploadField';
 import { AlphabeticalSelect } from '../ui/alphabetical-select';
@@ -36,6 +36,13 @@ import {
 import { useLanguage } from '../../context/LanguageContext';
 import { useDepartments } from '../../hooks/useDepartments';
 
+import { Button } from '@legalio/ui-components/button';
+import { Input } from '@legalio/ui-components/input';
+import { DialogHeader, DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
+import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { Card } from '@legalio/ui-components/card';
+import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
 // Add user modal
 
 interface AddUserModalProps {
@@ -155,63 +162,61 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 admin-dialog max-h-[92dvh] overflow-y-auto">
+    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
-            <UserPlus className="w-4 h-4 text-accent-text" />
-            <ModalTitle className="ds-modal-title flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-accent-foreground" />
+            <DialogTitle className="flex items-center gap-2">
               {t('admin.modal_add_user', 'Tambah Pengguna Sistem Baru')}
-            </ModalTitle>
+            </DialogTitle>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('redline.close', 'Tutup')} className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (
-            <div role="alert" className="ds-alert ds-status-danger border">
-              {error}
-            </div>
+            <Alert status="error" role="alert">
+              <AlertContent>{error}</AlertContent>
+            </Alert>
           )}
 
-          <div>
-            <label htmlFor="adminmodals-field-1" className="block text-xs font-medium text-ink mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-1">
               {t('admin.fullname_label', 'Nama Lengkap Pengguna *')}
-            </label>
-            <input id="adminmodals-field-1"
+            </FieldLabel>
+            <Input id="adminmodals-field-1"
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t('admin.contoh_rina_melati', 'Contoh: Rina Melati')}
-              className="ds-input w-full"
+              className="w-full"
             />
-          </div>
+          </Field>
 
-          <div>
-            <label htmlFor="adminmodals-field-2" className="block text-xs font-medium text-ink mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-2">
               {t('admin.email_label', 'Alamat Email (Google / Corporate) *')}
-            </label>
-            <input id="adminmodals-field-2"
+            </FieldLabel>
+            <Input id="adminmodals-field-2"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder={t('admin.name_example_com', 'name@example.com')}
-              className="ds-input w-full"
+              className="w-full"
             />
-          </div>
+          </Field>
 
           <div>
-            <label htmlFor="adminmodals-field-3" className="block text-xs font-medium text-ink mb-1">
+            <label htmlFor="adminmodals-field-3" className="block text-xs font-medium text-foreground mb-1">
               {t('admin.role_label', 'Role Hak Akses Aplikasi *')}
             </label>
             <AlphabeticalSelect id="adminmodals-field-3"
               value={role}
               onChange={(e) => handleRoleChange(e.target.value)}
-              className="ds-input w-full"
+              className="w-full"
             >
               {allowedRoles.includes('superuser') && <option value="superuser">{t('admin.superuser', 'Superuser')}</option>}
               {allowedRoles.includes('admin') && <option value="admin">{t('admin.admin', 'Admin')}</option>}
@@ -223,7 +228,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label htmlFor="admin-organization-1" className="block text-xs font-medium text-ink">
+              <label htmlFor="admin-organization-1" className="block text-xs font-medium text-foreground">
                 {t('admin.select_tenant_label', 'Organisasi / Tenant')} {role !== 'superuser' && role !== 'admin' && <span className="text-status-danger">*</span>}
               </label>
               {role !== 'superuser' && role !== 'admin' && (
@@ -237,7 +242,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
               onChange={(e) => setOrganizationId(e.target.value)}
               disabled={role === 'superuser'}
               required={role !== 'superuser' && role !== 'admin'}
-              className="ds-input w-full disabled:opacity-60"
+              className="w-full disabled:opacity-60"
             >
               {role === 'superuser' ? (
                 <option value="">{t('admin.all_tenants', 'Semua Tenant / Organisasi (Akses Global)')}</option>
@@ -264,14 +269,14 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
           </div>
 
           <div>
-            <label htmlFor="adminmodals-field-4" className="block text-xs font-medium text-ink mb-1">
+            <label htmlFor="adminmodals-field-4" className="block text-xs font-medium text-foreground mb-1">
               {t('admin.tab_teams', 'Departemen')}
             </label>
             <AlphabeticalSelect id="adminmodals-field-4"
               value={role === 'superuser' || role === 'admin' ? '' : department}
               onChange={(e) => setDepartment(e.target.value)}
               disabled={role === 'superuser' || role === 'admin'}
-              className="ds-input w-full disabled:opacity-60"
+              className="w-full disabled:opacity-60"
             >
               {role === 'superuser' || role === 'admin' ? (
                 <option value="">{t('admin.all_departments', 'Semua Departemen (Akses Global)')}</option>
@@ -285,34 +290,32 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
             </AlphabeticalSelect>
           </div>
 
-          <div>
-            <label htmlFor="adminmodals-field-5" className="block text-xs font-medium text-ink mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-5">
               {t('admin.pwd_init_label', 'Kata Sandi Awal (Opsional)')}
-            </label>
-            <input id="adminmodals-field-5"
+            </FieldLabel>
+            <Input id="adminmodals-field-5"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={t('admin.kosongkan_jika_menggunakan_google_login_sso', 'Kosongkan jika menggunakan Google Login SSO')}
-              className="ds-input w-full"
+              className="w-full"
             />
-          </div>
+          </Field>
 
           <div className="pt-2 flex items-center justify-end gap-2">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={onClose}
-              className="ui-button ui-button-lg ds-button ds-button-lg ds-button-ghost"
             >
               {t('admin.btn_cancel', 'Batal')}
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="submit"
               disabled={isSubmitting}
-              className="theme-action ui-button ui-button-lg disabled:opacity-50 ds-button ds-button-lg ds-button-ghost"
             >
               {isSubmitting ? t('admin.saving', 'Menyimpan...') : t('admin.btn_save_user', 'Simpan Pengguna')}
-            </button>
+            </Button>
           </div>
         </form>
 
@@ -406,62 +409,60 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 admin-dialog max-h-[92dvh] overflow-y-auto">
+    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-status-special" />
-            <ModalTitle className="ds-modal-title flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2">
               {t('admin.modal_edit_user', 'Ubah Informasi & Hak Akses Pengguna')}
-            </ModalTitle>
+            </DialogTitle>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('redline.close', 'Tutup')} className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (
-            <div role="alert" className="ds-alert ds-status-danger border">
-              {error}
-            </div>
+            <Alert status="error" role="alert">
+              <AlertContent>{error}</AlertContent>
+            </Alert>
           )}
 
-          <div className="ds-panel p-3 space-y-3">
-            <div>
-              <label htmlFor="adminmodals-field-6" className="block text-xs uppercase tracking-wider font-semibold text-ink-soft mb-1">
+          <Card className="p-3 space-y-3">
+            <Field>
+              <FieldLabel htmlFor="adminmodals-field-6">
                 {t('admin.col_name', 'Nama Lengkap')}
-              </label>
-              <input id="adminmodals-field-6"
+              </FieldLabel>
+              <Input id="adminmodals-field-6"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="ds-input w-full"
+                className="w-full"
               />
-            </div>
-            <div>
-              <label htmlFor="adminmodals-field-7" className="block text-xs uppercase tracking-wider font-semibold text-ink-soft mb-1">
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="adminmodals-field-7">
                 {t('admin.col_email', 'Alamat Email')}
-              </label>
-              <input id="adminmodals-field-7"
+              </FieldLabel>
+              <Input id="adminmodals-field-7"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="ds-input w-full"
+                className="w-full"
               />
-            </div>
-          </div>
+            </Field>
+          </Card>
 
           <div>
-            <label htmlFor="adminmodals-field-8" className="block text-xs font-medium text-ink mb-1">
+            <label htmlFor="adminmodals-field-8" className="block text-xs font-medium text-foreground mb-1">
               {t('admin.select_new_role', 'Pilih Peran Baru (Role)')}
             </label>
             <AlphabeticalSelect id="adminmodals-field-8"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="ds-input w-full"
+              className="w-full"
             >
               {allowedRoles.includes('superuser') && <option value="superuser">{t('admin.superuser', 'Superuser')}</option>}
               {allowedRoles.includes('admin') && <option value="admin">{t('admin.admin', 'Admin')}</option>}
@@ -473,7 +474,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label htmlFor="admin-organization-2" className="block text-xs font-medium text-ink">
+              <label htmlFor="admin-organization-2" className="block text-xs font-medium text-foreground">
                 {t('admin.select_tenant_label', 'Organisasi / Tenant')} {role !== 'superuser' && role !== 'admin' && <span className="text-status-danger">*</span>}
               </label>
               {role !== 'superuser' && role !== 'admin' && (
@@ -487,7 +488,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               onChange={(e) => setOrganizationId(e.target.value)}
               disabled={role === 'superuser'}
               required={role !== 'superuser' && role !== 'admin'}
-              className="ds-input w-full disabled:opacity-60"
+              className="w-full disabled:opacity-60"
             >
               {role === 'superuser' ? (
                 <option value="">{t('admin.all_tenants', 'Semua Tenant / Organisasi (Akses Global)')}</option>
@@ -514,14 +515,14 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </div>
 
           <div>
-            <label htmlFor="adminmodals-field-9" className="block text-xs font-medium text-ink mb-1">
+            <label htmlFor="adminmodals-field-9" className="block text-xs font-medium text-foreground mb-1">
               {t('admin.tab_teams', 'Departmens / Tim')}
             </label>
             <AlphabeticalSelect id="adminmodals-field-9"
               value={role === 'superuser' || role === 'admin' ? '' : department}
               onChange={(e) => setDepartment(e.target.value)}
               disabled={role === 'superuser' || role === 'admin'}
-              className="ds-input w-full disabled:opacity-60"
+              className="w-full disabled:opacity-60"
             >
               {role === 'superuser' || role === 'admin' ? (
                 <option value="">{t('admin.all_departments', 'Semua Departemen (Akses Global)')}</option>
@@ -536,20 +537,18 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-2">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={onClose}
-              className="ui-button ui-button-lg ds-button ds-button-lg ds-button-ghost"
             >
               {t('admin.btn_cancel', 'Batal')}
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="submit"
               disabled={isSubmitting}
-              className="ui-button ui-button-lg disabled:opacity-50 ds-button ds-button-lg ds-button-ghost"
             >
               {isSubmitting ? t('admin.saving', 'Menyimpan...') : t('admin.btn_update_user', 'Perbarui Pengguna')}
-            </button>
+            </Button>
           </div>
         </form>
 
@@ -597,63 +596,59 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 admin-dialog max-h-[92dvh] overflow-y-auto">
+    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <KeyRound className="w-4 h-4 text-status-info" />
-            <ModalTitle className="ds-modal-title flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2">
               {t('admin.modal_reset_pwd', 'Reset Kata Sandi Pengguna')}
-            </ModalTitle>
+            </DialogTitle>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('redline.close', 'Tutup')} className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (
-            <div role="alert" className="ds-alert ds-status-danger border">
-              {error}
-            </div>
+            <Alert status="error" role="alert">
+              <AlertContent>{error}</AlertContent>
+            </Alert>
           )}
 
           <div>
-            <div className="text-xs text-ink-soft">{t('admin.target_user', 'Target Pengguna')}:</div>
-            <div className="font-semibold text-sm text-ink">{user.name}</div>
-            <div className="text-xs text-ink-soft">{user.email}</div>
+            <div className="text-xs text-muted-foreground">{t('admin.target_user', 'Target Pengguna')}:</div>
+            <div className="font-semibold text-sm text-foreground">{user.name}</div>
+            <div className="text-xs text-muted-foreground">{user.email}</div>
           </div>
 
-          <div>
-            <label htmlFor="adminmodals-field-10" className="block text-xs font-medium text-ink mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-10">
               {t('admin.new_pwd_label', 'Kata Sandi Baru')}
-            </label>
-            <input id="adminmodals-field-10"
+            </FieldLabel>
+            <Input id="adminmodals-field-10"
               type="password"
               required
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={t('admin.minimal_6_karakter', 'Minimal 6 karakter')}
-              className="ds-input w-full"
+              className="w-full"
             />
-          </div>
+          </Field>
 
           <div className="pt-2 flex items-center justify-end gap-2">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={onClose}
-              className="ui-button ui-button-lg ds-button ds-button-lg ds-button-ghost"
             >
               {t('admin.btn_cancel', 'Batal')}
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="submit"
               disabled={isSubmitting}
-              className="ui-button ui-button-lg disabled:opacity-50 ds-button ds-button-lg ds-button-ghost"
             >
               {isSubmitting ? t('admin.saving', 'Menyimpan...') : t('admin.btn_update_pwd', 'Perbarui Kata Sandi')}
-            </button>
+            </Button>
           </div>
         </form>
 
@@ -721,40 +716,38 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 admin-dialog max-h-[92dvh] overflow-y-auto">
+    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-accent-text" />
-            <ModalTitle className="ds-modal-title flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-accent-foreground" />
+            <DialogTitle className="flex items-center gap-2">
               {t('admin.modal_create_org', 'Buat Organisasi Enterprise Baru')}
-            </ModalTitle>
+            </DialogTitle>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('redline.close', 'Tutup')} className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (
-            <div role="alert" className="ds-alert ds-status-danger border">
-              {error}
-            </div>
+            <Alert status="error" role="alert">
+              <AlertContent>{error}</AlertContent>
+            </Alert>
           )}
 
-          <div>
-            <label htmlFor="adminmodals-field-11" className="block text-xs font-medium text-ink mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-11">
               {t('admin.org_name_label', 'Nama Resmi Organisasi / Entitas PT')}
-            </label>
-            <input id="adminmodals-field-11"
+            </FieldLabel>
+            <Input id="adminmodals-field-11"
               type="text"
               required
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
               placeholder={t('admin.contoh_pt_fintek_digital_mandiri', 'Contoh: PT Fintek Digital Mandiri')}
-              className="ds-input w-full"
+              className="w-full"
             />
-          </div>
+          </Field>
 
           {/* Logo Uploader */}
           <LogoUploadField
@@ -764,36 +757,36 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
           />
 
           <div>
-            <label htmlFor="adminmodals-field-12" className="block text-xs font-medium text-ink mb-1">
+            <label htmlFor="adminmodals-field-12" className="block text-xs font-medium text-foreground mb-1">
               {t('admin.org_slug_label', 'Identifier Slug (Unik)')}
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-ink-soft font-mono">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono">
                 @
               </span>
-              <input id="adminmodals-field-12"
+              <Input id="adminmodals-field-12"
                 type="text"
                 required
                 value={slug}
                 onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                 placeholder="fintek-mandiri"
-                className="ds-input w-full pl-7 pr-3"
+                className="w-full pl-7 pr-3"
               />
             </div>
-            <p className="text-xs text-ink-soft mt-1">
-              {t('admin.org_slug_hint', 'Digunakan untuk pemetaan folder root dan tenant routing')}: <code className="font-mono text-accent-text">{t('admin.vendors', '/{slug}/[vendors]', { slug })}</code>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t('admin.org_slug_hint', 'Digunakan untuk pemetaan folder root dan tenant routing')}: <code className="font-mono text-accent-foreground">{t('admin.vendors', '/{slug}/[vendors]', { slug })}</code>
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ds-grid">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label htmlFor="adminmodals-field-13" className="block text-xs font-medium text-ink mb-1">
+              <label htmlFor="adminmodals-field-13" className="block text-xs font-medium text-foreground mb-1">
                 {t('admin.org_currency_label', 'Mata Uang Utama')}
               </label>
               <AlphabeticalSelect id="adminmodals-field-13"
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="ds-input w-full"
+                className="w-full"
               >
                 {SUPPORTED_CURRENCIES.map((c) => (
                   <option key={c.code} value={c.code}>{c.code} — {currencyLabel(c.code, language)}</option>
@@ -801,7 +794,7 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
               </AlphabeticalSelect>
             </div>
             <div>
-              <label htmlFor="create-org-country" className="block text-xs font-semibold text-ink mb-1">
+              <label htmlFor="create-org-country" className="block text-xs font-semibold text-foreground mb-1">
                 {t('settings.region.country', 'Country / jurisdiction pack')}
               </label>
               <AlphabeticalSelect
@@ -812,20 +805,20 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
                   const pack = countries.find((c) => c.code === e.target.value);
                   if (pack) setCurrency(pack.defaultCurrency);
                 }}
-                className="ds-input w-full"
+                className="w-full"
               >
                 {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
               </AlphabeticalSelect>
             </div>
             <div>
-              <label htmlFor="create-org-industry" className="block text-xs font-semibold text-ink mb-1">
+              <label htmlFor="create-org-industry" className="block text-xs font-semibold text-foreground mb-1">
                 {t('settings.region.industry', 'Industry pack')}
               </label>
               <AlphabeticalSelect
                 id="create-org-industry"
                 value={industry}
                 onChange={(e) => setIndustry(e.target.value)}
-                className="ds-input w-full"
+                className="w-full"
               >
                 {industries.map((i) => <option key={i.key} value={i.key}>{i.name.en}</option>)}
               </AlphabeticalSelect>
@@ -833,20 +826,18 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-2">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={onClose}
-              className="ui-button ui-button-lg ds-button ds-button-lg ds-button-ghost"
             >
               {t('admin.btn_cancel', 'Batal')}
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="submit"
               disabled={isSubmitting}
-              className="theme-action ui-button ui-button-lg disabled:opacity-50 ds-button ds-button-lg ds-button-ghost"
             >
               {isSubmitting ? t('admin.creating', 'Membuat...') : t('admin.btn_create_org', 'Buat Organisasi')}
-            </button>
+            </Button>
           </div>
         </form>
 
@@ -916,44 +907,42 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 admin-dialog max-h-[92dvh] overflow-y-auto">
+    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="theme-soft w-7 h-7 rounded-lg flex items-center justify-center">
               <Pencil className="w-3.5 h-3.5" />
             </div>
             <div>
-              <ModalTitle className="ds-modal-title flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2">
                 {t('admin.modal_edit_org_title', 'Edit Profil & Pengaturan Organisasi')}
-              </ModalTitle>
+              </DialogTitle>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('redline.close', 'Tutup')} className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft rounded-md hover:bg-surface-2 dark:hover:bg-surface-2">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (
-            <div role="alert" className="ds-alert ds-status-danger border">
-              {error}
-            </div>
+            <Alert status="error" role="alert">
+              <AlertContent>{error}</AlertContent>
+            </Alert>
           )}
 
-          <div>
-            <label htmlFor="adminmodals-field-15" className="block text-xs font-medium text-ink mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-15">
               {t('admin.org_name_label', 'Nama Resmi Organisasi / Entitas PT')} <span className="text-status-danger">*</span>
-            </label>
-            <input id="adminmodals-field-15"
+            </FieldLabel>
+            <Input id="adminmodals-field-15"
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t('admin.e_g_acme_holdings_pte_ltd', 'e.g. Acme Holdings Pte. Ltd.')}
-              className="ds-input w-full"
+              className="w-full"
             />
-          </div>
+          </Field>
 
           {/* Logo Uploader */}
           <LogoUploadField
@@ -963,69 +952,67 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
           />
 
           <div>
-            <label htmlFor="adminmodals-field-16" className="block text-xs font-medium text-ink mb-1">
+            <label htmlFor="adminmodals-field-16" className="block text-xs font-medium text-foreground mb-1">
               {t('admin.org_slug_label', 'Identifier Slug (Unik)')} <span className="text-status-danger">*</span>
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-ink-soft font-mono">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono">
                 @
               </span>
-              <input id="adminmodals-field-16"
+              <Input id="adminmodals-field-16"
                 type="text"
                 required
                 value={slug}
                 onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                 placeholder="acme"
-                className="ds-input w-full pl-7 pr-3"
+                className="w-full pl-7 pr-3"
               />
             </div>
-            <p className="text-xs text-ink-soft mt-1">
-              {t('admin.org_slug_hint', 'Pemetaan tenant routing')}: <code className="font-mono text-accent-text">/{slug || 'tenant'}{t('admin.vendors_2', '/[vendors]')}</code>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t('admin.org_slug_hint', 'Pemetaan tenant routing')}: <code className="font-mono text-accent-foreground">/{slug || 'tenant'}{t('admin.vendors_2', '/[vendors]')}</code>
             </p>
           </div>
 
 
-          <div className="ds-panel p-3 text-xs space-y-1.5">
-            <div className="flex items-center justify-between text-ink-soft text-xs">
+          <Card className="p-3 text-xs space-y-1.5">
+            <div className="flex items-center justify-between text-muted-foreground text-xs">
               <span>{t('admin.id_organisasi', 'ID Organisasi:')}</span>
-              <code className="font-mono text-ink">{org.id}</code>
+              <code className="font-mono text-foreground">{org.id}</code>
             </div>
-            <div className="flex items-center justify-between text-ink-soft text-xs">
+            <div className="flex items-center justify-between text-muted-foreground text-xs">
               <span>{t('admin.folder_isolasi', 'Folder Isolasi:')}</span>
-              <span className="font-mono text-accent-text">/{name || org.name}{t('admin.vendors_3', '/[Vendors]')}</span>
+              <span className="font-mono text-accent-foreground">/{name || org.name}{t('admin.vendors_3', '/[Vendors]')}</span>
             </div>
-          </div>
+          </Card>
 
           <div className="pt-2 flex items-center justify-between gap-2">
             {onDelete && !org.metadata?.isDefault ? (
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => {
                   onClose();
                   onDelete(org);
                 }}
-                className="px-3 min-h-8 text-xs font-semibold text-status-danger hover:bg-status-danger-soft dark:hover:bg-status-danger-soft/40 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="text-destructive"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{t('admin.btn_delete_org', 'Hapus Organisasi')}</span>
-              </button>
+              </Button>
             ) : <div />}
 
             <div className="flex items-center gap-2">
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={onClose}
-                className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
               >
                 {t('admin.btn_cancel', 'Batal')}
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="submit"
                 disabled={isSubmitting}
-                className="theme-action ui-button ui-button-lg disabled:opacity-50 cursor-pointer ds-button ds-button-lg ds-button-ghost"
               >
                 {isSubmitting ? t('admin.saving', 'Menyimpan...') : t('admin.btn_save_changes', 'Simpan Perubahan')}
-              </button>
+              </Button>
             </div>
           </div>
         </form>
@@ -1073,36 +1060,34 @@ export const DeleteOrganizationModal: React.FC<DeleteOrganizationModalProps> = (
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 admin-dialog max-h-[92dvh] overflow-y-auto">
+    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-status-danger-soft flex items-center justify-center text-status-danger">
               <Trash2 className="w-3.5 h-3.5" />
             </div>
             <div>
-              <ModalTitle className="ds-modal-title flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2">
                 {t('admin.delete_org_title', 'Hapus Organisasi')}
-              </ModalTitle>
-              <p className="text-xs text-ink-soft">
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground">
                 {org.name} (@{org.slug})
               </p>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('redline.close', 'Tutup')} className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 cursor-pointer">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
+        </DialogHeader>
 
         <div className="p-5 space-y-4">
           {error && (
-            <div role="alert" className="ds-alert ds-status-danger border">
-              {error}
-            </div>
+            <Alert status="error" role="alert">
+              <AlertContent>{error}</AlertContent>
+            </Alert>
           )}
 
           {isDefault ? (
-            <div className="p-3 rounded-lg bg-status-warning-soft dark:bg-status-warning-soft/40 border border-status-warning-border text-xs text-status-warning flex items-start gap-2">
+            <div className="p-3 rounded-lg bg-status-warning-soft border border-status-warning-border text-xs text-status-warning flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
               <div>
                 <strong>{t('admin.cant_delete_default_org', 'Organisasi default sistem tidak dapat dihapus.')}</strong>
@@ -1112,7 +1097,7 @@ export const DeleteOrganizationModal: React.FC<DeleteOrganizationModalProps> = (
               </div>
             </div>
           ) : isActive ? (
-            <div className="p-3 rounded-lg bg-status-warning-soft dark:bg-status-warning-soft/40 border border-status-warning-border text-xs text-status-warning flex items-start gap-2">
+            <div className="p-3 rounded-lg bg-status-warning-soft border border-status-warning-border text-xs text-status-warning flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
               <div>
                 <strong>{t('admin.cant_delete_active_org', 'Beralih ke organisasi lain terlebih dahulu sebelum menghapus.')}</strong>
@@ -1123,7 +1108,7 @@ export const DeleteOrganizationModal: React.FC<DeleteOrganizationModalProps> = (
             </div>
           ) : (
             <>
-              <div className="p-3 rounded-lg bg-status-danger-soft dark:bg-status-danger-soft/30 border border-status-danger-border dark:border-status-danger-border/40 text-xs text-status-danger flex items-start gap-2">
+              <div className="p-3 rounded-lg bg-status-danger-soft border border-status-danger-border text-xs text-status-danger flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-status-danger shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold">{t('admin.delete_org_confirm_msg', 'Apakah Anda yakin ingin menghapus organisasi ini secara permanen?')}</p>
@@ -1133,41 +1118,39 @@ export const DeleteOrganizationModal: React.FC<DeleteOrganizationModalProps> = (
                 </div>
               </div>
 
-              <div className="ds-panel p-3 text-xs space-y-1.5">
-                <div className="flex items-center justify-between text-ink-soft text-xs">
+              <Card className="p-3 text-xs space-y-1.5">
+                <div className="flex items-center justify-between text-muted-foreground text-xs">
                   <span>{t('admin.nama_organisasi', 'Nama Organisasi:')}</span>
-                  <span className="font-semibold text-ink">{org.name}</span>
+                  <span className="font-semibold text-foreground">{org.name}</span>
                 </div>
-                <div className="flex items-center justify-between text-ink-soft text-xs">
+                <div className="flex items-center justify-between text-muted-foreground text-xs">
                   <span>{t('admin.slug_tenant', 'Slug Tenant:')}</span>
-                  <code className="font-mono text-accent-text">@{org.slug}</code>
+                  <code className="font-mono text-accent-foreground">@{org.slug}</code>
                 </div>
-                <div className="flex items-center justify-between text-ink-soft text-xs">
+                <div className="flex items-center justify-between text-muted-foreground text-xs">
                   <span>{t('admin.id', 'ID:')}</span>
-                  <code className="font-mono text-ink-soft">{org.id}</code>
+                  <code className="font-mono text-muted-foreground">{org.id}</code>
                 </div>
-              </div>
+              </Card>
             </>
           )}
 
           <div className="pt-2 flex items-center justify-end gap-2">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={onClose}
-              className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
             >
               {t('admin.btn_cancel', 'Batal')}
-            </button>
+            </Button>
             {!isDefault && !isActive && (
-              <button
+              <Button variant="destructive"
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="ui-button ui-button-lg disabled:opacity-50 flex items-center cursor-pointer ds-button ds-button-lg ds-button-destructive"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{isDeleting ? t('admin.deleting', 'Menghapus...') : t('admin.btn_confirm_delete', 'Hapus Permanen')}</span>
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -1214,63 +1197,61 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 admin-dialog max-h-[92dvh] overflow-y-auto">
+    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-status-warning" />
-            <ModalTitle className="ds-modal-title flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2">
               {t('admin.modal_create_team', 'Buat Tim / Divisi Baru')}
-            </ModalTitle>
+            </DialogTitle>
           </div>
-          <button aria-label={t('common.close', 'Tutup')} type="button" onClick={() => { setErrorMsg(null); onClose(); }} className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft">
+          <Button variant="ghost" size="icon-sm" aria-label={t('common.close', 'Tutup')} type="button" onClick={() => { setErrorMsg(null); onClose(); }}>
             <X className="w-4 h-4" />
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {errorMsg && (
-            <div role="alert" className="ds-alert ds-status-danger border">
-              {errorMsg}
-            </div>
+            <Alert status="error" role="alert">
+              <AlertContent>{errorMsg}</AlertContent>
+            </Alert>
           )}
 
           <div>
-            <div className="text-xs text-ink-soft">{t('admin.col_org', 'Organisasi')}:</div>
-            <div className="font-semibold text-xs text-ink">
+            <div className="text-xs text-muted-foreground">{t('admin.col_org', 'Organisasi')}:</div>
+            <div className="font-semibold text-xs text-foreground">
               {activeOrg?.name || t('admin.active_org_fallback', 'Organisasi Aktif')}
             </div>
           </div>
 
-          <div>
-            <label htmlFor="adminmodals-field-19" className="block text-xs font-medium text-ink mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-19">
               {t('admin.team_name_label', 'Nama Tim / Divisi')}
-            </label>
-            <input id="adminmodals-field-19"
+            </FieldLabel>
+            <Input id="adminmodals-field-19"
               type="text"
               required
               value={name}
               onChange={(e) => { setName(e.target.value); setErrorMsg(null); }}
               placeholder={t('admin.contoh_procurement_vendor_sourcing', 'Contoh: Procurement & Vendor Sourcing')}
-              className="ds-input w-full"
+              className="w-full"
             />
-          </div>
+          </Field>
 
           <div className="pt-2 flex items-center justify-end gap-2">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => { setErrorMsg(null); onClose(); }}
-              className="ui-button ui-button-lg ds-button ds-button-lg ds-button-ghost"
             >
               {t('admin.btn_cancel', 'Batal')}
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="submit"
               disabled={isSubmitting}
-              className="ui-button ui-button-lg disabled:opacity-50 ds-button ds-button-lg ds-button-ghost"
             >
               {isSubmitting ? t('admin.creating', 'Membuat...') : t('admin.btn_create_team', 'Buat Tim')}
-            </button>
+            </Button>
           </div>
         </form>
 
@@ -1324,92 +1305,89 @@ export const EditDepartmentModal: React.FC<EditDepartmentModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 admin-dialog max-h-[92dvh] overflow-y-auto">
+    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-status-warning-soft dark:bg-status-warning-soft/60 border border-status-warning-border flex items-center justify-center text-status-warning">
+            <div className="w-7 h-7 rounded-lg bg-status-warning-soft border border-status-warning-border flex items-center justify-center text-status-warning">
               <Layers className="w-3.5 h-3.5" />
             </div>
             <div>
-              <ModalTitle className="ds-modal-title flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2">
                 {t('admin.edit_department_title', 'Edit Tim / Departemen')}
-              </ModalTitle>
-              <p className="text-xs text-ink-soft">
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground">
                 {team.name}
               </p>
             </div>
           </div>
-          <button aria-label={t('common.close', 'Tutup')}
+          <Button variant="secondary" size="icon-sm" aria-label={t('common.close', 'Tutup')}
             type="button"
             onClick={() => { setErrorMsg(null); onClose(); }}
-            className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 cursor-pointer"
           >
             <X className="w-4 h-4" />
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {errorMsg && (
-            <div role="alert" className="ds-alert ds-status-danger border">
-              {errorMsg}
-            </div>
+            <Alert status="error" role="alert">
+              <AlertContent>{errorMsg}</AlertContent>
+            </Alert>
           )}
 
-          <div>
-            <label htmlFor="adminmodals-field-20" className="block text-xs font-medium text-ink mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-20">
               {t('admin.team_name_label', 'Nama Tim / Divisi')}
-            </label>
-            <input id="adminmodals-field-20"
+            </FieldLabel>
+            <Input id="adminmodals-field-20"
               type="text"
               required
               value={name}
               onChange={(e) => { setName(e.target.value); setErrorMsg(null); }}
-              className="ds-input w-full"
+              className="w-full"
             />
-          </div>
+          </Field>
 
-          <div className="ds-panel p-3 text-xs space-y-1">
-            <div className="flex items-center justify-between text-ink-soft text-xs">
+          <Card className="p-3 text-xs space-y-1">
+            <div className="flex items-center justify-between text-muted-foreground text-xs">
               <span>{t('admin.col_members', 'Jumlah Anggota')}:</span>
-              <span className="font-semibold text-ink">{team.members.length}</span>
+              <span className="font-semibold text-foreground">{team.members.length}</span>
             </div>
-            <div className="flex items-center justify-between text-ink-soft text-xs">
+            <div className="flex items-center justify-between text-muted-foreground text-xs">
               <span>{t('admin.id_tim', 'ID Tim:')}</span>
-              <code className="font-mono text-ink-soft">{team.id}</code>
+              <code className="font-mono text-muted-foreground">{team.id}</code>
             </div>
-          </div>
+          </Card>
 
           <div className="pt-2 flex items-center justify-between gap-2">
             {onDelete ? (
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => {
                   onClose();
                   onDelete(team);
                 }}
-                className="px-3 min-h-8 text-xs font-semibold text-status-danger hover:bg-status-danger-soft dark:hover:bg-status-danger-soft/40 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="text-destructive"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{t('admin.btn_delete', 'Hapus')}</span>
-              </button>
+              </Button>
             ) : <div />}
 
             <div className="flex items-center gap-2">
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={() => { setErrorMsg(null); onClose(); }}
-                className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
               >
                 {t('admin.btn_cancel', 'Batal')}
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="submit"
                 disabled={isSubmitting}
-                className="theme-action ui-button ui-button-lg disabled:opacity-50 cursor-pointer ds-button ds-button-lg ds-button-ghost"
               >
                 {isSubmitting ? t('admin.saving', 'Menyimpan...') : t('admin.btn_save_changes', 'Simpan Perubahan')}
-              </button>
+              </Button>
             </div>
           </div>
         </form>
@@ -1452,39 +1430,33 @@ export const DeleteDepartmentModal: React.FC<DeleteDepartmentModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 admin-dialog max-h-[92dvh] overflow-y-auto">
+    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-status-danger-soft flex items-center justify-center text-status-danger">
               <Trash2 className="w-3.5 h-3.5" />
             </div>
             <div>
-              <ModalTitle className="ds-modal-title flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2">
                 {t('admin.delete_department_title', 'Hapus Departemen / Tim')}
-              </ModalTitle>
-              <p className="text-xs text-ink-soft">
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground">
                 {team.name}
               </p>
             </div>
           </div>
-          <button aria-label={t('common.close', 'Tutup')}
-            type="button"
-            onClick={onClose}
-            className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
+        </DialogHeader>
 
         <div className="p-5 space-y-4">
           {error && (
-            <div role="alert" className="ds-alert ds-status-danger border">
-              {error}
-            </div>
+            <Alert status="error" role="alert">
+              <AlertContent>{error}</AlertContent>
+            </Alert>
           )}
 
-          <div className="p-3 rounded-lg bg-status-danger-soft dark:bg-status-danger-soft/30 border border-status-danger-border dark:border-status-danger-border/40 text-xs text-status-danger flex items-start gap-2">
+          <div className="p-3 rounded-lg bg-status-danger-soft border border-status-danger-border text-xs text-status-danger flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-status-danger shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold">{t('admin.delete_department_confirm_msg', 'Apakah Anda yakin ingin menghapus departemen ini secara permanen?')}</p>
@@ -1494,46 +1466,44 @@ export const DeleteDepartmentModal: React.FC<DeleteDepartmentModalProps> = ({
             </div>
           </div>
 
-          <div className="ds-panel p-3 text-xs space-y-1.5">
-            <div className="flex items-center justify-between text-ink-soft text-xs">
+          <Card className="p-3 text-xs space-y-1.5">
+            <div className="flex items-center justify-between text-muted-foreground text-xs">
               <span>{t('admin.team_name_label', 'Nama Departemen')}:</span>
-              <span className="font-semibold text-ink">{team.name}</span>
+              <span className="font-semibold text-foreground">{team.name}</span>
             </div>
-            <div className="flex items-center justify-between text-ink-soft text-xs">
+            <div className="flex items-center justify-between text-muted-foreground text-xs">
               <span>{t('admin.department_members_count', 'Jumlah Anggota')}:</span>
-              <span className="font-medium text-ink">
+              <span className="font-medium text-foreground">
                 {team.members?.length || 0} {t('admin.team_members', 'Anggota')}
               </span>
             </div>
             {team.organizationName && (
-              <div className="flex items-center justify-between text-ink-soft text-xs">
+              <div className="flex items-center justify-between text-muted-foreground text-xs">
                 <span>{t('admin.col_org', 'Organisasi')}:</span>
-                <span className="text-ink">{team.organizationName}</span>
+                <span className="text-foreground">{team.organizationName}</span>
               </div>
             )}
-            <div className="flex items-center justify-between text-ink-soft text-xs">
+            <div className="flex items-center justify-between text-muted-foreground text-xs">
               <span>{t('admin.id', 'ID:')}</span>
-              <code className="font-mono text-ink-soft">{team.id}</code>
+              <code className="font-mono text-muted-foreground">{team.id}</code>
             </div>
-          </div>
+          </Card>
 
           <div className="pt-2 flex items-center justify-end gap-2">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={onClose}
-              className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
             >
               {t('admin.btn_cancel', 'Batal')}
-            </button>
-            <button
+            </Button>
+            <Button variant="destructive"
               type="button"
               onClick={handleDelete}
               disabled={isDeleting}
-              className="ui-button ui-button-lg disabled:opacity-50 flex items-center cursor-pointer ds-button ds-button-lg ds-button-destructive"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>{isDeleting ? t('admin.deleting', 'Menghapus...') : t('admin.btn_confirm_delete_department', 'Hapus Departemen')}</span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1581,32 +1551,30 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 admin-dialog max-h-[92dvh] overflow-y-auto">
+    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-accent-text" />
-            <ModalTitle className="ds-modal-title flex items-center gap-2">
+            <Layers className="w-4 h-4 text-accent-foreground" />
+            <DialogTitle className="flex items-center gap-2">
               {t('admin.modal_add_team_member', 'Tambah Anggota ke Tim')}
-            </ModalTitle>
+            </DialogTitle>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('redline.close', 'Tutup')} className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <div className="text-xs text-ink-soft">{t('admin.target_team', 'Tim Tujuan')}:</div>
-            <div className="font-semibold text-sm text-ink">{team.name}</div>
+            <div className="text-xs text-muted-foreground">{t('admin.target_team', 'Tim Tujuan')}:</div>
+            <div className="font-semibold text-sm text-foreground">{team.name}</div>
           </div>
 
           <div>
-            <label htmlFor="adminmodals-field-21" className="block text-xs font-medium text-ink mb-1">
+            <label htmlFor="adminmodals-field-21" className="block text-xs font-medium text-foreground mb-1">
               {t('admin.select_user', 'Pilih Pengguna')}
             </label>
             {availableUsers.length === 0 ? (
-              <div className="text-xs text-ink-soft p-3 bg-surface rounded-lg">
+              <div className="text-xs text-muted-foreground p-3 bg-card rounded-lg">
                 {t('admin.all_users_in_team', 'Semua pengguna yang terdaftar sudah tergabung dalam tim ini.')}
               </div>
             ) : (
@@ -1614,7 +1582,7 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({
                 required
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value)}
-                className="ds-input w-full"
+                className="w-full"
               >
                 <option value="">{t('admin.select_user_ph', 'Pilih pengguna...')}</option>
                 {availableUsers.map((u) => (
@@ -1627,20 +1595,18 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-2">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={onClose}
-              className="ui-button ui-button-lg ds-button ds-button-lg ds-button-ghost"
             >
               {t('admin.btn_cancel', 'Batal')}
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="submit"
               disabled={isSubmitting || !selectedUserId}
-              className="theme-action ui-button ui-button-lg disabled:opacity-50 ds-button ds-button-lg ds-button-ghost"
             >
               {isSubmitting ? t('admin.adding', 'Menambahkan...') : t('admin.btn_add', 'Tambahkan')}
-            </button>
+            </Button>
           </div>
         </form>
 
@@ -1686,53 +1652,51 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 admin-dialog max-h-[92dvh] overflow-y-auto">
+    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
-            <Mail className="w-4 h-4 text-accent-text" />
-            <ModalTitle className="ds-modal-title flex items-center gap-2">
+            <Mail className="w-4 h-4 text-accent-foreground" />
+            <DialogTitle className="flex items-center gap-2">
               {t('admin.modal_create_inv', 'Undang Anggota Organisasi')}
-            </ModalTitle>
+            </DialogTitle>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('redline.close', 'Tutup')} className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="ds-panel p-3 text-xs text-ink-soft space-y-1">
-            <p className="font-semibold text-ink flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-accent-text" />
+          <Card className="p-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-semibold text-foreground flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-accent-foreground" />
               <span>{t('admin.pengiriman_via_email_smtp_relay', 'Pengiriman via Email (SMTP Relay)')}</span>
             </p>
-            <p className="text-xs leading-relaxed text-ink-soft">
+            <p className="text-xs leading-relaxed text-muted-foreground">
               {t('admin.undangan_akan_dikirimkan_langsung_ke_inbox', 'Undangan akan dikirimkan langsung ke inbox email calon anggota menggunakan server SMTP yang terkonfigurasi.')}
             </p>
-          </div>
+          </Card>
 
-          <div>
-            <label htmlFor="adminmodals-field-22" className="block text-xs font-medium text-ink mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-22">
               {t('admin.col_user_email', 'Email Rekan Kerja')}
-            </label>
-            <input id="adminmodals-field-22"
+            </FieldLabel>
+            <Input id="adminmodals-field-22"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder={t('admin.colleague_example_com', 'colleague@example.com')}
-              className="ds-input w-full"
+              className="w-full"
             />
-          </div>
+          </Field>
 
           <div>
-            <label htmlFor="adminmodals-field-23" className="block text-xs font-medium text-ink mb-1">
+            <label htmlFor="adminmodals-field-23" className="block text-xs font-medium text-foreground mb-1">
               {t('admin.inv_col_role', 'Peran Diminta')}
             </label>
             <AlphabeticalSelect id="adminmodals-field-23"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="ds-input w-full"
+              className="w-full"
             >
               <option value="superuser">{t('admin.superuser_system_level', 'Superuser (System Level)')}</option>
               <option value="admin">{t('admin.admin_global_level', 'Admin (Global Level)')}</option>
@@ -1743,13 +1707,13 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
           </div>
 
           <div>
-            <label htmlFor="adminmodals-field-24" className="block text-xs font-medium text-ink mb-1">
+            <label htmlFor="adminmodals-field-24" className="block text-xs font-medium text-foreground mb-1">
               {t('admin.team_optional_label', 'Divisi / Tim (Opsional)')}
             </label>
             <AlphabeticalSelect id="adminmodals-field-24"
               value={teamId}
               onChange={(e) => setTeamId(e.target.value)}
-              className="ds-input w-full"
+              className="w-full"
             >
               <option value="">{t('admin.no_specific_team', 'Tanpa tim khusus')}</option>
               {teams.map((t) => (
@@ -1761,20 +1725,18 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-2">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={onClose}
-              className="ui-button ui-button-lg ds-button ds-button-lg ds-button-ghost"
             >
               {t('admin.btn_cancel', 'Batal')}
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="submit"
               disabled={isSubmitting}
-              className="theme-action ui-button ui-button-lg disabled:opacity-50 ds-button ds-button-lg ds-button-ghost"
             >
               {isSubmitting ? t('admin.sending', 'Mengirim...') : t('admin.btn_send_inv', 'Kirim Undangan')}
-            </button>
+            </Button>
           </div>
         </form>
 
@@ -1857,31 +1819,31 @@ export const GenerateApiKeyModal: React.FC<GenerateApiKeyModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={handleFinish} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 admin-dialog max-h-[92dvh] overflow-y-auto">
+    <ModalFrame onClose={handleFinish} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
 
-        <div className="ds-section-header">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <Lock className="w-4 h-4 text-status-info" />
-            <ModalTitle className="ds-modal-title flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2">
               {generatedSecret
                 ? t('admin.key_generated_success', 'API Key Berhasil Dibuat')
                 : t('admin.modal_gen_key', 'Generate API Key Baru')}
-            </ModalTitle>
+            </DialogTitle>
           </div>
-          <button type="button" onClick={handleFinish} aria-label={t('redline.close', 'Tutup')} className="inline-flex items-center justify-center size-8 text-ink-soft hover:text-ink-soft">
+          <Button variant="ghost" size="icon-sm" type="button" onClick={handleFinish} aria-label={t('redline.close', 'Tutup')}>
             <X className="w-4 h-4" />
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
 
         {error && (
-          <div role="alert" className="ds-alert ds-status-danger border">
-            {error}
-          </div>
+          <Alert status="error" role="alert">
+            <AlertContent>{error}</AlertContent>
+          </Alert>
         )}
 
         {generatedSecret ? (
           <div className="p-5 space-y-4">
-            <div className="p-3 rounded-lg bg-status-warning-soft dark:bg-status-warning-soft/40 border border-status-warning-border text-xs text-status-warning flex items-start gap-2">
+            <div className="p-3 rounded-lg bg-status-warning-soft border border-status-warning-border text-xs text-status-warning flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <div>
                 <strong>{t('admin.key_save_now', 'Simpan kunci ini sekarang!')}</strong> {t('admin.key_copy_warn', 'Kunci rahasia ini hanya ditampilkan sekali demi keamanan.')}
@@ -1889,95 +1851,81 @@ export const GenerateApiKeyModal: React.FC<GenerateApiKeyModalProps> = ({
             </div>
 
             <div>
-              <label htmlFor="adminmodals-field-25" className="block text-xs font-medium text-ink mb-1">
+              <label htmlFor="adminmodals-field-25" className="block text-xs font-medium text-foreground mb-1">
                 {t('admin.api_secret_label', 'API Secret Key')}
               </label>
               <div className="flex items-center gap-2">
-                <input id="adminmodals-field-25"
+                <Input id="adminmodals-field-25"
                   type="text"
                   readOnly
                   value={generatedSecret}
-                  className="ds-input w-full"
+                  className="w-full"
                 />
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={handleCopy}
-                  className="theme-action ui-button ui-button-lg flex items-center shrink-0 ds-button ds-button-lg ds-button-ghost"
+                  className="shrink-0"
                 >
                   {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   {copied ? t('admin.copied', 'Tersalin') : t('admin.copy', 'Salin')}
-                </button>
+                </Button>
               </div>
             </div>
 
             <div className="pt-2 flex justify-end">
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={handleFinish}
-                className="ui-button ui-button-lg ds-button ds-button-lg ds-button-ghost"
               >
                 {t('admin.done', 'Selesai')}
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
-            <div>
-              <label htmlFor="adminmodals-field-26" className="block text-xs font-medium text-ink mb-1">
+            <Field>
+              <FieldLabel htmlFor="adminmodals-field-26">
                 {t('admin.api_name_label', 'Nama Kunci / Sistem Pengguna')}
-              </label>
-              <input id="adminmodals-field-26"
+              </FieldLabel>
+              <Input id="adminmodals-field-26"
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t('admin.contoh_erp_sap_integration_bot_webhook', 'Contoh: ERP SAP Integration / Bot Webhook')}
-                className="ds-input w-full"
+                className="w-full"
               />
-            </div>
+            </Field>
 
             <div>
-              <label className="block text-xs font-medium text-ink mb-2">
+              <label className="block text-xs font-medium text-foreground mb-2">
                 {t('admin.api_col_scopes', 'Cakupan Izin (Permission Scopes)')}
               </label>
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
                 {availableScopes.map((scope) => (
-                  <label
-                    key={scope.id}
-                    className="flex items-center gap-2.5 p-2 rounded-lg bg-surface dark:bg-surface-2/60 border border-hairline hover:bg-surface-2 text-xs cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedScopes.includes(scope.id)}
-                      onChange={() => handleToggleScope(scope.id)}
-                      className="rounded-sm text-accent-text focus:ring-accent"
-                    />
-                    <div>
-                      <div className="font-medium text-ink font-mono text-xs">
+                  <Checkbox checked={selectedScopes.includes(scope.id)} onCheckedChange={() => handleToggleScope(scope.id)}><CheckboxControl /><CheckboxLabel><div>
+                      <div className="font-medium text-foreground font-mono text-xs">
                         {scope.id}
                       </div>
-                      <div className="text-xs text-ink-soft">{scope.label}</div>
-                    </div>
-                  </label>
+                      <div className="text-xs text-muted-foreground">{scope.label}</div>
+                    </div></CheckboxLabel><CheckboxHiddenInput /></Checkbox>
                 ))}
               </div>
             </div>
 
             <div className="pt-2 flex items-center justify-end gap-2">
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={handleFinish}
-                className="ui-button ui-button-lg ds-button ds-button-lg ds-button-ghost"
               >
                 {t('admin.btn_cancel', 'Batal')}
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="submit"
                 disabled={isSubmitting || selectedScopes.length === 0}
-                className="ui-button ui-button-lg disabled:opacity-50 ds-button ds-button-lg ds-button-ghost"
               >
                 {isSubmitting ? t('admin.creating', 'Membuat...') : t('admin.api_generate_btn', 'Generate Kunci')}
-              </button>
+              </Button>
             </div>
           </form>
         )}

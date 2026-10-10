@@ -1,10 +1,10 @@
-import { TableViewMenu } from './ui/table-view-menu';
+import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { downloadCsv } from '../lib/csv';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { formatBusinessDate } from '../lib/displayDate';
 import { FilterSummary } from './ui/filter-summary';
 import { TableEmptyState } from './ui/table-empty-state';
-import { ModalFrame, ModalTitle } from './ui/modal-frame';
+import { ModalFrame } from './ui/modal-frame';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useTenantSettings } from '../context/TenantSettingsContext';
 import { Partner, PartnerSpending } from '@legalio/types';
@@ -67,7 +67,7 @@ import { SUPPORTED_CURRENCIES, currencyMinorUnits, currencyLabel, formatMoney, g
 import { formatInvoiceFileName, formatBillingFileName } from '@legalio/shared/fileNaming';
 import { DateInput } from './DateInput';
 import { usePermissions } from '../lib/permissions';
-import { fieldControlClass } from '@legalio/ui-components/input';
+import { fieldControlClass, Input } from '@legalio/ui-components/input';
 import {
   parseMonthStr,
   parseAllMonths,
@@ -80,11 +80,21 @@ import {
   type SpendingAllocationInput,
 } from '@legalio/shared/spendingAllocations';
 
-const spendingFieldClass = `${fieldControlClass} min-w-0`;
-const spendingLabelClass = 'block text-sm font-semibold text-ink  mb-1.5';
-const spendingButtonClass = 'ui-button ui-button-md border border-hairline  bg-surface  font-semibold hover:bg-surface-2 dark:hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40 disabled:cursor-not-allowed';
+import { TableColumnHeader, Table, TableHeader, TableRow, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
+import { Button } from '@legalio/ui-components/button';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
+import { NativeSelect } from '@legalio/ui-components/native-select';
+import { Textarea } from '@legalio/ui-components/textarea';
+import { Card } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
+import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
+import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
+const spendingLabelClass = 'block text-sm font-semibold text-foreground  mb-1.5';
+const spendingButtonClass = 'ui-button ui-button-md border border-border  bg-card  font-semibold hover:bg-muted  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:cursor-not-allowed';
 const spendingUploadClass = 'ds-upload min-w-0 text-center';
-const spendingFileInputClass = 'w-[220px] max-w-full min-w-0 text-sm text-ink-soft  file:mr-2 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-accent-soft file:text-accent-text hover:file:bg-accent/20 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-xl';
+const spendingFileInputClass = 'w-[220px] max-w-full min-w-0 text-sm text-muted-foreground  file:mr-2 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl';
 
 // Re-export formatMonthTagDisplay for backwards compatibility with any external consumers
 export { formatMonthTagDisplay };
@@ -627,37 +637,36 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   };
 
   const renderSortHeader = (label: string, field: SortField) => (
-    <th
+    <TableColumnHeader
       scope="col"
       aria-sort={sortField === field ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-      className="p-4 text-xs font-bold text-ink text-left select-none align-middle"
+      className="text-left align-middle"
      data-numeric={field === 'amount'}>
-      <button
+      <Button variant="ghost" size="sm"
         type="button"
         onClick={() => handleSort(field)}
-        className="flex items-center gap-1.5 hover:text-ink dark:hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none rounded-sm py-0.5"
         title={t('spending.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}
       >
         <span>{label}</span>
         {sortField === field ? (
           sortOrder === 'asc' ? (
-            <ArrowUp className="w-3.5 h-3.5 text-accent-text shrink-0" />
+            <ArrowUp className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
           ) : (
-            <ArrowDown className="w-3.5 h-3.5 text-accent-text shrink-0" />
+            <ArrowDown className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
           )
         ) : (
-          <ArrowUpDown className="w-3.5 h-3.5 text-ink-soft shrink-0" />
+          <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         )}
-      </button>
-    </th>
+      </Button>
+    </TableColumnHeader>
   );
 
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) setSelectedRows(sortedSpendings.map(item => item.id || ''));
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedRows(sortedSpendings.map(item => item.id || ''));
     else setSelectedRows([]);
   };
 
@@ -689,46 +698,44 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="ds-page-bar">
+      <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
         <div>
-          <h2 className="ds-page-heading">
+          <Heading as="h2" size="lg" weight="semibold">
             <span>{t('spending.partner_spending_invoicing', 'Partner Spending / Invoicing')}</span>
-          </h2>
+          </Heading>
         </div>
 
         <div className="mobile-page-actions flex items-center gap-2.5 shrink-0 flex-wrap">
           {hasPermission('export.csv') && (
-            <button
+            <Button variant="outline"
               onClick={handleExportCSV}
               disabled={sortedSpendings.length === 0}
-              className="ui-button ui-button-lg cursor-pointer flex items-center disabled:opacity-50 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-outline"
               title={t('contracts.export_csv', 'Ekspor CSV')}
             >
               <Download className="w-4 h-4" />
               <span>{t('contracts.export_csv', 'Ekspor CSV')}</span>
-            </button>
+            </Button>
           )}
 
           {canCreateContract(user) && (
-            <button
+            <Button
               onClick={handleAddNew}
-              className="ui-button ui-button-lg cursor-pointer flex items-center ds-button ds-button-lg ds-button-default"
             >
-              <Plus className="w-4 h-4 text-white" />
+              <Plus className="w-4 h-4" />
               <span>{t('ui.add_spending')}</span>
-            </button>
+            </Button>
           )}
         </div>
-      </div>
+      </Card>
 
       {/* Filter Bar with 3 Dropdowns */}
       {/* Search & Filter Bar - Justified Responsive Grid/Flex */}
-      <div className="ds-panel p-4 sm:p-5 mb-6">
-        <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full ds-grid">
+      <Card className="p-4 sm:p-5">
+        <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
           {/* 1 Box Search */}
-          <div className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-            <Search className="w-4 h-4 text-ink-soft absolute left-3 top-2.5" />
-            <input
+          <InputGroup className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
+            <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+            <InputGroupInput
               type="text"
               placeholder={t('spending.search_placeholder', 'Cari invoice, partner, deskripsi...')}
               aria-label={t('ui.search')}
@@ -737,25 +744,24 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="ds-input w-full pl-9 pr-3"
             />
-          </div>
+          </InputGroup>
 
           {/* Filter 1: Tahun */}
-          <select
+          <NativeSelect
             aria-label={t('ui.filter_year')}
               value={selectedYear}
             onChange={(e) => {
               setSelectedYear(e.target.value);
               setCurrentPage(1);
             }}
-            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
+            className="flex-1 min-w-[130px]"
           >
             <option value="ALL">{t('dashboard.all_years', 'Semua Tahun')}</option>
             {availableYears.map(year => (
               <option key={year} value={year}>{year}</option>
             ))}
-          </select>
+          </NativeSelect>
 
           {/* Filter 2: Partner */}
           <AlphabeticalSelect
@@ -765,7 +771,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               setSelectedVendorFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
+            className="flex-1 min-w-[130px] appearance-none pr-8"
           >
             <option value="ALL">{t('spending.all_vendors', 'Semua Partner')}</option>
             {Array.from(new Set(spendings.map(s => s.vendor_name).filter(Boolean))).sort().map(vendor => (
@@ -774,14 +780,14 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
           </AlphabeticalSelect>
 
           {/* Filter 3: Periode Bulan */}
-          <select
+          <NativeSelect
             aria-label={t('ui.filter_month')}
               value={selectedMonthFilter}
             onChange={(e) => {
               setSelectedMonthFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="ds-input flex-1 min-w-[130px] appearance-none pr-8"
+            className="flex-1 min-w-[130px]"
           >
             <option value="ALL">{t('spending.semua_bulan', 'Semua Bulan')}</option>
             <option value="01">{t('spending.januari_01', 'Januari (01)')}</option>
@@ -796,11 +802,11 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
             <option value="10">{t('spending.oktober_10', 'Oktober (10)')}</option>
             <option value="11">{t('spending.november_11', 'November (11)')}</option>
             <option value="12">{t('spending.desember_12', 'Desember (12)')}</option>
-          </select>
+          </NativeSelect>
 
           {/* Column Toggle */}
           <TableViewMenu title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
-            <div className="px-3.5 py-1.5 text-xs font-bold text-ink-soft uppercase tracking-wider mb-1 border-b border-hairline">
+            <div className="px-3.5 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 border-b border-border">
               {t('io.toggle_columns', 'Toggle Kolom')}
             </div>
             {Object.keys(visibleColumns).map((col) => {
@@ -814,153 +820,133 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               else if (col === 'billing_doc') label = t('spending.col_billing_doc', 'Billing');
 
               return (
-                <label key={col} className="flex items-center gap-2.5 px-3.5 py-1.5 hover:bg-surface dark:hover:bg-surface-2/50 cursor-pointer text-xs font-medium text-ink select-none">
-                  <input
-                    type="checkbox"
-                    checked={visibleColumns[col]}
-                    onChange={() => toggleColumnVisibility(col)}
-                    className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                  />
-                  <span className="capitalize">{label}</span>
-                </label>
+                <TableViewOption key={col} value={col} checked={visibleColumns[col]} onToggle={() => toggleColumnVisibility(col)}>{label}</TableViewOption>
               );
             })}
           </TableViewMenu>
         </div>
-      </div>
+      </Card>
 
       {/* Table */}
-      <div className="ds-table-surface bg-surface border border-hairline rounded-2xl shadow-sm overflow-hidden">
+      <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_year'), value: selectedYear, active: selectedYear !== 'ALL' }, { label: t('ui.filter_partner'), value: selectedVendorFilter, active: selectedVendorFilter !== 'ALL' }, { label: t('ui.filter_month'), value: selectedMonthFilter, active: selectedMonthFilter !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedYear('ALL'); setSelectedVendorFilter('ALL'); setSelectedMonthFilter('ALL'); }} />
-        <p className="mobile-table-hint px-4 py-2 text-xs text-ink-soft md:hidden">{t('ui.scroll_table')}</p>
-        <div className="data-table-scroll overflow-x-auto bg-surface" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
-          <table className="ds-table app-data-table w-full text-left border-collapse text-xs bg-surface">
-            <thead className="bg-surface dark:bg-surface-2/50">
-              <tr className="bg-surface dark:bg-surface-2/50 border-b border-hairline text-xs font-bold text-ink h-12">
-                <th scope="col" className="pl-6 pr-2 py-4 w-12 text-left align-middle">
+        <p className="mobile-table-hint px-4 py-2 text-xs text-muted-foreground md:hidden">{t('ui.scroll_table')}</p>
+        <TableScrollArea className="data-table-scroll" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
+          <Table className="app-data-table w-full text-left">
+            <TableHeader>
+              <TableRow>
+                <TableColumnHeader scope="col" className="w-12 text-left align-middle">
                   <div className="flex items-center justify-start">
-                    <input
-                      type="checkbox"
-                      aria-label={t('spending.pilih_semua_spending', 'Pilih semua spending')}
-                      onChange={handleSelectAll}
-                      checked={selectedRows.length > 0 && selectedRows.length === currentSpendings.length}
-                      className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                    />
+                    <Checkbox aria-label={t('spending.pilih_semua_spending', 'Pilih semua spending')} checked={selectedRows.length > 0 && selectedRows.length === currentSpendings.length} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
-                </th>
+                </TableColumnHeader>
                 {visibleColumns.invoice_no && renderSortHeader(t('spending.col_invoice_no', 'No. Invoice'), 'invoice_no')}
                 {visibleColumns.vendor && renderSortHeader(t('spending.col_vendor', 'Partner'), 'vendor')}
                 {visibleColumns.invoice_month && renderSortHeader(t('spending.col_month', 'Periode Bulan'), 'invoice_month')}
                 {visibleColumns.invoice_date && renderSortHeader(t('spending.col_date', 'Tanggal Invoice'), 'invoice_date')}
                 {visibleColumns.amount && renderSortHeader(t('spending.col_amount', 'Total Nilai'), 'amount')}
                 {visibleColumns.invoice_doc && (
-                  <th scope="col" className="p-4 text-left text-xs font-bold text-ink align-middle">
+                  <TableColumnHeader scope="col" className="text-left align-middle">
                     <span>{t('spending.col_invoice_doc', 'Invoice')}</span>
-                  </th>
+                  </TableColumnHeader>
                 )}
                 {visibleColumns.billing_doc && (
-                  <th scope="col" className="p-4 text-left text-xs font-bold text-ink align-middle">
+                  <TableColumnHeader scope="col" className="text-left align-middle">
                     <span>{t('spending.col_billing_doc', 'Billing')}</span>
-                  </th>
+                  </TableColumnHeader>
                 )}
-                <th data-actions="true" scope="col" className="pl-2 pr-6 py-4 text-right w-20 text-xs font-bold text-ink align-middle">
+                <TableColumnHeader data-actions="true" scope="col" className="text-right w-20 align-middle">
                   <div className="flex items-center justify-end">{t('spending.col_action', 'Aksi')}</div>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-hairline">
+                </TableColumnHeader>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {sortedSpendings.length === 0 ? (
                 <TableEmptyState colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} />
               ) : (
                 currentSpendings.map((s) => (
-                  <tr key={s.id} className="hover:bg-surface dark:hover:bg-surface-2/50 transition-colors">
-                    <td className="pl-6 pr-2 py-4 text-left align-middle">
+                  <TableRow key={s.id}>
+                    <TableCell className="text-left align-middle">
                       <div className="flex items-center justify-start">
-                        <input
-                          type="checkbox"
-                          aria-label={t('spending.pilih_spending', 'Pilih spending {value}', { value: s.invoice_number || s.vendor_name || '' })}
-                          checked={selectedRows.includes(s.id || '')}
-                          onChange={() => handleSelectRow(s.id || '')}
-                          className="rounded-sm border-hairline text-accent-text focus:ring-accent"
-                        />
+                        <Checkbox aria-label={t('spending.pilih_spending', 'Pilih spending {value}', { value: s.invoice_number || s.vendor_name || '' })} checked={selectedRows.includes(s.id || '')} onCheckedChange={() => handleSelectRow(s.id || '')}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* 1. No. Invoice */}
                     {visibleColumns.invoice_no && (
-                      <td className="py-4 px-4 text-xs font-semibold text-ink text-left whitespace-nowrap">
+                      <TableCell className="text-left whitespace-nowrap">
                         {s.invoice_number}
-                      </td>
+                      </TableCell>
                     )}
 
                     {/* 2. Partner */}
                     {visibleColumns.vendor && (
-                      <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
+                      <TableCell className="text-left whitespace-nowrap">
                         {s.vendor_name}
-                      </td>
+                      </TableCell>
                     )}
 
                     {/* 3. Invoice Month */}
                     {visibleColumns.invoice_month && (
-                      <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
+                      <TableCell className="text-left whitespace-nowrap">
                         {s.invoice_month && s.invoice_month.length > 0
                           ? s.invoice_month.map((m) => formatMonthTagDisplay(m, language)).join(', ')
                           : '-'}
-                      </td>
+                      </TableCell>
                     )}
 
                     {/* 4. Invoice Date */}
                     {visibleColumns.invoice_date && (
-                      <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
+                      <TableCell className="text-left whitespace-nowrap">
                         {formatBusinessDate(s.invoice_date)}
-                      </td>
+                      </TableCell>
                     )}
 
                     {/* 5. Amount */}
                     {visibleColumns.amount && (
-                      <td className="py-4 px-4 text-xs font-normal text-ink text-right whitespace-nowrap tabular-nums">
+                      <TableCell className="text-right whitespace-nowrap tabular-nums">
                         {formatMoney(s.total_amount, s.currency)}
-                      </td>
+                      </TableCell>
                     )}
 
                     {/* 6. Invoice Doc */}
                     {visibleColumns.invoice_doc && (
-                      <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
+                      <TableCell className="text-left whitespace-nowrap">
                         {s.invoice_file_url ? (
                           <a
                             href={s.invoice_file_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-accent-text hover:text-accent-text font-normal hover:underline"
+                            className="inline-flex items-center gap-1 text-xs text-accent-foreground hover:text-accent-foreground font-normal hover:underline"
                           >
                             <FileDown className="w-3.5 h-3.5" /> {t('spending.pdf', 'PDF')}
                           </a>
                         ) : (
-                          <span className="text-on-solid">—</span>
+                          <span className="text-primary-foreground">—</span>
                         )}
-                      </td>
+                      </TableCell>
                     )}
 
                     {/* 7. Billing Doc */}
                     {visibleColumns.billing_doc && (
-                      <td className="py-4 px-4 text-xs font-normal text-ink text-left whitespace-nowrap">
+                      <TableCell className="text-left whitespace-nowrap">
                         {s.billing_file_url ? (
                           <a
                             href={s.billing_file_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-accent-text hover:text-accent-text font-normal hover:underline"
+                            className="inline-flex items-center gap-1 text-xs text-accent-foreground hover:text-accent-foreground font-normal hover:underline"
                           >
                             <FileSpreadsheet className="w-3.5 h-3.5" /> {t('spending.sheet', 'Sheet')}
                           </a>
                         ) : (
-                          <span className="text-on-solid">—</span>
+                          <span className="text-primary-foreground">—</span>
                         )}
-                      </td>
+                      </TableCell>
                     )}
 
                     {/* Actions */}
-                    <td data-actions="true" className="pl-2 pr-6 py-4 text-right align-middle w-20">
+                    <TableCell data-actions="true" className="text-right align-middle w-20">
                       <div className="flex items-center justify-end">
                         <ActionMenu
                           items={[
@@ -987,13 +973,13 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                           ]}
                         />
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableScrollArea>
 
         <TablePagination
           currentPage={currentPage}
@@ -1005,164 +991,163 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
             setCurrentPage(1);
           }}
         />
-      </div>
+      </Card>
 
       {/* 3. INPUT FORM MODAL */}
       {showModal && (
     <ModalFrame onClose={closeSpendingModal}>
             {/* Modal Header */}
-            <div className="ds-section-header">
+            <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
               <div>
-                <ModalTitle className="ds-modal-title flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-accent-text" />
+                <DialogTitle className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-accent-foreground" />
                   <span>
                     {editingSpending
                       ? t('spending.modal_edit_title', 'Edit Data Spending')
                       : t('spending.modal_title', 'Input Data Spending')}
                   </span>
-                </ModalTitle>
+                </DialogTitle>
               </div>
-              <button
+              <Button variant="secondary" size="icon-md"
                 type="button"
                 onClick={closeSpendingModal} disabled={formBusy}
                 aria-label={t('common.close', 'Close')}
-            className="min-w-10 min-h-10 flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink p-1.5 rounded-md hover:bg-surface-2 dark:hover:bg-surface-2 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
-              </button>
-            </div>
+              </Button>
+            </DialogHeader>
 
             {/* Modal Form */}
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-              <div className="p-5 sm:p-6 overflow-y-auto space-y-6 text-sm flex-1 min-w-0 text-ink">
-                {errorMessage && <div ref={errorRef} tabIndex={-1} role="alert" className="ds-alert ds-status-danger border">{errorMessage}</div>}
-                {parseSuccessMsg && <div role="status" className="ds-alert ds-status-success border flex items-start gap-2"><CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />{parseSuccessMsg}</div>}
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-6 text-sm flex-1 min-w-0 text-foreground">
+                {errorMessage && <Alert status="error" ref={errorRef} tabIndex={-1} role="alert"><AlertContent>{errorMessage}</AlertContent></Alert>}
+                {parseSuccessMsg && <Alert status="success" role="status" className="flex items-start gap-2"><AlertContent><CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />{parseSuccessMsg}</AlertContent></Alert>}
                 <fieldset disabled={formBusy} className="space-y-6 min-w-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ds-grid">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <section aria-labelledby="spending-partner-heading" className="min-w-0">
                       <h3 id="spending-partner-heading" className="font-semibold text-base mb-3">{t('spending.partner_details', 'Partner Details')}</h3>
-                      <div className="ds-panel p-4 sm:p-5 space-y-3">
+                      <Card className="p-4 sm:p-5 space-y-3">
                         <div>
                           <label htmlFor="spending-partner" className={spendingLabelClass}>{t('spending.partner_name', 'Partner Name')} <span className="text-status-danger">*</span></label>
                           <AlphabeticalSelect id="spending-partner" required value={formVendorId || formVendorName} onChange={e => {
                             const partner = partners.find(p => p.partner_id === e.target.value);
                             handleVendorSelect(partner?.nama_partner || e.target.value, partner?.partner_id);
-                          }} className={spendingFieldClass}>
+                          }}>
                             <option value="">{t('spending.vendor_select_ph', '-- Pilih Partner / Vendor --')}</option>
                             {partners.map(p => <option key={p.partner_id} value={p.partner_id}>{p.nama_partner} ({p.partner_id})</option>)}
                             {formVendorName && !partners.some(p => p.partner_id === formVendorId || p.nama_partner === formVendorName) && <option value={formVendorId || formVendorName}>{formVendorName}</option>}
                           </AlphabeticalSelect>
                         </div>
-                        <div>
-                          <label htmlFor="spending-invoice-number" className={spendingLabelClass}>{t('spending.invoice_no_label', 'Invoice Number')} <span className="text-status-danger">*</span></label>
-                          <input id="spending-invoice-number" required value={formInvoiceNumber} onChange={e => setFormInvoiceNumber(e.target.value)} placeholder={t('spending.invoice_no_ph', 'Contoh: INV-2026-0801')} className={spendingFieldClass} />
+                        <Field>
+                          <FieldLabel htmlFor="spending-invoice-number" className={spendingLabelClass}>{t('spending.invoice_no_label', 'Invoice Number')} <span className="text-status-danger">*</span></FieldLabel>
+                          <Input id="spending-invoice-number" required value={formInvoiceNumber} onChange={e => setFormInvoiceNumber(e.target.value)} placeholder={t('spending.invoice_no_ph', 'Contoh: INV-2026-0801')} />
                           {formInvoiceNumber.trim() && spendings.some(s => s.invoice_number.toLowerCase() === formInvoiceNumber.trim().toLowerCase() && s.id !== editingSpending?.id) && <p className="text-xs text-status-warning mt-1 flex gap-1"><Lightbulb className="size-3.5 shrink-0" aria-hidden="true" />{t('spending.nomor_invoice_ini_sudah_dicatat_sebelumnya', 'Nomor invoice ini sudah dicatat sebelumnya. Diizinkan menginput nomor invoice sama untuk bulan/amount berbeda.')}</p>}
-                        </div>
-                        <div>
-                          <label htmlFor="spending-invoice-title" className={spendingLabelClass}>{t('spending.invoice_title_label', 'Invoice Title')}</label>
-                          <input id="spending-invoice-title" value={formInvoiceTitle} onChange={e => setFormInvoiceTitle(e.target.value)} placeholder={t('spending.invoice_title_ph', 'e.g. Q4 Social Media Retainer')} className={spendingFieldClass} />
-                        </div>
-                      </div>
+                        </Field>
+                        <Field>
+                          <FieldLabel htmlFor="spending-invoice-title" className={spendingLabelClass}>{t('spending.invoice_title_label', 'Invoice Title')}</FieldLabel>
+                          <Input id="spending-invoice-title" value={formInvoiceTitle} onChange={e => setFormInvoiceTitle(e.target.value)} placeholder={t('spending.invoice_title_ph', 'e.g. Q4 Social Media Retainer')} />
+                        </Field>
+                      </Card>
                     </section>
                     <section aria-labelledby="spending-bank-heading" className="min-w-0">
                       <h3 id="spending-bank-heading" className="font-semibold text-base mb-3">{t('spending.bank_panel_title', 'Bank Account Information')}</h3>
-                      <div className="ds-panel p-4 sm:p-5 space-y-3">
-                        <div>
-                          <label htmlFor="spending-bank-name" className={spendingLabelClass}>{t('spending.bank_name_label', 'Bank Name')}</label>
-                          <input id="spending-bank-name" value={formBankName} onChange={e => { bankEdited.current.name = true; setFormBankName(e.target.value); }} className={spendingFieldClass} />
-                        </div>
-                        <div>
-                          <label htmlFor="spending-account-number" className={spendingLabelClass}>{t('spending.bank_account_no_label', 'Account Number')}</label>
-                          <input id="spending-account-number" value={formBankAccountNumber} onChange={e => { bankEdited.current.number = true; setFormBankAccountNumber(e.target.value); }} className={spendingFieldClass} />
-                        </div>
-                        <div>
-                          <label htmlFor="spending-account-holder" className={spendingLabelClass}>{t('spending.bank_account_holder_label', 'Account Holder')}</label>
-                          <input id="spending-account-holder" value={formBankAccountHolder} onChange={e => { bankEdited.current.holder = true; setFormBankAccountHolder(e.target.value); }} className={spendingFieldClass} />
-                        </div>
-                      </div>
+                      <Card className="p-4 sm:p-5 space-y-3">
+                        <Field>
+                          <FieldLabel htmlFor="spending-bank-name" className={spendingLabelClass}>{t('spending.bank_name_label', 'Bank Name')}</FieldLabel>
+                          <Input id="spending-bank-name" value={formBankName} onChange={e => { bankEdited.current.name = true; setFormBankName(e.target.value); }} />
+                        </Field>
+                        <Field>
+                          <FieldLabel htmlFor="spending-account-number" className={spendingLabelClass}>{t('spending.bank_account_no_label', 'Account Number')}</FieldLabel>
+                          <Input id="spending-account-number" value={formBankAccountNumber} onChange={e => { bankEdited.current.number = true; setFormBankAccountNumber(e.target.value); }} />
+                        </Field>
+                        <Field>
+                          <FieldLabel htmlFor="spending-account-holder" className={spendingLabelClass}>{t('spending.bank_account_holder_label', 'Account Holder')}</FieldLabel>
+                          <Input id="spending-account-holder" value={formBankAccountHolder} onChange={e => { bankEdited.current.holder = true; setFormBankAccountHolder(e.target.value); }} />
+                        </Field>
+                      </Card>
                     </section>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 ds-grid">
-                    <div className="min-w-0">
-                      <label htmlFor="spending-invoice-date" className={spendingLabelClass}>{t('spending.invoice_date_label', 'Invoice Date')}</label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <Field className="min-w-0">
+                      <FieldLabel htmlFor="spending-invoice-date" className={spendingLabelClass}>{t('spending.invoice_date_label', 'Invoice Date')}</FieldLabel>
                       <DateInput id="spending-invoice-date" value={formInvoiceDate} onChange={setFormInvoiceDate} focusColor="emerald" />
-                    </div>
+                    </Field>
                     <div className="min-w-0">
                       <label htmlFor="spending-currency" className={spendingLabelClass}>{t('spending.currency_label', 'Currency')}</label>
-                      <AlphabeticalSelect id="spending-currency" value={formCurrency} onChange={e => setFormCurrency(e.target.value)} className={spendingFieldClass}>
+                      <AlphabeticalSelect id="spending-currency" value={formCurrency} onChange={e => setFormCurrency(e.target.value)}>
                         {SUPPORTED_CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code} — {currencyLabel(c.code, language)}</option>)}
                       </AlphabeticalSelect>
                     </div>
                     <div className="min-w-0">
                       <label htmlFor="spending-total" className={spendingLabelClass}>{t('spending.total_amount_label', 'Total Amount')} <span className="text-status-danger">*</span></label>
-                      <input id="spending-total" required type="number" min="0" step="any" value={formTotalAmount} onChange={e => setFormTotalAmount(e.target.value === '' ? '' : Number(e.target.value))} className={`ds-input${spendingFieldClass} text-right`} />
-                      <div className="mt-2 text-xs text-ink-soft flex flex-wrap justify-between gap-1" aria-live="polite">
-                        <span>{t('spending.usd_estimate', 'Estimated USD Conversion')}</span><strong className="text-ink">{formatMoney(estimatedUsd, 'USD')}</strong>
+                      <Input id="spending-total" required type="number" min="0" step="any" value={formTotalAmount} onChange={e => setFormTotalAmount(e.target.value === '' ? '' : Number(e.target.value))} className={`text-right`} />
+                      <div className="mt-2 text-xs text-muted-foreground flex flex-wrap justify-between gap-1" aria-live="polite">
+                        <span>{t('spending.usd_estimate', 'Estimated USD Conversion')}</span><strong className="text-foreground">{formatMoney(estimatedUsd, 'USD')}</strong>
                       </div>
-                      <p className="mt-1 text-xs text-ink-soft">{formCurrency === 'USD' ? t('spending.sama_mata_uang_usd', 'Sama (Mata uang USD)') : t('spending.1_usd', '1 {formCurrency} ≈ {value} USD', { formCurrency, value: historicalRate.toFixed(8) })}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{formCurrency === 'USD' ? t('spending.sama_mata_uang_usd', 'Sama (Mata uang USD)') : t('spending.1_usd', '1 {formCurrency} ≈ {value} USD', { formCurrency, value: historicalRate.toFixed(8) })}</p>
                     </div>
                   </div>
-                  <section aria-labelledby="spending-allocation-heading" aria-describedby="spending-allocation-status" className="rounded-xl border border-hairline overflow-hidden">
+                  <section aria-labelledby="spending-allocation-heading" aria-describedby="spending-allocation-status" className="rounded-xl border border-border overflow-hidden">
                     <div className="flex flex-wrap justify-between items-center gap-3 p-4">
-                      <div><h3 id="spending-allocation-heading" className="font-semibold">{t('spending.allocation_title', 'Spending Month Allocation')}</h3><p className="text-xs text-ink-soft mt-1">{t('spending.allocation_help', 'One invoice can cover one or multiple spending months.')}</p></div>
+                      <div><h3 id="spending-allocation-heading" className="font-semibold">{t('spending.allocation_title', 'Spending Month Allocation')}</h3><p className="text-xs text-muted-foreground mt-1">{t('spending.allocation_help', 'One invoice can cover one or multiple spending months.')}</p></div>
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" disabled={!monthAllocations.length || formTotalAmount === '' || Number(formTotalAmount) < 0} onClick={() => setMonthAllocations(rows => splitSpendingEqually(rows, Number(formTotalAmount), currencyMinorUnits(formCurrency)))} className={spendingButtonClass}>{t('spending.split_equally', 'Split Equally')}</button>
-                        <button type="button" onClick={() => setMonthAllocations(rows => [...rows, { month: '', amount: '' }])} className={`${spendingButtonClass} flex items-center gap-1`}><Plus className="size-4" aria-hidden="true" />{t('spending.add_month', 'Add Month')}</button>
+                        <Button variant="ghost" type="button" disabled={!monthAllocations.length || formTotalAmount === '' || Number(formTotalAmount) < 0} onClick={() => setMonthAllocations(rows => splitSpendingEqually(rows, Number(formTotalAmount), currencyMinorUnits(formCurrency)))} className={spendingButtonClass}>{t('spending.split_equally', 'Split Equally')}</Button>
+                        <Button variant="ghost" type="button" onClick={() => setMonthAllocations(rows => [...rows, { month: '', amount: '' }])} className={`${spendingButtonClass} `}><Plus className="size-4" aria-hidden="true" />{t('spending.add_month', 'Add Month')}</Button>
                       </div>
                     </div>
-                    <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-3 px-4 py-3 bg-surface dark:bg-surface-2/50 border-y border-hairline text-xs font-semibold text-ink-soft ds-grid" aria-hidden="true"><span>{t('spending.spending_month', 'Spending Month')}</span><span className="text-right">{t('spending.allocated_amount', 'Allocated Amount')} ({formCurrency})</span><span className="sr-only">{t('spending.delete_month', 'Delete spending month {index}', { index: '' })}</span></div>
-                    <div className="divide-y divide-hairline">
+                    <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-3 px-4 py-3 bg-card border-y border-border text-xs font-semibold text-muted-foreground" aria-hidden="true"><span>{t('spending.spending_month', 'Spending Month')}</span><span className="text-right">{t('spending.allocated_amount', 'Allocated Amount')} ({formCurrency})</span><span className="sr-only">{t('spending.delete_month', 'Delete spending month {index}', { index: '' })}</span></div>
+                    <div className="divide-y divide-border">
                       {monthAllocations.map((row, index) => {
                         const duplicate = Boolean(row.month && monthAllocations.some((other, otherIndex) => index !== otherIndex && other.month === row.month));
-                        return <div key={index} className="grid grid-cols-[minmax(0,1fr)_44px] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-3 p-4 items-end ds-grid">
-                          <div className="min-w-0">
-                            <label htmlFor={`spending-month-${index}`} className="block text-xs font-semibold mb-1.5 sm:sr-only">{t('spending.spending_month', 'Spending Month')} {index + 1}</label>
-                            <input id={`spending-month-${index}`} type="month" required min="1900-01" max="2100-12" value={row.month} aria-invalid={duplicate || !row.month} aria-describedby="spending-allocation-status" onChange={e => setMonthAllocations(rows => rows.map((item, i) => i === index ? { ...item, month: e.target.value } : item))} className={spendingFieldClass} />
-                          </div>
-                          <div className="min-w-0 col-start-1 row-start-2 sm:col-start-auto sm:row-start-auto">
-                            <label htmlFor={`spending-amount-${index}`} className="block text-xs font-semibold mb-1.5 sm:sr-only">{t('spending.allocated_amount', 'Allocated Amount')} {index + 1} ({formCurrency})</label>
-                            <input id={`spending-amount-${index}`} type="number" min="0" step="any" required value={row.amount} aria-invalid={row.amount === '' || Number(row.amount) < 0} aria-describedby="spending-allocation-status" onChange={e => setMonthAllocations(rows => rows.map((item, i) => i === index ? { ...item, amount: e.target.value === '' ? '' : Number(e.target.value) } : item))} className={`ds-input${spendingFieldClass} text-right`} />
-                          </div>
-                          <button type="button" aria-label={t('spending.delete_month', 'Delete spending month {index}', { index: index + 1 })} onClick={() => setMonthAllocations(rows => rows.filter((_, i) => i !== index))} className={`ds-button ds-button-md ds-button-ghost${spendingButtonClass.replace('ui-button-md', 'ui-button-lg')} ui-button-icon col-start-2 row-start-1 sm:col-start-auto sm:row-start-auto`}><Trash2 className="size-4 mx-auto" aria-hidden="true" /></button>
+                        return <div key={index} className="grid grid-cols-[minmax(0,1fr)_44px] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-3 p-4 items-end">
+                          <Field className="min-w-0">
+                            <FieldLabel htmlFor={`spending-month-${index}`}>{t('spending.spending_month', 'Spending Month')} {index + 1}</FieldLabel>
+                            <Input id={`spending-month-${index}`} type="month" required min="1900-01" max="2100-12" value={row.month} aria-invalid={duplicate || !row.month} aria-describedby="spending-allocation-status" onChange={e => setMonthAllocations(rows => rows.map((item, i) => i === index ? { ...item, month: e.target.value } : item))} />
+                          </Field>
+                          <Field className="min-w-0 col-start-1 row-start-2 sm:col-start-auto sm:row-start-auto">
+                            <FieldLabel htmlFor={`spending-amount-${index}`}>{t('spending.allocated_amount', 'Allocated Amount')} {index + 1} ({formCurrency})</FieldLabel>
+                            <Input id={`spending-amount-${index}`} type="number" min="0" step="any" required value={row.amount} aria-invalid={row.amount === '' || Number(row.amount) < 0} aria-describedby="spending-allocation-status" onChange={e => setMonthAllocations(rows => rows.map((item, i) => i === index ? { ...item, amount: e.target.value === '' ? '' : Number(e.target.value) } : item))} className={`text-right`} />
+                          </Field>
+                          <Button variant="ghost" size="icon-md" type="button" aria-label={t('spending.delete_month', 'Delete spending month {index}', { index: index + 1 })} onClick={() => setMonthAllocations(rows => rows.filter((_, i) => i !== index))} className={`${spendingButtonClass.replace('', '')} col-start-2 row-start-1`}><Trash2 className="size-4 mx-auto" aria-hidden="true" /></Button>
                         </div>;
                       })}
                     </div>
-                    <div className="p-4 bg-surface dark:bg-surface-2/50 border-t border-hairline flex flex-wrap items-center justify-between gap-2">
+                    <div className="p-4 bg-card border-t border-border flex flex-wrap items-center justify-between gap-2">
                       <p id="spending-allocation-status" role="status" className={`text-sm font-medium ${!allocationError ? 'text-status-success ' : remaining < -ALLOCATION_TOLERANCE ? 'text-status-danger ' : 'text-status-warning '}`}>{allocationStatus}</p>
-                      <span className="text-xs text-ink-soft">{t('spending.allocated_total', 'Allocated: {amount}', { amount: formatMoney(allocatedTotal, formCurrency) })}</span>
+                      <span className="text-xs text-muted-foreground">{t('spending.allocated_total', 'Allocated: {amount}', { amount: formatMoney(allocatedTotal, formCurrency) })}</span>
                     </div>
                   </section>
-                  <div>
-                    <label htmlFor="spending-description" className={spendingLabelClass}>{t('spending.invoice_desc_label', 'Invoice Description')}</label>
-                    <textarea id="spending-description" rows={4} value={formInvoiceDesc} onChange={e => setFormInvoiceDesc(e.target.value)} placeholder={t('spending.invoice_desc_ph', 'Keterangan lengkap pengeluaran / rincian invoice...')} className={`ds-input${spendingFieldClass} resize-y`} />
-                  </div>
+                  <Field>
+                    <FieldLabel htmlFor="spending-description" className={spendingLabelClass}>{t('spending.invoice_desc_label', 'Invoice Description')}</FieldLabel>
+                    <Textarea id="spending-description" rows={4} value={formInvoiceDesc} onChange={e => setFormInvoiceDesc(e.target.value)} placeholder={t('spending.invoice_desc_ph', 'Keterangan lengkap pengeluaran / rincian invoice...')} className={`resize-y`} />
+                  </Field>
                   <section aria-labelledby="spending-documents-heading">
                     <h3 id="spending-documents-heading" className="font-semibold text-base mb-3">{t('spending.documents_title', 'Documents')}</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ds-grid">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="min-w-0">
                         <label htmlFor="spending-invoice-file" className={spendingLabelClass}>{t('spending.upload_invoice_label', 'Upload Invoice')}</label>
                         <div className={spendingUploadClass}>
-                          <Upload className="size-6 text-accent-text mx-auto mb-1.5" aria-hidden="true" />
-                          <p className="text-sm font-bold text-ink break-words">
+                          <Upload className="size-6 text-accent-foreground mx-auto mb-1.5" aria-hidden="true" />
+                          <p className="text-sm font-bold text-foreground break-words">
                             {invoiceFileObj ? <>{t('form.contract.file_selected', 'File selected:')} <span className="break-all">{invoiceFileObj.fileName}</span></>
                               : editingSpending?.invoice_file_url ? <a href={editingSpending.invoice_file_url} target="_blank" rel="noopener noreferrer" className="break-all underline">{editingSpending.invoice_file_name || t('spending.existing_invoice', 'View existing invoice')}</a>
                               : t('form.partner.drag_ref', 'Choose a reference document')}
                           </p>
                           <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
-                            {invoiceFileObj && <button type="button" disabled={formBusy} onClick={handleParseSpending} className="flex items-center gap-1.5 px-4 min-h-10 bg-accent-soft text-accent-text hover:bg-accent/20 font-semibold text-sm rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                            {invoiceFileObj && <Button variant="ghost" type="button" disabled={formBusy} onClick={handleParseSpending}>
                               {isParsing && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
                               {isParsing ? t('spending.mengekstrak', 'Mengekstrak...') : t('partners.parse_file', 'Parse File')}
-                            </button>}
+                            </Button>}
                             <input id="spending-invoice-file" type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => handleFileChange(e, 'invoice')} className={spendingFileInputClass} />
                           </div>
                         </div>
-                        <p className="mt-2 text-xs text-ink-soft">{t('spending.documents_help', 'PDF, Word, JPG or PNG. Maximum 20 MB.')}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">{t('spending.documents_help', 'PDF, Word, JPG or PNG. Maximum 20 MB.')}</p>
                       </div>
                       <div className="min-w-0">
                         <label htmlFor="spending-billing-file" className={spendingLabelClass}>{t('spending.upload_billing_label', 'Upload Billing')}</label>
                         <div className={spendingUploadClass}>
-                          <Upload className="size-6 text-accent-text mx-auto mb-1.5" aria-hidden="true" />
-                          <p className="text-sm font-bold text-ink break-words">
+                          <Upload className="size-6 text-accent-foreground mx-auto mb-1.5" aria-hidden="true" />
+                          <p className="text-sm font-bold text-foreground break-words">
                             {billingFileObj ? <>{t('form.contract.file_selected', 'File selected:')} <span className="break-all">{billingFileObj.fileName}</span></>
                               : editingSpending?.billing_file_url ? <a href={editingSpending.billing_file_url} target="_blank" rel="noopener noreferrer" className="break-all underline">{editingSpending.billing_file_name || t('spending.existing_billing', 'View existing billing')}</a>
                               : t('form.partner.drag_ref', 'Choose a reference document')}
@@ -1171,7 +1156,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                             <input id="spending-billing-file" type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => handleFileChange(e, 'billing')} className={spendingFileInputClass} />
                           </div>
                         </div>
-                        <p className="mt-2 text-xs text-ink-soft">{t('spending.documents_help', 'PDF, Word, JPG or PNG. Maximum 20 MB.')}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">{t('spending.documents_help', 'PDF, Word, JPG or PNG. Maximum 20 MB.')}</p>
                       </div>
                     </div>
                   </section>
@@ -1179,27 +1164,25 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               </div>
 
               {/* Actions */}
-              <div className="p-4 sm:p-5 bg-surface border-t border-hairline flex items-center justify-between gap-2 shrink-0">
-                <span className="text-xs text-ink-soft font-medium hidden sm:inline">
+              <div className="p-4 sm:p-5 bg-card border-t border-border flex items-center justify-between gap-2 shrink-0">
+                <span className="text-xs text-muted-foreground font-medium hidden sm:inline">
                   {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
                 </span>
                 <div className="flex items-center gap-2 ml-auto">
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     onClick={closeSpendingModal} disabled={formBusy}
-                    className="ui-button ui-button-lg cursor-pointer ds-button ds-button-lg ds-button-ghost"
                   >
                     {t('spending.cancel_btn', 'Batal')}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
                     disabled={formBusy || Boolean(allocationError) || !formVendorName || !formInvoiceNumber.trim()}
-                    className="ui-button ui-button-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ds-button ds-button-lg ds-button-default"
                   >
                     {isSubmitting
                       ? t('spending.saving_btn', 'Menyimpan...')
                       : t('spending.save_btn', 'Simpan Spending')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </form>

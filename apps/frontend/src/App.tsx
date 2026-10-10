@@ -12,7 +12,7 @@ import { TenantSettingsProvider, useTenantSettings } from './context/TenantSetti
 import { DefaultPasswordBanner } from './components/DefaultPasswordBanner';
 import { NavigationProvider, useNavigation, buildAppUrl } from './context/NavigationContext';
 import { Header } from './components/Header';
-import { Sidebar } from './components/Sidebar';
+import { AppShell } from './components/Sidebar';
 
 import { ConsoleSubmenu } from './components/admin/types';
 import { AlertTriangle, CheckCircle2, X, ExternalLink } from 'lucide-react';
@@ -54,6 +54,7 @@ import { InvitationPrompt } from './components/account/InvitationPrompt';
 import { SETTINGS_TABS, SYSTEM_TABS, needsOrganization, resolveRoute, type SettingsTabId } from './lib/appRoutes';
 import { tableDesignForTab } from './lib/tableDesign';
 
+import { Button } from '@legalio/ui-components/button';
 /** Full-page state shown instead of any privileged view (PRD §4.5.4, §6.2, §11.3). */
 /** `standalone` screens have no app header, so they carry the page's only h1. */
 const StateScreen: React.FC<{ title: string; message?: string; children?: React.ReactNode; busy?: boolean; standalone?: boolean }> = ({ title, message, children, busy, standalone }) => {
@@ -61,8 +62,8 @@ const StateScreen: React.FC<{ title: string; message?: string; children?: React.
   return (
   <div className="flex min-h-[60vh] items-center justify-center p-6" aria-busy={busy || undefined}>
     <div className="max-w-md space-y-4 text-center" role={busy ? 'status' : undefined}>
-      <Heading className="text-xl font-semibold text-ink dark:text-white">{title}</Heading>
-      {message && <p className="text-sm text-ink-soft">{message}</p>}
+      <Heading className="text-xl font-semibold text-foreground ">{title}</Heading>
+      {message && <p className="text-sm text-muted-foreground">{message}</p>}
       {children && <div className="flex flex-wrap justify-center gap-2">{children}</div>}
     </div>
   </div>
@@ -547,13 +548,13 @@ const MainApp: React.FC = () => {
               {organizations.map((org) => (
                 <li key={org.organizationId}>
                   <button type="button" onClick={() => void switchTenant(org.organizationId)}
-                    className="flex min-h-10 w-full cursor-pointer items-center justify-between rounded-lg border border-hairline bg-surface px-4 text-left text-sm font-semibold hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 dark:hover:bg-surface-2">
+                    className="flex min-h-10 w-full cursor-pointer items-center justify-between rounded-lg border border-border bg-card px-4 text-left text-sm font-semibold hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 ">
                     {org.organizationName}
                   </button>
                 </li>
               ))}
             </ul>
-            <button type="button" onClick={() => void logout()} className="rounded-md px-4 py-2 text-sm font-medium text-ink underline">{t('app.kembali_ke_login', 'Kembali ke login')}</button>
+            <Button variant="link" type="button" onClick={() => void logout()}>{t('app.kembali_ke_login', 'Kembali ke login')}</Button>
           </StateScreen>
         ) : (
           <OrganizationOnboarding />
@@ -568,44 +569,45 @@ const MainApp: React.FC = () => {
       <StateScreen busy title={t('app.memuat_halaman', 'Memuat halaman...')} />
     ) : gate.kind === 'caps-error' ? (
       <StateScreen title={t('tb.access_check_failed', 'Your access could not be checked')} message={t('tb.access_check_failed_desc', 'Nothing is shown until your permissions for this organization load.')}>
-        <button type="button" onClick={caps.retry} className="inline-flex items-center rounded-md bg-ink px-4 min-h-10 text-sm font-semibold text-white">{t('tb.retry', 'Retry')}</button>
+        <Button variant="ghost" type="button" onClick={caps.retry}>{t('tb.retry', 'Retry')}</Button>
       </StateScreen>
     ) : gate.kind === 'denied' ? (
       <StateScreen title={t('tb.access_denied', 'You do not have access to this page')} message={t('tb.access_denied_desc', 'Your role in this organization does not include this page.')}>
-        {permittedHome && <button type="button" onClick={() => replaceActiveTab(permittedHome)} className="inline-flex items-center rounded-md bg-ink px-4 min-h-10 text-sm font-semibold text-white">{t('tb.go_to_permitted', 'Go to an allowed page')}</button>}
+        {permittedHome && <Button variant="ghost" type="button" onClick={() => replaceActiveTab(permittedHome)}>{t('tb.go_to_permitted', 'Go to an allowed page')}</Button>}
       </StateScreen>
     ) : null;
 
   return (
-    <div data-table-design={tableDesignForTab(activeTab)} className="flex h-screen w-full bg-canvas text-ink font-sans overflow-hidden">
+    <div data-table-design={tableDesignForTab(activeTab)} className="h-screen w-full bg-background font-sans text-foreground">
       <a href="#main-content" className="skip-link">
         {t('app.skip_to_content', 'Lewati ke konten utama')}
       </a>
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        unresolvedNotifsCount={unreadNotifsCount}
-        expiringContractsCount={expiringContractsCount}
-        googleConfig={googleConfig}
-        lastSyncTimestamp={lastSyncTimestamp}
-        isMobileOpen={isMobileMenuOpen}
-        onCloseMobile={() => setIsMobileMenuOpen(false)}
-      />
-
-      <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
-        <Header
-          notifications={notifications}
-          googleConfig={googleConfig}
-          onRefreshData={loadAllData}
-          onNavigateToTab={setActiveTab}
-          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
-        />
-
+      <AppShell
+        navigation={{
+          activeTab,
+          setActiveTab,
+          unresolvedNotifsCount: unreadNotifsCount,
+          expiringContractsCount,
+          googleConfig,
+          lastSyncTimestamp,
+          isMobileOpen: isMobileMenuOpen,
+          onCloseMobile: () => setIsMobileMenuOpen(false),
+        }}
+        header={
+          <Header
+            notifications={notifications}
+            googleConfig={googleConfig}
+            onRefreshData={loadAllData}
+            onNavigateToTab={setActiveTab}
+            onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+          />
+        }
+      >
         <main
           id="main-content"
           tabIndex={-1}
           // The AI chat launcher is fixed bottom-right; reserve room so it never covers the last row's actions.
-          className={`flex-1 min-h-0 p-3.5 sm:p-5 md:p-7 ${modules.aiAssistant ? 'pb-24 sm:pb-28 md:pb-28' : ''} overflow-y-auto overflow-x-hidden bg-canvas dark:bg-canvas overscroll-contain focus:outline-none`}
+          className={`flex-1 min-h-0 p-3.5 sm:p-5 md:p-7 ${modules.aiAssistant ? 'pb-24 sm:pb-28 md:pb-28' : ''} overflow-y-auto overflow-x-hidden bg-background overscroll-contain focus:outline-none`}
         >
           {isPlatformAdmin && (
             <DefaultPasswordBanner
@@ -619,7 +621,7 @@ const MainApp: React.FC = () => {
               ].includes(activeTab)}
             />
           )}
-          <Suspense fallback={<div className="flex h-full min-h-70 items-center justify-center text-sm text-ink-soft">{t('app.memuat_halaman', 'Memuat halaman...')}</div>}>
+          <Suspense fallback={<div className="flex h-full min-h-70 items-center justify-center text-sm text-muted-foreground">{t('app.memuat_halaman', 'Memuat halaman...')}</div>}>
             {gateScreen ?? (
             <section className="w-full space-y-6">
               {activeTab === 'dashboard' && (
@@ -814,7 +816,7 @@ const MainApp: React.FC = () => {
             )}
           </Suspense>
         </main>
-      </div>
+      </AppShell>
 
       {/* Modals */}
       <Suspense fallback={null}>
@@ -864,12 +866,12 @@ const MainApp: React.FC = () => {
           <div
             key={toast.id}
             className={`pointer-events-auto p-4 rounded-xl border shadow-lg flex items-start gap-3 animate-in slide-in-from-bottom-5 fade-in duration-200 ${
-              toast.type === 'error'
-                ? 'bg-status-danger-soft border-status-danger-border text-status-danger dark:bg-status-danger-soft/90 '
-                : toast.type === 'warning'
-                ? 'bg-status-warning-soft border-status-warning-border text-status-warning dark:bg-status-warning-soft/90 '
-                : 'bg-status-success-soft border-status-success-border text-status-success dark:bg-status-success-soft/90 '
-            }`}
+ toast.type === 'error'
+ ? 'bg-status-danger-soft border-status-danger-border text-status-danger '
+ : toast.type === 'warning'
+ ? 'bg-status-warning-soft border-status-warning-border text-status-warning '
+ : 'bg-status-success-soft border-status-success-border text-status-success '
+ }`}
           >
             <div className="shrink-0 mt-0.5">
               {toast.type === 'error' ? (
@@ -884,26 +886,26 @@ const MainApp: React.FC = () => {
               <p className="text-xs font-bold leading-tight">{toast.title}</p>
               <p className="text-xs mt-1 leading-snug opacity-90">{toast.message}</p>
               {toast.actionText && toast.onAction && (
-                <button
+                <Button variant="link" size="sm"
                   onClick={() => {
                     toast.onAction?.();
                     setToasts((prev) => prev.filter((t) => t.id !== toast.id));
                   }}
-                  className="mt-2 text-xs font-bold underline cursor-pointer hover:opacity-80 flex items-center gap-1"
+                  className="mt-2"
                 >
                   <span>{toast.actionText}</span>
                   <ExternalLink className="w-3 h-3" />
-                </button>
+                </Button>
               )}
             </div>
-            <button
+            <Button variant="ghost" size="icon-md"
               type="button"
               onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
-              className="min-w-10 min-h-10 -mr-2 -mt-2 flex items-center justify-center text-ink-soft hover:text-ink dark:hover:text-ink shrink-0 cursor-pointer rounded-md focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none"
+              className="-mr-2 -mt-2 shrink-0"
               aria-label={t('app.tutup_notifikasi', 'Tutup notifikasi')}
             >
               <X className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         ))}
       </div>
@@ -1008,7 +1010,7 @@ const AppContent = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-canvas text-ink dark:text-white">
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground ">
         <p className="text-lg">{t('app.memuat', 'Memuat...')}</p>
       </div>
     );
@@ -1016,7 +1018,7 @@ const AppContent = () => {
 
   if (showPrivacyPolicy) {
     return (
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-ink-soft">{t('app.memuat_kebijakan', 'Memuat kebijakan...')}</div>}>
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">{t('app.memuat_kebijakan', 'Memuat kebijakan...')}</div>}>
         <LazyPrivacyPolicyView onBack={handleBackToMain} />
       </Suspense>
     );
@@ -1024,7 +1026,7 @@ const AppContent = () => {
 
   if (showTermsOfService) {
     return (
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-ink-soft">{t('app.memuat_syarat_ketentuan', 'Memuat syarat & ketentuan...')}</div>}>
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">{t('app.memuat_syarat_ketentuan', 'Memuat syarat & ketentuan...')}</div>}>
         <LazyTermsOfServiceView onBack={handleBackToMain} />
       </Suspense>
     );
@@ -1044,7 +1046,7 @@ const AppContent = () => {
         glowRadius={28}
         showFade
         fadeIntensity={25}
-        className="w-full bg-surface"
+        className="w-full bg-card"
         style={{ height: '100dvh' }}
       >
         <main className="flex h-full w-full flex-col items-center overflow-y-auto px-4 py-6 sm:px-6 sm:py-10">
@@ -1059,7 +1061,7 @@ const AppContent = () => {
 
   if (activeTab === 'login') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-canvas text-ink dark:text-white">
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground ">
         <p className="text-lg">{t('app.memuat', 'Memuat...')}</p>
       </div>
     );
