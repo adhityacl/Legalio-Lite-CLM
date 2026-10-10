@@ -18,7 +18,7 @@ import {
   type MetadataFieldType,
   type MetadataValues,
 } from '@legalio/types/documents';
-import { INPUT_CLASS, statusLabel, typeLabel } from './documentLabels';
+import { statusLabel, typeLabel } from './documentLabels';
 
 import { Input } from '@legalio/ui-components/input';
 import { Button } from '@legalio/ui-components/button';
@@ -143,7 +143,7 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
           {field.name}
         </label>
         {field.field_type === 'select' ? (
-          <AlphabeticalSelect id={inputId} disabled={!canEdit} value={text} onChange={(e) => set(e.target.value)} className={INPUT_CLASS}>
+          <AlphabeticalSelect id={inputId} disabled={!canEdit} value={text} onChange={(e) => set(e.target.value)}>
             <option value="">—</option>
             {field.options.map((option) => (
               <option key={option} value={option}>
@@ -158,7 +158,6 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
             disabled={!canEdit}
             value={text}
             onChange={(e) => set(e.target.value)}
-            className={INPUT_CLASS}
           />
         )}
       </div>
@@ -197,7 +196,6 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
                   disabled={!canEdit}
                   value={document.type}
                   onChange={(e) => isOneOf(DOCUMENT_TYPES, e.target.value) && onUpdate({ type: e.target.value })}
-                  className={INPUT_CLASS}
                 >
                   {DOCUMENT_TYPES.map((type) => (
                     <option key={type} value={type}>
@@ -219,7 +217,6 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
                   disabled={!canEdit}
                   value={document.status}
                   onChange={(e) => isOneOf(DOCUMENT_STATUSES, e.target.value) && onUpdate({ status: e.target.value })}
-                  className={INPUT_CLASS}
                 >
                   {DOCUMENT_STATUSES.map((status) => (
                     <option key={status} value={status}>
@@ -326,7 +323,6 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
                 value={newField.name}
                 onChange={(e) => setNewField({ ...newField, name: e.target.value })}
                 placeholder={t('documents.metadata.field_name_placeholder', 'mis. Kode Matter')}
-                className={INPUT_CLASS}
               />
             </label>
             <label className="block space-y-1">
@@ -334,7 +330,6 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
               <AlphabeticalSelect
                 value={newField.type}
                 onChange={(e) => isOneOf(METADATA_FIELD_TYPES, e.target.value) && setNewField({ ...newField, type: e.target.value })}
-                className={INPUT_CLASS}
               >
                 {METADATA_FIELD_TYPES.map((type) => (
                   <option key={type} value={type}>
@@ -351,7 +346,6 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
                   value={newField.options}
                   onChange={(e) => setNewField({ ...newField, options: e.target.value })}
                   placeholder={t('documents.ip_employment_real_estate_corporate', 'IP, Employment, Real Estate, Corporate')}
-                  className={INPUT_CLASS}
                 />
               </label>
             )}

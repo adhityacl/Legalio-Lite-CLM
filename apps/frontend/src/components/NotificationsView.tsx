@@ -195,7 +195,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
     currentNotifications.length > 0 &&
     currentNotifications.every((n) => selectedIds.includes(n.notif_id));
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = (_checked?: boolean) => {
     if (isAllCurrentSelected) {
       const currentIds = currentNotifications.map((n) => n.notif_id);
       setSelectedIds((prev) => prev.filter((id) => !currentIds.includes(id)));

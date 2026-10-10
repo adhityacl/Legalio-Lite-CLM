@@ -1,3 +1,4 @@
+import { Badge } from '@legalio/ui-components/badge';
 import { useDocumentList } from '../../features/documents/useDocumentList';
 import { TableViewMenu, TableViewOption } from '../ui/table-view-menu';
 import { AlphabeticalSelect } from '../ui/alphabetical-select';
@@ -33,7 +34,7 @@ import {
 import { RelativeTime } from './RelativeTime';
 import { ActionMenu, type ActionMenuItem } from '../ui/action-menu';
 import { TablePagination } from '../ui/TablePagination';
-import { INPUT_CLASS, statusBadgeClass, statusLabel, typeBadgeClass, typeLabel } from './documentLabels';
+import { statusBadgeTone, statusLabel, typeBadgeTone, typeLabel } from './documentLabels';
 
 import { TableColumnHeader, Table, TableHeader, TableRow, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
 import { Button } from '@legalio/ui-components/button';
@@ -400,7 +401,6 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                                 if (e.key === 'Escape') setRenaming(null);
                               }}
                               onBlur={submitRename}
-                              className={INPUT_CLASS}
                             />
                           ) : (
                             <button
@@ -415,10 +415,10 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                           <span className="text-xs text-muted-foreground">v{doc.current_version}</span>
                         </TableCell>
                         {visibleColumns.type && <TableCell className="text-left align-middle hidden md:table-cell">
-                          <span className={typeBadgeClass(doc.type)}>{typeLabel(t, doc.type)}</span>
+                          <Badge tone={typeBadgeTone(doc.type)}>{typeLabel(t, doc.type)}</Badge>
                         </TableCell>}
                         {visibleColumns.status && <TableCell className="text-left align-middle">
-                          <span className={statusBadgeClass(doc.status)}>{statusLabel(t, doc.status)}</span>
+                          <Badge tone={statusBadgeTone(doc.status)}>{statusLabel(t, doc.status)}</Badge>
                         </TableCell>}
                         {visibleColumns.created && <TableCell className="text-left align-middle whitespace-nowrap hidden lg:table-cell">
                           <RelativeTime iso={doc.created_at} />

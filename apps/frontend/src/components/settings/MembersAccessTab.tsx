@@ -10,11 +10,11 @@ import { Button } from '@legalio/ui-components/button';
 import { Badge } from '@legalio/ui-components/badge';
 import { Skeleton } from '@legalio/ui-components/skeleton';
 import { ModalFrame } from '../ui/modal-frame';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableScrollArea } from '@legalio/ui-components/table';
+import { Table, TableBody, TableCell, TableColumnHeader, TableHeader, TableRow, TableScrollArea } from '@legalio/ui-components/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 import { OrgApiError, orgApi, orgPath } from './orgApi';
 
-import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Input } from '@legalio/ui-components/input';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { NativeSelect } from '@legalio/ui-components/native-select';
 import { Card, CardHeader } from '@legalio/ui-components/card';
@@ -220,9 +220,9 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
           <TableScrollArea>
             <Table>
               <TableHeader><TableRow>
-                <TableHead>{t('tb.col_email', 'Email')}</TableHead><TableHead>{t('tb.col_role', 'Role')}</TableHead>
-                <TableHead>{t('tb.col_departments', 'Departments')}</TableHead><TableHead>{t('tb.col_expires', 'Expires')}</TableHead>
-                <TableHead className="text-right">{t('tb.col_action', 'Action')}</TableHead>
+                <TableColumnHeader>{t('tb.col_email', 'Email')}</TableColumnHeader><TableColumnHeader>{t('tb.col_role', 'Role')}</TableColumnHeader>
+                <TableColumnHeader>{t('tb.col_departments', 'Departments')}</TableColumnHeader><TableColumnHeader>{t('tb.col_expires', 'Expires')}</TableColumnHeader>
+                <TableColumnHeader className="text-right">{t('tb.col_action', 'Action')}</TableColumnHeader>
               </TableRow></TableHeader>
               <TableBody>
                 {(invitationsQuery.data?.invitations || []).map((inv) => (
@@ -249,9 +249,9 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
           <TableScrollArea>
             <Table>
               <TableHeader><TableRow>
-                <TableHead>{t('tb.col_name', 'Name')}</TableHead><TableHead>{t('tb.col_email', 'Email')}</TableHead><TableHead>{t('tb.col_role', 'Role')}</TableHead>
-                <TableHead>{t('tb.col_departments', 'Departments')}</TableHead><TableHead>{t('tb.col_status', 'Membership status')}</TableHead>
-                <TableHead className="text-right">{t('tb.col_action', 'Action')}</TableHead>
+                <TableColumnHeader>{t('tb.col_name', 'Name')}</TableColumnHeader><TableColumnHeader>{t('tb.col_email', 'Email')}</TableColumnHeader><TableColumnHeader>{t('tb.col_role', 'Role')}</TableColumnHeader>
+                <TableColumnHeader>{t('tb.col_departments', 'Departments')}</TableColumnHeader><TableColumnHeader>{t('tb.col_status', 'Membership status')}</TableColumnHeader>
+                <TableColumnHeader className="text-right">{t('tb.col_action', 'Action')}</TableColumnHeader>
               </TableRow></TableHeader>
               <TableBody>
                 {(membersQuery.data?.members || []).map((m) => {
@@ -560,7 +560,7 @@ const HistoryDialog: React.FC<{ organizationId: string; onClose: () => void }> =
     <ModalFrame onClose={onClose} className="max-w-5xl">
       <DialogHeader title={t('tb.history', 'History')} onClose={onClose} />
       <div className="overflow-y-auto p-5">
-        <Tabs value={dataset} onValueChange={(v) => setDataset(v as 'admin' | 'activity')}>
+        <Tabs value={dataset} onValueChange={details => setDataset(details.value as 'admin' | 'activity')}>
           <TabsList aria-label={t('tb.history', 'History')}>
             <TabsTrigger value="admin">{t('tb.history_admin', 'Administrative changes')}</TabsTrigger>
             <TabsTrigger value="activity">{t('tb.history_activity', 'Operational activity')}</TabsTrigger>
@@ -572,8 +572,8 @@ const HistoryDialog: React.FC<{ organizationId: string; onClose: () => void }> =
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader><TableRow>
-                    <TableHead>{t('tb.col_when', 'When')}</TableHead><TableHead>{t('tb.col_actor', 'By')}</TableHead>
-                    <TableHead>{t('tb.col_action', 'Action')}</TableHead><TableHead>{t('tb.col_changes', 'Changed fields')}</TableHead>
+                    <TableColumnHeader>{t('tb.col_when', 'When')}</TableColumnHeader><TableColumnHeader>{t('tb.col_actor', 'By')}</TableColumnHeader>
+                    <TableColumnHeader>{t('tb.col_action', 'Action')}</TableColumnHeader><TableColumnHeader>{t('tb.col_changes', 'Changed fields')}</TableColumnHeader>
                   </TableRow></TableHeader>
                   <TableBody>
                     {(audit.data?.events || []).map((e) => (

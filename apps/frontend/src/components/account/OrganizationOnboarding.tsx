@@ -8,7 +8,7 @@ import { useTenant } from '../../context/TenantContext';
 import { AlphabeticalSelect } from '../ui/alphabetical-select';
 import { capturePendingInvitation } from './InvitationPrompt';
 
-import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Input } from '@legalio/ui-components/input';
 import { NativeSelect } from '@legalio/ui-components/native-select';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { Alert, AlertContent } from '@legalio/ui-components/alert';

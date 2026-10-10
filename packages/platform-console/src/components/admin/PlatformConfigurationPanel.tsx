@@ -66,7 +66,7 @@ import {
 import { cn } from '@legalio/ui-components/utils';
 import { Button } from '@legalio/ui-components/button';
 import { Badge } from '@legalio/ui-components/badge';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@legalio/ui-components/card';
+import { Card, CardBody, CardDescription, CardFooter, CardHeader, CardTitle } from '@legalio/ui-components/card';
 import { Separator } from '@legalio/ui-components/separator';
 import { ResetWorkspaceDialog } from '../settings/ResetWorkspaceDialog';
 import { clearSelection } from '../../lib/organizationSelection';
@@ -914,7 +914,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                     )}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardBody className="space-y-4">
                   <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-primary/10 text-accent-foreground flex items-center justify-center font-bold text-sm shrink-0">
@@ -962,7 +962,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       )}
                     </div>
                   </Card>
-                </CardContent>
+                </CardBody>
               </Card>
 
 
@@ -1004,7 +1004,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-5">
+                  <CardBody className="space-y-5">
                     <div className="space-y-3">
                       <Card
                         id="master-storage-root-card"
@@ -1181,7 +1181,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       </Card>
                     </div>
 
-                  </CardContent>
+                  </CardBody>
                 </Card>
               )}
 
@@ -1240,7 +1240,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardBody className="space-y-4">
                   <form onSubmit={handleSaveApiKey} className="space-y-3">
                     <div className="space-y-1.5">
                       <label htmlFor="settingsview-field-3" className="font-semibold text-foreground flex items-center justify-between">
@@ -1313,7 +1313,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
  </Button>
  </div>
  </form>
- </CardContent>
+ </CardBody>
  </Card>
 
  {/* CARD 2: MODEL AI SELECTION */}
@@ -1324,7 +1324,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                     <span>{t('settings.ai_config_title', 'Pilihan Model Google Gemini')}</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardBody className="space-y-4">
                   <div className="space-y-3">
                     {[
                       {
@@ -1395,7 +1395,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       </Card>
                     ))}
                   </div>
-                </CardContent>
+                </CardBody>
               </Card>
             </div>
           )}
@@ -1425,7 +1425,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardBody className="space-y-4">
                   <form onSubmit={handleSaveSmtp} className="space-y-4">
                     {/* Toggle Enable SMTP */}
                     <Card className="p-3.5 flex items-center justify-between gap-3">
@@ -1602,7 +1602,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       </Button>
                     </div>
                   </form>
-                </CardContent>
+                </CardBody>
               </Card>
 
             </div>
@@ -1617,7 +1617,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                   <span>{t('settings.ui_customization_title', 'Kustomisasi Teks UI & Kamus Antarmuka')}</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardBody className="space-y-4">
                 <p role="note" className="rounded-xl border border-status-warning-border bg-status-warning-soft p-3 text-sm text-status-warning ">
                   {t('tb.texts_shared_note')}
                 </p>
@@ -1688,7 +1688,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                     <span>{t('settings.reset_dict_btn', 'Reset ke Bawaan')}</span>
                   </Button>
                 </div>
-              </CardContent>
+              </CardBody>
             </Card>
           )}
 
@@ -1706,7 +1706,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                     {t('settings.danger_zone_desc', 'Mereset seluruh pengaturan sistem ke kondisi awal bawaan (Manage Admin Access, Organisasi, Departemen, AI, Notifikasi, Penyimpanan) serta menghapus seluruh data transaksi.')}
                   </CardDescription>
                 </CardHeader>
-                <CardContent >
+                <CardBody >
                   <Card className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold text-foreground">{t('settings.delete_all_transactions', 'Reset Seluruh Pengaturan & Data Transaksi')}</p>
@@ -1721,7 +1721,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       {resettingData ? t('settings.resetting_db', 'Mereset Database...') : t('settings.reset_db_btn', 'Reset Database Sistem')}
                     </Button>
                   </Card>
-                </CardContent>
+                </CardBody>
               </Card>
             </div>
           )}

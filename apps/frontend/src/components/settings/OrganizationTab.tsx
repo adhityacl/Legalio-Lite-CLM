@@ -18,7 +18,7 @@ import { DueDiligenceChecklistEditor } from './DueDiligenceChecklistEditor';
 import { OrgApiError, orgApi, orgPath } from './orgApi';
 
 import type { OrganizationSettingsDto } from '@legalio/types/organizationSettings';
-import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Input } from '@legalio/ui-components/input';
 import { Textarea } from '@legalio/ui-components/textarea';
 import { Alert, AlertContent } from '@legalio/ui-components/alert';
 import { Field, FieldLabel, FieldHelperText, FieldErrorText } from '@legalio/ui-components/field';

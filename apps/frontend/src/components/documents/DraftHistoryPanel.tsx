@@ -5,7 +5,6 @@ import { useAlertToast } from '../../context/AlertToastContext';
 import { documentsApi, errorMessage } from '../../lib/documentsApi';
 import { formatBytes, type DraftVersion } from '@legalio/types/documents';
 import { RelativeTime } from './RelativeTime';
-import { INPUT_CLASS } from './documentLabels';
 
 import { Button } from '@legalio/ui-components/button';
 import { Input } from '@legalio/ui-components/input';
@@ -167,7 +166,6 @@ export const DraftHistoryPanel: React.FC<DraftHistoryPanelProps> = ({
                         value={editing.name}
                         onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                         placeholder="final-before-signature"
-                        className={INPUT_CLASS}
                       />
                     </label>
                     <label className="block text-xs font-semibold text-muted-foreground">
@@ -176,7 +174,6 @@ export const DraftHistoryPanel: React.FC<DraftHistoryPanelProps> = ({
                         value={editing.labels}
                         onChange={(e) => setEditing({ ...editing, labels: e.target.value })}
                         placeholder={t('documents.legal_review_cfo_approved', 'Legal Review, CFO Approved')}
-                        className={INPUT_CLASS}
                       />
                     </label>
                     <div className="flex gap-1">

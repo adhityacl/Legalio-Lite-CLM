@@ -8,12 +8,12 @@ import { usePermissions } from '../lib/permissions';
 import { confirmLeave, hasUnsavedChanges } from '../lib/unsavedChanges';
 import type { SettingsTabId } from '../lib/appRoutes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
-import { Button, buttonVariants } from '@legalio/ui-components/button';
+import { Button } from '@legalio/ui-components/button';
+import { ContextHeader } from '@legalio/ui-components/blocks';
 import { OrganizationTab } from './settings/OrganizationTab';
 import { MembersAccessTab } from './settings/MembersAccessTab';
 import { IntegrationsTab } from './settings/IntegrationsTab';
 
-import { Heading } from '@legalio/ui-components/heading';
 /**
  * Tenant Settings (PRD §6.1): one screen, at most three tabs —
  * Organization, Members & Access, Integrations — filtered by the selected
@@ -62,61 +62,31 @@ export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
   } as Record<string, string>)[tenantRole] : '';
 
   return (
-    <Tabs value={tab} onValueChange={(value) => void go(value)} id="settings" className="min-w-0 gap-5">
-      <header>
-        <div className="ds-context-bar">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="ds-context-bar-icon">
-              <Building2 className="h-4 w-4" aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <Heading as="h2" size="lg" weight="semibold" className="truncate">
-                {t('tb.settings_title', 'Settings — {org}', { org: orgName })}
-              </Heading>
-              {accessMode !== 'platform' && (
-                <p className="text-sm text-muted-foreground truncate">
-                  {t('tb.role_in_org', 'Role in this organization: {role}', { role: roleLabel })}
-                </p>
-              )}
-            </div>
-          </div>
-          {accessMode === 'platform' && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={async () => { if (await leaveOrganization()) setActiveTab('admin-system-organizations'); }}
-              aria-label={t('tb.back_to_system_admin', 'Back to System Admin')}
-              title={t('tb.back_to_system_admin', 'Back to System Admin')}
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">{t('tb.back_to_system_admin', 'Back to System Admin')}</span>
-            </Button>
-          )}
-        </div>
-
-        <TabsList
-          aria-label={t('tb.settings_sections', 'Settings sections')}
-          className="admin-tab-list flex h-auto w-full flex-wrap items-center justify-start gap-1 rounded-none bg-card/70 px-3 py-2 text-muted-foreground sm:px-4"
-        >
-          {visible.map((item) => {
+    <Tabs variant="line" value={tab} onValueChange={details => void go(details.value as SettingsTabId)} lazyMount unmountOnExit id="settings" className="min-w-0 gap-6">
+      <ContextHeader
+        icon={<Building2 />}
+        title={t('tb.settings_title', 'Settings — {org}', { org: orgName })}
+        description={accessMode !== 'platform' ? t('tb.role_in_org', 'Role in this organization: {role}', { role: roleLabel }) : undefined}
+        actions={accessMode === 'platform' && (
+          <Button size="sm" variant="ghost" onClick={async () => { if (await leaveOrganization()) setActiveTab('admin-system-organizations'); }}
+            aria-label={t('tb.back_to_system_admin', 'Back to System Admin')} title={t('tb.back_to_system_admin', 'Back to System Admin')}>
+            <ArrowLeft aria-hidden="true" />
+            <span className="hidden sm:inline">{t('tb.back_to_system_admin', 'Back to System Admin')}</span>
+          </Button>
+        )}
+      >
+        <TabsList aria-label={t('tb.settings_sections', 'Settings sections')} className="admin-tab-list overflow-x-auto border-t border-border px-4">
+          {visible.map(item => {
             const Icon = item.icon;
-            const isActive = tab === item.id;
             return (
-              <TabsTrigger
-                key={item.id}
-                value={item.id}
-                className={buttonVariants('ghost', 'sm', isActive
-                  ? 'bg-card  text-accent-foreground shadow-xs font-semibold hover:bg-card '
-                  : 'text-muted-foreground hover:text-foreground  hover:bg-card/60 ')}
-              >
-                <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span>{item.label}</span>
+              <TabsTrigger key={item.id} value={item.id}>
+                <Icon aria-hidden="true" />
+                {item.label}
               </TabsTrigger>
             );
           })}
         </TabsList>
-      </header>
+      </ContextHeader>
 
       {/* key: switching organization remounts the tab and drops drafts (PRD §6.8). */}
       <TabsContent value="settings-organization">

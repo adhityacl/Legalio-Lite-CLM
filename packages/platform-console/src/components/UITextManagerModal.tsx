@@ -254,7 +254,7 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
 
         <div className="p-4 border-b border-border bg-card grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
           <InputGroup className="sm:col-span-2 relative">
-            <InputGroupAddon><Search className="size-4" aria-hidden="true" aria-hidden /></InputGroupAddon>
+            <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
             <InputGroupInput
               type="search"
               aria-label={t('settings.search_ui_text', 'Cari kata kunci, ID key, atau teks UI...')}

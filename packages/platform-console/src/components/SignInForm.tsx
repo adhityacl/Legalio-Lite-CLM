@@ -3,14 +3,17 @@ import { authClient } from '../lib/auth-client';
 import { useAuth } from '../context/AuthContext';
 import { LANGUAGE_OPTIONS, useLanguage, type Language } from '../context/LanguageContext';
 import { signInWithGoogle } from '../lib/googleAuthService';
-import { Mail, Lock, User, Loader2, Clock } from 'lucide-react';
+import { Mail, User, Clock } from 'lucide-react';
 import { Button } from '@legalio/ui-components/button';
-import { Input } from '@legalio/ui-components/input';
-import { Label } from '@legalio/ui-components/label';
-import { Alert, AlertDescription } from '@legalio/ui-components/alert';
+import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { Card, CardBody, CardDescription, CardFooter, CardHeader, CardTitle } from '@legalio/ui-components/card';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
+import { PasswordInput, PasswordInputControl, PasswordInputIndicator, PasswordInputInput, PasswordInputLabel, PasswordInputVisibilityTrigger } from '@legalio/ui-components/password-input';
+import { SegmentGroup, SegmentGroupIndicator, SegmentGroupItems } from '@legalio/ui-components/segment-group';
+import { Separator } from '@legalio/ui-components/separator';
+import { Text } from '@legalio/ui-components/text';
 import { capturePendingInvitation, loadInvitationPreview, type InvitationPreview } from './account/InvitationPrompt';
-
-import { Card } from '@legalio/ui-components/card';
 interface SignInFormProps {
   allowRegistration?: boolean;
   onOpenPrivacyPolicy?: () => void;
@@ -20,9 +23,8 @@ interface SignInFormProps {
 /**
  * Sign-in / registration screen.
  *
- * Refactored onto the shadcn design standard (Button/Input/Label/Alert +
- * shared tokens). Behaviour and the auth calls are unchanged; only the
- * presentation layer and a few redundant wrappers were touched.
+ * Built on the moduix Sign in block (Card, Field, InputGroup, PasswordInput, Alert).
+ * Behaviour and the auth calls are unchanged.
  */
 export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onOpenTermsOfService, allowRegistration = true }) => {
   const { t, language, setLanguage } = useLanguage();
@@ -151,220 +153,129 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
 
   const isPending = /menunggu|pending/i.test(error);
 
+  const logo = <img src={new URL('../assets/logo-full.png', import.meta.url).href} alt="Legalio" className="mx-auto h-10 w-auto" />;
+  const blocked = loading || (!allowRegistration && !statusReady);
+
   if (registrationSuccess) {
     return (
-      <div className="my-auto w-full min-w-0 max-w-md shrink-0">
-        <div className="w-full rounded-2xl sm:rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm">
-          <div className="px-5 py-6 sm:px-8 sm:py-8 text-center">
-            <div className="flex justify-center mb-6">
-              <LanguageSwitcher language={language} setLanguage={setLanguage} t={t} />
-            </div>
-            <div className="mx-auto flex items-center justify-center w-16 h-16 rounded-full bg-[var(--warning)]/10 mb-6">
-              <Clock className="h-8 w-8 text-[var(--warning)]" />
-            </div>
-            <h1 className="text-2xl font-bold mb-3">{t('login.account_created_title')}</h1>
-            <p className="text-[var(--muted-foreground)] mb-6 leading-relaxed">
-              {invitation
-                ? t('tb.invited_registration_done', 'Your account was created and is waiting for manual superuser approval. Once approved, sign in to accept the invitation to {org}.', { org: invitation.organizationName })
-                : t('onboarding.registration_done', 'Your account was created and is waiting for manual superuser approval. Once approved, sign in to join or create an organization.')}
-            </p>
-            <Button
-              variant="link"
-              onClick={() => {
-                setRegistrationSuccess(false);
-                setIsRegister(false);
-                setError('');
-                setName('');
-                setPassword('');
-              }}
-            >
-              {t('login.back_to_login')}
-            </Button>
-            <LegalFooter onOpenPrivacy={handleOpenPrivacy} onOpenTerms={handleOpenTerms} t={t} />
-          </div>
-        </div>
-      </div>
+      <Card className="my-auto w-full max-w-md shrink-0">
+        <CardHeader className="justify-items-center text-center">
+          <div className="col-span-2 mb-2 flex justify-center"><LanguageSwitcher language={language} setLanguage={setLanguage} t={t} /></div>
+          <span className="col-span-2 mx-auto mb-2 inline-flex size-16 items-center justify-center rounded-full bg-status-warning-soft text-status-warning" aria-hidden="true"><Clock className="size-8" /></span>
+          <CardTitle asChild className="col-span-2 text-2xl"><h1>{t('login.account_created_title')}</h1></CardTitle>
+          <CardDescription className="col-span-2">
+            {invitation
+              ? t('tb.invited_registration_done', 'Your account was created and is waiting for manual superuser approval. Once approved, sign in to accept the invitation to {org}.', { org: invitation.organizationName })
+              : t('onboarding.registration_done', 'Your account was created and is waiting for manual superuser approval. Once approved, sign in to join or create an organization.')}
+          </CardDescription>
+        </CardHeader>
+        <CardBody className="flex justify-center">
+          <Button variant="link" onClick={() => { setRegistrationSuccess(false); setIsRegister(false); setError(''); setName(''); setPassword(''); }}>
+            {t('login.back_to_login')}
+          </Button>
+        </CardBody>
+        <CardFooter className="justify-center"><LegalFooter onOpenPrivacy={handleOpenPrivacy} onOpenTerms={handleOpenTerms} t={t} /></CardFooter>
+      </Card>
     );
   }
 
   return (
-    <div className="my-auto w-full min-w-0 max-w-md shrink-0">
-      <div className="w-full rounded-2xl sm:rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm">
-        <div className="px-5 py-6 sm:px-8 sm:py-8">
-          <div className="flex justify-center mb-6">
-            <LanguageSwitcher language={language} setLanguage={setLanguage} t={t} />
+    <Card className="my-auto w-full max-w-md shrink-0">
+      <CardHeader className="justify-items-center gap-4 text-center">
+        <div className="col-span-2 flex justify-center"><LanguageSwitcher language={language} setLanguage={setLanguage} t={t} /></div>
+        <div className="col-span-2">{logo}</div>
+        {(setupMode || isRegister) && (
+          <div className="col-span-2">
+            <CardTitle asChild className="text-xl sm:text-2xl"><h1>{setupMode ? t('login.setup_title', 'Create your admin account') : t('login.create_account')}</h1></CardTitle>
+            <CardDescription className="mt-1">{setupMode ? t('login.setup_subtitle', 'First-time setup: this account will manage the whole workspace.') : t('login.fill_form_reg')}</CardDescription>
           </div>
-          <div className="flex justify-center mb-6">
-            <img src={new URL('../assets/logo-full.png', import.meta.url).href} alt="Legalio" className="h-10 w-auto" />
-          </div>
-          {(setupMode || isRegister) && (
-            <div className="text-center mb-6 sm:mb-8">
-              <h1 className="text-xl sm:text-2xl font-bold break-words">
-                {setupMode ? t('login.setup_title', 'Create your admin account') : t('login.create_account')}
-              </h1>
-              <p className="text-[var(--muted-foreground)] mt-1.5 text-xs sm:text-sm">
-                {setupMode
-                  ? t('login.setup_subtitle', 'First-time setup: this account will manage the whole workspace.')
-                  : t('login.fill_form_reg')}
-              </p>
-            </div>
+        )}
+      </CardHeader>
+      <CardBody className="flex flex-col gap-5">
+        {invitation && (
+          <Alert status="info">
+            <AlertIndicator />
+            <AlertContent><AlertDescription>{t('tb.invitation_signin_hint', 'You were invited to join {org} as {role}. Sign in or create an account with the invited email address to accept.', { org: invitation.organizationName, role: invitation.tenantRole })}</AlertDescription></AlertContent>
+          </Alert>
+        )}
+        {error && (
+          <Alert status={isPending ? 'warning' : 'error'}>
+            <AlertIndicator />
+            <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
+          </Alert>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5" aria-busy={loading}>
+          {(isRegister || setupMode) && (
+            <Field required>
+              <FieldLabel>{t('login.fullname_label')}</FieldLabel>
+              <InputGroup>
+                <InputGroupAddon><User aria-hidden="true" /></InputGroupAddon>
+                <InputGroupInput id="signin-name" type="text" autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder={t('login.fullname_placeholder')} />
+              </InputGroup>
+            </Field>
           )}
+          <Field required>
+            <FieldLabel>{t('login.email_label')}</FieldLabel>
+            <InputGroup>
+              <InputGroupAddon><Mail aria-hidden="true" /></InputGroupAddon>
+              <InputGroupInput id="signin-email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('login.email_placeholder')} />
+            </InputGroup>
+          </Field>
+          <PasswordInput ids={{ input: 'signin-password' }} autoComplete={setupMode ? 'new-password' : 'current-password'}>
+            <PasswordInputLabel>{t('login.password_label')}</PasswordInputLabel>
+            <PasswordInputControl>
+              <PasswordInputInput required minLength={setupMode ? 8 : undefined} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
+              <PasswordInputVisibilityTrigger><PasswordInputIndicator /></PasswordInputVisibilityTrigger>
+            </PasswordInputControl>
+          </PasswordInput>
+          <Button type="submit" loading={loading} disabled={blocked} className="w-full">
+            {setupMode ? t('login.setup_submit', 'Create admin account') : isRegister ? t('login.btn_register') : t('login.btn_login')}
+          </Button>
+        </form>
 
-          {invitation && (
-            <Alert className="mb-6">
-              <AlertDescription>
-                {t('tb.invitation_signin_hint', 'You were invited to join {org} as {role}. Sign in or create an account with the invited email address to accept.', { org: invitation.organizationName, role: invitation.tenantRole })}
-              </AlertDescription>
-            </Alert>
-          )}
-          {error && (
-            <Alert variant={isPending ? 'warning' : 'destructive'} className="mb-6">
-              {isPending && <Clock className="h-4 w-4" />}
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5" aria-busy={loading}>
-            {(isRegister || setupMode) && (
-              <div className="space-y-1.5">
-                <Label htmlFor="signin-name">{t('login.fullname_label')}</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                  <Input id="signin-name" type="text" required value={name} onChange={(e) => setName(e.target.value)} className="pl-9" placeholder={t('login.fullname_placeholder')} />
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="signin-email">{t('login.email_label')}</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                <Input id="signin-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="pl-9" placeholder={t('login.email_placeholder')} />
-              </div>
+        {!setupMode && (
+          <>
+            <div className="flex items-center gap-3" role="presentation">
+              <Separator className="flex-1" />
+              <Text as="span" size="xs" tone="muted" className="uppercase tracking-wider">{t('login.or_sign_in_with', 'atau masuk dengan')}</Text>
+              <Separator className="flex-1" />
             </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="signin-password">{t('login.password_label')}</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                <Input
-                  id="signin-password"
-                  type="password"
-                  required
-                  minLength={setupMode ? 8 : undefined}
-                  autoComplete={setupMode ? 'new-password' : 'current-password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-9"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
-            <Button type="submit" disabled={loading || (!allowRegistration && !statusReady)} className="w-full mt-2">
-              {loading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : setupMode ? (
-                t('login.setup_submit', 'Create admin account')
-              ) : isRegister ? (
-                t('login.btn_register')
-              ) : (
-                t('login.btn_login')
-              )}
+            <Button variant="outline" onClick={handleGoogleSignIn} disabled={blocked} className="w-full">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+              </svg>
+              {t('login.google_button', 'Masuk dengan Google')}
             </Button>
-          </form>
-
-          {!setupMode && (
-            <>
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-[var(--border)]" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-[var(--card)] px-3 text-[var(--muted-foreground)] font-semibold tracking-wider">
-                    {t('login.or_sign_in_with', 'atau masuk dengan')}
-                  </span>
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleGoogleSignIn}
-                disabled={loading || (!allowRegistration && !statusReady)}
-                className="w-full"
-              >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                </svg>
-                <span>{t('login.google_button', 'Masuk dengan Google')}</span>
+            {allowRegistration && (
+              <Button variant="link" className="mx-auto max-w-full" onClick={() => { setIsRegister(!isRegister); setError(''); }}>
+                {isRegister ? t('login.has_account_prompt') : t('login.no_account_prompt')}
               </Button>
-
-              {allowRegistration && <div className="mt-6 text-center">
-                <Button
-                  type="button"
-                  variant="link"
-                  className="max-w-full"
-                  onClick={() => {
-                    setIsRegister(!isRegister);
-                    setError('');
-                  }}
-                >
-                  {isRegister ? t('login.has_account_prompt') : t('login.no_account_prompt')}
-                </Button>
-              </div>}
-            </>
-          )}
-
-          <LegalFooter onOpenPrivacy={handleOpenPrivacy} onOpenTerms={handleOpenTerms} t={t} />
-        </div>
-      </div>
-    </div>
+            )}
+          </>
+        )}
+      </CardBody>
+      <CardFooter className="justify-center"><LegalFooter onOpenPrivacy={handleOpenPrivacy} onOpenTerms={handleOpenTerms} t={t} /></CardFooter>
+    </Card>
   );
 };
 
-/** Same pill/segmented control as the in-app Header, so language switching looks the same before and after login. */
+/** Language choice before sign-in; the in-app header offers the same options. */
 const LanguageSwitcher: React.FC<{ language: Language; setLanguage: (lang: Language) => void; t: (k: string, d?: string) => string }> = ({ language, setLanguage, t }) => (
-  <Card
-    role="group"
-    aria-label={t('header.switch_language', 'Pilih bahasa')}
-    className="flex items-center p-0.5 text-xs font-semibold"
-  >
-    {LANGUAGE_OPTIONS.map((option) => (
-      <button
-        key={option.code}
-        type="button"
-        lang={option.htmlLang}
-        onClick={() => setLanguage(option.code)}
-        className={`min-w-10 min-h-10 px-2.5 py-1.5 rounded-full transition-all cursor-pointer text-xs font-bold flex items-center justify-center focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none ${
- language === option.code
- ? 'bg-primary text-white shadow-2xs'
- : 'text-muted-foreground hover:text-foreground '
- }`}
-        title={option.nativeName}
-        aria-label={option.nativeName}
-        aria-pressed={language === option.code}
-      >
-        {option.label}
-      </button>
-    ))}
-  </Card>
+  <SegmentGroup aria-label={t('header.switch_language', 'Pilih bahasa')} value={language} onValueChange={details => details.value && setLanguage(details.value as Language)}>
+    <SegmentGroupIndicator />
+    <SegmentGroupItems items={LANGUAGE_OPTIONS.map(option => ({ value: option.code, label: option.label }))} />
+  </SegmentGroup>
 );
 
 const LegalFooter: React.FC<{ onOpenPrivacy: (e: React.MouseEvent) => void; onOpenTerms: (e: React.MouseEvent) => void; t: (k: string, d?: string) => string }> = ({ onOpenPrivacy, onOpenTerms, t }) => (
-  <div className="mt-6 text-center">
-    <p className="flex flex-wrap items-center justify-center gap-x-1 text-xs text-[var(--muted-foreground)]">
-      <Button variant="link" type="button" onClick={onOpenPrivacy}>
-        {t('footer.privacy_policy', 'Privacy Policy')}
-      </Button>
-      <span>{t('login.footer_and', 'and')}</span>
-      <Button variant="link" type="button" onClick={onOpenTerms}>
-        {t('footer.terms_of_service', 'Terms of Service')}
-      </Button>
-      <span>{t('login.footer_apply', 'apply')}</span>
-    </p>
-  </div>
+  <Text size="xs" tone="muted" className="flex flex-wrap items-center justify-center gap-x-1">
+    <Button variant="link" size="sm" onClick={onOpenPrivacy}>{t('footer.privacy_policy', 'Privacy Policy')}</Button>
+    <span>{t('login.footer_and', 'and')}</span>
+    <Button variant="link" size="sm" onClick={onOpenTerms}>{t('footer.terms_of_service', 'Terms of Service')}</Button>
+    <span>{t('login.footer_apply', 'apply')}</span>
+  </Text>
 );

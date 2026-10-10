@@ -9,7 +9,7 @@ import { Button } from '@legalio/ui-components/button';
 import { Skeleton } from '@legalio/ui-components/skeleton';
 import { OrgApiError, orgApi, orgPath } from './orgApi';
 
-import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Input } from '@legalio/ui-components/input';
 import { Alert, AlertContent } from '@legalio/ui-components/alert';
 import { Field, FieldLabel, FieldErrorText } from '@legalio/ui-components/field';
 /** `GET /api/organizations/:id/integrations/google` (PRD §9.2). */

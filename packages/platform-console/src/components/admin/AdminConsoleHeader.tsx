@@ -14,10 +14,9 @@ import { ConsoleDashboardTab } from './types';
 import { useLanguage } from '../../context/LanguageContext';
 import { usePermissions } from '../../lib/permissions';
 import { Button } from '@legalio/ui-components/button';
-import { Badge, type BadgeVariant } from '@legalio/ui-components/badge';
-
-import { Card } from '@legalio/ui-components/card';
-import { Heading } from '@legalio/ui-components/heading';
+import { Badge, type StatusTone } from '@legalio/ui-components/badge';
+import { ContextHeader } from '@legalio/ui-components/blocks';
+import { Tabs, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 interface AdminConsoleHeaderProps {
   area: 'system' | 'organization';
   activeTab: ConsoleDashboardTab;
@@ -53,7 +52,7 @@ export const AdminConsoleHeader: React.FC<AdminConsoleHeaderProps> = ({
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     count?: number;
-    badgeVariant?: BadgeVariant;
+    badgeVariant?: StatusTone;
   }> = [
     { id: 'dashboard', label: t('admin.tab_dashboard', 'Dashboard'), icon: Sliders },
     { id: 'users', label: t('admin.tab_users', 'Pengguna'), icon: Users, count: userCounts.users },
@@ -72,91 +71,39 @@ export const AdminConsoleHeader: React.FC<AdminConsoleHeaderProps> = ({
   };
   const visibleNavItems = navItems.filter((item) => isSystemArea && hasPlatformPermission(requiredPermission[item.id]));
 
-  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
-    let nextIndex: number | null = null;
-    if (event.key === 'ArrowRight') nextIndex = (index + 1) % visibleNavItems.length;
-    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + visibleNavItems.length) % visibleNavItems.length;
-    if (event.key === 'Home') nextIndex = 0;
-    if (event.key === 'End') nextIndex = visibleNavItems.length - 1;
-    if (nextIndex === null) return;
-    event.preventDefault();
-    const nextTab = visibleNavItems[nextIndex].id;
-    onTabChange(nextTab);
-    requestAnimationFrame(() => document.getElementById(`admin-${area}-${nextTab}-tab`)?.focus());
-  };
-
+  const label = isSystemArea ? t('admin.system_admin', 'System Admin') : t('admin.organization_admin', 'Organization Admin');
   return (
-    <Card>
-      <div className="ds-context-bar">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="ds-context-bar-icon">
-            {isSystemArea ? <Shield className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
-          </div>
-          <div className="min-w-0">
-            <Heading as="h2" size="lg" weight="semibold">
-              {isSystemArea ? t('admin.system_admin', 'System Admin') : t('admin.organization_admin', 'Organization Admin')}
-            </Heading>
-            {!isSystemArea && (
-              <p className="text-sm text-muted-foreground truncate">
-                {t('admin.active_organization_controls', 'Active organization controls')}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-md"
-            onClick={onRefresh}
-            disabled={isRefreshing}
-            aria-label={t('admin.refresh_btn', 'Segarkan Data')}
-            title={t('admin.refresh_btn', 'Segarkan Data')}
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-accent-foreground' : ''}`} />
-          </Button>
-        </div>
-      </div>
-
-      <div
-        role="tablist"
-        aria-label={isSystemArea ? t('admin.system_admin', 'System Admin') : t('admin.organization_admin', 'Organization Admin')}
-        className="admin-tab-list flex flex-wrap items-center gap-1 bg-card/70 px-3 py-2 sm:px-4"
+    <ContextHeader
+      icon={isSystemArea ? <Shield /> : <Building2 />}
+      title={label}
+      description={isSystemArea ? undefined : t('admin.active_organization_controls', 'Active organization controls')}
+      actions={
+        <Button variant="ghost" size="icon-md" onClick={onRefresh} disabled={isRefreshing}
+          aria-label={t('admin.refresh_btn', 'Segarkan Data')} title={t('admin.refresh_btn', 'Segarkan Data')}>
+          <RefreshCw aria-hidden="true" className={isRefreshing ? 'animate-spin' : undefined} />
+        </Button>
+      }
+    >
+      {/* Panels render in the console view; ids keep the tab/panel relationship (WAI-ARIA tabs). */}
+      <Tabs
+        variant="line"
+        value={activeTab}
+        onValueChange={details => onTabChange(details.value as ConsoleDashboardTab)}
+        ids={{ trigger: value => `admin-${area}-${value}-tab`, content: value => `admin-${area}-${value}-panel` }}
       >
-        {visibleNavItems.map((item, index) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <Button
-              key={item.id}
-              type="button"
-              variant="ghost"
-              size="sm"
-              role="tab"
-              id={`admin-${area}-${item.id}-tab`}
-              aria-controls={`admin-${area}-${item.id}-panel`}
-              aria-selected={isActive}
-              tabIndex={isActive ? 0 : -1}
-              onClick={() => onTabChange(item.id)}
-              onKeyDown={(event) => handleTabKeyDown(event, index)}
-              className={
-                isActive
-                  ? ''
-                  : ''
-              }
-            >
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              <span>{item.label}</span>
-              {typeof item.count === 'number' && (
-                <Badge tone={item.badgeVariant || (isActive ? 'success' : 'neutral')} className="font-mono">
-                  {item.count}
-                </Badge>
-              )}
-            </Button>
-          );
-        })}
-      </div>
-    </Card>
+        <TabsList aria-label={label} className="admin-tab-list overflow-x-auto border-t border-border px-4">
+          {visibleNavItems.map(item => {
+            const Icon = item.icon;
+            return (
+              <TabsTrigger key={item.id} value={item.id}>
+                <Icon aria-hidden="true" />
+                {item.label}
+                {typeof item.count === 'number' && <Badge tone={item.badgeVariant || 'neutral'} className="font-mono">{item.count}</Badge>}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </Tabs>
+    </ContextHeader>
   );
 };

@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useLanguage } from '../context/LanguageContext';
-import { Calendar as CalendarIcon } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@legalio/ui-components/popover';
-import { Calendar } from '@legalio/ui-components/calendar';
-
-import { Input } from '@legalio/ui-components/input';
-import { Button } from '@legalio/ui-components/button';
+import React from 'react';
+import {
+  DatePicker, DatePickerContent, DatePickerContext, DatePickerDayTable, DatePickerField, DatePickerNextTrigger, DatePickerPositioner,
+  DatePickerPrevTrigger, DatePickerTable, DatePickerTableBody, DatePickerTableCell, DatePickerTableCellTrigger, DatePickerTableRow,
+  DatePickerView, DatePickerViewControl, DatePickerViewTrigger, parseDate, type DateValue,
+} from '@legalio/ui-components/date-picker';
 export interface DateInputProps {
   value: string; // ISO format YYYY-MM-DD or DD/MM/YYYY
   onChange: (isoDate: string) => void;
@@ -63,153 +61,72 @@ export function formatDdMmYyyyToIso(ddmmStr: string): string {
   return '';
 }
 
-function isoToDate(iso: string): Date | undefined {
-  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return undefined;
-  const [y, m, d] = iso.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  return Number.isNaN(date.getTime()) ? undefined : date;
+function toDateValue(iso: string | undefined): DateValue | undefined {
+  const normalized = iso && (formatDdMmYyyyToIso(iso) || iso);
+  if (!normalized || !/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return undefined;
+  try { return parseDate(normalized); } catch { return undefined; }
 }
 
-function dateToIso(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-export const DateInput: React.FC<DateInputProps> = ({
-  value,
-  onChange,
-  placeholder = 'dd/mm/yyyy',
-  required = false,
-  disabled = false,
-  className = '',
-  focusColor = 'indigo',
-  min,
-  max,
-  id,
-  name,
-}) => {
-  const { t } = useLanguage();
-  const [displayValue, setDisplayValue] = useState<string>(() => formatIsoToDdMmYyyy(value));
-  const [popoverOpen, setPopoverOpen] = useState(false);
-
-  // Sync internal displayValue when parent value changes
-  useEffect(() => {
-    setDisplayValue(formatIsoToDdMmYyyy(value));
-  }, [value]);
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawInput = e.target.value;
-
-    // Filter out non-digit and non-slash characters
-    let cleaned = rawInput.replace(/[^\d/]/g, '');
-
-    // Auto-format digits with slashes if user types numbers sequentially
-    const digitsOnly = cleaned.replace(/\D/g, '');
-    let formatted = '';
-    if (digitsOnly.length > 0) {
-      if (digitsOnly.length <= 2) {
-        formatted = digitsOnly;
-      } else if (digitsOnly.length <= 4) {
-        formatted = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2)}`;
-      } else {
-        formatted = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2, 4)}/${digitsOnly.slice(4, 8)}`;
-      }
-    } else {
-      formatted = '';
-    }
-
-    setDisplayValue(formatted);
-
-    if (formatted.length === 10) {
-      const iso = formatDdMmYyyyToIso(formatted);
-      if (iso) {
-        onChange(iso);
-      }
-    } else if (formatted === '') {
-      onChange('');
-    }
-  };
-
-  const handleBlur = () => {
-    if (displayValue.length === 10) {
-      const iso = formatDdMmYyyyToIso(displayValue);
-      if (iso) {
-        onChange(iso);
-      }
-    } else if (displayValue !== '') {
-      // If incomplete or invalid, revert to parent value or reset
-      setDisplayValue(formatIsoToDdMmYyyy(value));
-    }
-  };
-
-  const handleCalendarSelect = (date: Date | undefined) => {
-    if (!date) return;
-    const iso = dateToIso(date);
-    setDisplayValue(formatIsoToDdMmYyyy(iso));
-    onChange(iso);
-    setPopoverOpen(false);
-  };
-
-  const focusBorderClass =
-    focusColor === 'emerald'
-      ? 'focus-within:border-primary focus:border-primary'
-      : focusColor === 'slate'
-      ? 'focus-within:border-border focus:border-border'
-      : 'focus-within:border-primary focus:border-primary';
-
-  const selectedDate = isoToDate(formatDdMmYyyyToIso(value) || value);
-  const minDate = min ? isoToDate(min) : undefined;
-  const maxDate = max ? isoToDate(max) : undefined;
-
+/** Month and year grids shared by the picker views. */
+function GridView({ view }: { view: 'month' | 'year' }) {
   return (
-    <div className={`relative flex items-center ${className}`}>
-      <Input
-        type="text"
-        id={id}
-        name={name}
-        required={required}
-        disabled={disabled}
-        placeholder={placeholder}
-        value={displayValue}
-        onChange={handleTextChange}
-        onBlur={handleBlur}
-        maxLength={10}
-        className={`w-full pl-3 pr-9 ${focusBorderClass} ${
- disabled ? '' : ''
- }`}
-      />
-      <Popover open={popoverOpen} onOpenChange={(open) => !disabled && setPopoverOpen(open)}>
-        <PopoverTrigger asChild>
-          <Button variant="ghost" size="icon-md"
-            type="button"
-            disabled={disabled}
-            title={t('common.buka_kalender', 'Buka Kalender')}
-            aria-label={t('common.buka_kalender', 'Buka Kalender')}
-            className="absolute right-2.5"
-          >
-            <CalendarIcon className="w-4 h-4" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={handleCalendarSelect}
-            disabled={
-              minDate || maxDate
-                ? [
-                    ...(minDate ? [{ before: minDate }] : []),
-                    ...(maxDate ? [{ after: maxDate }] : []),
-                  ]
-                : undefined
-            }
-            defaultMonth={selectedDate}
-            autoFocus
-          />
-        </PopoverContent>
-      </Popover>
-    </div>
+    <DatePickerView view={view}>
+      <DatePickerContext>
+        {picker => (
+          <>
+            <DatePickerViewControl>
+              <DatePickerPrevTrigger />
+              <DatePickerViewTrigger />
+              <DatePickerNextTrigger />
+            </DatePickerViewControl>
+            <DatePickerTable columns={4}>
+              <DatePickerTableBody>
+                {(view === 'month' ? picker.getMonthsGrid({ columns: 4, format: 'short' }) : picker.getYearsGrid({ columns: 4 })).map((row, rowIndex) => (
+                  <DatePickerTableRow key={rowIndex}>
+                    {row.map(cell => (
+                      <DatePickerTableCell key={cell.value} value={cell.value} disabled={cell.disabled}>
+                        <DatePickerTableCellTrigger>{cell.label}</DatePickerTableCellTrigger>
+                      </DatePickerTableCell>
+                    ))}
+                  </DatePickerTableRow>
+                ))}
+              </DatePickerTableBody>
+            </DatePickerTable>
+          </>
+        )}
+      </DatePickerContext>
+    </DatePickerView>
+  );
+}
+
+/**
+ * Business date field (dd/mm/yyyy) on the moduix DatePicker: typed entry, popup calendar,
+ * month and year views, and min/max bounds. Values in and out stay ISO (YYYY-MM-DD).
+ */
+export const DateInput: React.FC<DateInputProps> = ({ value, onChange, placeholder = 'dd/mm/yyyy', required = false, disabled = false, className, min, max, id, name }) => {
+  const selected = toDateValue(value);
+  return (
+    <DatePicker
+      className={className}
+      locale="en-GB"
+      ids={id ? { input: () => id } : undefined}
+      name={name}
+      required={required}
+      disabled={disabled}
+      placeholder={placeholder}
+      min={toDateValue(min)}
+      max={toDateValue(max)}
+      value={selected ? [selected] : []}
+      onValueChange={details => onChange(details.value[0]?.toString() ?? '')}
+    >
+      <DatePickerField />
+      <DatePickerPositioner>
+        <DatePickerContent>
+          <DatePickerView view="day"><DatePickerDayTable /></DatePickerView>
+          <GridView view="month" />
+          <GridView view="year" />
+        </DatePickerContent>
+      </DatePickerPositioner>
+    </DatePicker>
   );
 };

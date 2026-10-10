@@ -67,7 +67,7 @@ import { SUPPORTED_CURRENCIES, currencyMinorUnits, currencyLabel, formatMoney, g
 import { formatInvoiceFileName, formatBillingFileName } from '@legalio/shared/fileNaming';
 import { DateInput } from './DateInput';
 import { usePermissions } from '../lib/permissions';
-import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Input } from '@legalio/ui-components/input';
 import {
   parseMonthStr,
   parseAllMonths,

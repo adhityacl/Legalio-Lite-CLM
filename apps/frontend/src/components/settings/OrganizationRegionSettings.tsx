@@ -8,7 +8,7 @@ import { SUPPORTED_CURRENCIES, currencyLabel } from '@legalio/shared/currencyUti
 import { buildDueDiligenceChecklist, getCountryPack, getIndustryPack, localize, localizeName, type TenantSettings } from '@legalio/shared/policy';
 import { DueDiligenceChecklistEditor } from './DueDiligenceChecklistEditor';
 
-import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Input } from '@legalio/ui-components/input';
 import { Button } from '@legalio/ui-components/button';
 import { Alert, AlertContent } from '@legalio/ui-components/alert';
 import { Field, FieldLabel, FieldHelperText } from '@legalio/ui-components/field';

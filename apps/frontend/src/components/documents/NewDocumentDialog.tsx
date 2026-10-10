@@ -93,7 +93,7 @@ export const NewDocumentDialog: React.FC<{
 
       <div className="overflow-y-auto px-6 pb-6 space-y-5">
         <InputGroup className="relative">
-          <InputGroupAddon><Search className="size-4" aria-hidden="true" aria-hidden /></InputGroupAddon>
+          <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
           <InputGroupInput
             type="search"
             value={query}

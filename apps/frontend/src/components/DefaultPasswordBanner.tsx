@@ -1,13 +1,13 @@
 import React, { useEffect, useId, useState } from 'react';
-import { Dialog } from 'radix-ui';
-import { ShieldAlert, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { Button } from '@legalio/ui-components/button';
-import { Input } from '@legalio/ui-components/input';
-import { Label } from '@legalio/ui-components/label';
+import { PasswordInput, PasswordInputControl, PasswordInputIndicator, PasswordInputInput, PasswordInputLabel, PasswordInputVisibilityTrigger } from '@legalio/ui-components/password-input';
+import { Alert, AlertActions, AlertContent, AlertDescription, AlertIndicator, AlertTitle } from '@legalio/ui-components/alert';
+import { Collapsible, CollapsibleBody, CollapsibleContent, CollapsibleIndicator, CollapsibleTrigger } from '@legalio/ui-components/collapsible';
+import {
+  Dialog, DialogBackdrop, DialogBody, DialogCloseIcon, DialogCloseTrigger, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPositioner, DialogTitle, DialogTrigger,
+} from '@legalio/ui-components/dialog';
 import { GoogleCredentialsDialog } from './settings/GoogleCredentialsDialog';
-
-import { Alert, AlertContent } from '@legalio/ui-components/alert';
 interface DefaultPasswordBannerProps {
   /** Opens the user administration screen, for changing other accounts. */
   onOpenSecurity: () => void;
@@ -94,110 +94,83 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
   const hasError = state.kind === 'error';
 
   return (
-    <div
-      role={passwordActive ? 'alert' : 'status'}
-      className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-status-warning-border/60 bg-status-warning-soft p-3 text-status-warning "
-    >
-      <ShieldAlert className="h-5 w-5 shrink-0" aria-hidden="true" />
-      {passwordActive ? (
-        <p className="min-w-48 flex-1 text-sm">
-          {t(
-              'security.default_password_warning',
-              'You are signed in with the default administrator password. Change it before using this workspace with real data.',
-            )}
-        </p>
-      ) : (
-        <details className="min-w-28 flex-1 text-sm">
-          <summary className="min-h-10 cursor-pointer content-center font-semibold">
-            {t('google_setup.summary', 'Penyiapan Google')}
-          </summary>
-          <p className="mt-2 leading-relaxed">{t(
-              'google_setup.finish_setup',
-              'Finish setup: upload your Google Service Account and OAuth Client JSON files to enable Drive, Sheets and Google sign-in.',
-            )}</p>
-        </details>
-      )}
-      <div className="flex flex-wrap gap-2">
+    <Alert status="warning" role={passwordActive ? 'alert' : 'status'} className="mb-4">
+      <AlertIndicator />
+      <AlertContent>
+        {passwordActive ? (
+          <AlertDescription>
+            {t('security.default_password_warning', 'You are signed in with the default administrator password. Change it before using this workspace with real data.')}
+          </AlertDescription>
+        ) : (
+          <Collapsible>
+            <CollapsibleTrigger className="font-semibold">
+              {t('google_setup.summary', 'Penyiapan Google')}
+              <CollapsibleIndicator />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CollapsibleBody>
+                <AlertDescription>
+                  {t('google_setup.finish_setup', 'Finish setup: upload your Google Service Account and OAuth Client JSON files to enable Drive, Sheets and Google sign-in.')}
+                </AlertDescription>
+              </CollapsibleBody>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+      </AlertContent>
+      <AlertActions>
         {passwordActive && (
-          <Dialog.Root open={open} onOpenChange={(value) => { setOpen(value); if (!value) setState({ kind: 'idle' }); }}>
-            <Dialog.Trigger asChild>
-              <Button type="button">
-                {t('security.change_password', 'Change password')}
-              </Button>
-            </Dialog.Trigger>
-            <Dialog.Portal>
-              <Dialog.Overlay className="fixed inset-0 z-1000 bg-foreground/60" />
-              <Dialog.Content className="fixed left-1/2 top-1/2 z-1001 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-card p-6 shadow-xl">
-                <div className="mb-4 flex items-start justify-between gap-4">
-                  <Dialog.Title className="flex items-center gap-2">
-                    {t('security.change_password', 'Change password')}
-                  </Dialog.Title>
-                  <Dialog.Close asChild>
-                    <Button variant="secondary" size="icon-md"
-                      type="button"
-                      aria-label={t('common.close', 'Close')}
-                    >
-                      <X className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  </Dialog.Close>
-                </div>
-                <Dialog.Description className="mb-4 text-sm text-muted-foreground">
-                  {t('security.change_password_desc', 'Other sessions will be signed out after the change.')}
-                </Dialog.Description>
-                <form onSubmit={submit} noValidate aria-busy={state.kind === 'saving'} className="space-y-3">
-                  {[
-                    { id: currentId, label: t('security.current_password', 'Current password'), value: current, set: setCurrent, auto: 'current-password' },
-                    { id: nextId, label: t('security.new_password', 'New password'), value: next, set: setNext, auto: 'new-password' },
-                    { id: confirmId, label: t('security.confirm_password', 'Confirm new password'), value: confirm, set: setConfirm, auto: 'new-password' },
-                  ].map((field) => (
-                    <div key={field.id} className="space-y-1">
-                      <Label htmlFor={field.id}>{field.label}</Label>
-                      <Input
-                        id={field.id}
-                        type="password"
-                        autoComplete={field.auto}
-                        required
-                        value={field.value}
-                        onChange={(e) => field.set(e.target.value)}
-                        aria-invalid={hasError}
-                        aria-describedby={hasError ? errorId : undefined}
-                      />
-                    </div>
-                  ))}
-                  {hasError && (
-                    <Alert status="error" id={errorId} role="alert">
-                      <AlertContent>{state.message}</AlertContent>
-                    </Alert>
-                  )}
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Dialog.Close asChild>
-                      <Button type="button" variant="outline">
-                        {t('common.cancel', 'Cancel')}
-                      </Button>
-                    </Dialog.Close>
-                    <Button type="submit" disabled={state.kind === 'saving'}>
+          <Dialog open={open} onOpenChange={details => { setOpen(details.open); if (!details.open) setState({ kind: 'idle' }); }}>
+            <DialogTrigger asChild>
+              <Button size="sm">{t('security.change_password', 'Change password')}</Button>
+            </DialogTrigger>
+            <DialogBackdrop />
+            <DialogPositioner>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{t('security.change_password', 'Change password')}</DialogTitle>
+                  <DialogCloseIcon aria-label={t('common.close', 'Close')} />
+                  <DialogDescription>{t('security.change_password_desc', 'Other sessions will be signed out after the change.')}</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} noValidate aria-busy={state.kind === 'saving'}>
+                  <DialogBody className="grid gap-4">
+                    {[
+                      { id: currentId, label: t('security.current_password', 'Current password'), value: current, set: setCurrent, auto: 'current-password' as const },
+                      { id: nextId, label: t('security.new_password', 'New password'), value: next, set: setNext, auto: 'new-password' as const },
+                      { id: confirmId, label: t('security.confirm_password', 'Confirm new password'), value: confirm, set: setConfirm, auto: 'new-password' as const },
+                    ].map(field => (
+                      <PasswordInput key={field.id} ids={{ input: field.id }} autoComplete={field.auto} invalid={hasError}>
+                        <PasswordInputLabel>{field.label}</PasswordInputLabel>
+                        <PasswordInputControl>
+                          <PasswordInputInput required value={field.value} onChange={e => field.set(e.target.value)} aria-describedby={hasError ? errorId : undefined} />
+                          <PasswordInputVisibilityTrigger><PasswordInputIndicator /></PasswordInputVisibilityTrigger>
+                        </PasswordInputControl>
+                      </PasswordInput>
+                    ))}
+                    {hasError && (
+                      <Alert status="error" id={errorId} role="alert">
+                        <AlertIndicator />
+                        <AlertContent><AlertDescription>{state.message}</AlertDescription></AlertContent>
+                      </Alert>
+                    )}
+                  </DialogBody>
+                  <DialogFooter>
+                    <DialogCloseTrigger asChild>
+                      <Button variant="outline">{t('common.cancel', 'Cancel')}</Button>
+                    </DialogCloseTrigger>
+                    <Button type="submit" loading={state.kind === 'saving'}>
                       {state.kind === 'saving' ? t('common.saving', 'Saving…') : t('security.save_password', 'Save password')}
                     </Button>
-                  </div>
+                  </DialogFooter>
                 </form>
-              </Dialog.Content>
-            </Dialog.Portal>
-          </Dialog.Root>
+              </DialogContent>
+            </DialogPositioner>
+          </Dialog>
         )}
-        {passwordActive && <Button type="button" onClick={onOpenSecurity}>
-          {t('security.manage_users', 'Manage users')}
-        </Button>}
+        {passwordActive && <Button size="sm" variant="outline" onClick={onOpenSecurity}>{t('security.manage_users', 'Manage users')}</Button>}
         {googleIncomplete && showGoogleSetup && (
-          <GoogleCredentialsDialog
-            onClose={refresh}
-            trigger={
-              <Button type="button">
-                {t('google_setup.button', 'Hubungkan Google')}
-              </Button>
-            }
-          />
+          <GoogleCredentialsDialog onClose={refresh} trigger={<Button size="sm">{t('google_setup.button', 'Hubungkan Google')}</Button>} />
         )}
-      </div>
-    </div>
+      </AlertActions>
+    </Alert>
   );
 };

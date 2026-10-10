@@ -6,7 +6,7 @@ import { useTenantSettings } from '../../context/TenantSettingsContext';
 import type { PartyIdentifier } from '@legalio/types';
 import { localizeName } from '@legalio/shared/policy';
 
-import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Input } from '@legalio/ui-components/input';
 import { Button } from '@legalio/ui-components/button';
 export interface PartnerJurisdictionFieldsProps {
   country: string;

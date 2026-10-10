@@ -7,7 +7,7 @@ import { useTenantSettings } from '../../context/TenantSettingsContext';
 import { localize } from '@legalio/shared/policy';
 import { Button } from '@legalio/ui-components/button';
 
-import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Input } from '@legalio/ui-components/input';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { Alert, AlertContent } from '@legalio/ui-components/alert';
 type ResetMode = 'empty' | 'demo';

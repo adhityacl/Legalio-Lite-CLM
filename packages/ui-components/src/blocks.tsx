@@ -40,3 +40,29 @@ export function FormField({ label, help, error, required, invalid, className, ch
     </Field>
   );
 }
+
+/** Context header block: an icon, title and actions above an optional row (usually Tabs). */
+export function ContextHeader({ icon, title, description, actions, children, className }: {
+  icon: React.ReactNode;
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  actions?: React.ReactNode;
+  children?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card className={cn('overflow-hidden', className)}>
+      <CardHeader className="items-center pb-4">
+        <div className="col-start-1 flex min-w-0 items-center gap-3">
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground [&>svg]:size-5" aria-hidden="true">{icon}</span>
+          <div className="min-w-0">
+            <CardTitle asChild className="text-xl"><h2>{title}</h2></CardTitle>
+            {description && <CardDescription>{description}</CardDescription>}
+          </div>
+        </div>
+        {actions && <CardAction className="self-center">{actions}</CardAction>}
+      </CardHeader>
+      {children}
+    </Card>
+  );
+}

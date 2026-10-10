@@ -8,7 +8,7 @@ import { ModalFrame } from '../ui/modal-frame';
 import { Button } from '@legalio/ui-components/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 
-import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Input } from '@legalio/ui-components/input';
 import { Textarea } from '@legalio/ui-components/textarea';
 import { CardHeader } from '@legalio/ui-components/card';
 import { DialogTitle } from '@legalio/ui-components/dialog';
@@ -171,7 +171,7 @@ export const AccountProfileDialog: React.FC<{ onClose: () => void }> = ({ onClos
     <ModalFrame onClose={onClose} className="max-w-3xl">
       <Header title={t('tb.account_profile', 'Account Profile')} onClose={onClose} />
       <div className="min-h-0 overflow-y-auto p-5 sm:p-6">
-        <Tabs value={tab} onValueChange={setTab} className="gap-8">
+        <Tabs value={tab} onValueChange={details => setTab(details.value)} className="gap-8">
           <TabsList aria-label={t('tb.account_profile', 'Account Profile')} className="h-auto w-full rounded-2xl bg-muted p-1">
             <TabsTrigger value="profile" className="min-h-10 flex-1 rounded-md">{t('tb.profile_tab', 'Profile')}</TabsTrigger>
             <TabsTrigger value="security" className="min-h-10 flex-1 rounded-md">{t('tb.security_tab', 'Security')}</TabsTrigger>

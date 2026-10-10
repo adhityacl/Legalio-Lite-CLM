@@ -15,7 +15,7 @@ import {
   Maximize2,
   X,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@legalio/ui-components/card';
+import { Card, CardBody, CardHeader, CardTitle } from '@legalio/ui-components/card';
 import { TableEmptyMessage, TableEmptyState } from './ui/table-empty-state';
 import { Button } from '@legalio/ui-components/button';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
@@ -233,7 +233,7 @@ export const SQLiteDatabaseCard: React.FC = () => {
  </div>
  </CardHeader>
 
- <CardContent className="space-y-4">
+ <CardBody className="space-y-4">
         {message && (
           <div
             className={cn(
@@ -456,7 +456,7 @@ export const SQLiteDatabaseCard: React.FC = () => {
             )}
           </div>
         </div>
-      </CardContent>
+      </CardBody>
 
       {/* Expanded Cell View Modal */}
       {expandedCell && (

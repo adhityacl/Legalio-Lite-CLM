@@ -17,7 +17,6 @@ import {
   type SelectionQuote,
 } from '../../lib/tiptapCommentMark';
 import { RelativeTime } from './RelativeTime';
-import { INPUT_CLASS } from './documentLabels';
 
 import { Textarea } from '@legalio/ui-components/textarea';
 import { Button } from '@legalio/ui-components/button';
@@ -315,7 +314,6 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
               rows={2}
               value={replyTo.body}
               onChange={(e) => setReplyTo({ id: comment.id, body: e.target.value })}
-              className={INPUT_CLASS}
             />
             <div className="flex gap-1">
               <Button type="submit" disabled={isBusy || !replyTo.body.trim()} className={`${SMALL_BUTTON} `}>
@@ -396,7 +394,7 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
           {composer.mode === 'suggestion' && (
             <label className="block space-y-1 text-xs font-semibold text-muted-foreground">
               <span>{t('documents.comments.replace_with', 'Ganti menjadi (kosongkan untuk menghapus)')}</span>
-              <Textarea rows={2} value={composer.newText} onChange={(e) => setComposer({ ...composer, newText: e.target.value })} className={INPUT_CLASS} />
+              <Textarea rows={2} value={composer.newText} onChange={(e) => setComposer({ ...composer, newText: e.target.value })} />
             </label>
           )}
           <label className="block space-y-1 text-xs font-semibold text-muted-foreground">
@@ -409,7 +407,6 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
               rows={3}
               value={composer.body}
               onChange={(e) => setComposer({ ...composer, body: e.target.value })}
-              className={INPUT_CLASS}
             />
           </label>
           <div className="flex gap-1">

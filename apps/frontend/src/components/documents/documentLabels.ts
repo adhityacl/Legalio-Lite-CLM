@@ -1,5 +1,5 @@
 import type { DocumentStatus, DocumentType } from '@legalio/types/documents';
-import { getStatusBadgeClass } from '@legalio/ui-components/badge';
+import { statusTone, type StatusTone } from '@legalio/ui-components/badge';
 
 type Translate = (key: string, fallback?: string, vars?: Record<string, string | number>) => string;
 
@@ -29,12 +29,6 @@ const STATUS_BADGE_KEY: Record<DocumentStatus, string> = {
   archived: 'inactive',
 };
 
-/** Same pill styling as the Partners / Contracts / Service Orders tables. */
-export const BADGE_CLASS = 'text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center justify-center whitespace-nowrap shadow-2xs';
-export const statusBadgeClass = (status: DocumentStatus) => `${BADGE_CLASS} ${getStatusBadgeClass(STATUS_BADGE_KEY[status])}`;
-export const typeBadgeClass = (type: DocumentType) => `${BADGE_CLASS} ${getStatusBadgeClass(type)}`;
-
-/** Field styling without width, for inline controls; INPUT_CLASS is the full-width default. */
-export const FIELD_CLASS =
-  'ds-input';
-export const INPUT_CLASS = `w-full ${FIELD_CLASS}`;
+/** Badge tones shared with the Partners / Contracts / Service Orders tables. */
+export const statusBadgeTone = (status: DocumentStatus): StatusTone => statusTone(STATUS_BADGE_KEY[status]);
+export const typeBadgeTone = (type: DocumentType): StatusTone => statusTone(type);

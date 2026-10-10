@@ -6,7 +6,7 @@ import { Button } from '@legalio/ui-components/button';
 import { Badge } from '@legalio/ui-components/badge';
 import { ModalFrame } from '../ui/modal-frame';
 
-import { fieldControlClass, Input } from '@legalio/ui-components/input';
+import { Input } from '@legalio/ui-components/input';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell } from '@legalio/ui-components/table';
 import { NativeSelect } from '@legalio/ui-components/native-select';
