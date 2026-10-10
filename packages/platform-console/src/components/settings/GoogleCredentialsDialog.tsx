@@ -1,6 +1,5 @@
 import React, { useId, useState } from 'react';
-import { Dialog } from 'radix-ui';
-import { AlertTriangle, CheckCircle2, FileJson, RotateCcw, Upload, X } from 'lucide-react';
+import { FileJson, RotateCcw } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useConfirm } from '../../context/ConfirmDialogContext';
 import { useAlertToast } from '../../context/AlertToastContext';
@@ -14,7 +13,13 @@ import {
   type ParseErrorCode,
 } from '@legalio/shared/googleCredentialFiles';
 
-import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Alert, AlertActions, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { Badge } from '@legalio/ui-components/badge';
+import { Card, CardBody, CardDescription, CardHeader, CardTitle } from '@legalio/ui-components/card';
+import { Dialog, DialogBackdrop, DialogBody, DialogCloseIcon, DialogCloseTrigger, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPositioner, DialogTitle, DialogTrigger } from '@legalio/ui-components/dialog';
+import { FileUpload, FileUploadDropzone, FileUploadHiddenInput, FileUploadTrigger } from '@legalio/ui-components/file-upload';
+import { Skeleton } from '@legalio/ui-components/skeleton';
+import { Text } from '@legalio/ui-components/text';
 interface GoogleCredentialsDialogProps {
   /** Element that opens the dialog (rendered through Dialog.Trigger asChild). */
   trigger: React.ReactElement;
@@ -47,7 +52,6 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [busy, setBusy] = useState<GoogleCredentialKind | null>(null);
   const [errors, setErrors] = useState<Partial<Record<GoogleCredentialKind, string>>>({});
-  const [dragOver, setDragOver] = useState<GoogleCredentialKind | null>(null);
 
   const load = () => {
     setState({ status: 'loading' });
@@ -123,190 +127,123 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
       !isSa && data.oauthClient.source === 'upload' && !data.oauthClient.javascript_origins.includes(origin);
 
     return (
-      <section
-        key={kind}
-        aria-labelledby={`${inputId}-title`}
-        aria-busy={busy === kind}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(kind);
-        }}
-        onDragLeave={() => setDragOver(null)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(null);
-          upload(kind, e.dataTransfer.files[0]);
-        }}
-        className={`ds-upload space-y-2 ${
- dragOver === kind ? 'border-status-success-border bg-status-success-soft ' : 'border-border '
- }`}
-      >
-        <h3 id={`${inputId}-title`} className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <FileJson className="w-4 h-4 text-muted-foreground" aria-hidden />
-          {isSa ? t('google_setup.sa_title', '1. Service Account (JSON)') : t('google_setup.oauth_title', '2. OAuth Client (JSON)')}
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          {isSa
-            ? t('google_setup.sa_help', 'Google Cloud Console → IAM & Admin → Service Accounts → pilih akun → Keys → Add key → JSON. Dipakai untuk Google Drive & Sheets.')
-            : t('google_setup.oauth_help', 'Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Download JSON. Dipakai untuk menghubungkan akun Google pengguna.')}
-        </p>
+      <Card key={kind} size="sm" aria-labelledby={`${inputId}-title`} aria-busy={busy === kind}>
+        <CardHeader>
+          <CardTitle id={`${inputId}-title`} className="flex items-center gap-2 text-sm">
+            <FileJson className="size-4 text-muted-foreground" aria-hidden="true" />
+            {isSa ? t('google_setup.sa_title', '1. Service Account (JSON)') : t('google_setup.oauth_title', '2. OAuth Client (JSON)')}
+          </CardTitle>
+          <CardDescription>
+            {isSa
+              ? t('google_setup.sa_help', 'Google Cloud Console → IAM & Admin → Service Accounts → pilih akun → Keys → Add key → JSON. Dipakai untuk Google Drive & Sheets.')
+              : t('google_setup.oauth_help', 'Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Download JSON. Dipakai untuk menghubungkan akun Google pengguna.')}
+          </CardDescription>
+        </CardHeader>
+        <CardBody className="grid gap-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+            <Badge tone={info.source ? 'success' : 'warning'}>
+              {info.source === 'upload'
+                ? t('google_setup.source_upload', 'Terpasang dari file unggahan')
+                : info.source === 'env'
+                  ? t('google_setup.source_env', 'Memakai nilai dari .env')
+                  : t('google_setup.source_none', 'Belum dikonfigurasi')}
+            </Badge>
+            {info.source && <span className="font-mono text-xs break-all">{isSa ? data.serviceAccount.client_email : data.oauthClient.client_id}{info.project_id && ` · ${info.project_id}`}</span>}
+            {info.updated_at && <Text as="span" size="xs" tone="muted"><RelativeTime iso={info.updated_at} /></Text>}
+          </div>
 
-        <p className="text-xs flex items-start gap-1.5 text-foreground">
-          {info.source ? (
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-status-success" aria-hidden />
-          ) : (
-            <AlertTriangle className="w-4 h-4 shrink-0 text-status-warning" aria-hidden />
+          {isSa && info.source && (
+            <Text size="xs" tone="muted">{t('google_setup.sa_share_hint', 'Bagikan folder Drive dan spreadsheet ke email service account di atas sebagai Editor.')}</Text>
           )}
-          <span>
-            {info.source === 'upload'
-              ? t('google_setup.source_upload', 'Terpasang dari file unggahan')
-              : info.source === 'env'
-                ? t('google_setup.source_env', 'Memakai nilai dari .env')
-                : t('google_setup.source_none', 'Belum dikonfigurasi')}
-            {info.source && (
-              <>
-                {' · '}
-                <span className="font-mono break-all">{isSa ? data.serviceAccount.client_email : data.oauthClient.client_id}</span>
-                {info.project_id && ` · ${info.project_id}`}
-              </>
-            )}
-            {info.updated_at && (
-              <>
-                {' · '}
-                <RelativeTime iso={info.updated_at} />
-              </>
-            )}
-          </span>
-        </p>
-
-        {isSa && info.source && (
-          <p className="text-xs text-muted-foreground">
-            {t('google_setup.sa_share_hint', 'Bagikan folder Drive dan spreadsheet ke email service account di atas sebagai Editor.')}
-          </p>
-        )}
-        {originMissing && (
-          <Alert status="warning" role="status">
-            <AlertContent>{t(
-              'google_setup.origin_missing',
-              'Origin aplikasi ini ({origin}) belum ada di "Authorized JavaScript origins" OAuth client (terdaftar: {list}). Tambahkan di Google Cloud Console, lalu unduh & unggah ulang file ini.',
-              { origin, list: data.oauthClient.javascript_origins.join(', ') || '—' },
-            )}</AlertContent>
-          </Alert>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            id={inputId}
-            type="file"
-            accept=".json,application/json"
-            className="peer sr-only"
-            disabled={busy !== null}
-            aria-describedby={errors[kind] ? errorId : undefined}
-            onChange={(e) => {
-              upload(kind, e.target.files?.[0]);
-              e.target.value = '';
-            }}
-          />
-          <label
-            htmlFor={inputId}
-            className="inline-flex items-center gap-1.5 px-3 min-h-10 rounded-md bg-primary hover:bg-[#05a847] text-white text-xs font-bold cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"
-          >
-            <Upload className="w-3.5 h-3.5" aria-hidden />
-            {busy === kind
-              ? t('common.saving', 'Menyimpan…')
-              : info.source === 'upload'
-                ? t('google_setup.replace', 'Ganti file')
-                : t('google_setup.choose', 'Pilih file JSON')}
-          </label>
-          <span className="text-xs text-muted-foreground">{t('google_setup.drop_hint', 'atau seret file ke kotak ini')}</span>
-          {info.source === 'upload' && (
-            <Button variant="ghost" size="icon-md"
-              type="button"
-              onClick={() => remove(kind)}
-              disabled={busy !== null}
-              aria-label={t('google_setup.reset', 'Reset file yang diunggah')}
-              title={t('google_setup.reset', 'Reset file yang diunggah')}
-              className="ml-auto text-destructive"
-            >
-              <RotateCcw className="w-4 h-4" aria-hidden />
-            </Button>
+          {originMissing && (
+            <Alert status="warning" role="status">
+              <AlertIndicator />
+              <AlertContent><AlertDescription>{t(
+                'google_setup.origin_missing',
+                'Origin aplikasi ini ({origin}) belum ada di "Authorized JavaScript origins" OAuth client (terdaftar: {list}). Tambahkan di Google Cloud Console, lalu unduh & unggah ulang file ini.',
+                { origin, list: data.oauthClient.javascript_origins.join(', ') || '—' },
+              )}</AlertDescription></AlertContent>
+            </Alert>
           )}
-        </div>
-        {errors[kind] && (
-          <Alert status="error" id={errorId} role="alert">
-            <AlertContent>{errors[kind]}</AlertContent>
-          </Alert>
-        )}
-      </section>
+
+          <FileUpload accept=".json,application/json" maxFiles={1} maxFileSize={MAX_FILE_BYTES} disabled={busy !== null}
+            onFileAccept={details => upload(kind, details.files[0])}
+            onFileReject={details => upload(kind, details.files[0]?.file)}>
+            <FileUploadDropzone className="flex-row flex-wrap justify-start gap-2 p-3">
+              <FileUploadTrigger asChild>
+                <Button size="sm" loading={busy === kind}>
+                  {busy === kind
+                    ? t('common.saving', 'Menyimpan…')
+                    : info.source === 'upload'
+                      ? t('google_setup.replace', 'Ganti file')
+                      : t('google_setup.choose', 'Pilih file JSON')}
+                </Button>
+              </FileUploadTrigger>
+              <Text as="span" size="xs" tone="muted">{t('google_setup.drop_hint', 'atau seret file ke kotak ini')}</Text>
+              {info.source === 'upload' && (
+                <Button variant="ghost" size="icon-sm" onClick={() => remove(kind)} disabled={busy !== null} className="ms-auto text-destructive"
+                  aria-label={t('google_setup.reset', 'Reset file yang diunggah')} title={t('google_setup.reset', 'Reset file yang diunggah')}>
+                  <RotateCcw aria-hidden="true" />
+                </Button>
+              )}
+            </FileUploadDropzone>
+            <FileUploadHiddenInput id={inputId} aria-describedby={errors[kind] ? errorId : undefined} />
+          </FileUpload>
+          {errors[kind] && (
+            <Alert status="error" id={errorId} role="alert"><AlertIndicator /><AlertContent><AlertDescription>{errors[kind]}</AlertDescription></AlertContent></Alert>
+          )}
+        </CardBody>
+      </Card>
     );
   };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={(value) => {
-        setOpen(value);
+      onOpenChange={(details) => {
+        setOpen(details.open);
         setErrors({});
-        if (value) load();
+        if (details.open) load();
         else onClose?.();
       }}
     >
-      <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-1000 bg-foreground/60" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-1000 w-[calc(100%-2rem)] max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-card p-6 shadow-xl">
-          <div className="mb-2 flex items-start justify-between gap-4">
-            <Dialog.Title className="flex items-center gap-2">
-              {t('google_setup.title', 'Hubungkan Google')}
-            </Dialog.Title>
-            <Dialog.Close asChild>
-              <Button variant="secondary" size="icon-md"
-                type="button"
-                aria-label={t('common.close', 'Tutup')}
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            </Dialog.Close>
-          </div>
-          <Dialog.Description className="mb-4 text-sm text-muted-foreground">
-            {t(
-              'google_setup.description',
-              'Unggah dua file JSON yang diekspor dari Google Cloud Console. File disimpan di server, menggantikan variabel GOOGLE_* di .env, dan isinya yang rahasia tidak pernah ditampilkan lagi.',
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogBackdrop />
+      <DialogPositioner>
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] w-[min(32rem,calc(100vw-2rem))] flex-col overflow-hidden p-0">
+          <DialogHeader className="border-b border-border px-6 py-4">
+            <DialogTitle>{t('google_setup.title', 'Hubungkan Google')}</DialogTitle>
+            <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
+            <DialogDescription>
+              {t('google_setup.description', 'Unggah dua file JSON yang diekspor dari Google Cloud Console. File disimpan di server, menggantikan variabel GOOGLE_* di .env, dan isinya yang rahasia tidak pernah ditampilkan lagi.')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="mt-0 grid gap-3 overflow-y-auto px-6 py-5">
+            {state.status === 'loading' && (
+              <div role="status" className="grid gap-3">
+                <span className="sr-only">{t('common.loading', 'Memuat…')}</span>
+                <Skeleton height={144} /><Skeleton height={144} />
+              </div>
             )}
-          </Dialog.Description>
-
-          {state.status === 'loading' && (
-            <div role="status" className="space-y-3">
-              <span className="sr-only">{t('common.loading', 'Memuat…')}</span>
-              {[0, 1].map((i) => (
-                <div key={i} className="h-36 rounded-xl bg-muted animate-pulse motion-reduce:animate-none" />
-              ))}
-            </div>
-          )}
-          {state.status === 'error' && (
-            <Alert status="error" role="alert">
-              <AlertContent><p>{state.message}</p>
-              <Button type="button" variant="outline" onClick={load}>
-                {t('common.retry', 'Coba lagi')}
-              </Button></AlertContent>
-            </Alert>
-          )}
-          {state.status === 'ready' && (
-            <div className="space-y-3">
-              {renderSlot('service-account', state.data)}
-              {renderSlot('oauth-client', state.data)}
-            </div>
-          )}
-
-          <div className="flex justify-end pt-4">
-            <Dialog.Close asChild>
-              <Button type="button">
-                {t('google_setup.done', 'Selesai')}
-              </Button>
-            </Dialog.Close>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+            {state.status === 'error' && (
+              <Alert status="error" role="alert">
+                <AlertIndicator />
+                <AlertContent><AlertDescription>{state.message}</AlertDescription></AlertContent>
+                <AlertActions><Button variant="outline" size="sm" onClick={load}>{t('common.retry', 'Coba lagi')}</Button></AlertActions>
+              </Alert>
+            )}
+            {state.status === 'ready' && (
+              <>
+                {renderSlot('service-account', state.data)}
+                {renderSlot('oauth-client', state.data)}
+              </>
+            )}
+          </DialogBody>
+          <DialogFooter className="mt-0 border-t border-border px-6 py-4">
+            <DialogCloseTrigger asChild><Button>{t('google_setup.done', 'Selesai')}</Button></DialogCloseTrigger>
+          </DialogFooter>
+        </DialogContent>
+      </DialogPositioner>
+    </Dialog>
   );
 };

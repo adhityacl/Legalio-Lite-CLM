@@ -35,7 +35,6 @@
     "lucide-react": "^0.546.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "radix-ui": "^1.6.7",
     "@legalio/platform-console": "*"
   },
   "devDependencies": {
