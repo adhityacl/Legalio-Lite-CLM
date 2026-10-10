@@ -46,6 +46,8 @@ import { Heading } from '@legalio/ui-components/heading';
 import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
+import { RadioGroup, RadioGroupItem, RadioGroupItemControl, RadioGroupItemHiddenInput, RadioGroupItemText, RadioGroupLabel } from '@legalio/ui-components/radio-group';
+import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 interface PartnerEvaluationViewProps {
   partners: Partner[];
   contracts?: Contract[];
@@ -926,9 +928,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               {/* BAGIAN 1: Informasi Dasar */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-border">
-                  <span className="w-6 h-6 rounded-full bg-accent text-accent-foreground border border-primary/30 font-black text-xs flex items-center justify-center shrink-0">
-                    1
-                  </span>
+                  <Badge tone="info" className="size-6 justify-center rounded-full p-0 font-semibold">1</Badge>
                   <Heading as="h3" size="sm" weight="semibold">{t('eval.section1')}</Heading>
                 </div>
 
@@ -946,10 +946,8 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                   </Field>
 
                   {/* Supplier Name (Dropdown Tersinkron) */}
-                  <div>
-                    <label htmlFor="partnerevaluationview-field-2" className="block text-xs font-bold text-foreground mb-1">
-                      {t('eval.supplier_name')} <span className="text-status-danger">*</span>
-                    </label>
+                  <Field required>
+                    <FieldLabel htmlFor="partnerevaluationview-field-2">{t('eval.supplier_name')}</FieldLabel>
                     {partners.length > 0 ? (
                       <AlphabeticalSelect id="partnerevaluationview-field-2"
                         required
@@ -975,11 +973,9 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                         ))}
                       </AlphabeticalSelect>
                     ) : (
-                      <div className="p-3 bg-status-warning-soft border border-status-warning-border rounded-xl text-xs font-bold text-status-warning">
-                        {t('eval.no_partners_warning')}
-                      </div>
+                      <Alert status="warning"><AlertIndicator /><AlertContent><AlertDescription>{t('eval.no_partners_warning')}</AlertDescription></AlertContent></Alert>
                     )}
-                  </div>
+                  </Field>
                 </div>
               </div>
 
@@ -987,199 +983,103 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-border">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-accent text-accent-foreground border border-primary/30 font-black text-xs flex items-center justify-center shrink-0">
-                      2
-                    </span>
+                    <Badge tone="info" className="size-6 justify-center rounded-full p-0 font-semibold">2</Badge>
                     <Heading as="h3" size="sm" weight="semibold">{t('eval.section2')}</Heading>
                   </div>
                 </div>
 
                 {/* Obligation / Target */}
-                <div>
-                  <label className="block text-xs font-bold text-foreground mb-1.5">
-                    {t('eval.obligation_target')} <span className="text-status-danger">*</span>
-                  </label>
+                <RadioGroup required value={formData.obligation_target || null} onValueChange={details => details.value && setFormData({ ...formData, obligation_target: details.value as typeof formData.obligation_target })}>
+                  <RadioGroupLabel>{t('eval.obligation_target')} <span className="text-destructive" aria-hidden="true">*</span></RadioGroupLabel>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { value: 'Sangat baik', label: t('eval.opt_sangat_baik'), points: `30 ${t('eval.points')}` },
                       { value: 'Baik', label: t('eval.opt_baik'), points: `20 ${t('eval.points')}` },
                       { value: 'Kurang baik', label: t('eval.opt_kurang_baik'), points: `10 ${t('eval.points')}` },
                     ].map((opt) => (
-                      <label
-                        key={opt.value}
-                        className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
- formData.obligation_target === opt.value
- ? 'bg-accent border-primary text-foreground font-bold shadow-2xs'
- : 'bg-background border-border text-foreground hover:bg-muted '
- }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="obligation_target"
-                            value={opt.value}
-                            checked={formData.obligation_target === opt.value}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                obligation_target: e.target.value as any,
-                              })
-                            }
-                            className="accent-[#2653F6]"
-                          />
-                          <span className="text-xs">{opt.label}</span>
-                        </div>
-                        <span className="text-xs font-bold text-accent-foreground bg-accent border border-primary/30 px-2 py-0.5 rounded-md">
-                          {opt.points}
-                        </span>
-                      </label>
+                      <RadioGroupItem key={opt.value} value={opt.value} className="flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
+                        <RadioGroupItemControl />
+                        <RadioGroupItemText className="text-sm">{opt.label}</RadioGroupItemText>
+                        <Badge tone="info" className="ms-auto">{opt.points}</Badge>
+                        
+                        <RadioGroupItemHiddenInput />
+                      </RadioGroupItem>
                     ))}
                   </div>
-                </div>
+                </RadioGroup>
 
                 {/* Incident Frequency */}
-                <div>
-                  <label className="block text-xs font-bold text-foreground mb-1.5">
-                    {t('eval.incident_freq')} <span className="text-status-danger">*</span>
-                  </label>
+                <RadioGroup required value={formData.incident_frequency || null} onValueChange={details => details.value && setFormData({ ...formData, incident_frequency: details.value as typeof formData.incident_frequency })}>
+                  <RadioGroupLabel>{t('eval.incident_freq')} <span className="text-destructive" aria-hidden="true">*</span></RadioGroupLabel>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { value: 'Never', label: t('eval.opt_never'), points: `20 ${t('eval.points')}` },
                       { value: 'Rare', label: t('eval.opt_rare'), points: `15 ${t('eval.points')}` },
                       { value: 'Frequent', label: t('eval.opt_frequent'), points: `10 ${t('eval.points')}` },
                     ].map((opt) => (
-                      <label
-                        key={opt.value}
-                        className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
- formData.incident_frequency === opt.value
- ? 'bg-accent border-primary text-foreground font-bold shadow-2xs'
- : 'bg-background border-border text-foreground hover:bg-muted '
- }`}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="radio"
-                            name="incident_frequency"
-                            value={opt.value}
-                            checked={formData.incident_frequency === opt.value}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                incident_frequency: e.target.value as any,
-                              })
-                            }
-                            className="accent-[#2653F6]"
-                          />
-                          <span className="text-xs">{opt.label}</span>
-                        </div>
-                        <span className="text-xs font-bold text-accent-foreground bg-accent border border-primary/30 px-2 py-0.5 rounded-md">
-                          {opt.points}
-                        </span>
-                      </label>
+                      <RadioGroupItem key={opt.value} value={opt.value} className="flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
+                        <RadioGroupItemControl />
+                        <RadioGroupItemText className="text-sm">{opt.label}</RadioGroupItemText>
+                        <Badge tone="info" className="ms-auto">{opt.points}</Badge>
+                        
+                        <RadioGroupItemHiddenInput />
+                      </RadioGroupItem>
                     ))}
                   </div>
-                </div>
+                </RadioGroup>
 
                 {/* Communication */}
-                <div>
-                  <label className="block text-xs font-bold text-foreground mb-1.5">
-                    {t('eval.communication')} <span className="text-status-danger">*</span>
-                  </label>
+                <RadioGroup required value={formData.communication || null} onValueChange={details => details.value && setFormData({ ...formData, communication: details.value as typeof formData.communication })}>
+                  <RadioGroupLabel>{t('eval.communication')} <span className="text-destructive" aria-hidden="true">*</span></RadioGroupLabel>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { value: 'Sangat baik', label: t('eval.opt_sangat_baik'), points: `20 ${t('eval.points')}` },
                       { value: 'Baik', label: t('eval.opt_baik'), points: `15 ${t('eval.points')}` },
                       { value: 'Kurang baik', label: t('eval.opt_kurang_baik'), points: `10 ${t('eval.points')}` },
                     ].map((opt) => (
-                      <label
-                        key={opt.value}
-                        className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
- formData.communication === opt.value
- ? 'bg-accent border-primary text-foreground font-bold shadow-2xs'
- : 'bg-background border-border text-foreground hover:bg-muted '
- }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="communication"
-                            value={opt.value}
-                            checked={formData.communication === opt.value}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                communication: e.target.value as any,
-                              })
-                            }
-                            className="accent-[#2653F6]"
-                          />
-                          <span className="text-xs">{opt.label}</span>
-                        </div>
-                        <span className="text-xs font-bold text-accent-foreground bg-accent border border-primary/30 px-2 py-0.5 rounded-md">
-                          {opt.points}
-                        </span>
-                      </label>
+                      <RadioGroupItem key={opt.value} value={opt.value} className="flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
+                        <RadioGroupItemControl />
+                        <RadioGroupItemText className="text-sm">{opt.label}</RadioGroupItemText>
+                        <Badge tone="info" className="ms-auto">{opt.points}</Badge>
+                        
+                        <RadioGroupItemHiddenInput />
+                      </RadioGroupItem>
                     ))}
                   </div>
-                </div>
+                </RadioGroup>
 
                 {/* Pricing */}
-                <div>
-                  <label className="block text-xs font-bold text-foreground mb-1.5">
-                    {t('eval.pricing')} <span className="text-status-danger">*</span>
-                  </label>
+                <RadioGroup required value={formData.pricing || null} onValueChange={details => details.value && setFormData({ ...formData, pricing: details.value as typeof formData.pricing })}>
+                  <RadioGroupLabel>{t('eval.pricing')} <span className="text-destructive" aria-hidden="true">*</span></RadioGroupLabel>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { value: 'Cheap', label: t('eval.opt_cheap'), points: `30 ${t('eval.points')}` },
                       { value: 'Moderate', label: t('eval.opt_moderate'), points: `20 ${t('eval.points')}` },
                       { value: 'Expensive', label: t('eval.opt_expensive'), points: `10 ${t('eval.points')}` },
                     ].map((opt) => (
-                      <label
-                        key={opt.value}
-                        className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
- formData.pricing === opt.value
- ? 'bg-accent border-primary text-foreground font-bold shadow-2xs'
- : 'bg-background border-border text-foreground hover:bg-muted '
- }`}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="radio"
-                            name="pricing"
-                            value={opt.value}
-                            checked={formData.pricing === opt.value}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                pricing: e.target.value as any,
-                              })
-                            }
-                            className="accent-[#2653F6]"
-                          />
-                          <span className="text-xs">{opt.label}</span>
-                        </div>
-                        <span className="text-xs font-bold text-accent-foreground bg-accent border border-primary/30 px-2 py-0.5 rounded-md">
-                          {opt.points}
-                        </span>
-                      </label>
+                      <RadioGroupItem key={opt.value} value={opt.value} className="flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
+                        <RadioGroupItemControl />
+                        <RadioGroupItemText className="text-sm">{opt.label}</RadioGroupItemText>
+                        <Badge tone="info" className="ms-auto">{opt.points}</Badge>
+                        
+                        <RadioGroupItemHiddenInput />
+                      </RadioGroupItem>
                     ))}
                   </div>
-                </div>
+                </RadioGroup>
               </div>
 
               {/* BAGIAN 3: Evaluasi Akhir & Catatan */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-border">
-                  <span className="w-6 h-6 rounded-full bg-accent text-accent-foreground border border-primary/30 font-black text-xs flex items-center justify-center shrink-0">
-                    3
-                  </span>
+                  <Badge tone="info" className="size-6 justify-center rounded-full p-0 font-semibold">3</Badge>
                   <Heading as="h3" size="sm" weight="semibold">
                     {t('eval.section3')}
                   </Heading>
                 </div>
 
                 {/* Live Score Calculation Display */}
-                <div className="p-4 bg-accent border border-primary/30 rounded-2xl space-y-3">
+                <Card className="gap-3 border-primary/30 bg-accent p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Calculator className="w-4 h-4 text-accent-foreground" />
@@ -1187,11 +1087,9 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                         {t('eval.calc_score_breakdown')}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 bg-primary text-white px-3 py-1 rounded-xl shadow-2xs">
-                      <span className="text-xs font-semibold">{t('eval.total', 'Total:')}</span>
-                      <span className="text-base font-black">{liveBreakdown.total}</span>
-                      <span className="text-xs opacity-80">/ 100 {t('eval.points')}</span>
-                    </div>
+                    <Badge tone="info" className="gap-1 px-3 py-1">
+                      {t('eval.total', 'Total:')} <strong className="text-base tabular-nums">{liveBreakdown.total}</strong> / 100 {t('eval.points')}
+                    </Badge>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
@@ -1220,63 +1118,39 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                       </span>
                     </Card>
                   </div>
-                </div>
+                </Card>
 
                 {/* Final Evaluation Option */}
-                <div>
-                  <label className="block text-xs font-bold text-foreground mb-1.5">
-                    {t('eval.col_final_eval')} <span className="text-status-danger">*</span>
-                  </label>
+                <RadioGroup required value={formData.final_evaluation || null} onValueChange={details => details.value && setFormData({ ...formData, final_evaluation: details.value as typeof formData.final_evaluation })}>
+                  <RadioGroupLabel>{t('eval.col_final_eval')} <span className="text-destructive" aria-hidden="true">*</span></RadioGroupLabel>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       {
                         value: 'Recommended',
                         label: t('eval.status_rec'),
                         desc: t('eval.opt_rec_desc'),
-                        activeClass: 'bg-accent border-primary text-foreground ',
                       },
                       {
                         value: 'Recommended with notes',
                         label: t('eval.rec_with_notes'),
                         desc: t('eval.opt_rec_notes_desc'),
-                        activeClass: 'bg-status-warning-soft  border-status-warning-border  text-foreground ',
                       },
                       {
                         value: 'Not recommended',
                         label: t('eval.status_not_rec'),
                         desc: t('eval.opt_not_rec_desc'),
-                        activeClass: 'bg-status-danger-soft  border-status-danger-border  text-foreground ',
                       },
                     ].map((opt) => (
-                      <label
-                        key={opt.value}
-                        className={`p-3 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
- formData.final_evaluation === opt.value
- ? `${opt.activeClass} font-bold shadow-2xs`
-                            : 'bg-background  border-border text-foreground hover:bg-muted '
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <input
-                            type="radio"
-                            name="final_evaluation"
-                            value={opt.value}
-                            checked={formData.final_evaluation === opt.value}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                final_evaluation: e.target.value as any,
-                              })
-                            }
-                            className="accent-[#2653F6]"
-                          />
-                          <span className="text-xs">{opt.label}</span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">{opt.desc}</span>
-                      </label>
+                      <RadioGroupItem key={opt.value} value={opt.value} className="flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
+                        <RadioGroupItemControl />
+                        <RadioGroupItemText className="text-sm">{opt.label}</RadioGroupItemText>
+                        
+                        <RadioGroupItemText className="basis-full text-xs text-muted-foreground">{opt.desc}</RadioGroupItemText>
+                        <RadioGroupItemHiddenInput />
+                      </RadioGroupItem>
                     ))}
                   </div>
-                </div>
+                </RadioGroup>
 
                 {/* Notes / Alasan Evaluasi */}
                 <Field>

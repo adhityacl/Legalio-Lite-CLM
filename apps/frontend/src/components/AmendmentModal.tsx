@@ -10,8 +10,13 @@ import { formatContractFileName, formatIOFileName } from '@legalio/shared/fileNa
 import { Button } from '@legalio/ui-components/button';
 import { Input } from '@legalio/ui-components/input';
 import { Textarea } from '@legalio/ui-components/textarea';
-import { DialogHeader, DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
+import { DialogBody, DialogCloseIcon, DialogFooter, DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { FileUpload, FileUploadDropzone, FileUploadDropzoneIcon, FileUploadHiddenInput, FileUploadLabel, FileUploadTrigger } from '@legalio/ui-components/file-upload';
+import { Text } from '@legalio/ui-components/text';
+import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
+import { ToggleGroup, ToggleGroupItem } from '@legalio/ui-components/toggle-group';
 interface AmendmentModalProps {
   initialParent?: Contract | InsertionOrder;
   contracts: Contract[];
@@ -119,16 +124,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
     ringkasanPerubahan.trim()
   );
 
-  const handleFieldToggle = (field: string) => {
-    if (selectedFields.includes(field)) {
-      setSelectedFields(selectedFields.filter((f) => f !== field));
-    } else {
-      setSelectedFields([...selectedFields, field]);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = (file: File | undefined) => {
     if (file) {
       setFileName(file.name);
       const reader = new FileReader();
@@ -219,7 +215,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1 text-foreground">
+          <DialogBody className="mt-0 flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-5 text-foreground">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field>
                 <FieldLabel>{t('amendments.tipe_induk_perjanjian', 'Tipe Induk Perjanjian *')}</FieldLabel>
@@ -281,27 +277,14 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
               </Field>
             </div>
 
-            <div>
-              <label className="block font-bold text-foreground mb-1.5 text-xs">{t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')}</label>
-              <div className="flex flex-wrap gap-1.5">
-                {['Nilai Kontrak / IO', 'Jangka Waktu Periode', 'Ruang Lingkup / Deliverables', 'Syarat Pembayaran', 'Pihak Berwenang'].map(
-                  (f) => (
-                    <label
-                      key={f}
-                      onClick={() => handleFieldToggle(f)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer select-none transition-all ${
- selectedFields.includes(f)
- ? 'bg-accent text-accent-foreground border-primary/40 font-bold'
- : 'bg-background text-muted-foreground border-border hover:border-border '
- }`}
-                    >
-                      {selectedFields.includes(f) ? '✓ ' : '+ '}
-                      {f}
-                    </label>
-                  )
-                )}
-              </div>
-            </div>
+            <Fieldset>
+              <FieldsetLegend>{t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')}</FieldsetLegend>
+              <ToggleGroup multiple value={selectedFields} onValueChange={details => setSelectedFields(details.value)} aria-label={t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')} className="flex-wrap">
+                {['Nilai Kontrak / IO', 'Jangka Waktu Periode', 'Ruang Lingkup / Deliverables', 'Syarat Pembayaran', 'Pihak Berwenang'].map((f) => (
+                  <ToggleGroupItem key={f} value={f}>{f}</ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </Fieldset>
 
             <Field>
               <FieldLabel>
@@ -317,56 +300,30 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
               />
             </Field>
 
-            <div>
-              <label className="block font-bold text-foreground mb-1.5 text-xs">{t('amendments.file_dokumen_addendum_pdf_drive_upload', 'File Dokumen Addendum PDF (Drive Upload)')}</label>
-              <div className="ds-upload text-center">
-                <Upload className="w-6 h-6 text-accent-foreground mx-auto mb-1.5" />
-                <p className="text-xs font-bold text-foreground">
-                  {fileName ? t('amendments.file_terpilih', 'File terpilih: {fileName}', { fileName }) : t('amendments.pilih_file_pdf_addendum', 'Pilih File PDF Addendum')}
-                </p>
-                <div className="mt-2.5 flex flex-wrap items-center justify-center gap-3">
-                  {fileData && (
-                    <Button variant="ghost" size="sm"
-                      type="button"
-                      onClick={handleParseAmendment}
-                      disabled={isParsing}
-                    >
-                      {isParsing ? t('amendments.parsing', 'Parsing...') : t('amendments.parse_file', 'Parse File')}
-                    </Button>
-                  )}
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileChange}
-                    className="w-[220px] text-xs text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
-                  />
-                </div>
-              </div>
-            </div>
+            <FileUpload accept=".pdf" maxFiles={1} onFileAccept={details => handleFileChange(details.files[0])}>
+              <FileUploadLabel>{t('amendments.file_dokumen_addendum_pdf_drive_upload', 'File Dokumen Addendum PDF (Drive Upload)')}</FileUploadLabel>
+              <FileUploadDropzone>
+                <FileUploadDropzoneIcon />
+                <Text size="sm" weight="semibold">{fileName ? t('amendments.file_terpilih', 'File terpilih: {fileName}', { fileName }) : t('amendments.pilih_file_pdf_addendum', 'Pilih File PDF Addendum')}</Text>
+                <FileUploadTrigger asChild><Button variant="outline" size="sm">{t('form.contract.choose_file', 'Pilih File')}</Button></FileUploadTrigger>
+              </FileUploadDropzone>
+              <FileUploadHiddenInput />
+            </FileUpload>
+            {fileData && <Button variant="outline" onClick={handleParseAmendment} loading={isParsing} className="self-start">{isParsing ? t('amendments.parsing', 'Parsing...') : t('amendments.parse_file', 'Parse File')}</Button>}
 
             {parseSuccessMsg && (
-              <div className="p-3 bg-status-success-soft border border-status-success-border text-status-success rounded-xl text-xs font-semibold flex items-center gap-2">
-                <span>{parseSuccessMsg}</span>
-              </div>
+              <Alert status="success" role="status"><AlertIndicator /><AlertContent><AlertDescription>{parseSuccessMsg}</AlertDescription></AlertContent></Alert>
             )}
 
             {error && (
-              <div className="p-3.5 bg-status-danger-soft border border-status-danger-border text-status-danger rounded-xl text-xs font-bold flex items-center gap-2">
-                <span>⚠️</span>
-                <span>{error}</span>
-              </div>
+              <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>
             )}
-          </div>
+          </DialogBody>
 
-          <div className="p-4 sm:p-5 bg-card border-t border-border flex items-center justify-between gap-2 shrink-0">
-            <span className="text-xs text-muted-foreground font-medium hidden sm:inline">
-              {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
-            </span>
+          <DialogFooter className="mt-0 flex-wrap items-center justify-between border-t border-border px-6 py-4">
+            <Text size="xs" tone="muted" className="hidden sm:block">{t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}</Text>
             <div className="flex items-center gap-2 ml-auto">
-              <Button variant="ghost"
-                type="button"
-                onClick={onClose}
-              >
+              <Button variant="outline" onClick={onClose}>
                 {t('eval.btn_cancel', 'Batal')}
               </Button>
               <Button
@@ -377,7 +334,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                 {submitting ? t('eval.btn_saving', 'Menyimpan...') : t('amendments.simpan_track_change_addendum', 'Simpan Track-Change Addendum')}
               </Button>
             </div>
-          </div>
+          </DialogFooter>
         </form>
 
     </ModalFrame>

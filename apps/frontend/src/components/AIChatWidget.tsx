@@ -7,7 +7,12 @@ import { useLanguage } from '../context/LanguageContext';
 import { Button } from '@legalio/ui-components/button';
 import { Table, TableColumnHeader, TableCell, TableScrollArea } from '@legalio/ui-components/table';
 import { Input } from '@legalio/ui-components/input';
-import { Card } from '@legalio/ui-components/card';
+import { Card, CardAction, CardBody, CardFooter, CardHeader, CardTitle } from '@legalio/ui-components/card';
+import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
+import { Text } from '@legalio/ui-components/text';
+import { Typeset } from '@legalio/ui-components/typeset';
+import { CloseButton } from '@legalio/ui-components/close-button';
+import { Spinner } from '@legalio/ui-components/spinner';
 interface Message {
   id: string;
   role: 'user' | 'ai';
@@ -183,191 +188,110 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
 
   const isInitialOnly = messages.length === 1 && (messages[0].id === 'welcome' || messages[0].id.startsWith('welcome-'));
 
-  return (
-    <div className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6 z-30">
-      {/* Chat Window */}
-      {isOpen && (
-        <Card
-          className="absolute bottom-16 right-0 w-[calc(100vw-1.5rem)] sm:w-[410px] flex flex-col overflow-hidden animate-in transform origin-bottom-right"
-          style={{ height: '520px', maxHeight: 'calc(100dvh - 6rem)' }}
-        >
-          {/* Header */}
-          <div className="bg-primary px-4 py-3 text-white flex justify-between items-center shadow-md z-10 select-none">
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 bg-card/20 rounded-lg flex items-center justify-center">
-                <AiIcon size={18} className="text-white" />
-              </div>
-              <div>
-                <h3 className="font-bold text-sm leading-tight text-white">
-                  {t('ai_chat.silegal_ai', 'Legalio AI')}
-                </h3>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon-sm"
-                type="button"
-                onClick={handleResetSession}
-                title={t('ai_chat.reset_sesi_percakapan_hapus_konteks', 'Reset Sesi Percakapan (Hapus Konteks)')}
-              >
-                <RotateCcw size={15} />
-              </Button>
-              <Button variant="ghost" size="icon-sm"
-                type="button"
-                onClick={() => setIsOpen(false)}
-                title={t('ai_chat.tutup_chat', 'Tutup Chat')}
-              >
-                <X size={17} />
-              </Button>
-            </div>
-          </div>
+  const assistantAvatar = <Avatar size="sm"><AvatarFallback className="bg-accent text-accent-foreground"><AiIcon size={14} /></AvatarFallback></Avatar>;
+  const closeLabel = t('ai_chat.tutup_ai_assistant', 'Tutup AI Assistant');
+  const openLabel = t('ai_chat.buka_asisten_ai_silegal', 'Buka Asisten AI Legalio');
 
-          {/* Message Area */}
-          <div className="flex-1 overflow-y-auto p-4 bg-card flex flex-col gap-3">
+  return (
+    <div className="fixed bottom-3 right-3 z-30 sm:bottom-6 sm:right-6">
+      {isOpen && (
+        <Card role="dialog" aria-label={t('ai_chat.silegal_ai', 'Legalio AI')}
+          className="absolute bottom-16 right-0 flex h-[520px] max-h-[calc(100dvh-6rem)] w-[calc(100vw-1.5rem)] flex-col overflow-hidden shadow-lg sm:w-[410px]">
+          <CardHeader className="items-center border-b border-border pb-4">
+            <CardTitle className="flex items-center gap-2"><AiIcon size={18} className="text-accent-foreground" />{t('ai_chat.silegal_ai', 'Legalio AI')}</CardTitle>
+            <CardAction className="items-center">
+              <Button variant="ghost" size="icon-sm" onClick={handleResetSession}
+                aria-label={t('ai_chat.reset_sesi_percakapan_hapus_konteks', 'Reset Sesi Percakapan (Hapus Konteks)')}
+                title={t('ai_chat.reset_sesi_percakapan_hapus_konteks', 'Reset Sesi Percakapan (Hapus Konteks)')}>
+                <RotateCcw aria-hidden="true" />
+              </Button>
+              <CloseButton onClick={() => setIsOpen(false)} aria-label={t('ai_chat.tutup_chat', 'Tutup Chat')} />
+            </CardAction>
+          </CardHeader>
+
+          <CardBody className="flex flex-1 flex-col gap-3 overflow-y-auto pt-4">
             {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex gap-2.5 max-w-[88%] ${
- msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'
- }`}
-              >
-                <div
-                  className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs ${
- msg.role === 'user'
- ? 'bg-primary text-white'
- : 'bg-card shadow-xs text-accent-foreground border border-border '
- }`}
-                >
-                  {msg.role === 'user' ? <User size={14} /> : <AiIcon size={14} />}
-                </div>
-                <Card
-                  className={` p-3 text-xs leading-relaxed ${
- msg.role === 'user'
- ? 'bg-primary text-white'
- : 'text-foreground'
- }`}
-                >
-                  {msg.role === 'user' ? (
-                    <div className="whitespace-pre-wrap font-medium">{msg.text}</div>
-                  ) : (
-                    <div className="wrap-break-word space-y-1">
+              <div key={msg.id} className={`flex max-w-[88%] gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse self-end' : 'self-start'}`}>
+                {msg.role === 'user'
+                  ? <Avatar size="sm"><AvatarFallback className="bg-primary text-primary-foreground"><User size={14} /></AvatarFallback></Avatar>
+                  : assistantAvatar}
+                {msg.role === 'user' ? (
+                  <Card size="sm" className="border-primary bg-primary p-3 text-sm whitespace-pre-wrap text-primary-foreground">{msg.text}</Card>
+                ) : (
+                  <Card size="sm" className="gap-2 p-3">
+                    <Typeset className="text-sm">
                       <ReactMarkdown
                         components={{
-                          ul: ({ node, ...props }) => <ul className="list-disc pl-4 my-1 space-y-0.5" {...props} />,
-                          ol: ({ node, ...props }) => <ol className="list-decimal pl-4 my-1 space-y-0.5" {...props} />,
-                          li: ({ node, ...props }) => <li className="my-0.5" {...props} />,
-                          p: ({ node, ...props }) => <p className="mb-1.5 last:mb-0" {...props} />,
-                          strong: ({ node, ...props }) => <strong className="font-bold text-foreground " {...props} />,
-                          a: ({ node, ...props }) => (
-                            <a
-                              className="underline text-status-success hover:opacity-80"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              {...props}
-                            />
-                          ),
-                          h1: ({ node, ...props }) => <h1 className="text-sm font-bold mb-1 mt-2 text-foreground " {...props} />,
-                          h2: ({ node, ...props }) => <h2 className="text-xs font-bold mb-1 mt-2 text-foreground " {...props} />,
-                          h3: ({ node, ...props }) => <h3 className="text-xs font-bold mb-1 mt-1.5 text-foreground " {...props} />,
+                          a: ({ node, ...props }) => <a target="_blank" rel="noopener noreferrer" {...props} />,
                           table: ({ node, ...props }) => (
-                            <TableScrollArea className="rounded-none border-0">
-                              <Table className="min-w-full" {...props} />
+                            <TableScrollArea>
+                              <Table size="sm" {...props} />
                             </TableScrollArea>
                           ),
-                          th: ({ node, ...props }) => <TableColumnHeader className="text-left" {...props} />,
-                          td: ({ node, ...props }) => <TableCell {...props} />
+                          th: ({ node, ...props }) => <TableColumnHeader {...props} />,
+                          td: ({ node, ...props }) => <TableCell {...props} />,
                         }}
                       >
                         {displayText(msg)}
                       </ReactMarkdown>
-                      <Button variant="secondary" size="sm"
-                        type="button"
-                        onClick={() => handleCopy(msg)}
-                        aria-label={copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}
-                        title={copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}
-                        className="mt-1.5"
-                      >
-                        {copiedId === msg.id ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
-                        <span aria-live="polite">{copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin')}</span>
-                      </Button>
-                    </div>
-                  )}
-                </Card>
+                    </Typeset>
+                    <Button variant="ghost" size="sm" className="self-start" onClick={() => handleCopy(msg)}
+                      aria-label={copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}
+                      title={copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}>
+                      {copiedId === msg.id ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                      <span aria-live="polite">{copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin')}</span>
+                    </Button>
+                  </Card>
+                )}
               </div>
             ))}
 
-            {/* Suggested Prompts if starting fresh */}
+            {/* Suggested prompts when starting fresh */}
             {isInitialOnly && (
-              <div className="flex gap-2.5 self-start w-full mt-2 pt-3 border-t border-border">
-                <div className="shrink-0 w-7 h-7 flex items-center justify-center text-status-success">
-                  <AiIcon size={16} />
-                </div>
-                <div className="flex-1 min-w-0 flex flex-col gap-2">
-                  <p className="text-xs font-bold text-muted-foreground flex items-center h-7">
-                    {t('ai_chat.saran_pertanyaan', 'Saran Pertanyaan:')}
-                  </p>
-                  <div className="flex flex-col gap-1.5">
-                    {SUGGESTED_PROMPTS.map(([key, fallback]) => t(key, fallback)).map((prompt) => (
-                      <Button variant="outline" size="sm"
-                        key={prompt}
-                        type="button"
-                        onClick={() => handleSend(prompt)}
-                        className="text-left"
-                      >
-                        {prompt}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
+              <div className="mt-2 flex w-full flex-col gap-2 border-t border-border pt-3">
+                <Text size="xs" weight="semibold" tone="muted">{t('ai_chat.saran_pertanyaan', 'Saran Pertanyaan:')}</Text>
+                {SUGGESTED_PROMPTS.map(([key, fallback]) => t(key, fallback)).map((prompt) => (
+                  <Button key={prompt} variant="outline" size="sm" onClick={() => handleSend(prompt)} className="h-auto justify-start py-2 text-start whitespace-normal">
+                    {prompt}
+                  </Button>
+                ))}
               </div>
             )}
 
             {isLoading && (
-              <div className="flex gap-2.5 self-start max-w-[85%]">
-                <div className="shrink-0 w-7 h-7 rounded-full bg-card shadow-xs border border-border flex items-center justify-center text-accent-foreground">
-                  <Loader2 size={14} className="animate-spin" />
-                </div>
-                <Card className="p-3 text-xs text-muted-foreground font-medium">
-                  <span>{t('ai_chat.menganalisis_data_konteks_sesi', 'Menganalisis data & konteks sesi...')}</span>
+              <div className="flex max-w-[85%] gap-2.5 self-start" role="status">
+                {assistantAvatar}
+                <Card size="sm" className="flex-row items-center gap-2 p-3 text-sm text-muted-foreground">
+                  <Spinner size="sm" decorative />{t('ai_chat.menganalisis_data_konteks_sesi', 'Menganalisis data & konteks sesi...')}
                 </Card>
               </div>
             )}
             <div ref={messagesEndRef} />
-          </div>
+          </CardBody>
 
-          {/* Input Area */}
-          <div className="p-3 bg-card border-t border-border">
-            <form onSubmit={(e) => handleSend(undefined, e)} className="flex items-center gap-2">
+          <CardFooter className="border-t border-border pt-4">
+            <form onSubmit={(e) => handleSend(undefined, e)} className="flex w-full items-center gap-2">
               <Input aria-label={t('ai_chat.tanya_seputar_data_atau_lanjutkan_konteks', 'Tanya seputar data atau lanjutkan konteks...')}
-                type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={t('ai_chat.tanya_seputar_data_atau_lanjutkan_konteks', 'Tanya seputar data atau lanjutkan konteks...')}
                 className="flex-1"
                 disabled={isLoading}
               />
-              <Button size="icon-md"
-                type="submit"
-                disabled={!input.trim() || isLoading}
-                title={t('ai_chat.kirim_pesan', 'Kirim Pesan')}
-              >
-                <Send size={15} />
+              <Button size="icon-md" type="submit" disabled={!input.trim() || isLoading}
+                aria-label={t('ai_chat.kirim_pesan', 'Kirim Pesan')} title={t('ai_chat.kirim_pesan', 'Kirim Pesan')}>
+                <Send aria-hidden="true" />
               </Button>
             </form>
-          </div>
+          </CardFooter>
         </Card>
       )}
 
-      {/* Toggle Button */}
-      <button
-        aria-expanded={isOpen}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-13 h-13 rounded-full shadow-xl flex items-center justify-center transition-colors duration-150 cursor-pointer ${
- isOpen ? 'bg-primary/90' : 'bg-primary hover:bg-primary/90'
- }`}
-        title={isOpen ? t('ai_chat.tutup_ai_assistant', 'Tutup AI Assistant') : t('ai_chat.buka_asisten_ai_silegal', 'Buka Asisten AI Legalio')}
-      >
-        <MessageSquare size={22} className="text-white" />
-      </button>
+      <Button size="icon-lg" aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}
+        aria-label={isOpen ? closeLabel : openLabel} title={isOpen ? closeLabel : openLabel}
+        className="size-13 rounded-full shadow-lg">
+        <MessageSquare className="size-5" aria-hidden="true" />
+      </Button>
     </div>
   );
 };

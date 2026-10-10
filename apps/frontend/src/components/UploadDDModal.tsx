@@ -15,6 +15,8 @@ import { Input } from '@legalio/ui-components/input';
 import { DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
 import { Card } from '@legalio/ui-components/card';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { FileUpload, FileUploadDropzone, FileUploadDropzoneIcon, FileUploadHiddenInput, FileUploadItemGroup, FileUploadItems, FileUploadLabel, FileUploadTrigger } from '@legalio/ui-components/file-upload';
+import { Text } from '@legalio/ui-components/text';
 interface UploadDDModalProps {
   partner: Partner;
   docName: string;
@@ -41,7 +43,6 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
   const { t, language } = useLanguage();
   const { policy } = useTenantSettings();
   const confirmDialog = useConfirm();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const existingDoc: DDDokumenItem | undefined = (partner.daftar_dokumen_dd || []).find((d) => d.nama === docName);
   const displayName = localizeDueDiligenceDocument(existingDoc || { nama: docName }, policy.dueDiligenceChecklist, language);
@@ -68,7 +69,6 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
   const [tahunDokumen, setTahunDokumen] = useState<string>(new Date().getFullYear().toString());
   const [isUploading, setIsUploading] = useState(false);
   const [isDeletingFileId, setIsDeletingFileId] = useState<string | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -90,29 +90,6 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFile(e.target.files[0]);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
 
   const handleDeleteExistingFile = async (fileId: string) => {
     const ok = await confirmDialog({ description: t('dd_upload.hapus_file_dokumen_ini', 'Hapus file dokumen ini?'), tone: 'danger', confirmLabel: t('io.action_delete', 'Hapus') });
@@ -287,68 +264,22 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
           )}
 
           {/* File Picker / Dropzone */}
-          <div>
-            <label className="block text-xs font-bold text-foreground mb-1.5">
-              {t('dd_upload.pilih_file_dokumen_dd', 'Pilih File Dokumen DD *')}
-            </label>
-            <div
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onClick={() => fileInputRef.current?.click()}
-              className={`ds-upload text-center cursor-pointer ${
- isDragOver
- ? 'bg-status-success-soft/60 '
- : selectedFile
- ? 'bg-primary/40 '
- : ''
- }`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.xlsx,.csv"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-
-              {selectedFile ? (
-                <Card className="flex items-center justify-between gap-3 p-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0 text-left">
-                    <div className="w-8 h-8 rounded-lg bg-accent text-accent-foreground flex items-center justify-center shrink-0">
-                      <FileText className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-foreground truncate">
-                        {selectedFile.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {t('dd_upload.kb', '{value} KB', { value: (selectedFile.size / 1024).toFixed(1) })}
-                      </p>
-                    </div>
-                  </div>
-                  <Button variant="secondary" size="icon-sm" aria-label={t('common.close', 'Tutup')}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedFile(null);
-                      setFileBase64('');
-                      if (fileInputRef.current) fileInputRef.current.value = '';
-                    }}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </Card>
-              ) : (
-                <div className="space-y-1">
-                  <Upload className="w-6 h-6 text-accent-foreground mx-auto mb-1" />
-                  <p className="text-xs font-bold text-foreground">
-                    {t('partners.drag_file', 'Pilih atau drag file dokumen ke sini')}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+          <FileUpload maxFiles={1} maxFileSize={25 * 1024 * 1024} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.xlsx,.csv"
+            acceptedFiles={selectedFile ? [selectedFile] : []}
+            onFileAccept={details => details.files[0] && handleFile(details.files[0])}
+            onFileReject={() => setError(t('dd_upload.ukuran_file_melebihi_batas_maksimal_25mb', 'Ukuran file melebihi batas maksimal 25MB.'))}
+            onFileChange={details => { if (!details.acceptedFiles.length) { setSelectedFile(null); setFileBase64(''); } }}>
+            <FileUploadLabel>{t('dd_upload.pilih_file_dokumen_dd', 'Pilih File Dokumen DD *')}</FileUploadLabel>
+            {!selectedFile && (
+              <FileUploadDropzone>
+                <FileUploadDropzoneIcon />
+                <Text size="sm" weight="semibold">{t('partners.drag_file', 'Pilih atau drag file dokumen ke sini')}</Text>
+                <FileUploadTrigger asChild><Button variant="outline" size="sm">{t('form.contract.choose_file', 'Pilih File')}</Button></FileUploadTrigger>
+              </FileUploadDropzone>
+            )}
+            <FileUploadItemGroup><FileUploadItems /></FileUploadItemGroup>
+            <FileUploadHiddenInput />
+          </FileUpload>
 
           {/* Metadata: Tahun / Periode & Expiry (Nomor Dokumen intentionally removed per request) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -1,6 +1,5 @@
 import { AlphabeticalDatalist, AlphabeticalSelect } from './ui/alphabetical-select';
 import React, { useState, useEffect, useRef } from 'react';
-import { Dialog } from 'radix-ui';
 import { useTenantSettings } from '../context/TenantSettingsContext';
 import { Contract, Partner, NoticeType, JenisDokumenContract, ContractStatus } from '@legalio/types';
 import { FileText, Upload, Plus, X, Tag, Link2, Shield, Check } from 'lucide-react';
@@ -20,9 +19,17 @@ import { Badge } from '@legalio/ui-components/badge';
 import { Button } from '@legalio/ui-components/button';
 import { Textarea } from '@legalio/ui-components/textarea';
 import { Input } from '@legalio/ui-components/input';
-import { CardHeader, Card } from '@legalio/ui-components/card';
+import { Card } from '@legalio/ui-components/card';
+import { ModalFrame } from './ui/modal-frame';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
+import { TagsInput, TagsInputClearTrigger, TagsInputControl, TagsInputHiddenInput, TagsInputInput, TagsInputItems, TagsInputLabel } from '@legalio/ui-components/tags-input';
+import { DialogBody, DialogCloseIcon, DialogFooter, DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
+import { Alert, AlertContent, AlertDescription, AlertIndicator, AlertTitle } from '@legalio/ui-components/alert';
+import { FileUpload, FileUploadDropzone, FileUploadDropzoneIcon, FileUploadHiddenInput, FileUploadLabel, FileUploadTrigger } from '@legalio/ui-components/file-upload';
+import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
+import { ToggleGroup, ToggleGroupItem } from '@legalio/ui-components/toggle-group';
+import { Text } from '@legalio/ui-components/text';
 interface ContractModalProps {
   contractToEdit?: Contract | null;
   partners: Partner[];
@@ -38,7 +45,6 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const returnFocusRef = useRef<HTMLElement | null>(null);
   const { user } = useAuth();
   const { t, language } = useLanguage();
   const { departments: ENTERPRISE_DEPARTMENTS } = useDepartments();
@@ -51,7 +57,6 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   );
   const [nomorKontrak, setNomorKontrak] = useState(contractToEdit?.nomor_kontrak || '');
   const [partnerId, setPartnerId] = useState(contractToEdit?.partner_id || (partners[0]?.partner_id || ''));
-  const [kategoriInput, setKategoriInput] = useState('');
   const [kategoriTags, setKategoriTags] = useState<string[]>(
     contractToEdit?.kategori_kerjasama || ['Advertising', 'Content']
   );
@@ -154,14 +159,6 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     contractToEdit?.ringkasan_perubahan || ''
   );
 
-  const handleFieldToggle = (field: string) => {
-    if (fieldYangBerubah.includes(field)) {
-      setFieldYangBerubah(fieldYangBerubah.filter((f) => f !== field));
-    } else {
-      setFieldYangBerubah([...fieldYangBerubah, field]);
-    }
-  };
-
   const handleAutoRenewalChange = (checked: boolean) => {
     setAutoRenewal(checked);
     if (checked) {
@@ -209,14 +206,11 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     isAddendumValid
   );
 
-  const handleAddTag = () => {
-    const trimmed = kategoriInput.trim();
-    if (trimmed && !kategoriTags.some((t) => t.toLowerCase() === trimmed.toLowerCase())) {
-      const updated = saveCategory(trimmed);
-      setSavedTemplates(updated);
-      setKategoriTags([...kategoriTags, trimmed]);
-      setKategoriInput('');
-    }
+  /** TagsInput change: new categories are remembered as templates; duplicates are ignored case-insensitively. */
+  const handleTagsChange = (next: string[]) => {
+    const unique = next.map((tag) => tag.trim()).filter((tag, index, all) => tag && all.findIndex((other) => other.toLowerCase() === tag.toLowerCase()) === index);
+    unique.filter((tag) => !kategoriTags.some((existing) => existing.toLowerCase() === tag.toLowerCase())).forEach((tag) => setSavedTemplates(saveCategory(tag)));
+    setKategoriTags(unique);
   };
 
   const [isParsing, setIsParsing] = useState(false);
@@ -341,12 +335,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     }
   };
 
-  const handleRemoveTag = (tag: string) => {
-    setKategoriTags(kategoriTags.filter((t) => t !== tag));
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = (file: File | undefined) => {
     if (file) {
       if (file.size > 20 * 1024 * 1024) {
         setError(t('contracts.ukuran_file_maksimal_20mb', 'Ukuran file maksimal 20MB.'));
@@ -496,18 +485,10 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   };
 
   return (
-    <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <Dialog.Portal>
-      <Dialog.Overlay className="fixed inset-0 z-50 bg-foreground/60 backdrop-blur-xs animate-in" />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 pointer-events-none">
-      <Dialog.Content
-        onOpenAutoFocus={() => { returnFocusRef.current = document.activeElement as HTMLElement; }}
-        onCloseAutoFocus={(event) => { event.preventDefault(); returnFocusRef.current?.focus(); }}
-        aria-describedby={undefined} onPointerDownOutside={(event) => event.preventDefault()} className="contract-form pointer-events-auto animate-in bg-card rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-border overflow-hidden">
-        {/* Header */}
-        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border pb-4">
+    <ModalFrame onClose={onClose} className="contract-form">
+        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
           <div>
-            <Dialog.Title className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-accent-foreground" />
               <span>
                 {contractToEdit?.contract_id
@@ -518,19 +499,13 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                       ? t('form.contract.title_add_addendum', 'Buat & Upload Agreement Addendum Baru')
                       : t('form.contract.title_add_master', 'Buat & Upload Kontrak Baru'))}
               </span>
-            </Dialog.Title>
+            </DialogTitle>
           </div>
-          <Button variant="secondary" size="icon-md"
-            type="button"
-            onClick={onClose}
-            aria-label={t('common.close', 'Tutup')}
-          >
-            <X className="w-5 h-5" />
-          </Button>
-        </CardHeader>
+          <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-sm flex-1 text-foreground">
+          <DialogBody className="mt-0 flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-5 text-foreground">
             {/* Document Type Selection & Parent Contract Selector */}
             <Card className="p-4 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -576,15 +551,13 @@ export const ContractModal: React.FC<ContractModalProps> = ({
               {/* Referensi Master Agreement Field - Active when Agreement Addendum is chosen */}
               {jenisDokumen === 'Agreement Addendum' && (
                 <div className="pt-2 border-t border-border space-y-3">
-                  <div>
-                    <label htmlFor="contract-field-3" className="block font-bold text-foreground mb-1.5 flex items-center gap-1.5 text-sm">
-                      <Link2 className="w-4 h-4 text-accent-foreground" />
-                      <span>{t('form.contract.ref_master_agreement', 'Referensi Master Agreement (Kontrak Induk) *')}</span>
-                    </label>
+                  <Field>
+                    <FieldLabel htmlFor="contract-field-3" className="gap-1.5">
+                      <Link2 className="size-4 text-accent-foreground" aria-hidden="true" />
+                      {t('form.contract.ref_master_agreement', 'Referensi Master Agreement (Kontrak Induk) *')}
+                    </FieldLabel>
                     {availableMasterContracts.length === 0 ? (
-                      <div className="p-3 bg-status-warning-soft border border-status-warning-border rounded-xl text-status-warning text-sm font-semibold">
-                        {t('form.contract.no_master_warning', 'Harap pilih partner lain atau buat Master Agreement terlebih dahulu.')}
-                      </div>
+                      <Alert status="warning"><AlertIndicator /><AlertContent><AlertDescription>{t('form.contract.no_master_warning', 'Harap pilih partner lain atau buat Master Agreement terlebih dahulu.')}</AlertDescription></AlertContent></Alert>
                     ) : (
                       <AlphabeticalSelect id="contract-field-3"
                         required={jenisDokumen === 'Agreement Addendum'}
@@ -600,41 +573,17 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                         ))}
                       </AlphabeticalSelect>
                     )}
-                  </div>
+                  </Field>
 
-                  <div className="p-3.5 bg-status-warning-soft/80 border border-status-warning-border/80 rounded-xl space-y-3">
-                    <div>
-                      <div className="block font-bold text-status-warning mb-1.5 text-sm">
-                        {t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          'Nilai Kontrak / IO',
-                          'Jangka Waktu Periode',
-                          'Ruang Lingkup / Deliverables',
-                          'Syarat Pembayaran',
-                          'Pihak Berwenang',
-                        ].map((f) => {
-                          const isSelected = fieldYangBerubah.includes(f);
-                          return (
-                            <button
-                              type="button"
-                              key={f}
-                              aria-pressed={isSelected}
-                              onClick={() => handleFieldToggle(f)}
-                              className={`inline-flex items-center px-4 min-h-10 rounded-md text-sm font-semibold border cursor-pointer select-none transition-colors ${
- isSelected
- ? 'bg-accent text-accent-foreground border-primary/50 font-semibold'
- : 'bg-card text-muted-foreground border-border hover:bg-card '
- }`}
-                            >
-                              {isSelected ? '✓ ' : '+ '}
-                              {f}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                  <Card size="sm" className="gap-3 border-status-warning-border bg-status-warning-soft p-4">
+                    <Fieldset>
+                      <FieldsetLegend>{t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')}</FieldsetLegend>
+                      <ToggleGroup multiple value={fieldYangBerubah} onValueChange={details => setFieldYangBerubah(details.value)} aria-label={t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')} className="flex-wrap">
+                        {['Nilai Kontrak / IO', 'Jangka Waktu Periode', 'Ruang Lingkup / Deliverables', 'Syarat Pembayaran', 'Pihak Berwenang'].map((f) => (
+                          <ToggleGroupItem key={f} value={f}>{f}</ToggleGroupItem>
+                        ))}
+                      </ToggleGroup>
+                    </Fieldset>
 
                     <Field>
                       <FieldLabel htmlFor="contract-field-4">
@@ -649,7 +598,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                         className="w-full"
                       />
                     </Field>
-                  </div>
+                  </Card>
                 </div>
               )}
             </Card>
@@ -695,56 +644,19 @@ export const ContractModal: React.FC<ContractModalProps> = ({
               </Field>
             </div>
 
-            {/* Kategori Tags */}
-            <div>
-              <label htmlFor="contract-field-7" className="block font-bold text-foreground text-sm mb-1.5">
-                {t('form.contract.kategori_tag', 'Kategori Kerjasama Tag *')}
-              </label>
-              <div className="flex items-center gap-2 mb-2">
-                <Input id="contract-field-7"
-                  type="text"
-                  list="contract-category-templates-list"
-                  placeholder={t('form.partner.tag_placeholder', 'Tambah tag kategori (mis. Advertising, IT, Logistics)...')}
-                  value={kategoriInput}
-                  onChange={(e) => setKategoriInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddTag();
-                    }
-                  }}
-                  className="min-w-0 flex-1"
-                />
-                <AlphabeticalDatalist id="contract-category-templates-list">
-                  {savedTemplates.map((cat) => (
-                    <option key={cat} value={cat} />
-                  ))}
-                </AlphabeticalDatalist>
-                <Button variant="ghost"
-                  type="button"
-                  onClick={handleAddTag}
-                >
-                  {t('form.partner.add_tag_btn', 'Tambah Tag')}
-                </Button>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {kategoriTags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="bg-accent text-accent-foreground border border-primary/30 px-3 py-1 rounded-lg text-sm font-semibold flex items-center gap-1.5"
-                  >
-                    <span>{tag}</span>
-                    <Button size="sm"
-                      type="button"
-                      onClick={() => handleRemoveTag(tag)}
-                    >
-                      ×
-                    </Button>
-                  </span>
-                ))}
-              </div>
-            </div>
+            {/* Category tags */}
+            <TagsInput value={kategoriTags} onValueChange={details => handleTagsChange(details.value)} addOnPaste delimiter=",">
+              <TagsInputLabel>{t('form.contract.kategori_tag', 'Kategori Kerjasama Tag *')}</TagsInputLabel>
+              <TagsInputControl>
+                <TagsInputItems />
+                <TagsInputInput id="contract-field-7" list="contract-category-templates-list" placeholder={t('form.partner.tag_placeholder', 'Tambah tag kategori (mis. Advertising, IT, Logistics)...')} />
+                <TagsInputClearTrigger aria-label={t('common.clear', 'Hapus semua')} />
+              </TagsInputControl>
+              <TagsInputHiddenInput />
+            </TagsInput>
+            <AlphabeticalDatalist id="contract-category-templates-list">
+              {savedTemplates.map((cat) => <option key={cat} value={cat} />)}
+            </AlphabeticalDatalist>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field>
@@ -759,16 +671,10 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 />
               </Field>
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="contract-field-9" className="block font-bold text-foreground text-sm">
-                    {t('form.contract.tanggal_berakhir', 'Tanggal Berakhir *')}
-                  </label>
-                  {autoRenewal && (
-                    <span className="text-xs bg-status-success-soft text-status-success font-semibold px-2 py-0.5 rounded-md border border-status-success-border">
-                      {t('contracts.auto_renewal', 'Auto-Renewal')}
-                    </span>
-                  )}
+              <Field>
+                <div className="flex items-center justify-between gap-2">
+                  <FieldLabel htmlFor="contract-field-9">{t('form.contract.tanggal_berakhir', 'Tanggal Berakhir *')}</FieldLabel>
+                  {autoRenewal && <Badge tone="success">{t('contracts.auto_renewal', 'Auto-Renewal')}</Badge>}
                 </div>
                 <DateInput id="contract-field-9"
                   required
@@ -776,7 +682,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                   value={tanggalBerakhir}
                   onChange={(val) => setTanggalBerakhir(val)}
                 />
-              </div>
+              </Field>
 
               <Field>
                 <FieldLabel htmlFor="contract-field-10">
@@ -809,18 +715,19 @@ export const ContractModal: React.FC<ContractModalProps> = ({
               </Field>
             </div>
 
-            {/* USD Conversion Info Banner */}
-            <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-sm flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <span className="font-semibold text-foreground">{t('contracts.estimasi_konversi_usd_kurs', 'Estimasi Konversi USD (Kurs {tanggalMulai}):', { tanggalMulai })}</span>
-                <span className="ml-2 font-bold text-accent-foreground">
-                  {formatMoney(estimatedUsd, 'USD')}
-                </span>
-              </div>
-              <span className="text-xs text-muted-foreground italic">
-                {currency === 'USD' ? t('contracts.sama_mata_uang_usd', 'Sama (Mata uang USD)') : t('contracts.1_usd', '1 {currency} ≈ {value} USD', { currency, value: historicalRate.toFixed(8) })}
-              </span>
-            </div>
+            {/* USD conversion estimate */}
+            <Alert status="info">
+              <AlertIndicator />
+              <AlertContent>
+                <AlertTitle>
+                  {t('contracts.estimasi_konversi_usd_kurs', 'Estimasi Konversi USD (Kurs {tanggalMulai}):', { tanggalMulai })}{' '}
+                  <span className="text-accent-foreground">{formatMoney(estimatedUsd, 'USD')}</span>
+                </AlertTitle>
+                <AlertDescription>
+                  {currency === 'USD' ? t('contracts.sama_mata_uang_usd', 'Sama (Mata uang USD)') : t('contracts.1_usd', '1 {currency} ≈ {value} USD', { currency, value: historicalRate.toFixed(8) })}
+                </AlertDescription>
+              </AlertContent>
+            </Alert>
 
             <Card className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4">
               <Field>
@@ -852,16 +759,12 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 </AlphabeticalSelect>
               </Field>
               <div className="flex items-center pt-4 sm:pt-6">
-                <Checkbox checked={autoRenewal} disabled={status === 'Terminated'} onCheckedChange={(details) => handleAutoRenewalChange(details.checked === true)}><CheckboxControl /><CheckboxLabel><span className="font-bold text-foreground text-sm">
-                    {t('form.contract.auto_renewal', 'Auto Renewal')}
-                  </span></CheckboxLabel><CheckboxHiddenInput /></Checkbox>
+                <Checkbox checked={autoRenewal} disabled={status === 'Terminated'} onCheckedChange={(details) => handleAutoRenewalChange(details.checked === true)}><CheckboxControl /><CheckboxLabel>{t('form.contract.auto_renewal', 'Auto Renewal')}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
               </div>
             </Card>
 
-            <div>
-              <label htmlFor="contract-field-14" className="block font-bold text-foreground mb-1.5 text-sm">
-                {t('form.contract.status_kontrak', 'Status Kontrak *')}
-              </label>
+            <Field>
+              <FieldLabel htmlFor="contract-field-14">{t('form.contract.status_kontrak', 'Status Kontrak *')}</FieldLabel>
               <AlphabeticalSelect id="contract-field-14"
                 value={status === 'Terminated' ? 'Terminated' : 'Active'}
                 onChange={(e) => { setStatus(e.target.value as ContractStatus); if (e.target.value === 'Terminated') setAutoRenewal(false); }}
@@ -872,9 +775,9 @@ export const ContractModal: React.FC<ContractModalProps> = ({
               </AlphabeticalSelect>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Badge tone={lifecyclePreview.status === 'Expired' ? 'warning' : lifecyclePreview.status === 'Terminated' ? 'danger' : 'info'}>{t(CONTRACT_STATUS_LABEL_KEY[lifecyclePreview.status])}</Badge>
-                {lifecyclePreview.scheduled && terminationDate && <p className="text-xs text-muted-foreground">{t('termination.scheduled')}</p>}
+                {lifecyclePreview.scheduled && terminationDate && <Text size="xs" tone="muted">{t('termination.scheduled')}</Text>}
               </div>
-            </div>
+            </Field>
 
             {showEndingFields && <ContractEndingFields terminated={lifecycleMode === 'terminated'} date={terminationDate} endDate={tanggalBerakhir}
               reason={terminationReason} document={contractToEdit?.termination_document} fileName={terminationFile?.fileName} reading={readingTerminationFile}
@@ -894,72 +797,45 @@ export const ContractModal: React.FC<ContractModalProps> = ({
               />
             </Field>
 
-            {/* File Upload Area */}
-            <div>
-              <label htmlFor="contract-field-16" className="block font-bold text-foreground mb-1.5 text-sm">
-                {t('form.contract.upload_label', 'Dokumen Asli Kontrak (Drive PDF Upload)')}
-              </label>
-              <div className="ds-upload text-center">
-                <Upload className="w-6 h-6 text-accent-foreground mx-auto mb-1.5" />
-                {fileData || fileName ? (
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold text-foreground">
-                      {t('contracts.file_terpilih', '📄 File terpilih:')} <span className="font-normal font-mono text-foreground ">{rawFileName || fileName}</span>
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm font-bold text-foreground">
-                    {t('form.contract.drag_pdf', 'Pilih atau Drag Dokumen Kontrak ke sini')}
-                  </p>
-                )}
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-                  {fileData && (
-                    <Button variant="ghost"
-                      type="button"
-                      onClick={handleParseContract}
-                      disabled={isParsing}
-                    >
-                      {isParsing ? t('contracts.parsing', 'Parsing...') : t('contracts.parse_file', 'Parse File')}
-                    </Button>
-                  )}
-                  <input id="contract-field-16"
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    onChange={handleFileChange}
-                    className="w-[220px] max-w-full text-sm text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-accent file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
-                  />
-                </div>
-              </div>
-            </div>
+            {/* Contract document upload */}
+            <FileUpload accept=".pdf,.doc,.docx" maxFiles={1} maxFileSize={20 * 1024 * 1024}
+              onFileAccept={details => handleFileChange(details.files[0])}
+              onFileReject={() => setError(t('contracts.ukuran_file_maksimal_20mb', 'Ukuran file maksimal 20MB.'))}>
+              <FileUploadLabel>{t('form.contract.upload_label', 'Dokumen Asli Kontrak (Drive PDF Upload)')}</FileUploadLabel>
+              <FileUploadDropzone>
+                <FileUploadDropzoneIcon />
+                <Text size="sm" weight="semibold">
+                  {fileData || fileName ? <>{t('contracts.file_terpilih', '📄 File terpilih:')} <span className="font-mono font-normal">{rawFileName || fileName}</span></> : t('form.contract.drag_pdf', 'Pilih atau Drag Dokumen Kontrak ke sini')}
+                </Text>
+                <FileUploadTrigger asChild><Button variant="outline" size="sm">{t('form.contract.choose_file', 'Pilih File')}</Button></FileUploadTrigger>
+              </FileUploadDropzone>
+              <FileUploadHiddenInput id="contract-field-16" />
+            </FileUpload>
+            {fileData && (
+              <Button variant="outline" onClick={handleParseContract} loading={isParsing} className="self-start">
+                {isParsing ? t('contracts.parsing', 'Parsing...') : t('contracts.parse_file', 'Parse File')}
+              </Button>
+            )}
 
             {parseSuccessMsg && (
-              <div className="p-3 bg-status-success-soft border border-status-success-border text-status-success rounded-xl text-sm font-semibold flex items-center gap-2">
-                <span>{parseSuccessMsg}</span>
-              </div>
+              <Alert status="success" role="status"><AlertIndicator /><AlertContent><AlertDescription>{parseSuccessMsg}</AlertDescription></AlertContent></Alert>
             )}
 
             {error && (
-              <div className="p-3.5 bg-status-danger-soft border border-status-danger-border text-status-danger rounded-xl text-sm font-bold flex items-center gap-2">
-                <span>⚠️</span>
-                <span>{error}</span>
-              </div>
+              <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>
             )}
-          </div>
+          </DialogBody>
 
-          <div className="p-4 sm:p-5 bg-card border-t border-border flex flex-wrap items-center justify-between gap-2 shrink-0">
-            <span className="text-xs text-muted-foreground font-medium">
-              {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
-            </span>
-            <div className="flex items-center gap-2 ml-auto">
-              <Button variant="ghost"
-                type="button"
-                onClick={onClose}
-              >
+          <DialogFooter className="mt-0 flex-wrap items-center justify-between border-t border-border px-6 py-4">
+            <Text size="xs" tone="muted">{t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}</Text>
+            <div className="ms-auto flex items-center gap-2">
+              <Button variant="outline" onClick={onClose}>
                 {t('form.common.cancel', 'Batal')}
               </Button>
               <Button
                 type="submit"
-                disabled={submitting || readingTerminationFile || !isFormValid}
+                loading={submitting}
+                disabled={readingTerminationFile || !isFormValid}
                 title={!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : ''}
               >
                 {submitting
@@ -967,11 +843,8 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                   : t('form.contract.save_btn', 'Simpan Data Kontrak')}
               </Button>
             </div>
-          </div>
+          </DialogFooter>
         </form>
-      </Dialog.Content>
-      </div>
-      </Dialog.Portal>
-    </Dialog.Root>
+    </ModalFrame>
   );
 };

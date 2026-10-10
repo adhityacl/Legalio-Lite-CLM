@@ -12,8 +12,11 @@ import { formatIOFileName } from '@legalio/shared/fileNaming';
 import { Button } from '@legalio/ui-components/button';
 import { Input } from '@legalio/ui-components/input';
 import { Textarea } from '@legalio/ui-components/textarea';
-import { DialogHeader, DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
+import { DialogBody, DialogCloseIcon, DialogFooter, DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { FileUpload, FileUploadDropzone, FileUploadDropzoneIcon, FileUploadHiddenInput, FileUploadLabel, FileUploadTrigger } from '@legalio/ui-components/file-upload';
+import { Alert, AlertContent, AlertDescription, AlertIndicator, AlertTitle } from '@legalio/ui-components/alert';
+import { Text } from '@legalio/ui-components/text';
 interface IOModalProps {
   ioToEdit?: InsertionOrder | null;
   contracts: Contract[];
@@ -154,8 +157,7 @@ export const IOModal: React.FC<IOModalProps> = ({
     noticePeriodHari !== undefined && noticePeriodHari !== null && String(noticePeriodHari) !== ''
   );
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = (file: File | undefined) => {
     if (file) {
       if (file.size > 20 * 1024 * 1024) {
         setError(t('io.ukuran_file_maksimal_20mb', 'Ukuran file maksimal 20MB.'));
@@ -384,7 +386,7 @@ export const IOModal: React.FC<IOModalProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-sm flex-1 text-foreground">
+          <DialogBody className="mt-0 flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-5 text-foreground">
             {/* Row 1: Partner & Induk Kontrak */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field>
@@ -578,17 +580,13 @@ export const IOModal: React.FC<IOModalProps> = ({
             </div>
 
             {/* USD Conversion Info Banner */}
-            <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-sm flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <span className="font-semibold text-foreground">{t('io.estimasi_konversi_usd_kurs', 'Estimasi Konversi USD (Kurs {tanggalMulai}):', { tanggalMulai })}</span>
-                <span className="ml-2 font-bold text-accent-foreground">
-                  {formatMoney(estimatedUsd, 'USD')}
-                </span>
-              </div>
-              <span className="text-xs text-muted-foreground italic">
-                {currency === 'USD' ? t('io.sama_mata_uang_usd', 'Sama (Mata uang USD)') : t('io.1_usd', '1 {currency} ≈ {value} USD', { currency, value: historicalRate.toFixed(8) })}
-              </span>
-            </div>
+            <Alert status="info">
+              <AlertIndicator />
+              <AlertContent>
+                <AlertTitle>{t('io.estimasi_konversi_usd_kurs', 'Estimasi Konversi USD (Kurs {tanggalMulai}):', { tanggalMulai })}{' '}<span className="text-accent-foreground">{formatMoney(estimatedUsd, 'USD')}</span></AlertTitle>
+                <AlertDescription>{currency === 'USD' ? t('io.sama_mata_uang_usd', 'Sama (Mata uang USD)') : t('io.1_usd', '1 {currency} ≈ {value} USD', { currency, value: historicalRate.toFixed(8) })}</AlertDescription>
+              </AlertContent>
+            </Alert>
 
             <Field>
               <FieldLabel htmlFor="IOModal-field-12">
@@ -605,65 +603,30 @@ export const IOModal: React.FC<IOModalProps> = ({
             </Field>
 
             {/* File Upload Area */}
-            <div>
-              <label htmlFor="IOModal-field-13" className="block font-bold text-foreground mb-1.5 text-sm">
-                {t('form.io.upload_label', 'Dokumen Asli IO (Drive PDF Upload)')}
-              </label>
-              <div className="ds-upload text-center">
-                <Upload className="w-6 h-6 text-accent-foreground mx-auto mb-1.5" />
-                {fileData || fileName ? (
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold text-foreground">
-                      {t('io.file_terpilih', '📄 File terpilih:')} <span className="font-normal font-mono text-foreground ">{rawFileName || fileName}</span>
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm font-bold text-foreground">
-                    {t('form.io.select_pdf', 'Pilih atau Drag Dokumen Insertion Order ke sini')}
-                  </p>
-                )}
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-                  {fileData && (
-                    <Button variant="ghost"
-                      type="button"
-                      onClick={handleParseIO}
-                      disabled={isParsing}
-                    >
-                      {isParsing ? t('io.parsing', 'Parsing...') : t('io.parse_file', 'Parse File')}
-                    </Button>
-                  )}
-                  <input id="IOModal-field-13"
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileChange}
-                    className="w-[220px] text-sm text-muted-foreground file:mr-2 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-accent file:text-accent-foreground hover:file:bg-primary/20 cursor-pointer"
-                  />
-                </div>
-              </div>
-            </div>
+            <FileUpload accept=".pdf" maxFiles={1} onFileAccept={details => handleFileChange(details.files[0])}>
+              <FileUploadLabel>{t('form.io.upload_label', 'Dokumen Asli IO (Drive PDF Upload)')}</FileUploadLabel>
+              <FileUploadDropzone>
+                <FileUploadDropzoneIcon />
+                <Text size="sm" weight="semibold">{fileData || fileName ? <>{t('io.file_terpilih', '📄 File terpilih:')} <span className="font-mono font-normal">{rawFileName || fileName}</span></> : t('form.io.select_pdf', 'Pilih atau Drag Dokumen Insertion Order ke sini')}</Text>
+                <FileUploadTrigger asChild><Button variant="outline" size="sm">{t('form.contract.choose_file', 'Pilih File')}</Button></FileUploadTrigger>
+              </FileUploadDropzone>
+              <FileUploadHiddenInput id="IOModal-field-13" />
+            </FileUpload>
+            {fileData && <Button variant="outline" onClick={handleParseIO} loading={isParsing} className="self-start">{isParsing ? t('io.parsing', 'Parsing...') : t('io.parse_file', 'Parse File')}</Button>}
 
             {parseSuccessMsg && (
-              <div className="p-3 bg-status-success-soft border border-status-success-border text-status-success rounded-xl text-sm font-semibold flex items-center gap-2">
-                <span>{parseSuccessMsg}</span>
-              </div>
+              <Alert status="success" role="status"><AlertIndicator /><AlertContent><AlertDescription>{parseSuccessMsg}</AlertDescription></AlertContent></Alert>
             )}
 
             {error && (
-              <div className="p-3.5 bg-status-danger-soft border border-status-danger-border text-status-danger rounded-xl text-sm font-bold flex items-center gap-2">
-                <span>⚠️</span>
-                <span>{error}</span>
-              </div>
+              <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>
             )}
-          </div>
+          </DialogBody>
 
-          <div className="p-4 sm:p-5 bg-card border-t border-border flex items-center justify-between gap-2 shrink-0">
-            <span className="text-xs text-muted-foreground font-medium hidden sm:inline">
-              {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
-            </span>
+          <DialogFooter className="mt-0 flex-wrap items-center justify-between border-t border-border px-6 py-4">
+            <Text size="xs" tone="muted" className="hidden sm:block">{t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}</Text>
             <div className="flex items-center gap-2 ml-auto">
-              <Button variant="ghost"
-                type="button"
-                onClick={onClose}
+              <Button variant="outline" onClick={onClose}
               >
                 {t('form.common.cancel', 'Batal')}
               </Button>
@@ -677,7 +640,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                   : t('form.io.save_btn', 'Simpan Insertion Order')}
               </Button>
             </div>
-          </div>
+          </DialogFooter>
         </form>
     </ModalFrame>
   );
