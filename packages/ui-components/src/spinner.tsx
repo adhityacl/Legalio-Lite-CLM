@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/spinner';
+export * from './moduix/ui/spinner';

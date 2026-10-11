@@ -112,7 +112,7 @@ test('chat, modals and editor load only when opened; saved document still opens 
   await page.getByRole('button', { name: 'Draft Workspace 1', exact: true }).click();
   await expect(editor).toContainText('Edited content');
   await page.getByTitle(/Open.*AI/i).click();
-  await expect(page.locator('[class*="origin-bottom-right"]')).toBeVisible();
+  await expect(page.getByTestId('ai-chat-panel')).toBeVisible();
   expect((await loaded()).some(name => /AIChatWidget-/.test(name))).toBe(true);
 });
 
@@ -126,15 +126,20 @@ for (const section of ['Contracts', 'Order Forms', 'Partners', 'Partner Spending
     const trigger = scope.getByRole('button', { name: 'View', exact: true });
     await trigger.focus();
     await page.keyboard.press('Enter');
-    const preferences = page.locator('[data-slot="popover-content"]');
+    // Column visibility is a moduix Menu: keyboard focus moves into the menu and highlights the first item.
+    const preferences = page.getByRole('menu');
     await expect(preferences).toBeVisible();
-    const checkbox = preferences.getByRole('checkbox').first();
-    await expect(checkbox).toBeFocused();
-    const checked = await checkbox.isChecked();
-    await page.keyboard.press('Space');
-    expect(await checkbox.isChecked()).toBe(!checked);
-    await page.keyboard.press('Tab');
+    const checkbox = preferences.getByRole('menuitemcheckbox').first();
+    await expect(checkbox).toHaveAttribute('data-highlighted', '');
     expect(await preferences.evaluate(element => element.contains(document.activeElement))).toBe(true);
+    const checked = await checkbox.getAttribute('aria-checked');
+    await page.keyboard.press('Space');
+    await expect(checkbox).toHaveAttribute('aria-checked', checked === 'true' ? 'false' : 'true');
+    await expect(preferences).toBeVisible();
+    await page.keyboard.press('ArrowDown');
+    await expect(preferences.getByRole('menuitemcheckbox').nth(1)).toHaveAttribute('data-highlighted', '');
+    // zag focuses the menu on the next animation frame after a highlight; keystrokes inside one frame are not human input.
+    await page.evaluate(() => new Promise(requestAnimationFrame));
     await page.keyboard.press('Escape');
     await expect(preferences).toBeHidden();
     await expect(trigger).toBeFocused();
@@ -147,15 +152,18 @@ for (const section of ['Contracts', 'Order Forms', 'Partners', 'Partner Spending
 test('calendar trigger is in the Tab sequence and restores focus on Escape', async ({ page }) => {
   await page.getByRole('button', { name: /^Contracts(?: \d+)?$/ }).click();
   await page.getByRole('button', { name: 'Add Contract', exact: true }).click();
-  const calendar = page.getByRole('button', { name: 'Open Calendar', exact: true }).first();
-  const input = calendar.locator('..').locator('input');
-  await input.focus();
+  const calendar = page.getByRole('button', { name: 'Open calendar', exact: true }).first();
+  const control = calendar.locator('..');
+  await control.locator('input').focus();
   await page.keyboard.press('Tab');
+  // moduix DatePicker puts its clear button between the input and the trigger while a date is set.
+  if (await control.getByRole('button', { name: 'Clear selected dates' }).isVisible()) await page.keyboard.press('Tab');
   await expect(calendar).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.locator('[data-slot="popover-content"]')).toBeVisible();
+  const picker = page.locator('[data-scope="date-picker"][data-part="content"]');
+  await expect(picker).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.locator('[data-slot="popover-content"]')).toBeHidden();
+  await expect(picker).toBeHidden();
   await expect(calendar).toBeFocused();
   await expect(page.getByRole('dialog')).toBeVisible();
 });
@@ -163,9 +171,11 @@ test('calendar trigger is in the Tab sequence and restores focus on Escape', asy
 test('workspace switch refreshes review documents and document explorer; outgoing draft keeps its workspace', async ({ page }) => {
   const pending = page.getByRole('region', { name: 'Documents Pending Review', exact: true });
   await expect(pending).toContainText('Draft Workspace 1');
+  // The organization switcher is a moduix Menu with radio items in the sidebar header.
+  const switcher = page.locator('[data-scope="sidebar"] button[aria-haspopup="menu"]').first();
   const switchWorkspace = async () => {
-    await page.locator('aside button[aria-haspopup="listbox"]').click();
-    await page.getByRole('listbox').getByRole('option').last().click();
+    await switcher.click();
+    await page.getByRole('menu').getByRole('menuitemradio').last().click();
   };
   await switchWorkspace();
   await expect(pending).toContainText('Draft Workspace 2');
@@ -176,8 +186,8 @@ test('workspace switch refreshes review documents and document explorer; outgoin
   await expect(editor).toContainText('Saved content 2');
   await editor.fill('Unsaved workspace two change');
   const save = page.waitForRequest(request => request.method() === 'POST' && request.url().endsWith('/doc-1/drafts'));
-  await page.locator('aside button[aria-haspopup="listbox"]').click();
-  await page.getByRole('listbox').getByRole('option').first().click();
+  await switcher.click();
+  await page.getByRole('menu').getByRole('menuitemradio').first().click();
   const request = await save;
   expect(request.headers()['x-organization-id']).toBe(SECOND_TENANT_ID);
   await expect(page.getByRole('button', { name: 'Draft Workspace 1', exact: true })).toBeVisible();

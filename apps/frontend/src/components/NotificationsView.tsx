@@ -1,3 +1,4 @@
+import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { formatDateTime } from '../lib/displayDate';
 import { notificationMessage } from '../lib/notificationText';
@@ -28,6 +29,8 @@ import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell, 
 import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Spinner } from '@legalio/ui-components/spinner';
 interface NotificationsViewProps {
   notifications: NotificationLog[];
   onTriggerCheck: () => Promise<void>;
@@ -52,7 +55,6 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   const [runningCron, setRunningCron] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
 
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     time: true,
@@ -212,11 +214,11 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in-50 duration-200">
+    <div className="space-y-g21 animate-in fade-in-50 duration-200">
       {/* 1. Standard Header Card */}
-      <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-g13">
         <div>
-          <Heading as="h2" size="lg" weight="semibold">
+          <Heading as="h2" size="md" weight="semibold">
             <span>{t('notifications.title', 'Pusat Notifikasi & Alarm Notice Period')}</span>
             {unreadCount > 0 && (
               <Badge tone={statusTone('warning')}>
@@ -226,13 +228,13 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           </Heading>
         </div>
 
-        <div className="mobile-page-actions flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-g8 shrink-0">
           {unreadCount > 0 && onMarkRead && (
             <Button variant="outline"
               onClick={handleMarkAllRead}
               className="shrink-0"
             >
-              <CheckCheck className="w-4 h-4 text-muted-foreground" />
+              <CheckCheck className="w-g16 h-g16 text-muted-foreground" />
               <span>{t('notifications.mark_all', 'Tandai Semua Dibaca')}</span>
             </Button>
           )}
@@ -242,18 +244,18 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
             disabled={runningCron}
             className="shrink-0"
           >
-            <RefreshCw className={`w-4 h-4 text-white ${runningCron ? 'animate-spin' : ''}`} />
+            {runningCron ? <Spinner size="sm" decorative /> : <RefreshCw aria-hidden="true" />}
             <span>{runningCron ? t('notifications.processing', 'Memproses...') : t('notifications.refresh_logs', 'Refresh Logs')}</span>
           </Button>
         </div>
-      </Card>
+      </div>
 
       {/* 2. Standard Filter Bar with 3 Dropdowns and View Column Toggle - Justified Responsive Grid/Flex */}
-      <Card className="p-6">
-        <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
+      <Card className="p-g13">
+        <div className="flex w-full flex-wrap items-center gap-g13">
           {/* 1. Search Box */}
-          <InputGroup className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-            <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+          <InputGroup className="relative flex-1 min-w-g233 sm:min-w-g233">
+            <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
             <InputGroupInput aria-label={t('notifications.search_ph', 'Cari nomor kontrak, partner, atau IO...')}
               type="text"
               placeholder={t('notifications.search_ph', 'Cari nomor kontrak, partner, atau IO...')}
@@ -272,7 +274,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               setFilterStatus(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('notifications.all_status', 'Semua Status')} ({notifications.length})</option>
             <option value="UNREAD">{t('notifications.status_unread', 'Belum Dibaca')} ({unreadCount})</option>
@@ -286,7 +288,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               setFilterType(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('notifications.all_types', 'Semua Jenis Notifikasi')}</option>
             {typeOptions.map((opt) => (
@@ -301,7 +303,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               setFilterTimeRange(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('notifications.all_time_periods', 'Semua Periode Waktu')}</option>
             <option value="TODAY">{t('notifications.time_today', 'Hari Ini (24 Jam Terakhir)')}</option>
@@ -310,56 +312,35 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           </NativeSelect>
 
           {/* View Column Toggle Menu */}
-          <div className="relative flex-initial">
-            <Button variant="outline"
-              onClick={() => setIsViewMenuOpen(!isViewMenuOpen)}
-              className="w-full"
-              title={t('notifications.view_settings', 'Pengaturan Tampilan Kolom')}
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-              <span>{t('notifications.view', 'View')}</span>
-            </Button>
-            {isViewMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-20" onClick={() => setIsViewMenuOpen(false)}></div>
-                <Card className="absolute right-0 top-11 w-52 z-30 py-2 animate-in fade-in zoom-in-95">
-                <div className="px-3.5 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 border-b border-border">
-                  {t('notifications.toggle_columns', 'Toggle Kolom')}
-                </div>
-                {Object.keys(visibleColumns).map((col) => {
-                  let label = col;
-                  if (col === 'time') label = t('notifications.col_time', 'Waktu');
-                  else if (col === 'type') label = t('notifications.col_type_header', 'Tipe Notifikasi');
-                  else if (col === 'subject') label = t('notifications.col_subject', 'Subjek');
-                  else if (col === 'message') label = t('notifications.col_message', 'Pesan');
-                  else if (col === 'recipient') label = t('notifications.col_recipient', 'Penerima');
-
-                  return (
-                    <Checkbox checked={visibleColumns[col]} onCheckedChange={() => toggleColumnVisibility(col)}><CheckboxControl /><CheckboxLabel><span>{label}</span></CheckboxLabel><CheckboxHiddenInput /></Checkbox>
-                  );
-                })}
-              </Card>
-            </>
-          )}
-        </div>
+          <TableViewMenu className="flex-initial" title={t('notifications.view_settings', 'Pengaturan Tampilan Kolom')} label={t('notifications.view', 'View')} heading={t('notifications.toggle_columns', 'Toggle Kolom')}>
+            {Object.keys(visibleColumns).map((col) => {
+              let label = col;
+              if (col === 'time') label = t('notifications.col_time', 'Waktu');
+              else if (col === 'type') label = t('notifications.col_type_header', 'Tipe Notifikasi');
+              else if (col === 'subject') label = t('notifications.col_subject', 'Subjek');
+              else if (col === 'message') label = t('notifications.col_message', 'Pesan');
+              else if (col === 'recipient') label = t('notifications.col_recipient', 'Penerima');
+              return <TableViewOption key={col} value={col} checked={visibleColumns[col]} onToggle={() => toggleColumnVisibility(col)}>{label}</TableViewOption>;
+            })}
+          </TableViewMenu>
       </div>
     </Card>
 
       {/* Bulk Action Bar (Visible when items selected) */}
       {selectedIds.length > 0 && (
-        <Card className="p-3 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+        <Card className="p-g13 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-g8 text-xs font-medium text-foreground">
             <span className="font-bold text-accent-foreground">{selectedIds.length}</span>
             <span>{t('notifications.selected_count', 'notifikasi dipilih')}</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-g8">
             {onMarkRead && (
               <Button variant="outline"
                 type="button"
                 onClick={handleMarkSelectedRead}
               >
-                <CheckCircle2 className="w-3.5 h-3.5 text-accent-foreground" />
+                <CheckCircle2 className="w-g13 h-g13 text-accent-foreground" />
                 <span>{t('notifications.mark_read_btn', 'Tandai Dibaca')}</span>
               </Button>
             )}
@@ -369,7 +350,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 type="button"
                 onClick={handleDeleteSelected}
               >
-                <Trash2 className="w-3.5 h-3.5 text-status-danger" />
+                <Trash2 className="w-g13 h-g13 text-status-danger" />
                 <span>{t('notifications.delete_selected', 'Hapus Terpilih')}</span>
               </Button>
             )}
@@ -379,13 +360,13 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
       {/* 3. Main Standard Table Card */}
       <Card className="border-border/80 overflow-hidden">
-        <TableScrollArea className="rounded-none border-0">
-          <Table className="w-full text-left">
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
+          <Table>
             {/* Table Header */}
             <TableHeader>
               <TableRow>
                 {/* 0. Checkbox */}
-                <TableColumnHeader className="w-12 text-left align-middle">
+                <TableColumnHeader className="w-g42">
                   <div className="flex items-center justify-start">
                     <Checkbox aria-label={t('table.select_all', 'Pilih semua baris')} checked={isAllCurrentSelected} onCheckedChange={(details) => toggleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
@@ -395,14 +376,13 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 {visibleColumns.time && (
                   <TableColumnHeader
                     onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
-                    className="align-middle"
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-g5">
                       <span>{t('notifications.col_created_time', 'Created time')}</span>
                       {sortOrder === 'desc' ? (
-                        <ArrowDown className="w-3.5 h-3.5 text-muted-foreground" />
+                        <ArrowDown className="w-g13 h-g13 text-muted-foreground" />
                       ) : (
-                        <ArrowUp className="w-3.5 h-3.5 text-muted-foreground" />
+                        <ArrowUp className="w-g13 h-g13 text-muted-foreground" />
                       )}
                     </div>
                   </TableColumnHeader>
@@ -410,26 +390,26 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
                 {/* 2. Type */}
                 {visibleColumns.type && (
-                  <TableColumnHeader className="align-middle">{t('notifications.col_type_short', 'Type')}</TableColumnHeader>
+                  <TableColumnHeader>{t('notifications.col_type_short', 'Type')}</TableColumnHeader>
                 )}
 
                 {/* 3. Subject */}
                 {visibleColumns.subject && (
-                  <TableColumnHeader className="align-middle">{t('notifications.col_subject', 'Subject')}</TableColumnHeader>
+                  <TableColumnHeader>{t('notifications.col_subject', 'Subject')}</TableColumnHeader>
                 )}
 
                 {/* 4. Message */}
                 {visibleColumns.message && (
-                  <TableColumnHeader className="align-middle">{t('notifications.col_message', 'Message')}</TableColumnHeader>
+                  <TableColumnHeader>{t('notifications.col_message', 'Message')}</TableColumnHeader>
                 )}
 
                 {/* 5. Recipient */}
                 {visibleColumns.recipient && (
-                  <TableColumnHeader className="align-middle">{t('notifications.col_recipient', 'Penerima')}</TableColumnHeader>
+                  <TableColumnHeader>{t('notifications.col_recipient', 'Penerima')}</TableColumnHeader>
                 )}
 
                 {/* 6. Actions */}
-                <TableColumnHeader className="text-right w-24 align-middle">
+                <TableColumnHeader className="text-right w-g89">
                   <div className="flex items-center justify-end">{t('notifications.col_actions', 'Aksi')}</div>
                 </TableColumnHeader>
               </TableRow>
@@ -456,7 +436,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
  }`}
                     >
                       {/* Checkbox */}
-                      <TableCell className="w-12 text-left align-middle">
+                      <TableCell className="w-g42">
                         <div className="flex items-center justify-start">
                           <Checkbox aria-label={t('table.select_row', 'Pilih baris {id}', { id: notif.notif_id })} checked={isSelected} onCheckedChange={() => toggleSelectRow(notif.notif_id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                         </div>
@@ -464,14 +444,14 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
                       {/* Created Time */}
                       {visibleColumns.time && (
-                        <TableCell className="whitespace-nowrap align-middle">
+                        <TableCell className="whitespace-nowrap">
                           {formatDateTime(notif.tanggal_terkirim)}
                         </TableCell>
                       )}
 
                       {/* Type Badge */}
                       {visibleColumns.type && (
-                        <TableCell className="whitespace-nowrap align-middle">
+                        <TableCell className="whitespace-nowrap">
                           <Badge
                             tone={statusTone(
  notif.jenis_notifikasi
@@ -484,12 +464,12 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
                       {/* Subject */}
                       {visibleColumns.subject && (
-                        <TableCell className="whitespace-nowrap align-middle">
+                        <TableCell className="whitespace-nowrap">
                           <span className="font-medium">
                             {notif.parent_nomor || notif.parent_id}
                           </span>
                           {notif.parent_judul && (
-                            <span className="text-muted-foreground ml-1.5">
+                            <span className="text-muted-foreground ml-g5">
                               • {notif.parent_judul}
                             </span>
                           )}
@@ -498,43 +478,41 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
                       {/* Message */}
                       {visibleColumns.message && (
-                        <TableCell className="max-w-[400px] align-middle">
-                          <span className="line-clamp-2" title={notificationMessage(notif, t)}>
+                        <TableCell className="max-w-g377">
+                          <Tooltip><TooltipTrigger asChild><span className="block truncate">
                             {notificationMessage(notif, t)}
-                          </span>
+                          </span></TooltipTrigger><TooltipBody>{notificationMessage(notif, t)}</TooltipBody></Tooltip>
                         </TableCell>
                       )}
 
                       {/* Recipient */}
                       {visibleColumns.recipient && (
-                        <TableCell className="whitespace-nowrap align-middle">
+                        <TableCell className="whitespace-nowrap">
                           {notif.penerima}
                         </TableCell>
                       )}
 
                       {/* Actions */}
-                      <TableCell className="text-right whitespace-nowrap w-24 align-middle">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <TableCell className="text-right whitespace-nowrap w-g89">
+                        <div className="flex items-center justify-end gap-g5">
                           {/* Mark Read Checkmark Button */}
                           {isUnread && onMarkRead && (
-                            <Button variant="secondary" size="icon-md"
+                            <Tooltip><TooltipTrigger asChild><Button variant="secondary" size="icon-sm"
                               type="button"
-                              onClick={(e) => handleMarkSingleRead(notif.notif_id, e)}
-                              title={t('notifications.mark_read', 'Tandai Dibaca')}
+                              onClick={(e) => handleMarkSingleRead(notif.notif_id, e)} aria-label={t('notifications.mark_read', 'Tandai Dibaca')}
                             >
-                              <CheckCircle2 className="w-4 h-4" />
-                            </Button>
+                              <CheckCircle2 className="w-g16 h-g16" />
+                            </Button></TooltipTrigger><TooltipBody>{t('notifications.mark_read', 'Tandai Dibaca')}</TooltipBody></Tooltip>
                           )}
 
                           {/* Delete Trash Button */}
                           {onDeleteNotif && (
-                            <Button variant="secondary" size="icon-md"
+                            <Tooltip><TooltipTrigger asChild><Button variant="secondary" size="icon-sm"
                               type="button"
-                              onClick={(e) => handleDeleteSingle(notif.notif_id, e)}
-                              title={t('notifications.delete_notif', 'Hapus Notifikasi')}
+                              onClick={(e) => handleDeleteSingle(notif.notif_id, e)} aria-label={t('notifications.delete_notif', 'Hapus Notifikasi')}
                             >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                              <Trash2 className="w-g16 h-g16" />
+                            </Button></TooltipTrigger><TooltipBody>{t('notifications.delete_notif', 'Hapus Notifikasi')}</TooltipBody></Tooltip>
                           )}
                         </div>
                       </TableCell>

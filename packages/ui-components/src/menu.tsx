@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/menu';
+export * from './moduix/ui/menu';

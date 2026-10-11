@@ -314,9 +314,6 @@ test('AC-030 superuser manages A without a membership; changes are audited as th
   await organizationPage.getByRole('tab', { name: 'Members & Access', exact: true }).click();
   await expect(organizationPage).toHaveURL(/tab=settings-access/);
   await expect(organizationPage.getByText('Platform administrator managing Alpha Org')).toHaveCount(0);
-  await organizationPage.getByRole('tab', { name: 'Integrations', exact: true }).click();
-  await expect(organizationPage).toHaveURL(/tab=settings-integrations/);
-  await expect(organizationPage.getByText('Platform administrator managing Alpha Org')).toHaveCount(0);
   await organizationPage.getByRole('tab', { name: 'Organization', exact: true }).click();
 
   await expect(organizationPage.getByLabel('Tagline', { exact: true })).toHaveCount(0);

@@ -48,6 +48,9 @@ import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
 import { RadioGroup, RadioGroupItem, RadioGroupItemControl, RadioGroupItemHiddenInput, RadioGroupItemText, RadioGroupLabel } from '@legalio/ui-components/radio-group';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Text } from '@legalio/ui-components/text';
+import { FormSection } from '@legalio/ui-components/blocks';
 interface PartnerEvaluationViewProps {
   partners: Partner[];
   contracts?: Contract[];
@@ -86,6 +89,33 @@ export const computeScoreFromFields = (
 
   return targetScore + incidentScore + commScore + pricingScore;
 };
+
+
+/** Criterion with its answers as one row of 34 tall pills: label on the minor side, pills on the major side (golden split). */
+function CriterionRow({ label, value, onChange, options, stacked = false }: {
+  label: React.ReactNode;
+  value: string | undefined;
+  onChange: (value: string) => void;
+  options: { value: string; label: React.ReactNode; points: React.ReactNode }[];
+  stacked?: boolean;
+}) {
+  return (
+    <RadioGroup required value={value || null} onValueChange={details => details.value && onChange(details.value)}
+      className={stacked ? 'gap-g8' : 'items-center gap-g8 sm:grid sm:grid-cols-[var(--spacing-g233)_minmax(0,1fr)] sm:gap-g13'}>
+      <RadioGroupLabel>{label} <span className="text-destructive" aria-hidden="true">*</span></RadioGroupLabel>
+      <div className="grid grid-cols-3 gap-g8">
+        {options.map(opt => (
+          <RadioGroupItem key={opt.value} value={opt.value}
+            className="h-g34 w-full min-w-0 justify-center overflow-hidden rounded-full border border-border bg-muted px-g8 text-sm font-medium data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground">
+            <RadioGroupItemText className="text-center leading-g16 whitespace-normal">{opt.label}</RadioGroupItemText>
+            <span className="sr-only">{opt.points}</span>
+            <RadioGroupItemHiddenInput />
+          </RadioGroupItem>
+        ))}
+      </div>
+    </RadioGroup>
+  );
+}
 
 export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
   partners,
@@ -549,66 +579,63 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
       <TableColumnHeader
         scope="col"
         aria-sort={isSorted ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className="text-left align-middle"
       >
-        <Button variant="ghost" size="sm"
+        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="-ms-g13 font-semibold text-muted-foreground"
           type="button"
           onClick={() => handleSort(field)}
-          title={t('eval.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}
         >
           <span>{label}</span>
           {isSorted ? (
             sortOrder === 'asc' ? (
-              <ArrowUp className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
+              <ArrowUp className="w-g13 h-g13 text-accent-foreground shrink-0" />
             ) : (
-              <ArrowDown className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
+              <ArrowDown className="w-g13 h-g13 text-accent-foreground shrink-0" />
             )
           ) : (
-            <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <ArrowUpDown className="w-g13 h-g13 text-muted-foreground shrink-0" />
           )}
-        </Button>
+        </Button></TooltipTrigger><TooltipBody>{t('eval.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}</TooltipBody></Tooltip>
       </TableColumnHeader>
     );
   };
 
   return (
-    <div className="space-y-6">
-      <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
+    <div className="space-y-g21">
+      <div className="flex flex-wrap items-center justify-between gap-g13">
         <div>
-          <Heading as="h2" size="lg" weight="semibold">
+          <Heading as="h2" size="md" weight="semibold">
             <span>{t('eval.annual_title', 'Evaluasi Vendor Tahunan')}</span>
           </Heading>
         </div>
 
-        <div className="mobile-page-actions flex items-center gap-2.5 shrink-0 flex-wrap">
+        <div className="flex items-center gap-g8 shrink-0 flex-wrap">
           {hasPermission('export.csv') && (
-            <Button variant="outline"
+            <Tooltip><TooltipTrigger asChild><Button variant="outline"
               onClick={handleExportCSV}
-              disabled={sortedEvaluations.length === 0}
-              title={t('eval.export_csv', 'Ekspor CSV')}
+              disabled={sortedEvaluations.length === 0} aria-label={t('eval.export_csv', 'Ekspor CSV')}
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-g16 h-g16" />
               <span>{t('eval.export_csv', 'Ekspor CSV')}</span>
-            </Button>
+            </Button></TooltipTrigger><TooltipBody>{t('eval.export_csv', 'Ekspor CSV')}</TooltipBody></Tooltip>
           )}
 
           {canCreateEvaluation && (
             <Button
               onClick={handleAddNew}
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-g16 h-g16" />
               <span>{t('ui.add_evaluation')}</span>
             </Button>
           )}
         </div>
-      </Card>
+      </div>
 
       {/* Filter Bar & View Toggle - Justified Responsive Grid/Flex */}
-      <Card className="p-4 sm:p-5">
-        <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
+      <Card className="p-g13">
+        <div className="flex w-full flex-wrap items-center gap-g13">
           {/* 1 Box Search */}
-          <InputGroup className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-            <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+          <InputGroup className="relative flex-1 min-w-g233 sm:min-w-g233">
+            <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
             <InputGroupInput
               type="text"
               placeholder={t('eval.search_placeholder', 'Cari vendor, reviewer, atau notes...')}
@@ -629,7 +656,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               setSelectedYear(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="2026">{t('eval.year_prefix', 'Tahun')} 2026</option>
             <option value="2025">{t('eval.year_prefix', 'Tahun')} 2025</option>
@@ -645,7 +672,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               setSelectedEvaluationFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('eval.all_decisions', 'Semua Keputusan')}</option>
             <option value="Recommended">{t('eval.decision_recommended', 'Lanjutkan Kerjasama')}</option>
@@ -662,7 +689,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               setSelectedObligationTarget(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('eval.all_obligation_targets', 'Semua Target Kewajiban')}</option>
             <option value="Sangat baik">{t('eval.opt_sangat_baik', 'Sangat baik')}</option>
@@ -672,9 +699,6 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
           {/* View Toggle */}
           <TableViewMenu title={t('eval.view_settings', 'Pengaturan Tampilan Kolom')} label={t('eval.view', 'View')}>
-            <div className="px-3.5 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 border-b border-border">
-              {t('eval.toggle_columns', 'Toggle Kolom')}
-            </div>
             {Object.keys(visibleColumns).map((col) => {
               let label = col;
               if (col === 'vendor') label = t('eval.col_vendor', 'Partner');
@@ -693,50 +717,50 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
       <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_year'), value: selectedYear, active: selectedYear !== String(new Date().getFullYear()) }, { label: t('ui.filter_decision'), value: selectedEvaluationFilter, active: selectedEvaluationFilter !== 'ALL' }, { label: t('ui.filter_target'), value: selectedObligationTarget, active: selectedObligationTarget !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedYear(String(new Date().getFullYear())); setSelectedEvaluationFilter('ALL'); setSelectedObligationTarget('ALL'); }} />
-        <p className="mobile-table-hint px-4 py-2 text-xs text-muted-foreground md:hidden">{t('ui.scroll_table')}</p>
-        <TableScrollArea className="data-table-scroll rounded-none border-0" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
-          <Table className="app-data-table w-full text-left">
+        <Text size="xs" tone="muted" className="px-g13 py-g8 md:hidden">{t('ui.scroll_table')}</Text>
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
+          <Table>
             <TableHeader>
               <TableRow>
-                <TableColumnHeader scope="col" className="w-12 text-left align-middle">
+                <TableColumnHeader scope="col" className="w-g42">
                   <div className="flex items-center justify-start">
                     <Checkbox aria-label={t('eval.pilih_semua_evaluasi', 'Pilih semua evaluasi')} checked={selectedRows.length > 0 && selectedRows.length === currentEvaluations.length} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
                 </TableColumnHeader>
                 {visibleColumns.vendor && (
-                  <TableColumnHeader scope="col" aria-sort={sortField === 'vendor' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left align-middle">
-                    <Button variant="ghost" size="sm" type="button" onClick={() => handleSort('vendor')}>
+                  <TableColumnHeader scope="col" aria-sort={sortField === 'vendor' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <Button variant="ghost" size="sm" className="-ms-g13 font-semibold text-muted-foreground" type="button" onClick={() => handleSort('vendor')}>
                       <span>{t('eval.col_vendor', 'Partner')}</span>
-                      <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
+                      <ArrowUpDown className="w-g13 h-g13 text-muted-foreground" />
                     </Button>
                   </TableColumnHeader>
                 )}
-                {visibleColumns.target && <TableColumnHeader scope="col" className="text-left align-middle">{t('eval.col_target', 'Target Kewajiban')}</TableColumnHeader>}
+                {visibleColumns.target && <TableColumnHeader scope="col">{t('eval.col_target', 'Target Kewajiban')}</TableColumnHeader>}
                 {visibleColumns.skor && (
-                  <TableColumnHeader scope="col" aria-sort={sortField === 'calculated_score' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left align-middle">
-                    <Button variant="ghost" size="sm" type="button" onClick={() => handleSort('calculated_score')}>
+                  <TableColumnHeader scope="col" aria-sort={sortField === 'calculated_score' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <Button variant="ghost" size="sm" className="-ms-g13 font-semibold text-muted-foreground" type="button" onClick={() => handleSort('calculated_score')}>
                       <span>{t('eval.col_calculated_score', 'Skor')}</span>
-                      <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
+                      <ArrowUpDown className="w-g13 h-g13 text-muted-foreground" />
                     </Button>
                   </TableColumnHeader>
                 )}
                 {visibleColumns.hasil && (
-                  <TableColumnHeader scope="col" aria-sort={sortField === 'final_eval' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left align-middle">
-                    <Button variant="ghost" size="sm" type="button" onClick={() => handleSort('final_eval')}>
+                  <TableColumnHeader scope="col" aria-sort={sortField === 'final_eval' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <Button variant="ghost" size="sm" className="-ms-g13 font-semibold text-muted-foreground" type="button" onClick={() => handleSort('final_eval')}>
                       <span>{t('eval.col_recommendation', 'Hasil Rekomendasi')}</span>
-                      <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
+                      <ArrowUpDown className="w-g13 h-g13 text-muted-foreground" />
                     </Button>
                   </TableColumnHeader>
                 )}
                 {visibleColumns.tanggal && (
-                  <TableColumnHeader scope="col" aria-sort={sortField === 'review_date' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left align-middle">
-                    <Button variant="ghost" size="sm" type="button" onClick={() => handleSort('review_date')}>
+                  <TableColumnHeader scope="col" aria-sort={sortField === 'review_date' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <Button variant="ghost" size="sm" className="-ms-g13 font-semibold text-muted-foreground" type="button" onClick={() => handleSort('review_date')}>
                       <span>{t('eval.col_review_date', 'Tanggal Review')}</span>
-                      <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
+                      <ArrowUpDown className="w-g13 h-g13 text-muted-foreground" />
                     </Button>
                   </TableColumnHeader>
                 )}
-                <TableColumnHeader scope="col" className="text-right w-20 align-middle">
+                <TableColumnHeader scope="col" className="text-right w-g89">
                   <div className="flex items-center justify-end">{t('eval.col_action', 'Aksi')}</div>
                 </TableColumnHeader>
               </TableRow>
@@ -761,7 +785,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                     <TableRow
                       key={item.id}
                     >
-                      <TableCell className="text-left align-middle">
+                      <TableCell>
                         <div className="flex items-center justify-start">
                           <Checkbox aria-label={t('eval.pilih_evaluasi', 'Pilih evaluasi {supplier_name}', { supplier_name: item.supplier_name })} checked={selectedRows.includes(item.id)} onCheckedChange={() => handleSelectRow(item.id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                         </div>
@@ -769,21 +793,21 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
                       {/* 1. Vendor */}
                       {visibleColumns.vendor && (
-                        <TableCell className="text-left">
+                        <TableCell>
                           {item.supplier_name}
                         </TableCell>
                       )}
 
                       {/* 2. Target Kewajiban */}
                       {visibleColumns.target && (
-                        <TableCell className="text-left">
+                        <TableCell>
                           {isNotReviewed ? '—' : item.obligation_target}
                         </TableCell>
                       )}
 
                       {/* 3. Skor */}
                       {visibleColumns.skor && (
-                        <TableCell className="text-left">
+                        <TableCell>
                           {isNotReviewed ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
@@ -794,28 +818,28 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
                       {/* 4. Hasil Rekomendasi */}
                       {visibleColumns.hasil && (
-                        <TableCell className="text-left whitespace-nowrap">
+                        <TableCell className="whitespace-nowrap">
                           {item.final_evaluation === 'Recommended' && (
                             <Badge tone={statusTone('Recommended')}>
-                              <CheckCircle2 className="w-3.5 h-3.5 text-accent-foreground" />
+                              <CheckCircle2 className="w-g13 h-g13 text-accent-foreground" />
                               <span>{t('eval.status_rec', 'Recommended')}</span>
                             </Badge>
                           )}
                           {item.final_evaluation === 'Recommended with notes' && (
                             <Badge tone={statusTone('Recommended with notes')}>
-                              <AlertCircle className="w-3.5 h-3.5 text-status-warning" />
+                              <AlertCircle className="w-g13 h-g13 text-status-warning" />
                               <span>{t('eval.status_rec_notes', 'Recommended with notes')}</span>
                             </Badge>
                           )}
                           {item.final_evaluation === 'Not recommended' && (
                             <Badge tone={statusTone('Not recommended')}>
-                              <XCircle className="w-3.5 h-3.5 text-status-danger" />
+                              <XCircle className="w-g13 h-g13 text-status-danger" />
                               <span>{t('eval.status_not_rec', 'Not recommended')}</span>
                             </Badge>
                           )}
                           {isNotReviewed && (
                             <Badge tone={statusTone('Draft')}>
-                              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                              <Clock className="w-g13 h-g13 text-muted-foreground" />
                               <span>{t('eval.status_not_reviewed', 'Belum Dinilai')}</span>
                             </Badge>
                           )}
@@ -824,40 +848,39 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
                       {/* 5. Tanggal Review */}
                       {visibleColumns.tanggal && (
-                        <TableCell className="text-left whitespace-nowrap">
+                        <TableCell className="whitespace-nowrap">
                           {formatBusinessDate(item.review_date)}
                         </TableCell>
                       )}
 
                       {/* Actions */}
-                      <TableCell className="text-right align-middle w-20">
+                      <TableCell className="text-right w-g89">
                         <div className="flex items-center justify-end">
                           {isNotReviewed ? (
                             canCreateEvaluation && (
-                              <Button size="sm"
-                                onClick={() => handleInputNotReviewed(item)}
-                                title={`${t('eval.input_eval')} - ${item.supplier_name}`}
+                              <Tooltip><TooltipTrigger asChild><Button size="sm"
+                                onClick={() => handleInputNotReviewed(item)} aria-label={`${t('eval.evaluate', 'Evaluate')} - ${item.supplier_name}`}
                               >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>{t('eval.input_eval')}</span>
-                              </Button>
+                                <Plus className="w-g13 h-g13" />
+                                <span>{t('eval.evaluate', 'Evaluate')}</span>
+                              </Button></TooltipTrigger><TooltipBody>{`${t('eval.input_eval')} - ${item.supplier_name}`}</TooltipBody></Tooltip>
                             )
                           ) : (
                             <ActionMenu
                               items={[
                                 {
                                   label: t('eval.action_detail', 'Detail'),
-                                  icon: <Award className="w-3.5 h-3.5" />,
+                                  icon: <Award className="w-g13 h-g13" />,
                                   onClick: () => setViewingDetailItem(item),
                                 },
                                 canEditEvaluation && {
                                   label: t('eval.action_edit', 'Edit'),
-                                  icon: <Edit2 className="w-3.5 h-3.5" />,
+                                  icon: <Edit2 className="w-g13 h-g13" />,
                                   onClick: () => handleOpenEditModal(item),
                                 },
                                 canDeleteEvaluation && {
                                   label: t('eval.action_delete', 'Hapus'),
-                                  icon: <Trash2 className="w-3.5 h-3.5" />,
+                                  icon: <Trash2 className="w-g13 h-g13" />,
                                   onClick: () => handleDelete(item.id, item.supplier_name),
                                   variant: 'danger' as const,
                                   dividerBefore: true,
@@ -889,291 +912,151 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
       {/* FORM MODAL: Submit / Edit Evaluasi Tahunan Vendor */}
       {showFormModal && (
-        <ModalFrame onClose={() => setShowFormModal(false)}>
+        <ModalFrame size="form" onClose={() => setShowFormModal(false)}>
 
             {/* Modal Header */}
-            <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-              <div className="flex items-center gap-2.5">
-                <ClipboardCheck className="w-5 h-5 text-accent-foreground" />
+            <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+              <div className="flex items-center gap-g8">
+                <ClipboardCheck className="w-g21 h-g21 text-muted-foreground" />
                 <div>
-                  <DialogTitle className="flex items-center gap-2">
+                  <DialogTitle className="flex items-center gap-g8">
                     {editingItem?.id && !editingItem.id.startsWith('NOT_REVIEWED')
                       ? t('eval.modal_title_edit', 'Edit Evaluasi Partner')
                       : t('eval.modal_title_add', 'Form Evaluasi Partner')}
                   </DialogTitle>
-                  {editingItem?.supplier_name && (
-                    <p className="text-xs text-muted-foreground font-medium">{editingItem.supplier_name}</p>
-                  )}
                 </div>
               </div>
-              <Button variant="secondary" size="icon-md"
+              <Button variant="outline" size="icon-md"
                 type="button"
                 onClick={() => setShowFormModal(false)}
                 aria-label={t('common.close')}
               >
-                <X className="w-5 h-5" />
+                <X className="w-g21 h-g21" />
               </Button>
             </DialogHeader>
 
             {/* Modal Form Body */}
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-              <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs text-foreground">
+              <div className="flex flex-1 flex-col gap-g13 overflow-y-auto px-g21 py-g13 text-foreground">
               {formError && (
-                <div className="p-3.5 bg-status-danger-soft border border-status-danger-border rounded-xl text-xs font-bold text-status-danger flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-status-danger shrink-0" />
-                  <span>{formError}</span>
-                </div>
+                <Alert status="error"><AlertIndicator /><AlertContent><AlertDescription>{formError}</AlertDescription></AlertContent></Alert>
               )}
 
-              {/* BAGIAN 1: Informasi Dasar */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-border">
-                  <Badge tone="info" className="size-6 justify-center rounded-full p-0 font-semibold">1</Badge>
-                  <Heading as="h3" size="sm" weight="semibold">{t('eval.section1')}</Heading>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Tanggal Review */}
-                  <Field>
-                    <FieldLabel htmlFor="partnerevaluationview-field-1">
-                      {t('eval.review_date')} <span className="text-status-danger">*</span>
-                    </FieldLabel>
-                    <DateInput id="partnerevaluationview-field-1"
-                      required
-                      value={formData.review_date}
-                      onChange={(val) => setFormData({ ...formData, review_date: val })}
-                    />
-                  </Field>
-
-                  {/* Supplier Name (Dropdown Tersinkron) */}
-                  <Field required>
-                    <FieldLabel htmlFor="partnerevaluationview-field-2">{t('eval.supplier_name')}</FieldLabel>
-                    {partners.length > 0 ? (
-                      <AlphabeticalSelect id="partnerevaluationview-field-2"
+              <FormSection step={1} title={t('eval.section1')}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
+                    {/* Tanggal Review */}
+                    <Field>
+                      <FieldLabel htmlFor="partnerevaluationview-field-1">
+                        {t('eval.review_date')} <span className="text-status-danger">*</span>
+                      </FieldLabel>
+                      <DateInput id="partnerevaluationview-field-1"
                         required
-                        value={formData.supplier_name}
-                        onChange={(e) => {
-                          const selectedPartnerName = e.target.value;
-                          const found = partners.find((p) => p.nama_partner === selectedPartnerName);
-                          setFormData({
-                            ...formData,
-                            supplier_name: selectedPartnerName,
-                            partner_id: found ? found.partner_id : '',
-                          });
-                        }}
-                        className="w-full" controlProps={{ className: "w-full" }}
-                      >
-                        <option value="" disabled>
-                          {t('eval.select_partner_ph')}
-                        </option>
-                        {partners.map((p) => (
-                          <option key={p.partner_id} value={p.nama_partner}>
-                            {p.nama_partner} ({p.partner_id} - {p.jenis_partner})
+                        value={formData.review_date}
+                        onChange={(val) => setFormData({ ...formData, review_date: val })}
+                      />
+                    </Field>
+  
+                    {/* Supplier Name (Dropdown Tersinkron) */}
+                    <Field required>
+                      <FieldLabel htmlFor="partnerevaluationview-field-2">{t('eval.supplier_name')}</FieldLabel>
+                      {partners.length > 0 ? (
+                        <AlphabeticalSelect id="partnerevaluationview-field-2"
+                          required
+                          value={formData.supplier_name}
+                          onChange={(e) => {
+                            const selectedPartnerName = e.target.value;
+                            const found = partners.find((p) => p.nama_partner === selectedPartnerName);
+                            setFormData({
+                              ...formData,
+                              supplier_name: selectedPartnerName,
+                              partner_id: found ? found.partner_id : '',
+                            });
+                          }}
+                          className="w-full" controlProps={{ className: "w-full" }}
+                        >
+                          <option value="" disabled>
+                            {t('eval.select_partner_ph')}
                           </option>
-                        ))}
-                      </AlphabeticalSelect>
-                    ) : (
-                      <Alert status="warning"><AlertIndicator /><AlertContent><AlertDescription>{t('eval.no_partners_warning')}</AlertDescription></AlertContent></Alert>
-                    )}
-                  </Field>
-                </div>
-              </div>
-
-              {/* BAGIAN 2: Kriteria Penilaian */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <Badge tone="info" className="size-6 justify-center rounded-full p-0 font-semibold">2</Badge>
-                    <Heading as="h3" size="sm" weight="semibold">{t('eval.section2')}</Heading>
+                          {partners.map((p) => (
+                            <option key={p.partner_id} value={p.nama_partner}>
+                              {p.nama_partner} ({p.partner_id} - {p.jenis_partner})
+                            </option>
+                          ))}
+                        </AlphabeticalSelect>
+                      ) : (
+                        <Alert status="warning"><AlertIndicator /><AlertContent><AlertDescription>{t('eval.no_partners_warning')}</AlertDescription></AlertContent></Alert>
+                      )}
+                    </Field>
                   </div>
-                </div>
+              </FormSection>
 
-                {/* Obligation / Target */}
-                <RadioGroup required value={formData.obligation_target || null} onValueChange={details => details.value && setFormData({ ...formData, obligation_target: details.value as typeof formData.obligation_target })}>
-                  <RadioGroupLabel>{t('eval.obligation_target')} <span className="text-destructive" aria-hidden="true">*</span></RadioGroupLabel>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {[
-                      { value: 'Sangat baik', label: t('eval.opt_sangat_baik'), points: `30 ${t('eval.points')}` },
-                      { value: 'Baik', label: t('eval.opt_baik'), points: `20 ${t('eval.points')}` },
-                      { value: 'Kurang baik', label: t('eval.opt_kurang_baik'), points: `10 ${t('eval.points')}` },
-                    ].map((opt) => (
-                      <RadioGroupItem key={opt.value} value={opt.value} className="flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
-                        <RadioGroupItemControl />
-                        <RadioGroupItemText className="text-sm">{opt.label}</RadioGroupItemText>
-                        <Badge tone="info" className="ms-auto">{opt.points}</Badge>
-                        
-                        <RadioGroupItemHiddenInput />
-                      </RadioGroupItem>
-                    ))}
-                  </div>
-                </RadioGroup>
+              <FormSection step={2} title={t('eval.section2')}>
+                <CriterionRow label={t('eval.obligation_target')} value={formData.obligation_target} onChange={value => setFormData({ ...formData, obligation_target: value as typeof formData.obligation_target })} options={[
+                  { value: 'Sangat baik', label: t('eval.opt_sangat_baik'), points: `30 ${t('eval.points')}` },
+                  { value: 'Baik', label: t('eval.opt_baik'), points: `20 ${t('eval.points')}` },
+                  { value: 'Kurang baik', label: t('eval.opt_kurang_baik'), points: `10 ${t('eval.points')}` },
+                ]} />
+                <CriterionRow label={t('eval.incident_freq')} value={formData.incident_frequency} onChange={value => setFormData({ ...formData, incident_frequency: value as typeof formData.incident_frequency })} options={[
+                  { value: 'Never', label: t('eval.opt_never'), points: `20 ${t('eval.points')}` },
+                  { value: 'Rare', label: t('eval.opt_rare'), points: `15 ${t('eval.points')}` },
+                  { value: 'Frequent', label: t('eval.opt_frequent'), points: `10 ${t('eval.points')}` },
+                ]} />
+                <CriterionRow label={t('eval.communication')} value={formData.communication} onChange={value => setFormData({ ...formData, communication: value as typeof formData.communication })} options={[
+                  { value: 'Sangat baik', label: t('eval.opt_sangat_baik'), points: `20 ${t('eval.points')}` },
+                  { value: 'Baik', label: t('eval.opt_baik'), points: `15 ${t('eval.points')}` },
+                  { value: 'Kurang baik', label: t('eval.opt_kurang_baik'), points: `10 ${t('eval.points')}` },
+                ]} />
+                <CriterionRow label={t('eval.pricing')} value={formData.pricing} onChange={value => setFormData({ ...formData, pricing: value as typeof formData.pricing })} options={[
+                  { value: 'Cheap', label: t('eval.opt_cheap'), points: `30 ${t('eval.points')}` },
+                  { value: 'Moderate', label: t('eval.opt_moderate'), points: `20 ${t('eval.points')}` },
+                  { value: 'Expensive', label: t('eval.opt_expensive'), points: `10 ${t('eval.points')}` },
+                ]} />
+              </FormSection>
 
-                {/* Incident Frequency */}
-                <RadioGroup required value={formData.incident_frequency || null} onValueChange={details => details.value && setFormData({ ...formData, incident_frequency: details.value as typeof formData.incident_frequency })}>
-                  <RadioGroupLabel>{t('eval.incident_freq')} <span className="text-destructive" aria-hidden="true">*</span></RadioGroupLabel>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {[
-                      { value: 'Never', label: t('eval.opt_never'), points: `20 ${t('eval.points')}` },
-                      { value: 'Rare', label: t('eval.opt_rare'), points: `15 ${t('eval.points')}` },
-                      { value: 'Frequent', label: t('eval.opt_frequent'), points: `10 ${t('eval.points')}` },
-                    ].map((opt) => (
-                      <RadioGroupItem key={opt.value} value={opt.value} className="flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
-                        <RadioGroupItemControl />
-                        <RadioGroupItemText className="text-sm">{opt.label}</RadioGroupItemText>
-                        <Badge tone="info" className="ms-auto">{opt.points}</Badge>
-                        
-                        <RadioGroupItemHiddenInput />
-                      </RadioGroupItem>
-                    ))}
-                  </div>
-                </RadioGroup>
-
-                {/* Communication */}
-                <RadioGroup required value={formData.communication || null} onValueChange={details => details.value && setFormData({ ...formData, communication: details.value as typeof formData.communication })}>
-                  <RadioGroupLabel>{t('eval.communication')} <span className="text-destructive" aria-hidden="true">*</span></RadioGroupLabel>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {[
-                      { value: 'Sangat baik', label: t('eval.opt_sangat_baik'), points: `20 ${t('eval.points')}` },
-                      { value: 'Baik', label: t('eval.opt_baik'), points: `15 ${t('eval.points')}` },
-                      { value: 'Kurang baik', label: t('eval.opt_kurang_baik'), points: `10 ${t('eval.points')}` },
-                    ].map((opt) => (
-                      <RadioGroupItem key={opt.value} value={opt.value} className="flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
-                        <RadioGroupItemControl />
-                        <RadioGroupItemText className="text-sm">{opt.label}</RadioGroupItemText>
-                        <Badge tone="info" className="ms-auto">{opt.points}</Badge>
-                        
-                        <RadioGroupItemHiddenInput />
-                      </RadioGroupItem>
-                    ))}
-                  </div>
-                </RadioGroup>
-
-                {/* Pricing */}
-                <RadioGroup required value={formData.pricing || null} onValueChange={details => details.value && setFormData({ ...formData, pricing: details.value as typeof formData.pricing })}>
-                  <RadioGroupLabel>{t('eval.pricing')} <span className="text-destructive" aria-hidden="true">*</span></RadioGroupLabel>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {[
-                      { value: 'Cheap', label: t('eval.opt_cheap'), points: `30 ${t('eval.points')}` },
-                      { value: 'Moderate', label: t('eval.opt_moderate'), points: `20 ${t('eval.points')}` },
-                      { value: 'Expensive', label: t('eval.opt_expensive'), points: `10 ${t('eval.points')}` },
-                    ].map((opt) => (
-                      <RadioGroupItem key={opt.value} value={opt.value} className="flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
-                        <RadioGroupItemControl />
-                        <RadioGroupItemText className="text-sm">{opt.label}</RadioGroupItemText>
-                        <Badge tone="info" className="ms-auto">{opt.points}</Badge>
-                        
-                        <RadioGroupItemHiddenInput />
-                      </RadioGroupItem>
-                    ))}
-                  </div>
-                </RadioGroup>
-              </div>
-
-              {/* BAGIAN 3: Evaluasi Akhir & Catatan */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-border">
-                  <Badge tone="info" className="size-6 justify-center rounded-full p-0 font-semibold">3</Badge>
-                  <Heading as="h3" size="sm" weight="semibold">
-                    {t('eval.section3')}
-                  </Heading>
-                </div>
-
-                {/* Live Score Calculation Display */}
-                <Card className="gap-3 border-primary/30 bg-accent p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Calculator className="w-4 h-4 text-accent-foreground" />
-                      <span className="text-xs font-extrabold text-accent-foreground uppercase tracking-wider">
-                        {t('eval.calc_score_breakdown')}
-                      </span>
+              <FormSection step={3} title={t('eval.section3')}>
+                <div className="grid grid-cols-2 gap-g8 sm:grid-cols-5" aria-label={t('eval.calc_score_breakdown')}>
+                  {[
+                    [t('eval.obligation_target_2', 'Obligation / Target'), liveBreakdown.tScore],
+                    [t('eval.incident_freq_2', 'Incident Freq'), liveBreakdown.fScore],
+                    [t('audit_col_evalCommunication', 'Communication'), liveBreakdown.cScore],
+                    [t('eval.pricing_2', 'Pricing'), liveBreakdown.pScore],
+                  ].map(([label, score]) => (
+                    <div key={String(label)} className="rounded-md border border-border bg-muted p-g8">
+                      <Text as="span" size="xs" weight="semibold" tone="muted" className="block truncate">{label}</Text>
+                      <Text as="span" weight="bold" size="md" className="tabular-nums">{score} {t('eval.points')}</Text>
                     </div>
-                    <Badge tone="info" className="gap-1 px-3 py-1">
-                      {t('eval.total', 'Total:')} <strong className="text-base tabular-nums">{liveBreakdown.total}</strong> / 100 {t('eval.points')}
-                    </Badge>
+                  ))}
+                  <div className="col-span-2 rounded-md border border-primary bg-primary p-g8 text-primary-foreground sm:col-span-1">
+                    <Text as="span" size="xs" weight="semibold" className="block text-current">{t('eval.total', 'Total:')}</Text>
+                    <Text as="span" weight="bold" size="md" className="tabular-nums text-current">{liveBreakdown.total} / 100</Text>
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    <Card className="p-2">
-                      <span className="text-muted-foreground text-xs block font-medium">{t('eval.obligation_target_2', 'Obligation / Target')}</span>
-                      <span className="font-extrabold text-accent-foreground">
-                        {liveBreakdown.tScore} {t('eval.points')}
-                      </span>
-                    </Card>
-                    <Card className="p-2">
-                      <span className="text-muted-foreground text-xs block font-medium">{t('eval.incident_freq_2', 'Incident Freq')}</span>
-                      <span className="font-extrabold text-accent-foreground">
-                        {liveBreakdown.fScore} {t('eval.points')}
-                      </span>
-                    </Card>
-                    <Card className="p-2">
-                      <span className="text-muted-foreground text-xs block font-medium">{t('audit_col_evalCommunication', 'Communication')}</span>
-                      <span className="font-extrabold text-accent-foreground">
-                        {liveBreakdown.cScore} {t('eval.points')}
-                      </span>
-                    </Card>
-                    <Card className="p-2">
-                      <span className="text-muted-foreground text-xs block font-medium">{t('eval.pricing_2', 'Pricing')}</span>
-                      <span className="font-extrabold text-accent-foreground">
-                        {liveBreakdown.pScore} {t('eval.points')}
-                      </span>
-                    </Card>
-                  </div>
-                </Card>
+                <CriterionRow stacked label={t('eval.col_final_eval')} value={formData.final_evaluation} onChange={value => setFormData({ ...formData, final_evaluation: value as typeof formData.final_evaluation })} options={[
+                  { value: 'Recommended', label: t('eval.status_rec'), points: t('eval.opt_rec_desc') },
+                  { value: 'Recommended with notes', label: t('eval.rec_with_notes'), points: t('eval.opt_rec_notes_desc') },
+                  { value: 'Not recommended', label: t('eval.status_not_rec'), points: t('eval.opt_not_rec_desc') },
+                ]} />
 
-                {/* Final Evaluation Option */}
-                <RadioGroup required value={formData.final_evaluation || null} onValueChange={details => details.value && setFormData({ ...formData, final_evaluation: details.value as typeof formData.final_evaluation })}>
-                  <RadioGroupLabel>{t('eval.col_final_eval')} <span className="text-destructive" aria-hidden="true">*</span></RadioGroupLabel>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {[
-                      {
-                        value: 'Recommended',
-                        label: t('eval.status_rec'),
-                        desc: t('eval.opt_rec_desc'),
-                      },
-                      {
-                        value: 'Recommended with notes',
-                        label: t('eval.rec_with_notes'),
-                        desc: t('eval.opt_rec_notes_desc'),
-                      },
-                      {
-                        value: 'Not recommended',
-                        label: t('eval.status_not_rec'),
-                        desc: t('eval.opt_not_rec_desc'),
-                      },
-                    ].map((opt) => (
-                      <RadioGroupItem key={opt.value} value={opt.value} className="flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
-                        <RadioGroupItemControl />
-                        <RadioGroupItemText className="text-sm">{opt.label}</RadioGroupItemText>
-                        
-                        <RadioGroupItemText className="basis-full text-xs text-muted-foreground">{opt.desc}</RadioGroupItemText>
-                        <RadioGroupItemHiddenInput />
-                      </RadioGroupItem>
-                    ))}
-                  </div>
-                </RadioGroup>
-
-                {/* Notes / Alasan Evaluasi */}
                 <Field>
-                  <FieldLabel htmlFor="partnerevaluationview-field-3">
-                    {t('eval.notes_label')}
-                  </FieldLabel>
+                  <FieldLabel htmlFor="partnerevaluationview-field-3">{t('eval.notes_label')}</FieldLabel>
                   <Textarea id="partnerevaluationview-field-3"
-                    rows={4}
+                    rows={2}
                     placeholder={t('eval.notes_ph')}
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     className="w-full"
                   />
                 </Field>
-              </div>
+              </FormSection>
               </div>
 
               {/* Modal Footer */}
-              <div className="p-4 sm:p-5 bg-card border-t border-border flex items-center justify-between gap-2 shrink-0">
-                <span className="text-xs text-muted-foreground font-medium hidden sm:inline">
+              <div className="p-g13 sm:p-g21 bg-card border-t border-border flex items-center justify-between gap-g8 shrink-0">
+                <Text as="span" size="xs" weight="medium" tone="muted" className="hidden sm:inline">
                   {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
-                </span>
-                <div className="flex items-center gap-2 ml-auto">
+                </Text>
+                <div className="flex items-center gap-g8 ml-auto">
                   <Button variant="ghost"
                     type="button"
                     onClick={() => setShowFormModal(false)}
@@ -1200,14 +1083,14 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
       {viewingDetailItem && (
         <ModalFrame onClose={() => setViewingDetailItem(null)}>
 
-            <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-              <div className="flex items-center gap-2.5">
-                <Building2 className="w-5 h-5 text-accent-foreground" />
+            <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+              <div className="flex items-center gap-g8">
+                <Building2 className="w-g21 h-g21 text-accent-foreground" />
                 <div>
-                  <DialogTitle className="flex items-center gap-2">
+                  <DialogTitle className="flex items-center gap-g8">
                     {t('eval.detail_modal_title', 'Laporan Evaluasi Partner')}
                   </DialogTitle>
-                  <p className="text-xs text-muted-foreground font-medium">{viewingDetailItem.supplier_name}</p>
+                  <Text size="xs" weight="medium" tone="muted">{viewingDetailItem.supplier_name}</Text>
                 </div>
               </div>
               <Button variant="secondary" size="icon-md"
@@ -1215,35 +1098,35 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                 onClick={() => setViewingDetailItem(null)}
                 aria-label={t('common.close')}
               >
-                <X className="w-5 h-5" />
+                <X className="w-g21 h-g21" />
               </Button>
             </DialogHeader>
 
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs text-foreground flex-1">
-              <Card className="grid grid-cols-2 gap-3 p-3.5">
+            <div className="p-g21 sm:p-g21 overflow-y-auto space-y-g13 text-xs text-foreground flex-1">
+              <Card className="grid grid-cols-2 gap-g13 p-g13">
                 <div>
-                  <span className="text-xs text-muted-foreground font-bold uppercase block">
+                  <Text as="span" size="xs" weight="bold" tone="muted" className="uppercase block">
                     {t('eval.col_id_date')} {t('eval.id', 'ID')}
-                  </span>
+                  </Text>
                   <span className="font-mono font-bold text-foreground">{viewingDetailItem.id}</span>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground font-bold uppercase block">
+                  <Text as="span" size="xs" weight="bold" tone="muted" className="uppercase block">
                     {t('eval.review_date')}
-                  </span>
+                  </Text>
                   <span className="font-bold text-foreground">{formatBusinessDate(viewingDetailItem.review_date)}</span>
                 </div>
               </Card>
 
-              <div className="p-3 bg-accent rounded-xl border border-primary/30 flex items-center justify-between">
+              <Card variant="subtle" className="flex-row items-center justify-between p-g13">
                 <div>
-                  <span className="text-xs text-accent-foreground font-bold uppercase block">
+                  <Text as="span" size="xs" weight="bold" tone="primary" className="uppercase block">
                     {t('eval.col_calculated_score')}
-                  </span>
-                  <span className="text-xs text-accent-foreground font-semibold">{t('eval.auto_score_text')}</span>
+                  </Text>
+                  <Text as="span" size="xs" weight="semibold" tone="primary">{t('eval.auto_score_text')}</Text>
                 </div>
                 <div className="text-right">
-                  <span className="text-xl font-black text-accent-foreground">
+                  <Text as="span" size="xl" weight="bold" tone="primary">
                     {viewingDetailItem.calculated_score !== undefined
                       ? viewingDetailItem.calculated_score
                       : computeScoreFromFields(
@@ -1252,25 +1135,25 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                           viewingDetailItem.communication,
                           viewingDetailItem.pricing
                         )}
-                  </span>
-                  <span className="text-xs font-semibold text-accent-foreground"> / 100 {t('eval.points')}</span>
+                  </Text>
+                  <Text as="span" size="xs" weight="semibold" tone="primary"> / 100 {t('eval.points')}</Text>
                 </div>
-              </div>
+              </Card>
 
-              <Card className="space-y-2 p-3.5 text-xs">
-                <div className="flex justify-between pb-1.5 border-b border-border">
+              <Card className="space-y-g8 p-g13 text-xs">
+                <div className="flex justify-between pb-g5 border-b border-border">
                   <span className="text-muted-foreground font-medium">{t('eval.obligation_target_2', 'Obligation / Target')}</span>
                   <span className="font-bold text-foreground">
                     {viewingDetailItem.obligation_target}
                   </span>
                 </div>
-                <div className="flex justify-between pb-1.5 border-b border-border">
+                <div className="flex justify-between pb-g5 border-b border-border">
                   <span className="text-muted-foreground font-medium">{t('audit_col_evalIncident', 'Incident Frequency')}</span>
                   <span className="font-bold text-foreground">
                     {viewingDetailItem.incident_frequency}
                   </span>
                 </div>
-                <div className="flex justify-between pb-1.5 border-b border-border">
+                <div className="flex justify-between pb-g5 border-b border-border">
                   <span className="text-muted-foreground font-medium">{t('audit_col_evalCommunication', 'Communication')}</span>
                   <span className="font-bold text-foreground">
                     {viewingDetailItem.communication}
@@ -1282,45 +1165,36 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                 </div>
               </Card>
 
-              <div className="pt-2">
-                <span className="text-xs text-muted-foreground font-bold uppercase block mb-1">
+              <div className="pt-g8">
+                <Text as="span" size="xs" weight="bold" tone="muted" className="uppercase block mb-g3">
                   {t('eval.rec_result')}
-                </span>
+                </Text>
                 <div className="font-bold">
                   {viewingDetailItem.final_evaluation === 'Recommended' && (
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-accent text-accent-foreground border border-primary/30 inline-flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-accent-foreground" />
-                      <span>{t('eval.status_rec')}</span>
-                    </span>
+                    <Badge tone="info"><CheckCircle2 className="w-g13 h-g13 text-accent-foreground" /><span>{t('eval.status_rec')}</span></Badge>
                   )}
                   {viewingDetailItem.final_evaluation === 'Recommended with notes' && (
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-status-warning-soft text-status-warning border border-status-warning-border inline-flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5 text-status-warning" />
-                      <span>{t('eval.status_rec_notes')}</span>
-                    </span>
+                    <Badge tone="warning"><AlertCircle aria-hidden="true" />{t('eval.status_rec_notes')}</Badge>
                   )}
                   {viewingDetailItem.final_evaluation === 'Not recommended' && (
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-status-danger-soft text-status-danger border border-status-danger-border inline-flex items-center gap-1.5">
-                      <X className="w-3.5 h-3.5 text-status-danger" />
-                      <span>{t('eval.status_not_rec')}</span>
-                    </span>
+                    <Badge tone="danger"><X aria-hidden="true" />{t('eval.status_not_rec')}</Badge>
                   )}
                 </div>
               </div>
 
               {viewingDetailItem.notes && (
-                <div className="p-3 bg-background rounded-xl border border-border">
-                  <span className="text-xs text-muted-foreground font-bold uppercase block mb-1">
+                <Card className="p-g13 bg-background">
+                  <Text as="span" size="xs" weight="bold" tone="muted" className="uppercase block mb-g3">
                     {t('eval.notes_title')}
-                  </span>
-                  <p className="text-xs text-foreground whitespace-pre-wrap">
+                  </Text>
+                  <Text size="xs" className="whitespace-pre-wrap">
                     {viewingDetailItem.notes}
-                  </p>
-                </div>
+                  </Text>
+                </Card>
               )}
             </div>
 
-            <div className="p-4 sm:p-5 bg-background border-t border-border flex justify-end">
+            <div className="p-g13 sm:p-g21 bg-background border-t border-border flex justify-end">
               <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => setViewingDetailItem(null)}

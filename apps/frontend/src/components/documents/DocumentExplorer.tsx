@@ -41,6 +41,9 @@ import { Button } from '@legalio/ui-components/button';
 import { Input } from '@legalio/ui-components/input';
 import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Text } from '@legalio/ui-components/text';
+import { Skeleton } from '@legalio/ui-components/skeleton';
 interface DocumentExplorerProps {
   canEdit: boolean;
   canDelete: boolean;
@@ -161,17 +164,17 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
   const rowActions = (doc: DocumentSummary): ActionMenuItem[] => {
     const archived = doc.status === 'archived';
     return [
-      { label: t('documents.action.open', 'Buka'), icon: <FolderInput className="w-3.5 h-3.5" />, onClick: () => onOpen(doc.id) },
+      { label: t('documents.action.open', 'Buka'), icon: <FolderInput className="w-g13 h-g13" />, onClick: () => onOpen(doc.id) },
       ...(canEdit
         ? [
             {
               label: t('documents.action.rename', 'Ganti nama'),
-              icon: <Pencil className="w-3.5 h-3.5" />,
+              icon: <Pencil className="w-g13 h-g13" />,
               onClick: () => setRenaming({ id: doc.id, value: doc.name }),
             },
             {
               label: archived ? t('documents.action.unarchive', 'Keluarkan dari arsip') : t('documents.action.archive', 'Arsipkan'),
-              icon: archived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />,
+              icon: archived ? <ArchiveRestore className="w-g13 h-g13" /> : <Archive className="w-g13 h-g13" />,
               onClick: () => toggleArchive(doc),
             },
           ]
@@ -180,7 +183,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
         ? [
             {
               label: t('documents.action.delete', 'Hapus'),
-              icon: <Trash2 className="w-3.5 h-3.5" />,
+              icon: <Trash2 className="w-g13 h-g13" />,
               onClick: () => deleteDocument(doc),
               variant: 'danger' as const,
               dividerBefore: true,
@@ -193,28 +196,28 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
   const data = state.status === 'ready' ? state.data : null;
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
 
-  const sortHeader = (sortKey: DocumentSortKey, label: string, className = 'p-4') => {
+  const sortHeader = (sortKey: DocumentSortKey, label: string, className = '') => {
     const active = sort.key === sortKey;
     return (
       <TableColumnHeader
         key={sortKey}
         scope="col"
         aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className={`${className} text-left align-middle`}
+        className={className || undefined}
       >
-        <Button variant="ghost" size="sm"
+        <Button variant="ghost" size="sm" className="-ms-g13 font-semibold text-muted-foreground"
           type="button"
           onClick={() => toggleSort(sortKey)}
         >
           <span>{label}</span>
           {active ? (
             sort.dir === 'asc' ? (
-              <ArrowUp className="w-3.5 h-3.5 text-accent-foreground shrink-0" aria-hidden />
+              <ArrowUp className="w-g13 h-g13 text-accent-foreground shrink-0" aria-hidden />
             ) : (
-              <ArrowDown className="w-3.5 h-3.5 text-accent-foreground shrink-0" aria-hidden />
+              <ArrowDown className="w-g13 h-g13 text-accent-foreground shrink-0" aria-hidden />
             )
           ) : (
-            <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+            <ArrowUpDown className="w-g13 h-g13 text-muted-foreground shrink-0" aria-hidden />
           )}
         </Button>
       </TableColumnHeader>
@@ -223,10 +226,10 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
 
   return (
     <section className="w-full min-w-0 bg-transparent" aria-labelledby="document-explorer-heading">
-      <div className="w-full space-y-6">
-        <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
+      <div className="w-full space-y-g21">
+        <div className="flex flex-wrap items-center justify-between gap-g13">
           <div>
-            <Heading as="h2" size="lg" weight="semibold" id="document-explorer-heading" ref={headingRef} tabIndex={-1}>
+            <Heading as="h2" size="md" weight="semibold" id="document-explorer-heading" ref={headingRef} tabIndex={-1} className="outline-none">
               {t('documents.explorer.title', 'Dokumen Saya')}
             </Heading>
           </div>
@@ -234,38 +237,31 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
             <Button
               type="button"
               onClick={onCreate}
-              className="mobile-page-action"
-            >
-              <FilePlus2 className="w-4 h-4" aria-hidden />
+                          >
+              <FilePlus2 className="w-g16 h-g16" aria-hidden />
               <span>{t('documents.explorer.new', 'Dokumen Baru')}</span>
             </Button>
           )}
-        </Card>
+        </div>
 
-        <Card className="p-4 sm:p-5">
-          <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
-            <div className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-              <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
-              <label htmlFor="document-search" className="sr-only">
-                {t('documents.explorer.search_label', 'Search Document')}
-              </label>
-              <Input
+        <Card className="p-g13">
+          <div className="flex w-full flex-wrap items-center gap-g13">
+            <div className="relative flex-1 min-w-g233 sm:min-w-g233">
+              <Search className="w-g16 h-g16 text-muted-foreground absolute left-g13 top-1/2 -translate-y-1/2" aria-hidden />
+              <Input aria-label={t('documents.explorer.search_label', 'Search Document')}
                 id="document-search"
                 type="search"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder={t('documents.explorer.search_placeholder', 'Search Documents…')}
-                className="w-full pl-9 pr-3"
+                className="w-full pl-g34 pr-g13"
               />
             </div>
-            <label htmlFor="document-status-filter" className="sr-only">
-              {t('documents.filter.status_label', 'Document Status')}
-            </label>
-            <AlphabeticalSelect
+            <AlphabeticalSelect aria-label={t('documents.filter.status_label', 'Document Status')}
               id="document-status-filter"
               value={filters.status}
               onChange={(e) => updateFilter('status', e.target.value)}
-              className="w-full" controlProps={{ className: "min-w-[130px] flex-1" }}
+              className="w-full" controlProps={{ className: "min-w-g144 flex-1" }}
             >
               <option value="">{t('documents.filter.status_active', 'Semua status aktif')}</option>
               {DOCUMENT_STATUSES.map((s) => (
@@ -276,14 +272,11 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               <option value="all">{t('documents.filter.status_all', 'Semua (termasuk arsip)')}</option>
             </AlphabeticalSelect>
 
-            <label htmlFor="document-type-filter" className="sr-only">
-              {t('documents.filter.type_label', 'Document Type')}
-            </label>
-            <AlphabeticalSelect
+            <AlphabeticalSelect aria-label={t('documents.filter.type_label', 'Document Type')}
               id="document-type-filter"
               value={filters.type}
               onChange={(e) => updateFilter('type', e.target.value)}
-              className="w-full" controlProps={{ className: "min-w-[130px] flex-1" }}
+              className="w-full" controlProps={{ className: "min-w-g144 flex-1" }}
             >
               <option value="">{t('documents.filter.type_all', 'All Document Types')}</option>
               {DOCUMENT_TYPES.map((type) => (
@@ -293,14 +286,11 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               ))}
             </AlphabeticalSelect>
 
-            <label htmlFor="document-creator-filter" className="sr-only">
-              {t('documents.filter.created_by_label', 'Created By')}
-            </label>
-            <AlphabeticalSelect
+            <AlphabeticalSelect aria-label={t('documents.filter.created_by_label', 'Created By')}
               id="document-creator-filter"
               value={filters.created_by}
               onChange={(e) => updateFilter('created_by', e.target.value)}
-              className="w-full" controlProps={{ className: "min-w-[130px] flex-1" }}
+              className="w-full" controlProps={{ className: "min-w-g144 flex-1" }}
             >
               <option value="">{t('documents.filter.created_by_all', 'All Creators')}</option>
               {(data?.creators ?? []).map((creator) => (
@@ -310,10 +300,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               ))}
             </AlphabeticalSelect>
 
-            <TableViewMenu label={t('documents.filter.view', 'View')}>
-              <div className="mb-1 border-b border-border px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                {t('documents.filter.toggle_columns', 'Toggle Columns')}
-              </div>
+            <TableViewMenu label={t('documents.filter.view', 'View')} heading={t('documents.filter.toggle_columns', 'Toggle Columns')}>
               {([
                 ['type', t('documents.field.type', 'Type')],
                 ['status', t('documents.field.status', 'Status')],
@@ -328,8 +315,8 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
           </div>
         </Card>
 
-        <section
-          className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden"
+        <Card asChild><section
+          className="overflow-hidden"
           aria-busy={isFetching}
           aria-live="polite"
         >
@@ -337,26 +324,26 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
             <div className="divide-y divide-border" role="status">
               <span className="sr-only">{t('common.loading', 'Memuat…')}</span>
               {Array.from({ length: 6 }, (_, i) => (
-                <div key={i} className="h-14 px-3 flex items-center gap-3 animate-pulse motion-reduce:animate-none">
-                  <div className="h-3 w-1/3 rounded-sm bg-muted" />
-                  <div className="h-3 w-16 rounded-sm bg-muted" />
-                  <div className="h-3 w-20 rounded-sm bg-muted ml-auto" />
+                <div key={i} className="h-g42 px-g13 flex items-center gap-g13">
+                  <Skeleton className="h-g13 w-1/3" />
+                  <Skeleton className="h-g13 w-g68" />
+                  <Skeleton className="h-g13 w-g89 ms-auto" />
                 </div>
               ))}
             </div>
           )}
 
           {state.status === 'error' && (
-            <div role="alert" className="p-8 text-center space-y-3">
-              <p className="text-sm font-semibold text-status-danger">
+            <div role="alert" className="p-g34 text-center space-y-g13">
+              <Text size="sm" weight="semibold" tone="destructive">
                 {t('documents.explorer.load_failed', 'Gagal memuat daftar dokumen.')}
-              </p>
-              <p className="text-xs text-muted-foreground">{state.message}</p>
+              </Text>
+              <Text size="xs" tone="muted">{state.message}</Text>
               <Button variant="ghost"
                 type="button"
                 onClick={reload}
               >
-                <RefreshCw className="w-3.5 h-3.5" aria-hidden />
+                <RefreshCw className="w-g13 h-g13" aria-hidden />
                 {t('common.retry', 'Coba lagi')}
               </Button>
             </div>
@@ -364,19 +351,19 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
 
           {data && (
             <>
-              <TableScrollArea>
-                <Table className="app-data-table w-full text-left">
+              <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
+                <Table>
                   <caption className="sr-only">{t('documents.explorer.title', 'Dokumen Saya')}</caption>
                   <TableHeader>
                     <TableRow>
-                      {sortHeader('name', t('documents.field.name', 'Nama'), 'pl-6 pr-4 py-4')}
-                      {visibleColumns.type && sortHeader('type', t('documents.field.type', 'Jenis'), 'p-4 hidden md:table-cell')}
+                      {sortHeader('name', t('documents.field.name', 'Nama'), '')}
+                      {visibleColumns.type && sortHeader('type', t('documents.field.type', 'Jenis'), 'hidden md:table-cell')}
                       {visibleColumns.status && sortHeader('status', t('documents.field.status', 'Status'))}
-                      {visibleColumns.created && sortHeader('created_at', t('documents.field.created', 'Dibuat'), 'p-4 hidden lg:table-cell')}
+                      {visibleColumns.created && sortHeader('created_at', t('documents.field.created', 'Dibuat'), 'hidden lg:table-cell')}
                       {visibleColumns.modified && sortHeader('modified_at', t('documents.field.modified', 'Diubah'))}
-                      {visibleColumns.createdBy && sortHeader('created_by', t('documents.field.created_by', 'Dibuat oleh'), 'p-4 hidden md:table-cell')}
-                      {visibleColumns.size && sortHeader('file_size', t('documents.field.size', 'Ukuran'), 'p-4 hidden lg:table-cell')}
-                      <TableColumnHeader scope="col" className="text-right w-20 align-middle">
+                      {visibleColumns.createdBy && sortHeader('created_by', t('documents.field.created_by', 'Dibuat oleh'), 'hidden md:table-cell')}
+                      {visibleColumns.size && sortHeader('file_size', t('documents.field.size', 'Ukuran'), 'hidden lg:table-cell')}
+                      <TableColumnHeader scope="col" className="text-right w-g89">
                         <div className="flex items-center justify-end">{t('documents.field.actions', 'Aksi')}</div>
                       </TableColumnHeader>
                     </TableRow>
@@ -389,7 +376,8 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                       />
                     ) : data.documents.map((doc) => (
                       <TableRow key={doc.id}>
-                        <TableCell className="text-left align-middle max-w-[320px]">
+                        <TableCell className="max-w-g377">
+                          <div className="flex items-center gap-g8">
                           {renaming?.id === doc.id ? (
                             <Input
                               autoFocus
@@ -403,36 +391,32 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                               onBlur={submitRename}
                             />
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => onOpen(doc.id)}
-                              className="font-semibold text-left text-foreground hover:text-accent-foreground truncate block max-w-full cursor-pointer transition-colors"
-                              title={doc.name}
-                            >
+                            <Tooltip><TooltipTrigger asChild><Button variant="link" className="block h-auto min-w-0 truncate p-0 text-start text-foreground no-underline hover:underline" onClick={() => onOpen(doc.id)}>
                               {doc.name}
-                            </button>
+                            </Button></TooltipTrigger><TooltipBody>{doc.name}</TooltipBody></Tooltip>
                           )}
-                          <span className="text-xs text-muted-foreground">v{doc.current_version}</span>
+                          <Text as="span" size="xs" tone="muted" className="shrink-0">v{doc.current_version}</Text>
+                          </div>
                         </TableCell>
-                        {visibleColumns.type && <TableCell className="text-left align-middle hidden md:table-cell">
+                        {visibleColumns.type && <TableCell className="hidden md:table-cell">
                           <Badge tone={typeBadgeTone(doc.type)}>{typeLabel(t, doc.type)}</Badge>
                         </TableCell>}
-                        {visibleColumns.status && <TableCell className="text-left align-middle">
+                        {visibleColumns.status && <TableCell>
                           <Badge tone={statusBadgeTone(doc.status)}>{statusLabel(t, doc.status)}</Badge>
                         </TableCell>}
-                        {visibleColumns.created && <TableCell className="text-left align-middle whitespace-nowrap hidden lg:table-cell">
+                        {visibleColumns.created && <TableCell className="whitespace-nowrap hidden lg:table-cell">
                           <RelativeTime iso={doc.created_at} />
                         </TableCell>}
-                        {visibleColumns.modified && <TableCell className="text-left align-middle whitespace-nowrap">
+                        {visibleColumns.modified && <TableCell className="whitespace-nowrap">
                           <RelativeTime iso={doc.modified_at} />
                         </TableCell>}
-                        {visibleColumns.createdBy && <TableCell className="text-left align-middle hidden md:table-cell">
+                        {visibleColumns.createdBy && <TableCell className="hidden md:table-cell">
                           {doc.created_by_name || '—'}
                         </TableCell>}
-                        {visibleColumns.size && <TableCell className="text-left align-middle whitespace-nowrap hidden lg:table-cell">
+                        {visibleColumns.size && <TableCell className="whitespace-nowrap hidden lg:table-cell">
                           {formatBytes(doc.file_size)}
                         </TableCell>}
-                        <TableCell className="text-right align-middle w-20">
+                        <TableCell className="text-right w-g89">
                           <div className="flex items-center justify-end">
                             <ActionMenu items={rowActions(doc)} title={`${t('documents.field.actions', 'Aksi')}: ${doc.name}`} />
                           </div>
@@ -456,7 +440,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
               />}
             </>
           )}
-        </section>
+        </section></Card>
       </div>
     </section>
   );

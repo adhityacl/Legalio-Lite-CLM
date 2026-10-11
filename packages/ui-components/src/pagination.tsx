@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/pagination';
+export * from './moduix/ui/pagination';

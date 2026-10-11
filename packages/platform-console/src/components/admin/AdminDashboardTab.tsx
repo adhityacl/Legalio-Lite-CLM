@@ -23,6 +23,11 @@ import { useLanguage } from '../../context/LanguageContext';
 
 import { Button } from '@legalio/ui-components/button';
 import { Card, CardHeader } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Badge, BadgeDot } from '@legalio/ui-components/badge';
+import { Text } from '@legalio/ui-components/text';
+import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
 interface AdminDashboardTabProps {
   metrics: ConsoleMetrics | null;
   activeOrg: ConsoleOrganization | null;
@@ -102,39 +107,37 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-g21">
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-g13">
         {statCards.map((card, idx) => {
           const Icon = card.icon;
           return (
             <Card
               key={idx}
               onClick={() => onNavigateTab(card.tab)}
-              className="p-4 transition-all cursor-pointer group"
+              className="p-g13 transition-all cursor-pointer group"
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-muted-foreground">
+              <div className="flex items-center justify-between mb-g8">
+                <Text as="span" size="xs" weight="medium" tone="muted">
                   {card.label}
-                </span>
-                <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent size-8 bg-card text-muted-foreground group-hover:bg-status-success-soft group-hover:text-status-success transition-colors">
-                  <Icon className="w-4 h-4" />
-                </div>
+                </Text>
+                <Avatar size="md" className="shrink-0 rounded-md border bg-card text-muted-foreground group-hover:bg-status-success-soft group-hover:text-status-success transition-colors"><AvatarFallback className="bg-transparent text-inherit"><Icon className="w-g16 h-g16" /></AvatarFallback></Avatar>
               </div>
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-baseline gap-g8">
                 <span className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
                   {card.value}
                 </span>
                 {card.pulse && (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-status-success">
-                    <span className="w-1.5 h-1.5 rounded-full bg-status-success animate-ping" />
+                  <span className="inline-flex items-center gap-g3 text-xs font-medium text-status-success">
+                    <BadgeDot className="size-g5 text-status-success animate-ping" />
                     {t('admin.online_status', 'Online')}
                   </span>
                 )}
               </div>
-              <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+              <div className="mt-g8 flex items-center justify-between text-xs text-muted-foreground">
                 <span className="truncate">{card.sub}</span>
-                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                <ArrowUpRight className="w-g13 h-g13 text-muted-foreground group-hover:text-muted-foreground transition-transform group-hover:translate-x-g2 group-hover:-translate-y-g2" />
               </div>
             </Card>
           );
@@ -142,40 +145,38 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
       </div>
 
       {/* Two Columns: Recent Users & Recent Sessions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-g21">
         {/* Recent Users Card */}
         <Card className="overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border pb-4">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-status-success" />
-              <h3 className="text-sm font-semibold text-foreground">
+          <CardHeader className="flex flex-row items-center justify-between gap-g13 border-b border-border pb-g13">
+            <div className="flex items-center gap-g8">
+              <Users className="w-g16 h-g16 text-status-success" />
+              <Heading as="h3" size="xs" weight="semibold">
                 {t('admin.recent_users_title', 'Pengguna Terbaru')}
-              </h3>
+              </Heading>
             </div>
             <Button variant="ghost" size="sm"
               type="button"
               onClick={() => onNavigateTab('users')}
             >
               {t('admin.view_all', 'Lihat Semua')}
-              <ArrowUpRight className="w-3 h-3" />
+              <ArrowUpRight className="w-g13 h-g13" />
             </Button>
           </CardHeader>
 
           <div className="divide-y divide-border">
             {recentUsers.length === 0 ? (
-              <div className="p-6 text-center text-xs text-muted-foreground">
+              <div className="p-g21 text-center text-xs text-muted-foreground">
                 {t('admin.no_users_found', 'Belum ada pengguna terdaftar.')}
               </div>
             ) : (
               recentUsers.slice(0, 5).map((user) => (
                 <div
                   key={user.id}
-                  className="p-3.5 flex items-center justify-between hover:bg-card transition-colors"
+                  className="p-g13 flex items-center justify-between hover:bg-card transition-colors"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-semibold text-xs shrink-0">
-                      {user.name.charAt(0).toUpperCase()}
-                    </div>
+                  <div className="flex items-center gap-g13 min-w-0">
+                    <Avatar size="sm" className="bg-muted text-foreground shrink-0"><AvatarFallback className="bg-transparent text-inherit">{user.name.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
                     <div className="truncate">
                       <div className="font-medium text-xs text-foreground truncate">
                         {user.name}
@@ -186,9 +187,9 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-g8">
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      className={`text-xs px-g8 py-g2 rounded-full font-medium ${
  user.role === 'superuser'
  ? 'bg-status-danger-soft text-status-danger '
  : user.role === 'admin'
@@ -203,16 +204,14 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
                       {user.role.toUpperCase()}
                     </span>
                     {user.banned ? (
-                      <span className="text-xs px-1.5 py-0.5 rounded-sm bg-status-danger-soft text-status-danger font-medium">
-                        {t('admin.status_banned', 'Dicekal')}
-                      </span>
+                      <Badge tone="danger">{t('admin.status_banned', 'Dicekal')}</Badge>
                     ) : (
-                      <span className="text-xs text-muted-foreground">
+                      <Text as="span" size="xs" tone="muted">
                         {new Date(user.createdAt).toLocaleDateString(getActiveFormattingLocale(), {
                           day: 'numeric',
                           month: 'short',
                         })}
-                      </span>
+                      </Text>
                     )}
                   </div>
                 </div>
@@ -223,59 +222,56 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
 
         {/* Recent Active Sessions Card */}
         <Card className="overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border pb-4">
-            <div className="flex items-center gap-2">
-              <Radio className="w-4 h-4 text-status-info" />
-              <h3 className="text-sm font-semibold text-foreground">
+          <CardHeader className="flex flex-row items-center justify-between gap-g13 border-b border-border pb-g13">
+            <div className="flex items-center gap-g8">
+              <Radio className="w-g16 h-g16 text-status-info" />
+              <Heading as="h3" size="xs" weight="semibold">
                 {t('admin.active_login_sessions_title', 'Sesi Login Aktif')}
-              </h3>
+              </Heading>
             </div>
             <Button variant="ghost" size="sm"
               type="button"
               onClick={() => onNavigateTab('sessions')}
             >
               {t('admin.view_all', 'Lihat Semua')} ({activeSessions.length})
-              <ArrowUpRight className="w-3 h-3" />
+              <ArrowUpRight className="w-g13 h-g13" />
             </Button>
           </CardHeader>
 
           <div className="divide-y divide-border">
             {activeSessions.length === 0 ? (
-              <div className="p-6 text-center text-xs text-muted-foreground">
+              <div className="p-g21 text-center text-xs text-muted-foreground">
                 {t('admin.no_sessions_found', 'Tidak ada sesi login aktif saat ini.')}
               </div>
             ) : (
               activeSessions.slice(0, 5).map((session) => (
                 <div
                   key={session.id}
-                  className="p-3.5 flex items-center justify-between hover:bg-card transition-colors"
+                  className="p-g13 flex items-center justify-between hover:bg-card transition-colors"
                 >
-                  <div className="min-w-0 pr-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-xs text-foreground">
+                  <div className="min-w-0 pr-g8">
+                    <div className="flex items-center gap-g8">
+                      <Text as="span" size="xs" weight="medium">
                         {session.userName || t('admin.generic_user', 'Pengguna')}
-                      </span>
-                      <span className="text-xs font-mono px-1.5 py-0.2 rounded-sm bg-muted text-muted-foreground">
-                        {session.ipAddress || t('admin.not_available', 'Tidak tersedia')}
-                      </span>
+                      </Text>
+                      <Badge tone="neutral" className="font-mono">{session.ipAddress || t('admin.not_available', 'Tidak tersedia')}</Badge>
                     </div>
-                    <div className="text-xs text-muted-foreground truncate mt-0.5 font-mono">
+                    <div className="text-xs text-muted-foreground truncate mt-g2 font-mono">
                       {t('admin.token', 'Token:')} {session.token ? `${session.token.slice(0, 10)}...` : (session.id || '').slice(0, 10)}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs text-muted-foreground hidden sm:inline">
+                  <div className="flex items-center gap-g8 shrink-0">
+                    <Text as="span" size="xs" tone="muted" className="hidden sm:inline">
                       {t('admin.expires_prefix', 'Kadaluarsa:')} {new Date(session.expiresAt).toLocaleDateString(getActiveFormattingLocale())}
-                    </span>
-                    <Button variant="ghost" size="sm"
+                    </Text>
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm"
                       type="button"
                       onClick={() => onRevokeSession(session.id)}
                       className="text-destructive"
-                      title={t('admin.btn_revoke_session', 'Cabut sesi login ini')}
                     >
                       {t('admin.btn_revoke', 'Cabut')}
-                    </Button>
+                    </Button></TooltipTrigger><TooltipBody>{t('admin.btn_revoke_session', 'Cabut sesi login ini')}</TooltipBody></Tooltip>
                   </div>
                 </div>
               ))

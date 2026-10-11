@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/switch';
+export * from './moduix/ui/switch';

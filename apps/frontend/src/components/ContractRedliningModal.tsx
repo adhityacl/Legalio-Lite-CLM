@@ -17,12 +17,20 @@ import {
   Scale,
   SlidersHorizontal,
   Info,
-} from 'lucide-react';
+ RefreshCw } from 'lucide-react';
 import { Button } from '@legalio/ui-components/button';
 import { Badge } from '@legalio/ui-components/badge';
 import { Card } from '@legalio/ui-components/card';
 
 import { DialogTitle } from '@legalio/ui-components/dialog';
+import { SegmentGroup, SegmentGroupIndicator, SegmentGroupItems } from '@legalio/ui-components/segment-group';
+import { CloseButton } from '@legalio/ui-components/close-button';
+import { Alert, AlertActions, AlertContent, AlertDescription, AlertIndicator, AlertTitle } from '@legalio/ui-components/alert';
+import { Spinner } from '@legalio/ui-components/spinner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
+import { Text } from '@legalio/ui-components/text';
+import { List, ListItem } from '@legalio/ui-components/list';
+import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
 interface ContractRedliningModalProps {
   isOpen: boolean;
   contract: Contract | null;
@@ -161,30 +169,30 @@ export const ContractRedliningModal: React.FC<ContractRedliningModalProps> = ({
     switch (level) {
       case 'LOW':
         return (
-          <Badge tone="success" className="gap-1.5">
-            <ShieldCheck className="size-3.5" />
+          <Badge tone="success" className="gap-g5">
+            <ShieldCheck className="size-g13" />
             {t('redline.risk_level_low', 'Risiko Rendah (Aman)')}
           </Badge>
         );
       case 'MEDIUM':
         return (
-          <Badge tone="warning" className="gap-1.5">
-            <AlertTriangle className="size-3.5" />
+          <Badge tone="warning" className="gap-g5">
+            <AlertTriangle className="size-g13" />
             {t('redline.risk_level_medium', 'Risiko Sedang (Perlu Penyesuaian)')}
           </Badge>
         );
       case 'HIGH':
         return (
-          <Badge tone="warning" className="gap-1.5">
-            <ShieldAlert className="size-3.5" />
+          <Badge tone="warning" className="gap-g5">
+            <ShieldAlert className="size-g13" />
             {t('redline.risk_level_high', 'Risiko Tinggi (Klausul Perlu Diwaspadai)')}
           </Badge>
         );
       case 'CRITICAL':
       default:
         return (
-          <Badge tone="danger" className="gap-1.5">
-            <AlertCircle className="size-3.5" />
+          <Badge tone="danger" className="gap-g5">
+            <AlertCircle className="size-g13" />
             {t('redline.risk_level_critical', 'Risiko Kritis (Wajib Negosiasi Ulang)')}
           </Badge>
         );
@@ -250,182 +258,140 @@ ${analysis.analyzedClauses
   }) || [];
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-5xl max-h-[92dvh] flex flex-col overflow-hidden">
+    <ModalFrame size="xl" onClose={onClose} className="flex flex-col overflow-hidden">
 
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-gradient-to-r from-emerald-50/60 via-transparent to-transparent ">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-md bg-primary/10 text-accent-foreground flex items-center justify-center border border-primary/20 shadow-xs">
-              <Scale className="size-5" />
-            </div>
+        <div className="px-g21 py-g13 border-b border-border flex items-center justify-between bg-card">
+          <div className="flex items-center gap-g13">
+            <Avatar size="md" className="rounded-md bg-primary/10 text-accent-foreground border border-primary/20"><AvatarFallback className="bg-transparent text-inherit"><Scale className="size-g21" /></AvatarFallback></Avatar>
             <div>
-              <div className="flex items-center gap-2">
-                <DialogTitle className="flex items-center gap-2">
+              <div className="flex items-center gap-g8">
+                <DialogTitle className="flex items-center gap-g8">
                   {t('redline.modal_title', 'Analisis Risiko & Kepatuhan Klausul Kontrak (Redlining)')}
                 </DialogTitle>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-status-success-soft text-status-success tracking-wide">
-                  {t('redline.badge_audit', 'Audit Kepatuhan Klausul')}
-                </span>
+                <Badge tone="success">{t('redline.badge_audit', 'Audit Kepatuhan Klausul')}</Badge>
                 {analysis && !loading && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
-                    <CheckCircle2 className="size-3 text-status-success shrink-0" />
-                    {analyzedAt
+                  <Badge tone="neutral" className="hidden sm:inline-flex"><CheckCircle2 className="size-g13 text-status-success shrink-0" />{analyzedAt
                       ? `${t('redline.saved_indicator', 'Hasil Tersimpan')} • ${new Date(analyzedAt).toLocaleDateString(getActiveFormattingLocale(), {
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric',
                         })}`
-                      : t('redline.saved_indicator', 'Hasil Tersimpan')}
-                  </span>
+                      : t('redline.saved_indicator', 'Hasil Tersimpan')}</Badge>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <Text size="xs" tone="muted" className="mt-g2">
                 <span className="font-semibold text-foreground">{contract.nomor_kontrak}</span> • {contract.judul_kontrak} ({contract.partner_nama || t('redline.vendor', 'Vendor')})
-              </p>
+              </Text>
             </div>
           </div>
-          <button aria-label={t('common.close', 'Tutup')}
-            onClick={onClose}
-            className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-muted-foreground hover:bg-muted cursor-pointer transition-colors"
-          >
-            <X className="size-5" />
-          </button>
+          <CloseButton aria-label={t('common.close', 'Tutup')} onClick={onClose} />
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-g21 space-y-g21">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 space-y-4">
-              <div className="relative">
-                <div className="size-16 rounded-full border-4 border-primary/20 border-t-accent-strong animate-spin" />
-                <Scale className="size-6 text-accent-foreground absolute inset-0 m-auto" />
-              </div>
-              <div className="text-center space-y-1">
-                <p className="font-bold text-foreground text-sm">
+            <div className="flex flex-col items-center justify-center py-g89 space-y-g13">
+              <Spinner size="lg" decorative />
+              <div className="text-center space-y-g3">
+                <Text size="sm" weight="bold">
                   {t('redline.analyzing', 'Menganalisis Kontrak & Memeriksa Risiko...')}
-                </p>
-                <p className="text-xs text-muted-foreground max-w-sm">
+                </Text>
+                <Text size="xs" tone="muted" className="max-w-g377">
                   {t('redline.analyzing_desc', 'Sistem membedah klausul, menakar liabilitas hukum, dan menyiapkan rekomendasi redline...')}
-                </p>
+                </Text>
               </div>
             </div>
           ) : error ? (
-            <div className="p-6 rounded-2xl bg-status-danger-soft border border-status-danger-border text-center space-y-3 my-6">
-              <AlertCircle className="size-8 text-status-danger mx-auto" />
-              <div>
-                <p className="font-bold text-status-danger text-sm">{t('redline.analisis_gagal', 'Analisis Gagal')}</p>
-                <p className="text-xs text-status-danger mt-1">{error}</p>
-              </div>
+            <Alert status="error" role="alert" className="my-g21">
+              <AlertIndicator />
+              <AlertContent>
+                <AlertTitle>{t('redline.analisis_gagal', 'Analisis Gagal')}</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </AlertContent>
+              <AlertActions>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => executeAnalysis(true)}
               >
-                <RotateCw className="size-3.5 mr-1.5" />
+                <RotateCw aria-hidden="true" />
                 {t('redline.coba_lagi', 'Coba Lagi')}
               </Button>
-            </div>
+              </AlertActions>
+            </Alert>
           ) : analysis ? (
             <>
               {/* TOP SUMMARY CARDS */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-g13">
                 {/* Score Card */}
-                <Card className="md:col-span-4 p-5 flex flex-col justify-between">
+                <Card className="md:col-span-4 p-g21 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-muted-foreground">
+                      <Text as="span" size="xs" weight="semibold" tone="muted">
                         {t('redline.risk_score', 'Skor Risiko Hukum')}
-                      </span>
-                      <Scale className="size-4 text-muted-foreground" />
+                      </Text>
+                      <Scale className="size-g16 text-muted-foreground" />
                     </div>
-                    <div className="flex items-baseline gap-2 mt-2">
+                    <div className="flex items-baseline gap-g8 mt-g8">
                       <span className={`text-4xl font-extrabold tracking-tight ${getRiskScoreColor(analysis.overallRiskScore).split(' ')[0]}`}>
                         {analysis.overallRiskScore}
                       </span>
-                      <span className="text-xs font-semibold text-muted-foreground">/ 100</span>
+                      <Text as="span" size="xs" weight="semibold" tone="muted">/ 100</Text>
                     </div>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-border ">
+                  <div className="mt-g13 pt-g13 border-t border-border ">
                     {getRiskLevelBadge(analysis.riskLevel)}
                   </div>
                 </Card>
 
                 {/* Executive Summary Card */}
-                <Card className="md:col-span-8 p-5 flex flex-col justify-between">
+                <Card className="md:col-span-8 p-g21 flex flex-col justify-between">
                   <div>
-                    <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                      <Info className="size-3.5 text-accent-foreground" />
+                    <Text as="span" size="xs" weight="semibold" tone="muted" className="flex items-center gap-g5">
+                      <Info className="size-g13 text-accent-foreground" />
                       {t('redline.executive_summary', 'Ringkasan Eksekutif Legal')}
-                    </span>
-                    <p className="text-xs text-foreground mt-2 leading-relaxed line-clamp-4">
+                    </Text>
+                    <Text size="xs" className="mt-g8 leading-relaxed line-clamp-4">
                       {analysis.executiveSummary}
-                    </p>
+                    </Text>
                   </div>
                   {analysis.keyFindings && analysis.keyFindings.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
+                    <div className="mt-g13 flex flex-wrap gap-g5">
                       {analysis.keyFindings.slice(0, 3).map((finding, idx) => (
-                        <span
-                          key={idx}
-                          className="text-xs px-2.5 py-1 rounded-lg bg-card border border-border text-foreground font-medium"
-                        >
+                        <Text as="span" size="xs" weight="medium" className="px-g8 py-g3 rounded-lg bg-card border border-border" key={idx}>
                           ⚠️ {finding}
-                        </span>
+                        </Text>
                       ))}
                     </div>
                   )}
                 </Card>
               </div>
 
-              {/* TABS HEADER */}
-              <div className="flex items-center justify-between border-b border-border pb-2">
-                <div className="flex items-center gap-2">
-                  <Button size="sm"
-                    onClick={() => setActiveTab('clauses')}
-                    className={` ${
- activeTab === 'clauses'
- ? ''
- : ' '
- }`}
-                  >
-                    {t('redline.tab_clauses', 'Analisis Klausul & Redlining')} ({analysis.analyzedClauses?.length || 0})
-                  </Button>
-                  <Button size="sm"
-                    onClick={() => setActiveTab('summary')}
-                    className={` ${
- activeTab === 'summary'
- ? ''
- : ' '
- }`}
-                  >
-                    {t('redline.tab_summary', 'Kepatuhan Regulasi & Standar OJK')} ({analysis.complianceChecklist?.length || 0})
-                  </Button>
-                </div>
+              {/* Tabs: clause analysis / compliance checklist */}
+              <Tabs value={activeTab} onValueChange={details => setActiveTab(details.value as typeof activeTab)} className="gap-g13">
+              <div className="flex flex-wrap items-center justify-between gap-g8">
+                <TabsList aria-label={t('redline.view_label', 'Tampilan analisis')}>
+                  <TabsTrigger value="clauses">{t('redline.tab_clauses', 'Analisis Klausul & Redlining')} ({analysis.analyzedClauses?.length || 0})</TabsTrigger>
+                  <TabsTrigger value="summary">{t('redline.tab_summary', 'Kepatuhan Regulasi & Standar OJK')} ({analysis.complianceChecklist?.length || 0})</TabsTrigger>
+                </TabsList>
 
                 {activeTab === 'clauses' && (
-                  <div className="flex items-center gap-1">
-                    <SlidersHorizontal className="size-3 text-muted-foreground mr-1" />
-                    {['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map((lvl) => (
-                      <Button variant="secondary" size="sm"
-                        key={lvl}
-                        onClick={() => setSeverityFilter(lvl)}
-                        className={` ${
- severityFilter === lvl
- ? ' '
- : ' '
- }`}
-                      >
-                        {lvl === 'ALL' ? t('redline.filter_all', 'Semua') : lvl}
-                      </Button>
-                    ))}
+                  <div className="flex items-center gap-g3">
+                    <SlidersHorizontal className="size-g13 text-muted-foreground mr-g3" />
+                    <SegmentGroup aria-label={t('redline.severity_filter', 'Filter tingkat risiko')} value={severityFilter} onValueChange={details => details.value && setSeverityFilter(details.value)}>
+                      <SegmentGroupIndicator />
+                      <SegmentGroupItems items={['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(lvl => ({ value: lvl, label: lvl === 'ALL' ? t('redline.filter_all', 'Semua') : lvl }))} />
+                    </SegmentGroup>
                   </div>
                 )}
               </div>
 
               {/* TAB 1: CLAUSE ANALYSIS & REDLINING */}
-              {activeTab === 'clauses' && (
-                <div className="space-y-4">
+              <TabsContent value="clauses">
+                <div className="space-y-g13">
                   {filteredClauses.length === 0 ? (
-                    <div className="text-center py-10 text-muted-foreground text-xs">
+                    <div className="text-center py-g34 text-muted-foreground text-xs">
                       {t('redline.tidak_ada_klausul_dengan_tingkat_risiko', 'Tidak ada klausul dengan tingkat risiko \'{severityFilter}\'.', { severityFilter })}
                     </div>
                   ) : (
@@ -434,41 +400,29 @@ ${analysis.analyzedClauses
                         key={idx}
                         className="overflow-hidden transition-colors"
                       >
-                        <div className="p-4 space-y-3">
+                        <div className="p-g13 space-y-g13">
                           {/* Clause Header */}
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-foreground text-xs">
+                          <div className="flex items-center justify-between gap-g13">
+                            <div className="flex items-center gap-g8">
+                              <Text as="span" size="xs" weight="bold">
                                 {idx + 1}. {clause.clauseTitle}
-                              </span>
-                              <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-md bg-muted font-medium">
-                                {clause.riskCategory}
-                              </span>
+                              </Text>
+                              <Badge tone="neutral">{clause.riskCategory}</Badge>
                             </div>
                             <div>{getSeverityBadge(clause.severity)}</div>
                           </div>
 
                           {/* Original / Issue Box */}
-                          <div className="p-3 rounded-xl bg-status-danger-soft/70 border border-status-danger-border/60 text-xs">
-                            <p className="font-semibold text-status-danger text-xs mb-1 flex items-center gap-1">
-                              <AlertTriangle className="size-3 text-status-danger" />
-                              {t('redline.original_issue', 'Klausul Asal / Masalah Teridentifikasi')}
-                            </p>
-                            <p className="text-foreground leading-relaxed font-mono text-xs">
+                          <Alert status="error"><AlertIndicator /><AlertContent><AlertTitle>{t('redline.original_issue', 'Klausul Asal / Masalah Teridentifikasi')}</AlertTitle><AlertDescription>
+                            <Text size="xs" className="font-mono leading-relaxed">
                               {clause.originalTextOrIssue}
-                            </p>
-                            <p className="text-status-danger text-xs mt-2 italic">
+                            </Text>
+                            <Text size="xs" className="mt-g8 italic">
                               <strong>{t('redline.dampak', 'Dampak:')}</strong> {clause.identifiedRisk}
-                            </p>
-                          </div>
+                            </Text></AlertDescription></AlertContent></Alert>
 
                           {/* Recommended Redline Box */}
-                          <div className="p-3.5 rounded-xl bg-status-success-soft/70 border border-status-success-border/60 text-xs relative group">
-                            <div className="flex items-center justify-between mb-1">
-                              <p className="font-semibold text-status-success text-xs flex items-center gap-1">
-                                <AiIcon className="size-3 text-status-success" />
-                                {t('redline.recommended_redline', 'Rekomendasi Redlining (Revisi Lebih Adil & Patuh OJK)')}
-                              </p>
+                          <Alert status="success"><AlertIndicator><AiIcon /></AlertIndicator><AlertContent><AlertTitle>{t('redline.recommended_redline', 'Rekomendasi Redlining (Revisi Lebih Adil & Patuh OJK)')}</AlertTitle><AlertDescription><div className="mb-g3 flex justify-end">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -476,75 +430,64 @@ ${analysis.analyzedClauses
                               >
                                 {copiedClauseIdx === idx ? (
                                   <>
-                                    <Check className="size-3 text-status-success" />
+                                    <Check className="size-g13 text-status-success" />
                                     {t('redline.copied', 'Tersalin!')}
                                   </>
                                 ) : (
                                   <>
-                                    <Copy className="size-3" />
+                                    <Copy className="size-g13" />
                                     {t('redline.copy_clause', 'Salin Revisi')}
                                   </>
                                 )}
                               </Button>
                             </div>
-                            <p className="text-foreground leading-relaxed font-medium text-xs bg-card p-2.5 rounded-lg border border-status-success-border ">
+                            <Text size="xs" weight="medium" className="rounded-md border border-status-success-border bg-card p-g8 leading-relaxed">
                               "{clause.recommendedRedline}"
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-2">
+                            </Text>
+                            <Text size="xs" tone="muted" className="mt-g8">
                               <strong>{t('redline.pertimbangan', 'Pertimbangan:')}</strong> {clause.legalRationale}
-                            </p>
-                          </div>
+                            </Text></AlertDescription></AlertContent></Alert>
                         </div>
                       </Card>
                     ))
                   )}
                 </div>
-              )}
+              </TabsContent>
 
               {/* TAB 2: COMPLIANCE CHECKLIST (INCL. OJK REGULATIONS) */}
-              {activeTab === 'summary' && (
-                <div className="space-y-4">
-                  <div className="p-3.5 rounded-2xl bg-status-info-soft/70 border border-status-info-border/80 flex items-start gap-2.5 text-xs text-status-info">
-                    <Info className="size-4 text-status-info shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold">{t('redline.standar_kepatuhan_ojk_regulasi_finansial_korpora', 'Standar Kepatuhan OJK & Regulasi Finansial / Korporasi')}</p>
-                      <p className="text-xs text-status-info/80 mt-0.5">
+              <TabsContent value="summary">
+                <div className="space-y-g13">
+                  <Alert status="info"><AlertIndicator /><AlertContent><AlertTitle>{t('redline.standar_kepatuhan_ojk_regulasi_finansial_korpora', 'Standar Kepatuhan OJK & Regulasi Finansial / Korporasi')}</AlertTitle><AlertDescription><div>
+                      <p>
                         {t('redline.daftar_periksa_ini_mencakup_pojk_kerja', 'Daftar periksa ini mencakup POJK Kerja Sama Pihak Ketiga, POJK Tata Kelola TI, Hak Audit Regulator OJK, serta kepatuhan UU PDP & KUHPerdata.')}
                       </p>
-                    </div>
-                  </div>
+                    </div></AlertDescription></AlertContent></Alert>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
                     {analysis.complianceChecklist?.map((item, idx) => {
                       const isOjkItem = item.item.toUpperCase().includes('OJK') || item.item.toUpperCase().includes('POJK') || item.item.toUpperCase().includes('REGULATOR');
                       return (
                         <Card
                           key={idx}
-                          className="p-4 flex items-start gap-3 relative overflow-hidden"
+                          className="p-g13 flex items-start gap-g13 relative overflow-hidden"
                         >
                           {item.status === 'COMPLIANT' ? (
-                            <div className="size-7 rounded-xl bg-status-success-soft text-status-success flex items-center justify-center shrink-0 mt-0.5">
-                              <CheckCircle2 className="size-4" />
-                            </div>
+                            <Avatar size="sm" className="rounded-xl bg-status-success-soft text-status-success shrink-0 mt-g2"><AvatarFallback className="bg-transparent text-inherit"><CheckCircle2 className="size-g16" /></AvatarFallback></Avatar>
                           ) : item.status === 'NEEDS_REVIEW' ? (
-                            <div className="size-7 rounded-xl bg-status-warning-soft text-status-warning flex items-center justify-center shrink-0 mt-0.5">
-                              <AlertTriangle className="size-4" />
-                            </div>
+                            <Avatar size="sm" className="rounded-xl bg-status-warning-soft text-status-warning shrink-0 mt-g2"><AvatarFallback className="bg-transparent text-inherit"><AlertTriangle className="size-g16" /></AvatarFallback></Avatar>
                           ) : (
-                            <div className="size-7 rounded-xl bg-status-danger-soft text-status-danger flex items-center justify-center shrink-0 mt-0.5">
-                              <AlertCircle className="size-4" />
-                            </div>
+                            <Avatar size="sm" className="rounded-xl bg-status-danger-soft text-status-danger shrink-0 mt-g2"><AvatarFallback className="bg-transparent text-inherit"><AlertCircle className="size-g16" /></AvatarFallback></Avatar>
                           )}
-                          <div className="space-y-1.5 flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="font-bold text-foreground text-xs">{item.item}</p>
+                          <div className="space-y-g5 flex-1">
+                            <div className="flex items-center justify-between gap-g8">
+                              <Text size="xs" weight="bold">{item.item}</Text>
                               {isOjkItem && (
                                 <Badge tone="info" className="shrink-0">
                                   {t('redline.ojk_standard', 'OJK Standard')}
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-xs text-muted-foreground leading-relaxed">{item.notes}</p>
+                            <Text size="xs" tone="muted" className="leading-relaxed">{item.notes}</Text>
                             <div>
                               {item.status === 'COMPLIANT' ? (
                                 <span className="inline-flex items-center text-xs font-bold text-status-success">
@@ -555,9 +498,9 @@ ${analysis.analyzedClauses
                                   {t('redline.perlu_penyesuaian_klausul', '⚠️ Perlu Penyesuaian Klausul')}
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center text-xs font-bold text-status-danger">
+                                <Text as="span" size="xs" weight="bold" tone="destructive" className="inline-flex items-center">
                                   {t('redline.tidak_sesuai_berisiko_regulasi', '✗ Tidak Sesuai / Berisiko Regulasi')}
-                                </span>
+                                </Text>
                               )}
                             </div>
                           </div>
@@ -567,35 +510,31 @@ ${analysis.analyzedClauses
                   </div>
 
                   {/* Key Findings List */}
-                  <div className="p-4 rounded-2xl bg-status-warning-soft/50 border border-status-warning-border space-y-2">
-                    <p className="font-bold text-status-warning text-xs flex items-center gap-1.5">
-                      <AlertTriangle className="size-3.5 text-status-warning" />
-                      {t('redline.key_findings', 'Temuan Risiko Utama')}
-                    </p>
-                    <ul className="space-y-1.5 text-xs text-foreground list-disc list-inside">
+                  <Alert status="warning"><AlertIndicator /><AlertContent><AlertTitle>{t('redline.key_findings', 'Temuan Risiko Utama')}</AlertTitle><AlertDescription>
+                    <List marker="disc" className="space-y-g5">
                       {analysis.keyFindings?.map((finding, idx) => (
-                        <li key={idx} className="leading-relaxed">
+                        <ListItem key={idx} className="leading-relaxed">
                           {finding}
-                        </li>
+                        </ListItem>
                       ))}
-                    </ul>
-                  </div>
+                    </List></AlertDescription></AlertContent></Alert>
                 </div>
-              )}
+              </TabsContent>
+              </Tabs>
             </>
           ) : null}
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3.5 border-t border-border flex items-center justify-between bg-card/50 ">
-          <div className="flex items-center gap-2">
+        <div className="px-g21 py-g13 border-t border-border flex items-center justify-between bg-card/50 ">
+          <div className="flex items-center gap-g8">
             <Button
               variant="outline"
               size="sm"
               onClick={() => executeAnalysis(true)}
               disabled={loading}
             >
-              <RotateCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? <Spinner size="sm" decorative /> : <RefreshCw aria-hidden="true" />}
               <span>{t('redline.reanalyze', 'Analisis Ulang')}</span>
             </Button>
 
@@ -605,7 +544,7 @@ ${analysis.analyzedClauses
                 size="sm"
                 onClick={handleCopyFullReport}
               >
-                {copiedFull ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
+                {copiedFull ? <Check className="size-g13 text-status-success" /> : <Copy className="size-g13" />}
                 <span>{copiedFull ? t('redline.copied', 'Tersalin!') : t('redline.copy_full_report', 'Salin Seluruh Laporan')}</span>
               </Button>
             )}

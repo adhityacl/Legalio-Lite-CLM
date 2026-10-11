@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/fieldset';
+export * from './moduix/ui/fieldset';

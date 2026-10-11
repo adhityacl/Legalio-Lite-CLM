@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { ChevronsUpDown } from 'lucide-react';
 import { useIdentity } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
@@ -10,6 +10,7 @@ import {
   MenuItemTextIcon, MenuItemTextLabel, MenuPositioner, MenuRadioItem, MenuRadioItemGroup, MenuTrigger, MenuViewport,
 } from '@legalio/ui-components/menu';
 
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 interface WorkspaceSwitcherProps {
   isCollapsed?: boolean;
   onNavigateToSettings?: () => void;
@@ -20,8 +21,8 @@ const visibleLogo = (url?: string) => (url && url !== '/favicon.png' ? url : und
 
 function WorkspaceAvatar({ name, letter, logoUrl, size = 'md' }: { name: string; letter: string; logoUrl?: string; size?: 'sm' | 'md' }) {
   return (
-    <Avatar size={size} data-sidebar-icon>
-      {logoUrl && <AvatarImage src={logoUrl} alt={name} />}
+    <Avatar size={size} className={logoUrl ? 'rounded-none bg-transparent' : undefined} data-sidebar-icon>
+      {logoUrl && <AvatarImage src={logoUrl} alt={name} className="rounded-none object-contain" />}
       <AvatarFallback className="bg-primary text-primary-foreground">{letter}</AvatarFallback>
     </Avatar>
   );
@@ -47,27 +48,27 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ className 
     : isPlatform
     ? (branding.logoUrl === '/favicon.png' ? new URL('../assets/favicon.png', import.meta.url).href : branding.logoUrl)
     : visibleLogo(activeTenant?.logoUrl);
-  const subtitle = isPlatform ? t('nav.system_admin', 'System Admin') : t('workspace.workspace', 'Workspace');
 
-  const trigger = (
-    <SidebarNavigationButton size="lg" className={className}
-      title={canSwitch ? name : t('workspace.akses_switch_workspace_terkunci', '{name} (Akses Switch Workspace Terkunci)', { name })}>
-      <WorkspaceAvatar name={name} letter={letter} logoUrl={logoUrl} />
-      <SidebarLabel className="flex min-w-0 flex-col leading-tight">
+  // Tooltip and Menu share one trigger id; MenuTrigger must wrap the button itself so it receives aria-haspopup and the click handler.
+  const triggerId = `workspace-switcher-${useId()}`;
+  const tooltip = canSwitch ? name : t('workspace.akses_switch_workspace_terkunci', '{name} (Akses Switch Workspace Terkunci)', { name });
+  const button = (
+    <SidebarNavigationButton size="md" className={className}>
+      <WorkspaceAvatar size="sm" name={name} letter={letter} logoUrl={logoUrl} />
+      <SidebarLabel className="min-w-0">
         <span className="truncate text-sm font-semibold">{name}</span>
-        <span className="truncate text-xs text-muted-foreground">{subtitle}</span>
       </SidebarLabel>
       {canSwitch && <MenuIndicator><ChevronsUpDown /></MenuIndicator>}
     </SidebarNavigationButton>
   );
-  if (!canSwitch) return trigger;
+  if (!canSwitch) return <Tooltip><TooltipTrigger asChild>{button}</TooltipTrigger><TooltipBody>{tooltip}</TooltipBody></Tooltip>;
 
   return (
-    <Menu positioning={{ placement: 'bottom-start', gutter: 8 }}>
-      <MenuTrigger asChild>{trigger}</MenuTrigger>
+    <Menu ids={{ trigger: triggerId }} positioning={{ placement: 'bottom-start', gutter: 8 }}>
+      <Tooltip ids={{ trigger: triggerId }}><TooltipTrigger asChild><MenuTrigger asChild>{button}</MenuTrigger></TooltipTrigger><TooltipBody>{tooltip}</TooltipBody></Tooltip>
       <MenuPositioner>
-        <MenuContent className="min-w-60" aria-label={t('workspace.pilih_ruang_kerja', 'Pilih Ruang Kerja')}>
-          <MenuViewport className="max-h-72">
+        <MenuContent className="min-w-g233" aria-label={t('workspace.pilih_ruang_kerja', 'Pilih Ruang Kerja')}>
+          <MenuViewport className="max-h-g233">
             <MenuItemGroup>
               <MenuItemGroupLabel>{t('workspace.switch_title', 'Pilih Ruang Kerja:')}</MenuItemGroupLabel>
               <MenuRadioItemGroup value={activeTenantId ?? ''} onValueChange={details => { if (details.value !== activeTenantId) void switchTenant(details.value); }}>
@@ -77,7 +78,7 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ className 
                     <MenuRadioItem key={org.organizationId} value={org.organizationId} indicator="end">
                       <MenuItemText>
                         <MenuItemTextContent>
-                          <MenuItemTextIcon><WorkspaceAvatar size="sm" name={orgName} letter={(orgName || 'W').charAt(0).toUpperCase()} logoUrl={visibleLogo(org.logoUrl)} /></MenuItemTextIcon>
+                          <MenuItemTextIcon className="size-g26"><WorkspaceAvatar size="sm" name={orgName} letter={(orgName || 'W').charAt(0).toUpperCase()} logoUrl={visibleLogo(org.logoUrl)} /></MenuItemTextIcon>
                           <MenuItemTextLabel>{orgName}</MenuItemTextLabel>
                         </MenuItemTextContent>
                       </MenuItemText>

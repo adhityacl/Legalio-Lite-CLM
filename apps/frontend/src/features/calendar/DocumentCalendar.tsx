@@ -12,6 +12,9 @@ import { Legend } from './Legend';
 import { groupCalendarEvents, parseCalendarDate } from './calendarModel';
 import { EVENT_TYPES, type CalendarEvent, type CalendarView, type EventType } from './eventTypes';
 
+import { Card } from '@legalio/ui-components/card';
+import { Text } from '@legalio/ui-components/text';
+import { Alert, AlertActions, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 export interface DocumentCalendarProps {
   events: CalendarEvent[];
   loading?: boolean;
@@ -42,20 +45,20 @@ export function DocumentCalendar({ events, loading, error, onRetry, initialView 
     return next;
   });
   const onMonthClick = (month: Date) => { setDate(month); setView('month'); };
-  return <section aria-label={t('calendar.title')} className="space-y-4 rounded-2xl border border-[var(--moduix-color-border)] bg-[var(--moduix-color-card)] p-3 text-[var(--moduix-color-foreground)] shadow-xs sm:p-5">
+  return <Card asChild><section aria-label={t('calendar.title')} className="space-y-g13 p-g13 text-foreground sm:p-g21">
     <CalendarToolbar date={date} view={view} onViewChange={setView} onNavigate={offset => setDate(previous => view === 'year' ? addYears(previous, offset) : addMonths(previous, offset))}
-      onToday={() => setDate(startOfMonth(today))} />
-    {error && <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--moduix-color-destructive)]/30 bg-[var(--moduix-color-muted)] p-3 text-sm">
-      <AlertCircle aria-hidden="true" className="size-5 text-[var(--moduix-color-destructive)]" />
-      <span className="flex-1">{t('calendar.load_error')}</span>
-      {onRetry && <Button type="button" variant="outline" disabled={loading} onClick={onRetry}>{t('calendar.retry')}</Button>}
-    </div>}
-    {loading && <p role="status" className="sr-only">{t('calendar.loading')}</p>}
+      onToday={() => setDate(startOfMonth(today))} onYearChange={year => setDate(previous => new Date(year, previous.getMonth(), 1))} />
+    {error && <Alert status="error" role="alert">
+      <AlertIndicator />
+      <AlertContent><AlertDescription>{t('calendar.load_error')}</AlertDescription></AlertContent>
+      {onRetry && <AlertActions><Button type="button" variant="outline" size="sm" disabled={loading} onClick={onRetry}>{t('calendar.retry')}</Button></AlertActions>}
+    </Alert>}
+    {loading && <Text size="sm" className="sr-only" role="status">{t('calendar.loading')}</Text>}
     <div aria-busy={loading || undefined}>
       {view === 'year'
         ? <YearView date={date} today={today} byMonth={groups.byMonth} loading={loading} onMonthClick={onMonthClick} onEventClick={onEventClick} />
         : <MonthView date={date} today={today} byDay={groups.byDay} loading={loading} weekStartsOn={weekStartsOn} onEventClick={onEventClick} />}
     </div>
     <Legend enabled={enabled} onToggle={onToggle} />
-  </section>;
+  </section></Card>;
 }

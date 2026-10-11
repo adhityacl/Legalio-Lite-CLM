@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/number-input';
+export * from './moduix/ui/number-input';

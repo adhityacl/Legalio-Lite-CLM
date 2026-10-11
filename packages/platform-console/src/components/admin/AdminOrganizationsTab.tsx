@@ -18,6 +18,10 @@ import { useLanguage } from '../../context/LanguageContext';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { Button } from '@legalio/ui-components/button';
 import { Card } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
+import { Avatar, AvatarFallback, AvatarImage } from '@legalio/ui-components/avatar';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Badge } from '@legalio/ui-components/badge';
 interface AdminOrganizationsTabProps {
   organizations: ConsoleOrganization[];
   activeOrg: ConsoleOrganization | null;
@@ -46,11 +50,11 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-g13">
       {/* Controls Bar */}
-      <Card className="mobile-controls-bar flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4">
-        <InputGroup className="relative flex-1 min-w-[220px] max-w-md">
-          <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+      <Card className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-g13 p-g13">
+        <InputGroup className="relative flex-1 min-w-g233 max-w-g377">
+          <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
           <InputGroupInput aria-label={t('admin.org_search_ph', 'Cari nama atau slug organisasi...')}
             type="text"
             placeholder={t('admin.org_search_ph', 'Cari nama atau slug organisasi...')}
@@ -59,24 +63,24 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
           />
         </InputGroup>
 
-        <Button variant="ghost"
+        <Button
           type="button"
           onClick={onOpenCreateOrg}
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-g16 h-g16" />
           <span>{t('admin.btn_create_org', 'Buat Organisasi Baru')}</span>
         </Button>
       </Card>
 
       {/* Organizations Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-g13">
         {filteredOrgs.map((org) => {
           const isActive = activeOrg?.id === org.id;
 
           return (
             <Card
               key={org.id}
-              className={` p-5 transition-all flex flex-col justify-between overflow-hidden relative ${
+              className={` p-g21 transition-all flex flex-col justify-between overflow-hidden relative ${
  isActive
  ? 'ring-1 ring-ring/20 bg-accent'
  : ''
@@ -84,51 +88,33 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
             >
               <div className="min-w-0">
                 {/* Header info */}
-                <div className="flex items-start justify-between gap-2.5 mb-3">
-                  <div className="flex items-start gap-3 min-w-0 flex-1">
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-base shrink-0 border border-border overflow-hidden shadow-2xs mt-0.5">
-                      {org.logo && org.logo !== '/favicon.png' ? (
-                        <img
-                          src={org.logo}
-                          alt={org.name || t('documents.info.organization', 'Organization')}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <span>{(org.name || 'O').charAt(0).toUpperCase()}</span>
-                      )}
-                    </div>
+                <div className="flex items-start justify-between gap-g8 mb-g13">
+                  <div className="flex items-start gap-g13 min-w-0 flex-1">
+                    <Avatar className="mt-g2 shrink-0">
+                      {org.logo && org.logo !== '/favicon.png' && <AvatarImage src={org.logo} alt={org.name || t('documents.info.organization', 'Organization')} />}
+                      <AvatarFallback>{(org.name || 'O').charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold text-foreground text-sm truncate" title={org.name || ''}>
+                      <Tooltip><TooltipTrigger asChild><Heading as="h3" size="xs" weight="semibold" className="truncate">
                         {org.name || t('documents.info.organization', 'Organisasi')}
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-mono text-muted-foreground mt-1">
-                        <span className="truncate max-w-[120px]" title={`@${org.slug}`}>@{org.slug}</span>
+                      </Heading></TooltipTrigger><TooltipBody>{org.name || ''}</TooltipBody></Tooltip>
+                      <div className="flex flex-wrap items-center gap-x-g5 gap-y-g3 text-xs font-mono text-muted-foreground mt-g3">
+                        <Tooltip><TooltipTrigger asChild><span className="truncate max-w-g110">@{org.slug}</span></TooltipTrigger><TooltipBody>{`@${org.slug}`}</TooltipBody></Tooltip>
                         <span className="text-primary-foreground select-none">•</span>
-                        <span
-                          className="text-xs bg-muted px-1.5 py-0.5 rounded-sm border border-border/80 text-muted-foreground font-mono inline-block max-w-full truncate"
-                          title={org.id}
-                        >
-                          {t('admin.id_2', 'ID: {id}', { id: org.id })}
-                        </span>
+                        <Tooltip><TooltipTrigger asChild><Badge tone="neutral" className="font-mono max-w-full truncate">{t('admin.id_2', 'ID: {id}', { id: org.id })}</Badge></TooltipTrigger><TooltipBody>{org.id}</TooltipBody></Tooltip>
                       </div>
                     </div>
                   </div>
 
                   {isActive && (
-                    <span className="theme-soft shrink-0 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap self-start">
-                      <Check className="w-3 h-3 shrink-0" />
-                      <span>{t('admin.badge_active', 'Aktif')}</span>
-                    </span>
+                    <Badge tone="success" className="shrink-0 whitespace-nowrap self-start"><Check className="w-g13 h-g13 shrink-0" /><span>{t('admin.badge_active', 'Aktif')}</span></Badge>
                   )}
                 </div>
 
                 {/* Metrics pill */}
-                <div className="grid grid-cols-2 gap-2 mb-4 p-2.5 rounded-lg bg-card text-xs">
-                  <div className="flex items-center gap-2">
-                    <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+                <div className="grid grid-cols-2 gap-g8 mb-g13 p-g8 rounded-lg bg-card text-xs">
+                  <div className="flex items-center gap-g8">
+                    <Layers className="w-g13 h-g13 text-muted-foreground" />
                     <div>
                       <div className="text-xs text-muted-foreground uppercase">{t('admin.org_departments', 'Departemen')}</div>
                       <div className="font-semibold text-foreground font-mono">
@@ -136,8 +122,8 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-3.5 h-3.5 text-muted-foreground" />
+                  <div className="flex items-center gap-g8">
+                    <ShieldCheck className="w-g13 h-g13 text-muted-foreground" />
                     <div>
                       <div className="text-xs text-muted-foreground uppercase">{t('admin.org_currency', 'Mata Uang')}</div>
                       <div className="font-semibold text-foreground font-mono">
@@ -148,50 +134,51 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
                 </div>
 
                 {/* Storage structure info */}
-                <div className="text-xs text-muted-foreground flex items-center gap-1.5 mb-4">
-                  <FolderTree className="w-3.5 h-3.5 text-accent-foreground" />
+                <div className="text-xs text-muted-foreground flex items-center gap-g5 mb-g13">
+                  <FolderTree className="w-g13 h-g13 text-accent-foreground" />
                   <span>{t('admin.org_folder_iso', 'Isolasi Folder')}: <strong>{t('admin.vendors_4', '/{name}/[Vendors]', { name: org.name })}</strong></span>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
+              <div className="pt-g13 border-t border-border flex items-center justify-between gap-g8">
+                <div className="flex items-center gap-g5">
                   <Button variant="secondary" size="sm"
                     type="button"
                     onClick={() => onOpenEditOrg(org)}
                   >
-                    <Edit2 className="w-3 h-3" />
+                    <Edit2 className="w-g13 h-g13" />
                     <span>{t('admin.btn_edit', 'Edit')}</span>
                   </Button>
 
-                  <Button variant="ghost" size="sm"
+                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm"
                     type="button"
                     onClick={() => onDeleteOrg(org)}
-                    disabled={isActive || Boolean(org.metadata?.isDefault)}
-                    title={
-                      Boolean(org.metadata?.isDefault)
+                    disabled={isActive || Boolean(org.metadata?.isDefault)} aria-label={Boolean(org.metadata?.isDefault)
                         ? t('admin.cant_delete_default_org', 'Organisasi default sistem tidak dapat dihapus.')
                         : isActive
                         ? t('admin.cant_delete_active_org', 'Beralih ke organisasi lain terlebih dahulu sebelum menghapus.')
-                        : t('admin.btn_delete_org', 'Hapus Organisasi')
-                    }
+                        : t('admin.btn_delete_org', 'Hapus Organisasi')}
                     className={ /*extra*/` ${
  isActive || Boolean(org.metadata?.isDefault)
  ? ''
  : ''
  }`}
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-g13 h-g13" />
                     <span>{t('admin.btn_delete', 'Hapus')}</span>
-                  </Button>
+                  </Button></TooltipTrigger><TooltipBody>{Boolean(org.metadata?.isDefault)
+                        ? t('admin.cant_delete_default_org', 'Organisasi default sistem tidak dapat dihapus.')
+                        : isActive
+                        ? t('admin.cant_delete_active_org', 'Beralih ke organisasi lain terlebih dahulu sebelum menghapus.')
+                        : t('admin.btn_delete_org', 'Hapus Organisasi')}</TooltipBody></Tooltip>
                 </div>
 
                 {onSelectOrg && (
                   <Button variant="outline" size="sm"
                     type="button"
                     onClick={() => onSelectOrg(org)}
-                    className="theme-soft"
+                   
                   >
                     {t('tb.manage_organization', 'Manage organization')}
                   </Button>

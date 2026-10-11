@@ -64,6 +64,8 @@ import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Text } from '@legalio/ui-components/text';
 export function getValidPartnerTags(tags?: string[]): string[] {
   if (!tags || !Array.isArray(tags)) return ['Advertising'];
   const valid = tags.filter((t) => t && typeof t === 'string' && !/^\d{4}-\d{2}-\d{2}/.test(t.trim()));
@@ -282,24 +284,22 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
       <TableColumnHeader
         scope="col"
         aria-sort={isSorted ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className="text-left align-middle"
       >
-        <Button variant="ghost" size="sm"
+        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="-ms-g13 font-semibold text-muted-foreground"
           type="button"
           onClick={() => handleSort(field)}
-          title={t('partners.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}
         >
           <span>{label}</span>
           {isSorted ? (
             sortOrder === 'asc' ? (
-              <ArrowUp className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
+              <ArrowUp className="w-g13 h-g13 text-accent-foreground shrink-0" />
             ) : (
-              <ArrowDown className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
+              <ArrowDown className="w-g13 h-g13 text-accent-foreground shrink-0" />
             )
           ) : (
-            <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <ArrowUpDown className="w-g13 h-g13 text-muted-foreground shrink-0" />
           )}
-        </Button>
+        </Button></TooltipTrigger><TooltipBody>{t('partners.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}</TooltipBody></Tooltip>
       </TableColumnHeader>
     );
   };
@@ -398,7 +398,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-g21">
       {subTab === 'evaluation' ? (
         <PartnerEvaluationView
           partners={partners}
@@ -412,42 +412,41 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
       ) : (
         <>
           {/* Header */}
-          <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-g13">
             <div>
-              <Heading as="h2" size="lg" weight="semibold">
+              <Heading as="h2" size="md" weight="semibold">
                 <span>{t('partners.header_title', 'Manajemen Partner')}</span>
               </Heading>
             </div>
 
-            <div className="mobile-page-actions flex flex-wrap items-center gap-2.5 shrink-0">
+            <div className="flex flex-wrap items-center gap-g8 shrink-0">
               {hasPermission('export.csv') && (
-                <Button variant="outline"
+                <Tooltip><TooltipTrigger asChild><Button variant="outline"
                   onClick={handleExportCSV}
-                  disabled={filteredPartners.length === 0}
-                  title={t('contracts.export_csv', 'Ekspor CSV')}
+                  disabled={filteredPartners.length === 0} aria-label={t('contracts.export_csv', 'Ekspor CSV')}
                 >
-                  <Download className="w-4 h-4" />
+                  <Download className="w-g16 h-g16" />
                   <span>{t('contracts.export_csv', 'Ekspor CSV')}</span>
-                </Button>
+                </Button></TooltipTrigger><TooltipBody>{t('contracts.export_csv', 'Ekspor CSV')}</TooltipBody></Tooltip>
               )}
 
               {canCreatePartner(user) && (
                 <Button
                   onClick={onAddPartner}
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-g16 h-g16" />
                   <span>{t('ui.add_partner')}</span>
                 </Button>
               )}
             </div>
-          </Card>
+          </div>
 
           {/* Filter Bar & View Toggle - Justified Responsive Grid/Flex */}
-          <Card className="p-4 sm:p-5">
-            <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
+          <Card className="p-g13">
+            <div className="flex w-full flex-wrap items-center gap-g13">
               {/* Search Input */}
-              <InputGroup className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-                <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+              <InputGroup className="relative flex-1 min-w-g233 sm:min-w-g233">
+                <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
                 <InputGroupInput
                   type="text"
                   placeholder={t('partners.search_placeholder')}
@@ -468,7 +467,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setSelectedPartnerStatus(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+                className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
               >
                 <option value="ALL">{t('partners.all_status')}</option>
                 <option value="Active">{t('partners.active')}</option>
@@ -483,7 +482,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setSelectedDDStatus(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+                className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
               >
                 <option value="ALL">{t('partners.all_dd_status')}</option>
                 <option value="Complete">{t('partners.dd_complete')}</option>
@@ -499,7 +498,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   setSelectedBadanHukum(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+                className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
               >
                 <option value="ALL">{t('partners.all_legal_entity')}</option>
                 <option value="DOMESTIC">{t('partners.domestic', 'Domestic')}</option>
@@ -511,9 +510,6 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
               {/* Column Toggle */}
               <TableViewMenu title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
-                <div className="px-3.5 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 border-b border-border">
-                  {t('io.toggle_columns', 'Toggle Kolom')}
-                </div>
                 {Object.keys(visibleColumns).map((col) => {
                   let label = col;
                   if (col === 'nama_partner') label = t('partners.col_name', 'Nama Partner');
@@ -537,26 +533,26 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
           {/* Partners List: TABLE VIEW */}
           <Card className="overflow-hidden">
               <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_dd'), value: selectedDDStatus, active: selectedDDStatus !== 'ALL' }, { label: t('ui.filter_country'), value: selectedBadanHukum, active: selectedBadanHukum !== 'ALL' }, { label: t('ui.filter_status'), value: selectedPartnerStatus, active: selectedPartnerStatus !== 'ALL' }, { label: t('ui.filter_department'), value: selectedDepartment, active: selectedDepartment !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedDDStatus('ALL'); setSelectedBadanHukum('ALL'); setSelectedPartnerStatus('ALL'); setSelectedDepartment('ALL'); }} />
-        <p className="mobile-table-hint px-4 py-2 text-xs text-muted-foreground md:hidden">{t('ui.scroll_table')}</p>
-        <TableScrollArea className="data-table-scroll rounded-none border-0" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
-                <Table className="app-data-table w-full text-left">
+        <Text size="xs" tone="muted" className="px-g13 py-g8 md:hidden">{t('ui.scroll_table')}</Text>
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
+                <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableColumnHeader scope="col" className="w-12 text-left align-middle">
+                      <TableColumnHeader scope="col" className="w-g42">
                         <div className="flex items-center justify-start">
                           <Checkbox checked={selectedRows.length > 0 && selectedRows.length === currentPartners.length} aria-label={t('partners.select_all', 'Pilih semua partner')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                         </div>
                       </TableColumnHeader>
                       {visibleColumns.nama_partner && renderSortHeader(t('partners.col_name', 'Nama Partner'), 'name')}
                       {visibleColumns.channel && renderSortHeader(t('partners.col_channel', 'Nama Channel'), 'channel')}
-                      {visibleColumns.badan_hukum && <TableColumnHeader scope="col" className="text-left align-middle">{t('partners.col_entity', 'Badan Hukum')}</TableColumnHeader>}
+                      {visibleColumns.badan_hukum && <TableColumnHeader scope="col">{t('partners.col_entity', 'Badan Hukum')}</TableColumnHeader>}
                       {visibleColumns.kategori && renderSortHeader(t('partners.col_category', 'Kategori Kerjasama'), 'tags')}
                       {visibleColumns.pic && renderSortHeader(t('partners.col_pic', 'PIC Partner'), 'pic')}
-                      {visibleColumns.email && <TableColumnHeader scope="col" className="text-left align-middle">{t('partners.col_email', 'Email')}</TableColumnHeader>}
-                      {visibleColumns.telepon && <TableColumnHeader scope="col" className="text-left align-middle">{t('partners.col_phone', 'Telepon')}</TableColumnHeader>}
+                      {visibleColumns.email && <TableColumnHeader scope="col">{t('partners.col_email', 'Email')}</TableColumnHeader>}
+                      {visibleColumns.telepon && <TableColumnHeader scope="col">{t('partners.col_phone', 'Telepon')}</TableColumnHeader>}
                       {visibleColumns.status && renderSortHeader(t('partners.col_status', 'Status Partner'), 'status')}
                       {visibleColumns.due_diligence && renderSortHeader(t('partners.col_dd_status', 'Status DD'), 'status_dd')}
-                      <TableColumnHeader data-actions="true" scope="col" className="text-right w-20 align-middle">
+                      <TableColumnHeader data-actions="true" scope="col" className="text-right w-g89">
                         <div className="flex items-center justify-end">
                           {t('partners.col_action', 'Aksi')}
                         </div>
@@ -572,7 +568,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
                         return (
                           <TableRow key={partner.partner_id}>
-                            <TableCell className="text-left align-middle">
+                            <TableCell>
                               <div className="flex items-center justify-start">
                                 <Checkbox checked={selectedRows.includes(partner.partner_id)} aria-label={t('partners.pilih', 'Pilih {nama_partner}', { nama_partner: partner.nama_partner })} onCheckedChange={() => handleSelectRow(partner.partner_id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                               </div>
@@ -580,20 +576,20 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
                             {/* 1. Nama Partner */}
                             {visibleColumns.nama_partner && (
-                              <TableCell className="text-left">
+                              <TableCell>
                                 {partner.nama_partner}
                               </TableCell>
                             )}
 
                             {visibleColumns.channel && (
-                              <TableCell className="text-left">
+                              <TableCell>
                                 {partner.codename || '—'}
                               </TableCell>
                             )}
 
                             {/* 2. Country */}
                             {visibleColumns.badan_hukum && (
-                              <TableCell className="text-left">
+                              <TableCell>
                                 <Badge tone={statusTone(partnerCountry(partner) === homeCountry ? 'BHI' : 'BHA')}>
                                   {partnerCountry(partner) || '—'}
                                 </Badge>
@@ -601,13 +597,11 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                             )}
 
                             {visibleColumns.kategori && (
-                              <TableCell className="text-left">
+                              <TableCell>
                                 {getValidPartnerTags(partner.tags).length > 0 ? (
-                                  <div className="flex flex-wrap gap-1">
+                                  <div className="flex flex-wrap gap-g3">
                                     {getValidPartnerTags(partner.tags).map((tag) => (
-                                      <span key={tag} className="px-2 py-0.5 rounded-full border border-border bg-card whitespace-nowrap">
-                                        {tag}
-                                      </span>
+                                      <Badge tone="neutral" className="whitespace-nowrap" key={tag}>{tag}</Badge>
                                     ))}
                                   </div>
                                 ) : (
@@ -618,17 +612,17 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
                             {/* 3. PIC Partner */}
                             {visibleColumns.pic && (
-                              <TableCell className="text-left">
+                              <TableCell>
                                 {partner.nama_pic || partner.pic_partner || '-'}
                               </TableCell>
                             )}
 
                             {visibleColumns.email && (
-                              <TableCell className="text-left whitespace-nowrap">
+                              <TableCell className="whitespace-nowrap">
                                 {partner.email_pic ? (
-                                  <a href={`mailto:${partner.email_pic}`} className="hover:underline hover:text-accent-foreground">
+                                  <Button asChild variant="link"><a href={`mailto:${partner.email_pic}`} >
                                     {partner.email_pic}
-                                  </a>
+                                  </a></Button>
                                 ) : (
                                   '—'
                                 )}
@@ -636,11 +630,11 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                             )}
 
                             {visibleColumns.telepon && (
-                              <TableCell className="text-left whitespace-nowrap">
+                              <TableCell className="whitespace-nowrap">
                                 {partner.telepon_pic ? (
-                                  <a href={`tel:${partner.telepon_pic.replace(/[^\d+]/g, '')}`} className="hover:underline hover:text-accent-foreground">
+                                  <Button asChild variant="link"><a href={`tel:${partner.telepon_pic.replace(/[^\d+]/g, '')}`} >
                                     {partner.telepon_pic}
-                                  </a>
+                                  </a></Button>
                                 ) : (
                                   '—'
                                 )}
@@ -649,7 +643,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
                             {/* 4. Status Partner */}
                             {visibleColumns.status && (
-                              <TableCell className="text-left">
+                              <TableCell>
                                 {pStatus === 'Active' ? (
                                   <Badge tone={statusTone('Aktif')}>
                                     <span>{t('status.aktif', 'Aktif')}</span>
@@ -664,37 +658,33 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
                             {/* 5. Status Due Diligence */}
                             {visibleColumns.due_diligence && (
-                              <TableCell className="text-left">
-                                <button
-                                  onClick={() => setSelectedPartnerDetail(partner)}
-                                  className={`text-xs font-normal px-3 py-0.5 rounded-full border inline-flex items-center gap-1.5 transition-all hover:scale-105 hover:shadow-xs cursor-pointer ${getDDStatusBadge(
- partner.status_dd
- )}`}
-                                  title={t('partners.klik_untuk_audit_checklist_due_diligence', 'Klik untuk Audit Checklist Due Diligence')}
-                                >
-                                  {partner.status_dd === 'Complete' && <CheckCircle2 className="w-3.5 h-3.5 text-accent-foreground" />}
-                                  {partner.status_dd === 'Incomplete' && <Clock className="w-3.5 h-3.5 text-status-warning" />}
-                                  {partner.status_dd === 'Expired' && <AlertTriangle className="w-3.5 h-3.5 text-status-danger" />}
-                                  <span>{t(DD_STATUS_LABEL_KEY[partner.status_dd] || 'status.dd_incomplete', partner.status_dd)}</span>
-                                </button>
+                              <TableCell>
+                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-auto px-g3" onClick={() => setSelectedPartnerDetail(partner)} aria-label={t('partners.klik_untuk_audit_checklist_due_diligence', 'Klik untuk Audit Checklist Due Diligence')}>
+                                  <Badge tone={getDDStatusBadge(partner.status_dd)}>
+                                  {partner.status_dd === 'Complete' && <CheckCircle2 className="w-g13 h-g13 text-accent-foreground" />}
+                                  {partner.status_dd === 'Incomplete' && <Clock className="w-g13 h-g13 text-status-warning" />}
+                                  {partner.status_dd === 'Expired' && <AlertTriangle className="w-g13 h-g13 text-status-danger" />}
+                                  {t(DD_STATUS_LABEL_KEY[partner.status_dd] || 'status.dd_incomplete', partner.status_dd)}
+                                  </Badge>
+                                </Button></TooltipTrigger><TooltipBody>{t('partners.klik_untuk_audit_checklist_due_diligence', 'Klik untuk Audit Checklist Due Diligence')}</TooltipBody></Tooltip>
                               </TableCell>
                             )}
 
                             {/* Aksi */}
-                            <TableCell data-actions="true" className="text-right align-middle w-20">
+                            <TableCell data-actions="true" className="text-right w-g89">
                               <div className="flex items-center justify-end">
                                 <ActionMenu
                                   items={[
                                     {
                                       label: t('partners.audit_dd', 'Audit DD'),
-                                      icon: <FileCheck2 className="w-3.5 h-3.5" />,
+                                      icon: <FileCheck2 className="w-g13 h-g13" />,
                                       onClick: () => setSelectedPartnerDetail(partner),
                                     },
                                     ...(canEditPartner(partner, user)
                                       ? [
                                           {
                                             label: t('hierarchy.edit_btn', 'Edit'),
-                                            icon: <Edit2 className="w-3.5 h-3.5" />,
+                                            icon: <Edit2 className="w-g13 h-g13" />,
                                             onClick: () => onEditPartner(partner),
                                           },
                                         ]
@@ -703,7 +693,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                       ? [
                                           {
                                             label: t('io.action_delete', 'Hapus'),
-                                            icon: <Trash2 className="w-3.5 h-3.5" />,
+                                            icon: <Trash2 className="w-g13 h-g13" />,
                                             onClick: () => onDeletePartner(partner.partner_id, partner.nama_partner),
                                             variant: 'danger' as const,
                                             dividerBefore: true,
@@ -736,51 +726,51 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
       {/* Due Diligence Audit Modal */}
       {selectedPartnerDetail && (
-        <ModalFrame onClose={() => setSelectedPartnerDetail(null)} className="max-w-4xl w-full max-h-[92dvh] flex flex-col overflow-hidden">
+        <ModalFrame onClose={() => setSelectedPartnerDetail(null)} className="max-w-g987 w-full flex flex-col overflow-hidden">
 
             {/* Header */}
-            <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
+            <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
               <div>
-                <DialogTitle className="flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-accent-foreground" />
+                <DialogTitle className="flex items-center gap-g8">
+                  <Building2 className="w-g21 h-g21 text-accent-foreground" />
                   <span>{selectedPartnerDetail.nama_partner}</span>
                 </DialogTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <Text size="xs" tone="muted" className="mt-g2">
                   {t('partners.status_dd', 'Status DD:')} <strong className="text-foreground">{selectedPartnerDetail.status_dd}</strong> {t('partners.pic', '• PIC: {pic_partner}', { pic_partner: selectedPartnerDetail.pic_partner })}
-                </p>
+                </Text>
               </div>
 
               <Button variant="secondary" size="icon-sm" aria-label={t('common.close', 'Tutup')}
                 type="button"
                 onClick={() => setSelectedPartnerDetail(null)}
               >
-                <X className="w-5 h-5" />
+                <X className="w-g21 h-g21" />
               </Button>
             </DialogHeader>
 
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1">
+            <div className="p-g21 sm:p-g21 overflow-y-auto space-y-g13 text-xs flex-1">
               {/* Due Diligence Narrative Profile */}
               {selectedPartnerDetail.catatan && (
-                <Card className="p-4 space-y-1.5">
-                  <h4 className="text-xs font-bold text-accent-foreground flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-accent-foreground" />
+                <Card className="p-g13 space-y-g5">
+                  <Heading as="h4" size="xs" weight="bold" className="text-accent-foreground flex items-center gap-g5">
+                    <ShieldCheck className="w-g16 h-g16 text-accent-foreground" />
                     <span>{t('partners.profil_due_diligence_operasional_vendor_senior', 'Profil Due Diligence & Operasional Vendor (Senior Risk Analyst)')}</span>
-                  </h4>
-                  <p className="text-xs text-foreground leading-relaxed font-medium">
+                  </Heading>
+                  <Text size="xs" weight="medium" className="leading-relaxed">
                     {selectedPartnerDetail.catatan}
-                  </p>
+                  </Text>
                 </Card>
               )}
 
               {/* Checklist Items List with Upload Trigger */}
-              <div className="space-y-3">
+              <div className="space-y-g13">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                  <Heading as="h4" size="xs" weight="bold" className="uppercase tracking-wider">
                     {t('partners.req_docs_title', 'Dokumen Due Diligence')}
-                  </h4>
-                  <span className="text-xs text-muted-foreground font-medium">
+                  </Heading>
+                  <Text as="span" size="xs" weight="medium" tone="muted">
                     {t('partners.nda_bersifat_wajib_dokumen_lain_opsional', '* NDA bersifat Wajib, dokumen lain Opsional')}
-                  </span>
+                  </Text>
                 </div>
 
                 {(selectedPartnerDetail.daftar_dokumen_dd || []).filter((doc) => !isTerminationNoticeDocument(doc)).map((doc) => {
@@ -803,26 +793,22 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   return (
                     <Card
                       key={doc.nama}
-                      className="p-3.5 sm:p-4 space-y-3"
+                      className="p-g13 sm:p-g13 space-y-g13"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center flex-wrap gap-2">
-                          <span className="font-bold text-xs text-foreground">{displayName}</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-g13">
+                        <div className="flex items-center flex-wrap gap-g8">
+                          <Text as="span" size="xs" weight="bold">{displayName}</Text>
 
                           {/* Wajib / Opsional Pill Badge (Refined) */}
                           {doc.wajib ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border border-status-danger-border/40 bg-status-danger/10 text-status-danger uppercase tracking-wide">
-                              {t('settings.region.dd_required', 'Wajib')}
-                            </span>
+                            <Badge tone="danger" className="uppercase">{t('settings.region.dd_required', 'Wajib')}</Badge>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border border-border bg-muted text-muted-foreground uppercase tracking-wide">
-                              {t('contract_creator.optional_badge', 'Opsional')}
-                            </span>
+                            <Badge tone="neutral" className="uppercase">{t('contract_creator.optional_badge', 'Opsional')}</Badge>
                           )}
 
                           {/* Status Ada / Belum / Kadaluarsa Pill Badge */}
                           <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                            className={`inline-flex items-center px-g8 py-g2 rounded-full text-xs font-semibold border ${
  doc.status === 'Available'
  ? 'border-status-success-border/40 bg-status-success/10 text-status-success '
  : doc.status === 'Expired'
@@ -834,7 +820,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-g8 shrink-0">
                           <Button variant="ghost" size="sm"
                             type="button"
                             onClick={() => {
@@ -844,7 +830,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                               });
                             }}
                           >
-                            <Upload className="w-3 h-3" />
+                            <Upload className="w-g13 h-g13" />
                             <span>{t('partners.upload_file', 'Upload File')}</span>
                           </Button>
                         </div>
@@ -852,40 +838,38 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
                       {/* Multiple Files list for this DD Requirement */}
                       {docFiles.length > 0 && (
-                        <div className="pt-2.5 border-t border-border space-y-1.5">
+                        <div className="pt-g8 border-t border-border space-y-g5">
                           {docFiles.map((f, fIdx) => (
                             <Card
                               key={f.id || fIdx}
-                              className="px-3 py-2 flex items-center justify-between gap-2"
+                              className="px-g13 py-g8 flex items-center justify-between gap-g8"
                             >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <FileText className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
-                                <span className="text-xs font-medium text-foreground truncate">
+                              <div className="flex items-center gap-g8 min-w-0">
+                                <FileText className="w-g13 h-g13 text-accent-foreground shrink-0" />
+                                <Text as="span" size="xs" weight="medium" truncate>
                                   {f.fileName || `${doc.nama}.pdf`}
-                                </span>
+                                </Text>
                               </div>
 
-                              <div className="flex items-center gap-1.5 shrink-0">
+                              <div className="flex items-center gap-g5 shrink-0">
                                 {f.linkDrive && (
-                                  <a
-                                    href={f.linkDrive}
+                                  <Button asChild variant="outline" size="sm"><a href={f.linkDrive}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-2.5 py-1 bg-status-success-soft hover:bg-status-success-soft text-accent-foreground rounded-sm text-xs font-medium transition-colors flex items-center gap-1 border border-status-success-border/30"
+                                    
                                   >
-                                    <ExternalLink className="w-3 h-3" />
+                                    <ExternalLink className="w-g13 h-g13" />
                                     <span>{t('partners.view_file', 'Lihat File')}</span>
-                                  </a>
+                                  </a></Button>
                                 )}
                                 {isLegal && (
-                                  <Button variant="ghost" size="icon-sm"
+                                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm"
                                     type="button"
                                     onClick={() => handleDeleteDDFile(selectedPartnerDetail.partner_id, doc.nama, f.id, displayName)}
-                                    className="text-destructive"
-                                    title={t('partners.hapus_file_ini', 'Hapus file ini')}
+                                    className="text-destructive" aria-label={t('partners.hapus_file_ini', 'Hapus file ini')}
                                   >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </Button>
+                                    <Trash2 className="w-g13 h-g13" />
+                                  </Button></TooltipTrigger><TooltipBody>{t('partners.hapus_file_ini', 'Hapus file ini')}</TooltipBody></Tooltip>
                                 )}
                               </div>
                             </Card>
@@ -898,7 +882,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               </div>
             </div>
 
-            <div className="p-4 sm:p-5 bg-background border-t border-border flex justify-end shrink-0">
+            <div className="p-g13 sm:p-g21 bg-background border-t border-border flex justify-end shrink-0">
               <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => setSelectedPartnerDetail(null)}

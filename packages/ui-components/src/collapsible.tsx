@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/collapsible';
+export * from './moduix/ui/collapsible';

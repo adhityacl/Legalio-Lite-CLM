@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/breadcrumbs';
+export * from './moduix/ui/breadcrumbs';

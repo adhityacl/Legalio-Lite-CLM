@@ -4,6 +4,7 @@ import { buildDueDiligenceChecklist, localize } from '@legalio/shared/policy';
 import { translations } from '../../apps/frontend/src/context/LanguageContext';
 import { accentPalettes, contrastRatio, organizationThemeTokens } from '../../apps/frontend/src/lib/organizationColors';
 import type { Locator } from '@playwright/test';
+import { controlSize, type ControlSize } from './fixtures/controlSize';
 import { becomeSuperuser, createTenantApi, fulfillTenantApi, openActivityHistory, policyView, workspaceInit } from './fixtures/tenantApi';
 
 let api: ReturnType<typeof createTenantApi>;
@@ -13,7 +14,7 @@ for (const [palette, color] of [['Iris', '#5B5BD6'], ['Grass', '#46A758']]) {
     test.setTimeout(90_000);
     const hex = (css: string) => '#' + css.match(/[\d.]+/g)!.slice(0, 3).map(channel => Math.round(Number(channel)).toString(16).padStart(2, '0')).join('');
     const inspect = async (scope: Locator = page.locator('main')) => {
-      const actions = scope.locator('button.theme-action:visible, button.bg-accent-strong:visible');
+      const actions = scope.locator('[data-slot="button-root"][data-variant="default"]:visible');
       await expect(actions.first()).toBeVisible();
       for (const action of await actions.all()) {
         await expect.poll(() => action.evaluate(element => {
@@ -23,8 +24,8 @@ for (const [palette, color] of [['Iris', '#5B5BD6'], ['Grass', '#46A758']]) {
           const probe = document.createElement('span');
           document.body.appendChild(probe);
           const resolved = (token: string) => { probe.style.color = root.getPropertyValue(token); return getComputedStyle(probe).color; };
-          const background = resolved(disabled ? '--primary-disabled' : '--primary');
-          const foreground = resolved(disabled ? '--primary-disabled-foreground' : '--primary-foreground');
+          const background = resolved(disabled ? '--primary-disabled' : '--moduix-primary');
+          const foreground = resolved(disabled ? '--primary-disabled-foreground' : '--moduix-primary-foreground');
           probe.remove();
           return styles.backgroundColor === background && styles.color === foreground;
         })).toBe(true);
@@ -141,7 +142,7 @@ for (const width of [1440, 390]) {
       expect(await action.evaluate(element => {
         const styles = getComputedStyle(element);
         const probe = document.createElement('span');
-        probe.style.color = (element as HTMLButtonElement).disabled ? 'var(--primary-disabled-foreground)' : 'var(--primary-foreground)';
+        probe.style.color = (element as HTMLButtonElement).disabled ? 'var(--primary-disabled-foreground)' : 'var(--moduix-primary-foreground)';
         document.body.appendChild(probe);
         const matches = styles.color === getComputedStyle(probe).color;
         probe.remove();
@@ -230,14 +231,13 @@ test('shared table design covers operational and admin pages while preserving ex
   test.setTimeout(90_000);
   await becomeSuperuser(page, api);
   const inspect = async (scope: Locator = page.locator('main')) => {
-    const tables = scope.locator('table.ds-table:visible');
+    const tables = scope.locator('table[data-slot="table-root"]:visible');
     await expect(tables.first()).toBeVisible();
     for (const table of await tables.all()) {
       const presentation = await table.evaluate(element => {
         const cell = element.querySelector('thead th')!;
         const row = element.querySelector('thead tr')!;
-        let surface = element.closest('.ds-table-surface')!;
-        while (surface.parentElement?.closest('.ds-table-surface')) surface = surface.parentElement.closest('.ds-table-surface')!;
+        let surface = element.closest('[data-slot="table-scroll-area"]')!;
         return { font: getComputedStyle(cell).fontSize, weight: getComputedStyle(cell).fontWeight, transform: getComputedStyle(cell).textTransform, height: cell.getBoundingClientRect().height, header: getComputedStyle(row).backgroundColor, radius: getComputedStyle(surface).borderRadius, scope: element.closest('[data-table-design]')?.getAttribute('data-table-design') };
       });
       expect(presentation).toMatchObject({ font: '14px', weight: '600', transform: 'none', radius: '20px', scope: 'standard' });
@@ -263,7 +263,7 @@ test('shared table design covers operational and admin pages while preserving ex
   }
   await open('Partners');
   await page.screenshot({ path: '/tmp/shared-table-partners.png' });
-  const checkbox = page.locator('main table.ds-table tbody input[type="checkbox"]').first();
+  const checkbox = page.locator('main table[data-slot="table-root"] tbody input[type="checkbox"]').first();
   await checkbox.check();
   await expect(checkbox).toBeChecked();
   await expect.poll(() => checkbox.evaluate(element => {
@@ -282,7 +282,6 @@ test('shared table design covers operational and admin pages while preserving ex
   await page.screenshot({ path: '/tmp/shared-table-members.png' });
   await page.getByRole('button', { name: 'History', exact: true }).click();
   const history = page.getByRole('dialog');
-  await expect(history).toHaveAttribute('data-table-design', 'standard');
   await inspect(history);
   await page.keyboard.press('Escape');
   await open('System Admin');
@@ -292,9 +291,8 @@ test('shared table design covers operational and admin pages while preserving ex
   }
   for (const label of ['Main Dashboard', /^(Explorer|Explore|Document Structure)$/]) {
     await open(label);
-    await expect(page.locator('[data-table-design="legacy"]').first()).toBeVisible();
-    await expect(page.locator('main table.ds-table')).toHaveCount(0);
-    const pagination = page.locator('main .ds-table-pagination');
+    await expect(page.locator('main table[data-slot="table-root"]')).toHaveCount(0);
+    const pagination = page.locator('main [data-slot="pagination-root"]');
     if (await pagination.count()) expect(await pagination.first().locator('span').first().evaluate(element => getComputedStyle(element).fontSize)).toBe('12px');
   }
 });
@@ -369,8 +367,9 @@ test('Account Profile saves details and photo with separate Profile and Security
   await expect(dialog.getByLabel('Bio', { exact: true })).toHaveValue('Legal operations manager');
 });
 
-async function expectReadableAction(button: Locator, height: number) {
+async function expectReadableAction(button: Locator, size: ControlSize | number) {
   await expect(button).toBeVisible();
+  const height = typeof size === 'number' ? size : await controlSize(button.page(), size);
   const layout = await button.evaluate(element => {
     const bounds = element.getBoundingClientRect();
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
@@ -533,15 +532,15 @@ test('header controls align, desktop checkboxes stay 14px and dropdowns share Co
   // sample a color mid-transition and compare unequal intermediate values.
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1440, height: 1000 });
-  const controls = page.locator('.app-header-control:visible');
+  const controls = page.locator('header [data-slot="button-root"][data-size="icon-md"]:visible');
+  const md = await controlSize(page, 'md');
   for (const control of await controls.all()) {
     const bounds = await control.boundingBox();
-    expect(bounds!.width).toBe(40);
-    expect(bounds!.height).toBe(40);
+    expect(bounds!.width).toBe(md);
+    expect(bounds!.height).toBe(md);
   }
-  expect((await page.locator('.app-header-languages').boundingBox())!.height).toBe(40);
-  for (const icon of await page.locator('.app-header-control > svg:visible').all()) {
-    expect((await icon.boundingBox())!.height).toBe(18);
+  for (const icon of await page.locator('header [data-slot="button-root"][data-size="icon-md"] > svg:visible').all()) {
+    expect((await icon.boundingBox())!.height).toBe(16);
   }
   await page.getByRole('button', { name: /^Contracts(?: \d+)?$/ }).click();
   for (const checkbox of await page.locator('input[type="checkbox"]:visible').all()) {
@@ -556,7 +555,7 @@ test('header controls align, desktop checkboxes stay 14px and dropdowns share Co
     await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), dark);
     await page.getByRole('button', { name: /^Contracts(?: \d+)?$/ }).click();
     const reference = await dropdownStyle(page.getByRole('combobox').first());
-    expect(reference.height).toBe(40);
+    expect(reference.height).toBe(md);
     for (const select of await page.locator('select:visible').all()) expect(await dropdownStyle(select)).toEqual(reference);
     await page.getByRole('button', { name: 'My Documents', exact: true }).click();
     for (const select of await page.locator('select:visible').all()) expect(await dropdownStyle(select)).toEqual(reference);
@@ -574,8 +573,8 @@ test('header controls align, desktop checkboxes stay 14px and dropdowns share Co
   }
   await page.screenshot({ path: test.info().outputPath('controls-desktop-dark.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const control of await controls.all()) expect((await control.boundingBox())!.height).toBe(40);
-  for (const select of await page.locator('select:visible').all()) expect((await select.boundingBox())!.height).toBe(40);
+  for (const control of await controls.all()) expect((await control.boundingBox())!.height).toBe(md);
+  for (const select of await page.locator('select:visible').all()) expect((await select.boundingBox())!.height).toBe(md);
   await page.screenshot({ path: test.info().outputPath('controls-mobile-dark.png'), fullPage: true });
 });
 
@@ -593,8 +592,9 @@ test('single-line inputs and selects share one height and font size across core 
     const fields = dialog.locator(fieldSelector);
     expect(await fields.count()).toBeGreaterThan(1);
     const fontSizes = new Set<string>();
+    const md = await controlSize(page, 'md');
     for (const field of await fields.all()) {
-      expect((await field.boundingBox())!.height).toBe(40);
+      expect((await field.boundingBox())!.height).toBe(md);
       fontSizes.add(await field.evaluate(element => getComputedStyle(element).fontSize));
     }
     expect([...fontSizes]).toEqual(['14px']);
@@ -649,31 +649,31 @@ test('large, medium and small actions keep icon-and-text labels inside their but
       await page.setViewportSize({ width, height: 1000 });
     };
     await navigate('Main Dashboard');
-    const currencies = page.getByRole('group', { name: 'Reporting currency', exact: true });
-    await expectReadableAction(currencies.getByRole('button', { name: 'USD', exact: true }), 40);
+    const currencies = page.getByRole('radiogroup', { name: 'Reporting currency', exact: true });
+    await expectReadableAction(currencies.locator('[data-part="item"]', { hasText: 'USD' }), 'md');
 
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: /^Contract and due diligence rules/ }).click();
     await page.setViewportSize({ width, height: 1000 });
-    await expectReadableAction(page.getByRole('button', { name: 'Save Profile', exact: true }), 40);
-    await expectReadableAction(page.getByRole('button', { name: 'Add checklist item', exact: true }), 40);
+    await expectReadableAction(page.getByRole('button', { name: 'Save Profile', exact: true }), 'md');
+    await expectReadableAction(page.getByRole('button', { name: 'Add checklist item', exact: true }), 'md');
 
     await navigate('Partners');
-    await expectReadableAction(page.getByRole('button', { name: 'Add Partner', exact: true }), 40);
+    await expectReadableAction(page.getByRole('button', { name: 'Add Partner', exact: true }), 'md');
     await page.getByRole('button', { name: 'Add Partner', exact: true }).click();
-    await expectReadableAction(page.getByRole('dialog').getByRole('button', { name: 'Add identifier', exact: true }), 36);
+    await expectReadableAction(page.getByRole('dialog').getByRole('button', { name: 'Add identifier', exact: true }), 'md');
     await page.keyboard.press('Escape');
 
     await navigate('Partner Spending');
     await page.getByRole('button', { name: 'Add Spending', exact: true }).click();
-    await expectReadableAction(page.getByRole('dialog').getByRole('button', { name: 'Add Month', exact: true }), 36);
+    await expectReadableAction(page.getByRole('dialog').getByRole('button', { name: 'Add Month', exact: true }), 'md');
     await page.keyboard.press('Escape');
 
     await navigate(/^(Explorer|Explore|Document Structure)$/);
     await page.getByRole('tab', { name: 'Table View', exact: true }).click();
     for (const button of await page.locator('main .mobile-page-actions:not([role="tablist"]) button').all()) {
-      await expectReadableAction(button, 36);
+      await expectReadableAction(button, 'md');
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
   }
@@ -701,20 +701,21 @@ test('draft history small actions retain readable text on desktop and mobile', a
   await page.getByRole('button', { name: document.name, exact: true }).click();
   await page.getByRole('tab', { name: 'History', exact: true }).click();
   const panel = page.locator('.editor-panel-content');
-  // Document info: Created and Modified share a row, and every row is 16px apart.
+  // Document info: paired facts share a row, and every row is 16px apart.
   await page.getByRole('tab', { name: 'Info', exact: true }).click();
-  const item = (label: string) => panel.locator('dl > div').filter({ has: page.locator('dt', { hasText: new RegExp(`^${label}$`) }) });
+  const item = (label: string) => panel.locator('dl > div').filter({ has: page.locator('dt, label', { hasText: new RegExp(`^${label}$`) }) });
   const box = async (label: string) => (await item(label).boundingBox())!;
   const [name, type, status, created, modified, organization, versions] = await Promise.all(
     ['Name', 'Type', 'Status', 'Created', 'Modified', 'Organization', 'Versions'].map(box),
   );
-  for (const [left, right] of [[type, status], [created, modified], [organization, versions]]) {
+  for (const [left, right] of [[created, modified], [organization, versions], [type, status]]) {
     expect(right.y).toBe(left.y);
     expect(right.x).toBeGreaterThan(left.x + left.width);
   }
-  expect(type.y - (name.y + name.height)).toBe(16);
-  expect(created.y - (type.y + type.height)).toBe(16);
+  // Read-only facts first, the editable Type/Status pair last; every row is 16px apart.
+  expect(created.y - (name.y + name.height)).toBe(16);
   expect(organization.y - (created.y + Math.max(created.height, modified.height))).toBe(16);
+  expect(type.y - (organization.y + Math.max(organization.height, versions.height))).toBe(16);
   await page.screenshot({ path: test.info().outputPath('document-info.png'), fullPage: true });
   await page.getByRole('tab', { name: 'History', exact: true }).click();
   for (const width of [1440, 390]) {
@@ -727,7 +728,7 @@ test('draft history small actions retain readable text on desktop and mobile', a
     }
     await expect(panel).toBeVisible();
     for (const action of ['View', 'Compare', 'Restore', 'Name']) {
-      await expectReadableAction(panel.getByRole('button', { name: action, exact: true }).first(), 28);
+      await expectReadableAction(panel.getByRole('button', { name: action, exact: true }).first(), 'sm');
     }
     // Restore takes the header slot the current version uses for its badge.
     const [latest, older] = await panel.locator('li.editor-panel-card').all();
@@ -1004,7 +1005,7 @@ test('chart exposes every month, has theme colors and keeps dashboard checkboxes
   const chartControls = [
     page.getByRole('combobox', { name: 'Year', exact: true }),
     page.getByRole('combobox', { name: 'Category', exact: true }),
-    page.getByRole('group', { name: 'Reporting currency', exact: true }),
+    page.getByRole('radiogroup', { name: 'Reporting currency', exact: true }),
   ];
   const controlBoxes = await Promise.all(chartControls.map(control => control.boundingBox()));
   expect(Math.abs(controlBoxes[0]!.y - controlBoxes[1]!.y)).toBeLessThan(2);
@@ -1138,7 +1139,7 @@ async function misalignedRowActions(page: import('@playwright/test').Page) {
 /**
  * Filled (primary/destructive) actions and form submits are commits or page
  * actions, so they all use the large size. Segments, tabs, table-row actions
- * and the listed card-level actions are lower in the hierarchy (docs/button-sizes.md).
+ * and the listed card-level actions are lower in the hierarchy (docs/design-system/STANDARD.md §3).
  */
 async function undersizedPrimaryActions(page: import('@playwright/test').Page) {
   return page.evaluate(() => {

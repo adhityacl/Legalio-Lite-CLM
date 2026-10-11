@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { notificationMessage } from '../lib/notificationText';
 import { getActiveFormattingLocale } from '@legalio/shared/currencyUtils';
 import { useAuth } from '../context/AuthContext';
-import { AccountProfileDialog, PreferencesDialog } from './account/AccountDialogs';
+import { AccountProfileDialog } from './account/AccountDialogs';
 import { LANGUAGE_OPTIONS, useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useTenant } from '../context/TenantContext';
 import { NotificationLog, GoogleSheetsConfig } from '@legalio/types';
-import { Bell, ChevronDown, LogOut, Menu as MenuIcon, Moon, Shield, SlidersHorizontal, Sun, UserRound } from 'lucide-react';
+import { Bell, ChevronDown, Search, LogOut, Menu as MenuIcon, Moon, Sun, UserRound } from 'lucide-react';
 import { Button } from '@legalio/ui-components/button';
 import { Badge } from '@legalio/ui-components/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@legalio/ui-components/avatar';
@@ -20,7 +20,9 @@ import {
 import { Popover, PopoverBody, PopoverContent, PopoverFooter, PopoverHeader, PopoverPositioner, PopoverTitle, PopoverTrigger } from '@legalio/ui-components/popover';
 import { Empty, EmptyContent, EmptyDescription } from '@legalio/ui-components/empty';
 import { Text } from '@legalio/ui-components/text';
+import { CommandPaletteTrigger } from '@legalio/ui-components/command-palette';
 
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 interface HeaderProps {
   notifications: NotificationLog[];
   googleConfig?: GoogleSheetsConfig;
@@ -31,8 +33,8 @@ interface HeaderProps {
 
 /** Application header (moduix App header block): breadcrumbs, preferences, notifications and account menu. */
 export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, onOpenMobileMenu }) => {
-  const { user, identity, logout, isPlatformAdmin } = useAuth();
-  const [accountDialog, setAccountDialog] = useState<null | 'preferences' | 'security'>(null);
+  const { user, identity, logout } = useAuth();
+  const [accountDialog, setAccountDialog] = useState<null | 'security'>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
@@ -50,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
       case 'ios': return t('nav.ios', 'Insertion Order (IO)');
       case 'notifikasi': return t('nav.notifications', 'Notifikasi & Log');
       case 'bulk-import': return t('nav.bulk_import', 'Import Data');
-      case 'settings-organization': case 'settings-access': case 'settings-integrations': return t('nav.settings', 'Pengaturan Sistem');
+      case 'settings-organization': case 'settings-access': return t('nav.settings', 'Pengaturan Sistem');
       default: return activeTab.startsWith('admin-system-') ? t('nav.system_admin', 'System Admin') : t('nav.dashboard', 'Dashboard');
     }
   })();
@@ -60,34 +62,37 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
   const openNotifications = () => { setNotificationsOpen(false); onNavigateToTab('notifikasi'); };
 
   return (
-    <header className="app-header sticky top-0 z-20 flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-3 sm:px-6">
-      <div className="flex min-w-0 items-center gap-2">
-        <Button variant="ghost" size="icon-md" onClick={onOpenMobileMenu} className="md:hidden"
-          title={t('header.buka_navigasi', 'Buka Navigasi')} aria-label={t('header.buka_menu_navigasi', 'Buka Menu Navigasi')}>
+    <header className="sticky top-0 z-20 flex h-g42 shrink-0 items-center justify-between gap-g13 border-b border-border bg-muted px-g13 md:px-g34">
+      <div className="flex min-w-0 items-center gap-g8">
+        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" onClick={onOpenMobileMenu} className="md:hidden" aria-label={t('header.buka_menu_navigasi', 'Buka Menu Navigasi')}>
           <MenuIcon aria-hidden="true" />
-        </Button>
+        </Button></TooltipTrigger><TooltipBody>{t('header.buka_navigasi', 'Buka Navigasi')}</TooltipBody></Tooltip>
         <Breadcrumbs>
           <BreadcrumbsList>
             <BreadcrumbsItem className="hidden sm:inline-flex">{organization}</BreadcrumbsItem>
             <BreadcrumbsSeparator className="hidden sm:inline-flex" />
             <BreadcrumbsItem>
-              <BreadcrumbsPage asChild><h1 className="app-page-title truncate">{tabLabel}</h1></BreadcrumbsPage>
+              <BreadcrumbsPage asChild><h1 className="truncate">{tabLabel}</h1></BreadcrumbsPage>
             </BreadcrumbsItem>
           </BreadcrumbsList>
         </Breadcrumbs>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-        <Button variant="ghost" size="icon-md" onClick={toggleTheme} title={themeLabel} aria-label={themeLabel}>
-          {theme === 'dark' ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
-        </Button>
+      <div className="flex shrink-0 items-center gap-g3 sm:gap-g8">
+        <Tooltip ids={{ trigger: 'header-search-trigger' }}><TooltipTrigger asChild><CommandPaletteTrigger asChild>
+          <Button variant="ghost" size="icon-sm" aria-label={t('nav.search_label', 'Cari menu')}><Search aria-hidden="true" /></Button>
+        </CommandPaletteTrigger></TooltipTrigger><TooltipBody>{t('nav.search_label', 'Cari menu')}</TooltipBody></Tooltip>
 
-        <Menu positioning={{ placement: 'bottom-end', gutter: 8 }}>
-          <MenuTrigger asChild>
-            <Button variant="ghost" size="icon-md" title={t('header.switch_language', 'Pilih bahasa')} aria-label={t('header.switch_language', 'Pilih bahasa')}>
+        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" onClick={toggleTheme} aria-label={themeLabel}>
+          {theme === 'dark' ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+        </Button></TooltipTrigger><TooltipBody>{themeLabel}</TooltipBody></Tooltip>
+
+        <Menu ids={{ trigger: 'header-language-trigger' }} positioning={{ placement: 'bottom-end', gutter: 8 }}>
+          <Tooltip ids={{ trigger: 'header-language-trigger' }}><TooltipTrigger asChild><MenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm" aria-label={t('header.switch_language', 'Pilih bahasa')}>
               {language}
             </Button>
-          </MenuTrigger>
+          </MenuTrigger></TooltipTrigger><TooltipBody>{t('header.switch_language', 'Pilih bahasa')}</TooltipBody></Tooltip>
           <MenuPositioner>
             <MenuContent>
               <MenuViewport>
@@ -107,30 +112,30 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
           </MenuPositioner>
         </Menu>
 
-        <Popover open={notificationsOpen} onOpenChange={details => setNotificationsOpen(details.open)} positioning={{ placement: 'bottom-end', gutter: 8 }}>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon-md" className="relative" title={t('header.notifikasi', 'Notifikasi')}
+        <Popover ids={{ trigger: 'header-notifications-trigger' }} open={notificationsOpen} onOpenChange={details => setNotificationsOpen(details.open)} positioning={{ placement: 'bottom-end', gutter: 8 }}>
+          <Tooltip ids={{ trigger: 'header-notifications-trigger' }}><TooltipTrigger asChild><PopoverTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="relative"
               aria-label={t('header.notifikasi_belum_dibaca', 'Notifikasi: {unreadCount} belum dibaca', { unreadCount })}>
               <Bell aria-hidden="true" />
-              {unreadCount > 0 && <span className="absolute end-2 top-2 size-2 rounded-full bg-destructive" aria-hidden="true" />}
+              {unreadCount > 0 && <Badge tone="danger" className="absolute -end-g5 -top-g5" aria-hidden="true">{unreadCount > 9 ? '9+' : unreadCount}</Badge>}
             </Button>
-          </PopoverTrigger>
+          </PopoverTrigger></TooltipTrigger><TooltipBody>{t('header.notifikasi', 'Notifikasi')}</TooltipBody></Tooltip>
           <PopoverPositioner>
-            <PopoverContent className="w-[min(24rem,calc(100vw-1.5rem))] p-0">
-              <PopoverHeader className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+            <PopoverContent className="w-full max-w-g377 p-0">
+              <PopoverHeader className="flex items-center justify-between gap-g8 border-b border-border px-g13 py-g13">
                 <PopoverTitle>{t('header.notice_notifications', 'Notifikasi')}</PopoverTitle>
                 {unreadCount > 0
                   ? <Badge tone="info">{t('header.baru', '{unreadCount} baru', { unreadCount })}</Badge>
                   : <Text size="xs" tone="muted">{t('header.semua_sudah_dibaca', 'Semua sudah dibaca')}</Text>}
               </PopoverHeader>
-              <PopoverBody className="max-h-80 overflow-y-auto p-1">
+              <PopoverBody className="max-h-g377 overflow-y-auto p-g3">
                 {notifications.length === 0 ? (
                   <Empty>
                     <EmptyContent><EmptyDescription>{t('header.no_notifications', 'Tidak ada notifikasi saat ini.')}</EmptyDescription></EmptyContent>
                   </Empty>
                 ) : notifications.slice(0, 8).map(notif => (
-                  <Button key={notif.notif_id} variant="ghost" onClick={openNotifications} className="h-auto w-full flex-col items-stretch gap-1 whitespace-normal py-3 text-start">
-                    <span className="flex items-center justify-between gap-2">
+                  <Button key={notif.notif_id} variant="ghost" onClick={openNotifications} className="h-auto w-full flex-col items-stretch gap-g3 whitespace-normal py-g13 text-start">
+                    <span className="flex items-center justify-between gap-g8">
                       <Badge tone="danger">{notif.jenis_notifikasi}</Badge>
                       <Text as="span" size="xs" tone="muted">
                         {new Date(notif.tanggal_terkirim).toLocaleDateString(getActiveFormattingLocale(), { day: 'numeric', month: 'short' })}
@@ -141,38 +146,37 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
                   </Button>
                 ))}
               </PopoverBody>
-              <PopoverFooter className="border-t border-border p-2">
+              <PopoverFooter className="border-t border-border p-g8">
                 <Button size="sm" className="w-full" onClick={openNotifications}>{t('dashboard.view_all', 'Lihat Semua Notifikasi')}</Button>
               </PopoverFooter>
             </PopoverContent>
           </PopoverPositioner>
         </Popover>
 
-        <Menu positioning={{ placement: 'bottom-end', gutter: 8 }} onSelect={details => {
-          if (details.value === 'preferences' || details.value === 'security') setAccountDialog(details.value);
+        <Menu ids={{ trigger: 'header-user-trigger' }} positioning={{ placement: 'bottom-end', gutter: 8 }} onSelect={details => {
+          if (details.value === 'security') setAccountDialog('security');
           if (details.value === 'sign-out') logout();
         }}>
-          <MenuTrigger asChild>
-            <Button variant="ghost" className="gap-2 px-1.5" title={user?.name || t('header.profil_pengguna', 'Profil Pengguna')} aria-label={t('header.menu_pengguna', 'Menu Pengguna')}>
+          <Tooltip ids={{ trigger: 'header-user-trigger' }}><TooltipTrigger asChild><MenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-g8" aria-label={t('header.menu_pengguna', 'Menu Pengguna')}>
               <Avatar size="sm">
                 {identity?.image && <AvatarImage src={identity.image} alt="" />}
                 <AvatarFallback>{user?.name ? user.name.charAt(0).toUpperCase() : <UserRound aria-hidden="true" />}</AvatarFallback>
               </Avatar>
+              <span className="hidden min-w-0 flex-col items-start text-start lg:flex">
+                <Text as="strong" size="sm" truncate>{user?.name || t('admin.generic_user', 'Pengguna')}</Text>
+              </span>
               <ChevronDown className="hidden sm:block" aria-hidden="true" />
             </Button>
-          </MenuTrigger>
+          </MenuTrigger></TooltipTrigger><TooltipBody>{user?.name || t('header.profil_pengguna', 'Profil Pengguna')}</TooltipBody></Tooltip>
           <MenuPositioner>
-            <MenuContent className="w-60">
+            <MenuContent className="w-g233">
               <MenuViewport>
                 <MenuItemGroup>
-                  <MenuItemGroupLabel className="flex flex-col gap-0.5">
+                  <MenuItemGroupLabel className="flex flex-col gap-g2 px-g13">
                     <Text as="span" size="sm" weight="semibold" truncate className="text-foreground">{user?.name || t('admin.generic_user', 'Pengguna')}</Text>
                     <Text as="span" size="xs" tone="muted" truncate>{user?.email}</Text>
-                    {isPlatformAdmin && <Badge tone="info" className="mt-1 self-start"><Shield aria-hidden="true" />{t('tb.platform_administrator', 'Platform administrator')}</Badge>}
                   </MenuItemGroupLabel>
-                  <MenuItem value="preferences">
-                    <MenuItemText><MenuItemTextContent><MenuItemTextIcon><SlidersHorizontal /></MenuItemTextIcon><MenuItemTextLabel>{t('tb.preferences', 'Preferences')}</MenuItemTextLabel></MenuItemTextContent></MenuItemText>
-                  </MenuItem>
                   <MenuItem value="security">
                     <MenuItemText><MenuItemTextContent><MenuItemTextIcon><UserRound /></MenuItemTextIcon><MenuItemTextLabel>{t('tb.account_profile', 'Account Profile')}</MenuItemTextLabel></MenuItemTextContent></MenuItemText>
                   </MenuItem>
@@ -186,7 +190,6 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
           </MenuPositioner>
         </Menu>
       </div>
-      {accountDialog === 'preferences' && <PreferencesDialog onClose={() => setAccountDialog(null)} />}
       {accountDialog === 'security' && <AccountProfileDialog onClose={() => setAccountDialog(null)} />}
     </header>
   );

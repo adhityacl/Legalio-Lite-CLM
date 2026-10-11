@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/popover';
+export * from './moduix/ui/popover';

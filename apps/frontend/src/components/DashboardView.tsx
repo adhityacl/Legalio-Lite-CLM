@@ -46,7 +46,7 @@ import {
   Bar,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as ChartTooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -57,10 +57,15 @@ import {
 import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
 import { Button } from '@legalio/ui-components/button';
 import { NativeSelect } from '@legalio/ui-components/native-select';
-import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 import { CardHeader, Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
+import { SegmentGroup, SegmentGroupIndicator, SegmentGroupItems } from '@legalio/ui-components/segment-group';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Text } from '@legalio/ui-components/text';
+import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
+import { TableCardHeader } from '@legalio/ui-components/blocks';
 interface DashboardViewProps {
   contracts: Contract[];
   ios: InsertionOrder[];
@@ -224,10 +229,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const totalNilaiKontrak = contractTotalInCurrency(activeContracts, viewCurrency);
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in-50 duration-200">
+    <div className="flex flex-col gap-g21 animate-in fade-in-50 duration-200">
       {noDepartmentAccess && (
-        <Alert status="warning" role="status">
-          <AlertContent>{t('tb.no_department_access', 'You are not assigned to a department in this organization, so no records are shown. Ask an administrator to assign one.')}</AlertContent>
+        <Alert status="warning" role="status"><AlertIndicator />
+          <AlertContent><AlertDescription>{t('tb.no_department_access', 'You are not assigned to a department in this organization, so no records are shown. Ask an administrator to assign one.')}</AlertDescription></AlertContent>
         </Alert>
       )}
       <DashboardOverview
@@ -244,25 +249,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Notice Period Tracker Table */}
       <Card className="overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border pb-4">
-          <div className="flex items-center gap-3">
-            <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-status-danger-soft text-status-danger border border-status-danger-border">
-              <AlertTriangle className="w-5 h-5 text-status-danger" />
-            </div>
-            <div>
-              <Heading as="h3" size="sm" weight="semibold">
-                {t('dashboard.expiring_table_title')}
-              </Heading>
-            </div>
-          </div>
+        <TableCardHeader tone="danger" icon={<AlertTriangle />} title={t('dashboard.expiring_table_title')} />
 
-        </CardHeader>
-
-        <TableScrollArea className="rounded-none border-0" role="region" tabIndex={0} aria-label={t('dashboard.expiring_table_title')}>
-          <Table className="dashboard-data-table dashboard-document-table w-full min-w-[760px] text-left">
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('dashboard.expiring_table_title')}>
+          <Table className="dashboard-data-table dashboard-document-table w-full min-w-g610 text-left">
             <TableHeader>
               <TableRow>
-                <TableColumnHeader scope="col" className="w-12 text-left align-middle">
+                <TableColumnHeader scope="col" className="w-g42">
                   <div className="flex items-center justify-start">
                     <Checkbox aria-label={t('dashboard.select_all_requiring_action', 'Select all documents requiring action')} disabled><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
@@ -272,7 +265,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <TableColumnHeader scope="col">{t('dashboard.partner', 'Partner')}</TableColumnHeader>
                 <TableColumnHeader scope="col">{t('dashboard.remaining_time', 'Sisa Waktu')}</TableColumnHeader>
                 <TableColumnHeader scope="col">{t('dashboard.end_date', 'Tanggal Berakhir')}</TableColumnHeader>
-                <TableColumnHeader scope="col" className="text-right w-20 align-middle">
+                <TableColumnHeader scope="col" className="text-right w-g89">
                   <div className="flex items-center justify-end">{t('dashboard.action', 'Aksi')}</div>
                 </TableColumnHeader>
               </TableRow>
@@ -283,19 +276,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               ) : (
                 requiringActionDocuments.map((document) => (
                   <TableRow key={document.id}>
-                    <TableCell className="text-left align-middle">
+                    <TableCell>
                       <div className="flex items-center justify-start">
                         <Checkbox aria-label={t('dashboard.select_requiring_action', 'Select {name}', { name: document.name })} disabled><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                       </div>
                     </TableCell>
 
                     {/* 1. Document Name */}
-                    <TableCell className="max-w-72">
-                      <span className="line-clamp-2" title={document.name}>{document.name}</span>
+                    <TableCell className="max-w-g233">
+                      <Tooltip><TooltipTrigger asChild><span className="block truncate">{document.name}</span></TooltipTrigger><TooltipBody>{document.name}</TooltipBody></Tooltip>
                     </TableCell>
 
                     {/* 2. Type */}
-                    <TableCell className="max-w-72">
+                    <TableCell className="max-w-g233">
                       {document.type}
                     </TableCell>
 
@@ -307,7 +300,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     {/* 4. Sisa Waktu */}
                     <TableCell className="whitespace-nowrap">
                       <Badge tone={statusTone('Akan Berakhir')}>
-                        <Clock className="w-3.5 h-3.5" />
+                        <Clock className="w-g13 h-g13" />
                         <span>{document.remainingDays ?? Math.ceil((Date.parse(document.endDate) - Date.now()) / 86_400_000)} {t('dashboard.days_left', 'Days Left')}</span>
                       </Badge>
                     </TableCell>
@@ -322,13 +315,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </TableCell>
 
                     {/* 6. Aksi */}
-                    <TableCell className="text-right align-middle w-20">
-                      <Button variant="secondary" size="icon-md"
+                    <TableCell className="text-right w-g89">
+                      <Button variant="secondary" size="icon-sm"
                         type="button"
                         onClick={document.onOpen}
                         aria-label={`${t('common.open', 'Open')} ${document.name}`}
                       >
-                        <ArrowUpRight className="size-4" />
+                        <ArrowUpRight className="size-g16" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -342,25 +335,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <RecentDocumentsTable contracts={scopedContracts} ios={scopedIOs} onNavigate={onNavigateTab} />
 
       <Card className="overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border pb-4">
-          <div className="flex items-center gap-3">
-            <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-status-warning-soft text-status-warning border border-status-warning-border">
-              <FileClock className="w-5 h-5 text-status-warning" />
-            </div>
-            <div>
-              <Heading as="h3" size="sm" weight="semibold">
-                {t('dashboard.pending_review_table_title', 'Dokumen Menunggu Review (Pending Review)')}
-              </Heading>
-            </div>
-          </div>
+        <TableCardHeader tone="warning" icon={<FileClock />} title={t('dashboard.pending_review_table_title', 'Dokumen Menunggu Review (Pending Review)')} />
 
-        </CardHeader>
-
-        <TableScrollArea className="rounded-none border-0" role="region" tabIndex={0} aria-label={t('dashboard.pending_review_table_title')}>
-          <Table className="dashboard-data-table w-full min-w-[760px] text-left">
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('dashboard.pending_review_table_title')}>
+          <Table className="dashboard-data-table w-full min-w-g610 text-left">
             <TableHeader>
               <TableRow>
-                <TableColumnHeader scope="col" className="w-12 text-left align-middle">
+                <TableColumnHeader scope="col" className="w-g42">
                   <div className="flex items-center justify-start">
                     <Checkbox aria-label={t('dashboard.pilih_semua_dokumen_pending_review', 'Pilih semua dokumen pending review')} disabled><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
@@ -370,7 +351,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_modified_by', 'Diubah Oleh')}</TableColumnHeader>
                 <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_created_at', 'Dibuat')}</TableColumnHeader>
                 <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_modified_at', 'Terakhir Diubah')}</TableColumnHeader>
-                <TableColumnHeader scope="col" className="text-right w-20 align-middle">
+                <TableColumnHeader scope="col" className="text-right w-g89">
                   <div className="flex items-center justify-end">{t('dashboard.action', 'Aksi')}</div>
                 </TableColumnHeader>
               </TableRow>
@@ -387,15 +368,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               ) : (
                 pendingReviewDocs.map((doc) => (
                   <TableRow key={doc.id}>
-                    <TableCell className="text-left align-middle">
+                    <TableCell>
                       <div className="flex items-center justify-start">
                         <Checkbox aria-label={t('dashboard.pilih_dokumen', 'Pilih dokumen {nama}', { nama: doc.name })} disabled><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                       </div>
                     </TableCell>
 
                     {/* 1. Nama Dokumen */}
-                    <TableCell className="max-w-72">
-                      <span className="line-clamp-2" title={doc.name}>{doc.name}</span>
+                    <TableCell className="max-w-g233">
+                      <Tooltip><TooltipTrigger asChild><span className="block truncate">{doc.name}</span></TooltipTrigger><TooltipBody>{doc.name}</TooltipBody></Tooltip>
                     </TableCell>
 
                     {/* 2. Jenis */}
@@ -419,13 +400,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </TableCell>
 
                     {/* 6. Aksi */}
-                    <TableCell className="text-right align-middle w-20">
-                      <Button variant="secondary" size="icon-md"
+                    <TableCell className="text-right w-g89">
+                      <Button variant="secondary" size="icon-sm"
                         type="button"
                         onClick={() => onNavigateTab('create-contract')}
                         aria-label={`${t('common.open', 'Open')} ${doc.name}`}
                       >
-                        <ArrowUpRight className="size-4" />
+                        <ArrowUpRight className="size-g16" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -438,12 +419,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Stacked Spending Chart Card (Under Table); hidden with the spending module (PRD §4.5.3) */}
       {policy.settings.modules.spending && (
-      <Card className="min-w-0 p-4 sm:p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-accent text-accent-foreground border border-primary/30">
-              <DollarSign className="w-5 h-5 text-accent-foreground" />
-            </div>
+      <Card className="min-w-0 p-g13 sm:p-g21 space-y-g13">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-g13 pb-g13 border-b border-border">
+          <div className="flex items-center gap-g13">
+            <Avatar size="md" className="shrink-0 rounded-md border bg-accent text-accent-foreground border border-primary/30"><AvatarFallback className="bg-transparent text-inherit"><DollarSign className="w-g21 h-g21 text-accent-foreground" /></AvatarFallback></Avatar>
             <div>
               <Heading as="h3" size="sm" weight="semibold">
                 {t('dashboard.spending_title', 'Tren Spending')}
@@ -452,7 +431,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Chart Filters */}
-          <div className="mobile-filter-grid flex w-full min-w-0 flex-nowrap items-center gap-2 sm:w-auto">
+          <div className="flex w-full min-w-0 flex-nowrap items-center gap-g8 sm:w-auto">
             {/* 1. Year Filter */}
             <NativeSelect
               aria-label={t('ui.filter_year')}
@@ -473,7 +452,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               aria-label={t('ui.filter_category')}
               value={spendingCategoryFilter}
               onChange={(e) => setSpendingCategoryFilter(e.target.value)}
-              className="w-full truncate" controlProps={{ className: "min-w-0 flex-1 sm:w-48 sm:flex-none" }}
+              className="w-full truncate" controlProps={{ className: "min-w-0 flex-1 sm:w-g233 sm:flex-none" }}
             >
               <option value="ALL">{t('dashboard.all_categories', 'Semua Kategori')}</option>
               {categoryOptions.map((cat) => (
@@ -484,31 +463,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </AlphabeticalSelect>
 
             {/* 3. Currency Toggle */}
-            <Card role="group" aria-label={t('settings.region.reporting_currency', 'Reporting currency')} className="flex h-10 shrink-0 items-center p-0.75">
-              {currencyViews.map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  aria-pressed={viewCurrency === code}
-                  onClick={() => setSpendingCurrencyView(code)}
-                  className={` cursor-pointer ${
- viewCurrency === code
- ? ''
- : ''
- }`}
-                >
-                  {code}
-                </button>
-              ))}
-            </Card>
+            <SegmentGroup aria-label={t('settings.region.reporting_currency', 'Reporting currency')} value={viewCurrency}
+              onValueChange={details => details.value && setSpendingCurrencyView(details.value)} className="shrink-0">
+              <SegmentGroupIndicator />
+              <SegmentGroupItems items={currencyViews.map(code => ({ value: code, label: code }))} />
+            </SegmentGroup>
           </div>
         </div>
 
         {/* Chart Visualization */}
-        <p className="text-sm text-foreground">{t('ui.period_total')}: <strong className="tabular-nums">{formatView(spendingChart.total)}</strong> · {spendingFilterYear === 'ALL' ? t('dashboard.all_years') : spendingFilterYear} · {spendingCategoryFilter === 'ALL' ? t('dashboard.all_categories') : spendingCategoryFilter}</p>
-        {spendingChart.skipped > 0 && <p className="text-sm text-status-warning">{t('ui.skipped_dates', undefined, { count: spendingChart.skipped })}</p>}
+        <Text size="sm">{t('ui.period_total')}: <strong className="tabular-nums">{formatView(spendingChart.total)}</strong> · {spendingFilterYear === 'ALL' ? t('dashboard.all_years') : spendingFilterYear} · {spendingCategoryFilter === 'ALL' ? t('dashboard.all_categories') : spendingCategoryFilter}</Text>
+        {spendingChart.skipped > 0 && <Text size="sm" className="text-status-warning">{t('ui.skipped_dates', undefined, { count: spendingChart.skipped })}</Text>}
         <div className="min-w-0 w-full" role="region" aria-label={t('dashboard.spending_title')}>
-        <div className="w-full pt-2" style={stackKeys.length ? { height: 'clamp(240px, 28vw, 360px)' } : undefined}>
+        <div className="w-full pt-g8" style={stackKeys.length ? { height: 'clamp(240px, 28vw, 360px)' } : undefined}>
           {stackKeys.length === 0 ? (
             <TableEmptyMessage icon={BarChart3} />
           ) : (
@@ -542,28 +509,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     );
                   }}
                 />
-                <Tooltip
+                <ChartTooltip
                   content={({ active, payload, label }: any) => {
                     if (active && payload && payload.length) {
                       const total = payload.reduce((sum: number, entry: any) => sum + (Number(entry.value) || 0), 0);
                       const formattedTotal = formatView(total);
 
                       return (
-                        <Card className="p-3 text-xs text-foreground min-w-42.5">
-                          <div className="font-extrabold pb-2 mb-2 border-b border-border text-foreground flex justify-between items-center gap-2">
+                        <Card className="p-g13 text-xs text-foreground min-w-g144">
+                          <div className="font-extrabold pb-g8 mb-g8 border-b border-border text-foreground flex justify-between items-center gap-g8">
                             <span>{formatChartMonth(String(label))}</span>
                             <span className="text-accent-foreground font-black">({formattedTotal})</span>
                           </div>
-                          <div className="space-y-1.5">
+                          <div className="space-y-g5">
                             {payload.map((entry: any, index: number) => {
                               const val = Number(entry.value) || 0;
                               if (val === 0) return null;
                               const formattedVal = formatView(val);
 
                               return (
-                                <div key={`item-${index}`} className="flex items-center justify-between gap-3 text-[11px]">
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color || entry.fill }} />
+                                <div key={`item-${index}`} className="flex items-center justify-between gap-g13 text-xs">
+                                  <div className="flex items-center gap-g5 min-w-0">
+                                    <span className="w-g8 h-g8 rounded-full shrink-0" style={{ backgroundColor: entry.color || entry.fill }} />
                                     <span className="text-muted-foreground font-medium truncate">{entry.name}</span>
                                   </div>
                                   <span className="font-bold text-foreground shrink-0">{formattedVal}</span>
@@ -588,7 +555,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     dataKey={key}
                     name={spendingChart.series.find(series => series.key === key)?.name}
                     stackId="spendingStack"
-                    fill={stackColors[key] || '#4CAF50'}
+                    fill={stackColors[key] || 'var(--moduix-chart-1)'}
                     maxBarSize={isCompactChart ? 28 : 52}
                     radius={[2, 2, 0, 0]}
                   />

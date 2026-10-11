@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/heading';
+export * from './moduix/ui/heading';

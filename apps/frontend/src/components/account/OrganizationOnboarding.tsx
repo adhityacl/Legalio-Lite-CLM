@@ -11,8 +11,14 @@ import { capturePendingInvitation } from './InvitationPrompt';
 import { Input } from '@legalio/ui-components/input';
 import { NativeSelect } from '@legalio/ui-components/native-select';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
-import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 
+import { Heading } from '@legalio/ui-components/heading';
+import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
+import { Spinner } from '@legalio/ui-components/spinner';
+import { Card } from '@legalio/ui-components/card';
+import { Text } from '@legalio/ui-components/text';
+import { List, ListItem } from '@legalio/ui-components/list';
 export function OrganizationOnboarding() {
   const { t, language } = useLanguage();
   const { logout, refreshUser } = useIdentity();
@@ -60,36 +66,36 @@ export function OrganizationOnboarding() {
   };
 
   return (
-    <main className="flex min-h-dvh w-full items-center justify-center bg-(--moduix-color-background) px-4 py-8 text-(--moduix-color-foreground)">
-      <section aria-labelledby="onboarding-title" className="w-full max-w-xl rounded-2xl border border-(--moduix-color-border) bg-(--moduix-color-card) p-6 shadow-sm sm:p-8">
+    <main className="flex min-h-dvh w-full items-center justify-center bg-(--moduix-color-background) px-g13 py-g34 text-(--moduix-color-foreground)">
+      <Card asChild><section aria-labelledby="onboarding-title" className="w-full max-w-g610 p-g21 sm:p-g34">
         {(stage === 'profile' || stage === 'region') && (
-          <ol aria-label={t('onboarding.progress', 'Organization setup progress')} className="mb-6 grid grid-cols-2 gap-3 text-sm">
+          <List as="ol" size="sm" marker="none" aria-label={t('onboarding.progress', 'Organization setup progress')} className="mb-g21 grid grid-cols-2 gap-g13">
             {[['profile', t('tb.section_profile', 'Organization profile')], ['region', t('tb.section_region', 'Region and formatting')]].map(([step, label], index) => (
-              <li key={step} aria-current={stage === step ? 'step' : undefined} className={`border-t-2 pt-2 ${stage === step ? 'border-(--moduix-color-primary) font-semibold' : 'border-(--moduix-color-border) text-(--moduix-color-muted-foreground)'}`}>{index + 1}. {label}</li>
+              <ListItem key={step} aria-current={stage === step ? 'step' : undefined} className={`border-t-2 pt-g8 ${stage === step ? 'border-(--moduix-color-primary) font-semibold' : 'border-(--moduix-color-border) text-(--moduix-color-muted-foreground)'}`}>{index + 1}. {label}</ListItem>
             ))}
-          </ol>
+          </List>
         )}
-        <h1 id="onboarding-title" ref={heading} tabIndex={-1} className="text-2xl font-semibold tracking-tight focus:outline-none">{title}</h1>
-        <p className="mt-2 text-sm leading-6 text-(--moduix-color-muted-foreground)">
+        <Heading as="h1" size="xl" weight="semibold" id="onboarding-title" ref={heading} tabIndex={-1} className="focus:outline-none">{title}</Heading>
+        <Text size="sm" className="mt-g8 leading-6 text-(--moduix-color-muted-foreground)">
           {stage === 'choose' ? t('onboarding.description', 'Join your team with an invite code, or create an organization to get started.')
             : stage === 'join' ? t('onboarding.join_description', 'Enter the invite code shared by your organization administrator. Codes expire after 24 hours.')
             : stage === 'profile' ? t('onboarding.profile_description', 'Tell us about your organization. You will be its first administrator.')
             : t('onboarding.region_description', 'Choose the country, industry, and language for your workspace.')}
-        </p>
+        </Text>
         {stage === 'choose' ? (
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div className="mt-g21 grid gap-g13 sm:grid-cols-2">
             {([{ next: 'join', Icon: Users, label: t('onboarding.join', 'Join organization'), description: t('onboarding.join_hint', 'I have an invite code') },
               { next: 'profile', Icon: Building2, label: t('onboarding.create', 'Create organization'), description: t('onboarding.create_hint', 'Start a new workspace') }] as const).map(({ next, Icon, label, description }) => (
               <Button variant="outline" key={next} type="button" aria-label={label} onClick={() => navigate(next)} className="text-left">
-                <Icon aria-hidden="true" className="mb-4 h-6 w-6 text-(--moduix-color-muted-foreground)" />
-                <span className="block font-semibold">{label}</span><span className="mt-1 block text-sm text-(--moduix-color-muted-foreground)">{description}</span>
+                <Icon aria-hidden="true" className="mb-g13 h-g26 w-g26 text-(--moduix-color-muted-foreground)" />
+                <span className="block font-semibold">{label}</span><span className="mt-g3 block text-sm text-(--moduix-color-muted-foreground)">{description}</span>
               </Button>
             ))}
           </div>
         ) : (
-          <form onSubmit={submit} className="mt-6 space-y-4" aria-busy={busy}>
-            <fieldset disabled={busy} className="space-y-4">
-              <legend className="sr-only">{title}</legend>
+          <form onSubmit={submit} className="mt-g21 space-y-g13" aria-busy={busy}>
+            <Fieldset disabled={busy} className="space-y-g13">
+              <FieldsetLegend className="sr-only">{title}</FieldsetLegend>
               {stage === 'join' ? (
                 <Field><FieldLabel htmlFor="invite-code">{t('onboarding.invite_code', 'Invite code')}</FieldLabel>
                   <Input id="invite-code" value={code} onChange={(e) => setCode(e.target.value)} required pattern=".*\S.*" maxLength={128} autoComplete="off" spellCheck={false} aria-describedby={error ? 'onboarding-error' : undefined} /></Field>
@@ -116,20 +122,20 @@ export function OrganizationOnboarding() {
                     </NativeSelect></Field>
                 </>
               )}
-            </fieldset>
-            {error && <Alert status="error" id="onboarding-error" role="alert"><AlertContent>{error}</AlertContent></Alert>}
-            <div className="flex justify-between gap-3 pt-2">
+            </Fieldset>
+            {error && <Alert status="error" id="onboarding-error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>}
+            <div className="flex justify-between gap-g13 pt-g8">
               <Button type="button" variant="outline" disabled={busy} onClick={() => navigate(stage === 'region' ? 'profile' : 'choose')}>{t('onboarding.back', 'Back')}</Button>
               <Button type="submit" disabled={busy}>
-                {busy && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
+                {busy && <Spinner size="sm" decorative />}
                 {stage === 'profile' ? t('onboarding.continue', 'Continue') : stage === 'join' ? t('onboarding.join', 'Join organization') : t('onboarding.create', 'Create organization')}
-                {stage === 'profile' && <ArrowRight aria-hidden="true" className="h-4 w-4" />}
+                {stage === 'profile' && <ArrowRight aria-hidden="true" className="h-g16 w-g16" />}
               </Button>
             </div>
           </form>
         )}
-        <div className="mt-6 border-t border-(--moduix-color-border) pt-4"><Button type="button" variant="ghost" disabled={busy} onClick={() => void logout()}>{t('app.kembali_ke_login', 'Back to login')}</Button></div>
-      </section>
+        <div className="mt-g21 border-t border-(--moduix-color-border) pt-g13"><Button type="button" variant="ghost" disabled={busy} onClick={() => void logout()}>{t('app.kembali_ke_login', 'Back to login')}</Button></div>
+      </section></Card>
     </main>
   );
 }

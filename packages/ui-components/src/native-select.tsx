@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/native-select';
+export * from './moduix/ui/native-select';

@@ -160,42 +160,44 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
   const statusSelectId = `${idPrefix}-status`;
 
   const sectionTitle = (id: string, icon: React.ReactNode, label: string) => (
-    <Heading as="h3" size="xs" weight="semibold" id={id} className="flex items-center gap-1.5">{icon}{label}</Heading>
+    <Heading as="h3" size="sm" weight="semibold" id={id} className="flex items-center gap-g8">{icon}{label}</Heading>
   );
+  // Type/Status labels read as the same uppercase terms as the read-only facts above them.
+  const termClass = 'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
   const term = (label: React.ReactNode) => <dt><Text as="span" size="xs" weight="semibold" tone="muted" className="uppercase tracking-wide">{label}</Text></dt>;
 
   return (
-    <div className="flex flex-col gap-5">
-      <section className="flex flex-col gap-3" aria-labelledby={`${idPrefix}-info`}>
-        {sectionTitle(`${idPrefix}-info`, <Info className="size-3.5 text-muted-foreground" aria-hidden="true" />, t('documents.info.title', 'Informasi Dokumen'))}
+    <div className="flex flex-col gap-g21">
+      <section className="flex flex-col gap-g13" aria-labelledby={`${idPrefix}-info`}>
+        {sectionTitle(`${idPrefix}-info`, <Info className="size-g16 text-muted-foreground" aria-hidden="true" />, t('documents.info.title', 'Informasi Dokumen'))}
         {!document ? (
           <Alert status="info"><AlertIndicator /><AlertContent><AlertDescription>{t('documents.info.unsaved', 'Dokumen belum disimpan. Pembuat dan waktu dicatat otomatis saat penyimpanan pertama.')}</AlertDescription></AlertContent></Alert>
         ) : (
-          <dl className="grid grid-cols-2 gap-x-3 gap-y-4 text-sm">
-            <div className="col-span-2 grid gap-1">{term(t('documents.field.name', 'Nama'))}<dd className="font-semibold break-words">{document.name}</dd></div>
-            <Field disabled={!canEdit} className="gap-1">
-              <FieldLabel htmlFor={typeSelectId}>{t('documents.field.type', 'Jenis')}</FieldLabel>
+          <dl className="grid grid-cols-2 gap-x-g13 gap-y-g16 text-sm">
+            <div className="col-span-2 grid gap-g3">{term(t('documents.field.name', 'Nama'))}<dd className="break-words">{document.name}</dd></div>
+            <div className="grid gap-g3">{term(t('documents.field.created', 'Dibuat'))}<dd>{t('documents.info.by', 'oleh {name}', { name: document.created_by_name || '—' })}<Text as="span" size="xs" tone="muted" className="block">{formatDateTime(document.created_at, language)}</Text></dd></div>
+            <div className="grid gap-g3">{term(t('documents.field.modified', 'Diubah'))}<dd>{t('documents.info.by', 'oleh {name}', { name: document.modified_by_name || '—' })}<Text as="span" size="xs" tone="muted" className="block">{formatDateTime(document.modified_at, language)}</Text></dd></div>
+            <div className="grid gap-g3">{term(t('documents.info.organization', 'Organisasi'))}<dd className="break-words">{organizationName}</dd></div>
+            <div className="grid gap-g3">{term(t('documents.info.versions', 'Versi'))}<dd>v{document.current_version} · {t('documents.info.version_count', '{n} tersimpan', { n: document.draft_count })}</dd></div>
+            <Field disabled={!canEdit} className="gap-g3">
+              <FieldLabel htmlFor={typeSelectId} className={termClass}>{t('documents.field.type', 'Jenis')}</FieldLabel>
               <AlphabeticalSelect id={typeSelectId} value={document.type} onChange={(e) => isOneOf(DOCUMENT_TYPES, e.target.value) && onUpdate({ type: e.target.value })} className="w-full" controlProps={{ className: 'w-full' }}>
                 {DOCUMENT_TYPES.map(type => <option key={type} value={type}>{typeLabel(t, type)}</option>)}
               </AlphabeticalSelect>
             </Field>
-            <Field disabled={!canEdit} className="gap-1">
-              <FieldLabel htmlFor={statusSelectId}>{t('documents.field.status', 'Status')}</FieldLabel>
+            <Field disabled={!canEdit} className="gap-g3">
+              <FieldLabel htmlFor={statusSelectId} className={termClass}>{t('documents.field.status', 'Status')}</FieldLabel>
               <AlphabeticalSelect id={statusSelectId} value={document.status} onChange={(e) => isOneOf(DOCUMENT_STATUSES, e.target.value) && onUpdate({ status: e.target.value })} className="w-full" controlProps={{ className: 'w-full' }}>
                 {DOCUMENT_STATUSES.map(status => <option key={status} value={status}>{statusLabel(t, status)}</option>)}
               </AlphabeticalSelect>
             </Field>
-            <div className="grid gap-1">{term(t('documents.field.created', 'Dibuat'))}<dd>{t('documents.info.by', 'oleh {name}', { name: document.created_by_name || '—' })}<Text as="span" size="xs" tone="muted" className="block">{formatDateTime(document.created_at, language)}</Text></dd></div>
-            <div className="grid gap-1">{term(t('documents.field.modified', 'Diubah'))}<dd>{t('documents.info.by', 'oleh {name}', { name: document.modified_by_name || '—' })}<Text as="span" size="xs" tone="muted" className="block">{formatDateTime(document.modified_at, language)}</Text></dd></div>
-            <div className="grid gap-1">{term(t('documents.info.organization', 'Organisasi'))}<dd className="break-words">{organizationName}</dd></div>
-            <div className="grid gap-1">{term(t('documents.info.versions', 'Versi'))}<dd>v{document.current_version} · {t('documents.info.version_count', '{n} tersimpan', { n: document.draft_count })}</dd></div>
           </dl>
         )}
       </section>
 
       <Separator />
-      <section className="flex flex-col gap-3" aria-labelledby={`${idPrefix}-meta`}>
-        {sectionTitle(`${idPrefix}-meta`, <Tags className="size-3.5 text-muted-foreground" aria-hidden="true" />, t('documents.metadata.title', 'Metadata'))}
+      <section className="flex flex-col gap-g13" aria-labelledby={`${idPrefix}-meta`}>
+        {sectionTitle(`${idPrefix}-meta`, <Tags className="size-g16 text-muted-foreground" aria-hidden="true" />, t('documents.metadata.title', 'Metadata'))}
         {fields.length === 0 ? (
           <Text size="sm" tone="muted">
             {canManageFields
@@ -205,7 +207,7 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
         ) : !document ? (
           <Text size="sm" tone="muted">{t('documents.metadata.unsaved', 'Simpan dokumen terlebih dahulu untuk mengisi metadata.')}</Text>
         ) : (
-          <form onSubmit={saveMetadata} className="flex flex-col gap-3" aria-busy={saveState.status === 'saving'}>
+          <form onSubmit={saveMetadata} className="flex flex-col gap-g13" aria-busy={saveState.status === 'saving'}>
             {fields.map(renderInput)}
             {saveState.status === 'error' && (
               <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{saveState.message}</AlertDescription></AlertContent></Alert>
@@ -223,12 +225,12 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
       {canManageFields && (
         <>
           <Separator />
-          <section className="flex flex-col gap-3" aria-labelledby={`${idPrefix}-fields`}>
-            {sectionTitle(`${idPrefix}-fields`, <PlusCircle className="size-3.5 text-muted-foreground" aria-hidden="true" />, t('documents.metadata.manage_title', 'Kelola Kolom Metadata (Organisasi)'))}
+          <section className="flex flex-col gap-g13" aria-labelledby={`${idPrefix}-fields`}>
+            {sectionTitle(`${idPrefix}-fields`, <PlusCircle className="size-g16 text-muted-foreground" aria-hidden="true" />, t('documents.metadata.manage_title', 'Kelola Kolom Metadata (Organisasi)'))}
             {fields.length > 0 && (
-              <List className="gap-1">
+              <List className="gap-g3">
                 {fields.map(field => (
-                  <ListItem key={field.id} className="flex items-center justify-between gap-2 rounded-md border border-border p-1.5 ps-3 text-sm">
+                  <ListItem key={field.id} className="flex items-center justify-between gap-g8 rounded-md border border-border p-g5 ps-g13 text-sm">
                     <span className="min-w-0"><span className="font-semibold">{field.name}</span><Text as="span" size="xs" tone="muted"> · {fieldTypeLabel(field.field_type)}</Text></span>
                     <Button variant="ghost" size="icon-sm" onClick={() => removeField(field)} className="text-destructive" aria-label={`${t('documents.action.delete', 'Hapus')}: ${field.name}`}>
                       <Trash2 aria-hidden="true" />
@@ -237,21 +239,21 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
                 ))}
               </List>
             )}
-            <Card size="sm" className="border-dashed p-4">
-              <form onSubmit={addField} className="flex flex-col gap-3">
+            <Card size="sm" className="p-g13">
+              <form onSubmit={addField} className="flex flex-col gap-g13">
                 <Field required>
-                  <FieldLabel>{t('documents.metadata.field_name', 'Nama kolom')}</FieldLabel>
+                  <FieldLabel className="font-semibold">{t('documents.metadata.field_name', 'Nama kolom')}</FieldLabel>
                   <Input value={newField.name} onChange={(e) => setNewField({ ...newField, name: e.target.value })} placeholder={t('documents.metadata.field_name_placeholder', 'mis. Kode Matter')} />
                 </Field>
                 <Field>
-                  <FieldLabel>{t('documents.metadata.field_type', 'Tipe')}</FieldLabel>
+                  <FieldLabel className="font-semibold">{t('documents.metadata.field_type', 'Tipe')}</FieldLabel>
                   <AlphabeticalSelect value={newField.type} onChange={(e) => isOneOf(METADATA_FIELD_TYPES, e.target.value) && setNewField({ ...newField, type: e.target.value })} className="w-full" controlProps={{ className: 'w-full' }}>
                     {METADATA_FIELD_TYPES.map(type => <option key={type} value={type}>{fieldTypeLabel(type)}</option>)}
                   </AlphabeticalSelect>
                 </Field>
                 {(newField.type === 'select' || newField.type === 'multi_select') && (
                   <Field required>
-                    <FieldLabel>{t('documents.metadata.options', 'Opsi (pisahkan dengan koma)')}</FieldLabel>
+                    <FieldLabel className="font-semibold">{t('documents.metadata.options', 'Opsi (pisahkan dengan koma)')}</FieldLabel>
                     <Input value={newField.options} onChange={(e) => setNewField({ ...newField, options: e.target.value })} placeholder={t('documents.ip_employment_real_estate_corporate', 'IP, Employment, Real Estate, Corporate')} />
                   </Field>
                 )}

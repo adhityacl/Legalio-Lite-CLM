@@ -1,0 +1,14 @@
+:root {
+  --moduix-radius: 13px;
+  --moduix-radius-none: 0;
+}
+
+:root,
+:where([data-moduix-theme], [data-moduix-color-scheme]) {
+  --moduix-radius-xs: 3px;
+  --moduix-radius-sm: 5px;
+  --moduix-radius-md: 8px;
+  --moduix-radius-lg: var(--moduix-radius);
+  --moduix-radius-xl: 21px;
+  --moduix-radius-full: 9999px;
+}

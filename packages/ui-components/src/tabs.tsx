@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/tabs';
+export * from './moduix/ui/tabs';

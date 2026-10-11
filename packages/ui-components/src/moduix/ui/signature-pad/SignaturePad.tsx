@@ -1,0 +1,216 @@
+'use client';
+
+import { useFieldContext } from '@ark-ui/react/field';
+import {
+  SignaturePad as SignaturePadPrimitive,
+  useSignaturePad as useSignaturePadPrimitive,
+  useSignaturePadContext,
+} from '@ark-ui/react/signature-pad';
+import type { ComponentProps, ComponentRef } from 'react';
+import { createContext, forwardRef, useContext } from 'react';
+import { cn } from '../../lib/cn';
+import { RotateCcwIcon } from '../../lib/icons/ui';
+import { CloseButton } from '../close-button';
+
+const SignaturePadReadOnlyContext = createContext(false);
+type SignaturePadApi = ReturnType<typeof useSignaturePadPrimitive> & { readOnly: boolean };
+type SignaturePadRootProviderProps = Omit<
+  ComponentProps<typeof SignaturePadPrimitive.RootProvider>,
+  'value'
+> & { value: ReturnType<typeof useSignaturePadPrimitive> & { readOnly?: boolean } };
+
+const SignaturePad = forwardRef<
+  ComponentRef<typeof SignaturePadPrimitive.Root>,
+  ComponentProps<typeof SignaturePadPrimitive.Root>
+>(function SignaturePad({ asChild, children, className, ...props }, ref) {
+  const field = useFieldContext();
+  const readOnly = props.readOnly ?? field?.readOnly ?? false;
+
+  return (
+    <SignaturePadReadOnlyContext.Provider value={readOnly}>
+      <SignaturePadPrimitive.Root
+        ref={ref}
+        className={cn(
+          'box-border inline-flex w-g233 max-w-full flex-col gap-g8 text-foreground data-disabled:opacity-50',
+          className,
+        )}
+        asChild={asChild}
+        {...props}
+        data-slot="signature-pad-root"
+      >
+        {children}
+      </SignaturePadPrimitive.Root>
+    </SignaturePadReadOnlyContext.Provider>
+  );
+});
+
+const SignaturePadRootProvider = forwardRef<
+  ComponentRef<typeof SignaturePadPrimitive.RootProvider>,
+  SignaturePadRootProviderProps
+>(function SignaturePadRootProvider({ asChild, children, className, ...props }, ref) {
+  const readOnly = props.value.readOnly ?? false;
+
+  return (
+    <SignaturePadReadOnlyContext.Provider value={readOnly}>
+      <SignaturePadPrimitive.RootProvider
+        ref={ref}
+        className={cn(
+          'box-border inline-flex w-g233 max-w-full flex-col gap-g8 text-foreground data-disabled:opacity-50',
+          className,
+        )}
+        asChild={asChild}
+        {...props}
+        data-slot="signature-pad-root-provider"
+      >
+        {children}
+      </SignaturePadPrimitive.RootProvider>
+    </SignaturePadReadOnlyContext.Provider>
+  );
+});
+
+const SignaturePadLabel = forwardRef<
+  ComponentRef<typeof SignaturePadPrimitive.Label>,
+  ComponentProps<typeof SignaturePadPrimitive.Label>
+>(function SignaturePadLabel({ className, ...props }, ref) {
+  return (
+    <SignaturePadPrimitive.Label
+      ref={ref}
+      className={cn('text-sm leading-5 font-medium text-foreground select-none', className)}
+      {...props}
+      data-slot="signature-pad-label"
+    />
+  );
+});
+
+const SignaturePadControl = forwardRef<
+  ComponentRef<typeof SignaturePadPrimitive.Control>,
+  ComponentProps<typeof SignaturePadPrimitive.Control>
+>(function SignaturePadControl({ className, ...props }, ref) {
+  return (
+    <SignaturePadPrimitive.Control
+      ref={ref}
+      className={cn(
+        'box-border h-g144 min-h-g144 w-full min-w-0 overflow-hidden rounded-md border border-border bg-background text-foreground shadow-sm transition-[border-color,box-shadow,opacity] duration-200 ease-in-out outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring data-disabled:cursor-not-allowed motion-reduce:transition-none',
+        className,
+      )}
+      {...props}
+      data-slot="signature-pad-control"
+    />
+  );
+});
+
+const SignaturePadSegment = forwardRef<
+  ComponentRef<typeof SignaturePadPrimitive.Segment>,
+  ComponentProps<typeof SignaturePadPrimitive.Segment>
+>(function SignaturePadSegment({ className, ...props }, ref) {
+  return (
+    <SignaturePadPrimitive.Segment
+      ref={ref}
+      className={cn('fill-current', className)}
+      {...props}
+      data-slot="signature-pad-segment"
+    />
+  );
+});
+
+const SignaturePadGuide = forwardRef<
+  ComponentRef<typeof SignaturePadPrimitive.Guide>,
+  ComponentProps<typeof SignaturePadPrimitive.Guide>
+>(function SignaturePadGuide({ className, ...props }, ref) {
+  return (
+    <SignaturePadPrimitive.Guide
+      ref={ref}
+      className={cn(
+        'pointer-events-none absolute start-g26 end-g26 bottom-g34 border-b border-dashed border-border',
+        className,
+      )}
+      {...props}
+      data-slot="signature-pad-guide"
+    />
+  );
+});
+
+const SignaturePadClearTrigger = forwardRef<
+  ComponentRef<typeof SignaturePadPrimitive.ClearTrigger>,
+  ComponentProps<typeof SignaturePadPrimitive.ClearTrigger>
+>(function SignaturePadClearTrigger(
+  {
+    asChild,
+    className,
+    children,
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledBy,
+    ...props
+  },
+  ref,
+) {
+  const readOnly = useContext(SignaturePadReadOnlyContext);
+  const triggerClassName = cn('absolute end-g8 top-g8 border-0', className);
+
+  return (
+    <SignaturePadPrimitive.ClearTrigger
+      ref={ref}
+      asChild
+      className={triggerClassName}
+      aria-label={asChild ? ariaLabel : undefined}
+      aria-labelledby={asChild ? ariaLabelledBy : undefined}
+      {...props}
+      data-slot="signature-pad-clear-trigger"
+      disabled={readOnly || props.disabled}
+    >
+      {asChild ? (
+        children
+      ) : (
+        <CloseButton
+          aria-label={ariaLabel}
+          aria-labelledby={ariaLabelledBy}
+          className={cn(
+            `size-control-xs rounded-sm bg-transparent text-muted-foreground focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-ring motion-reduce:transition-none [&>svg]:shrink-0 [&>svg:not([class*='size-'])]:size-g16 [@media(hover:hover)]:[&:not([data-disabled]):hover]:bg-muted [@media(hover:hover)]:[&:not([data-disabled]):hover]:text-foreground`,
+            className,
+          )}
+        >
+          {children ?? <RotateCcwIcon className="size-g16" aria-hidden="true" />}
+        </CloseButton>
+      )}
+    </SignaturePadPrimitive.ClearTrigger>
+  );
+});
+
+const SignaturePadCanvas = forwardRef<
+  ComponentRef<typeof SignaturePadPrimitive.Control>,
+  Omit<ComponentProps<typeof SignaturePadPrimitive.Control>, 'asChild' | 'children'>
+>(function SignaturePadCanvas({ className, ...props }, ref) {
+  return (
+    <SignaturePadControl ref={ref} className={className} {...props}>
+      <SignaturePadSegment />
+      <SignaturePadClearTrigger>
+        <RotateCcwIcon className="size-g16" aria-hidden="true" />
+      </SignaturePadClearTrigger>
+      <SignaturePadGuide />
+    </SignaturePadControl>
+  );
+});
+
+function useSignaturePad(props?: Parameters<typeof useSignaturePadPrimitive>[0]): SignaturePadApi {
+  const field = useFieldContext();
+  const signaturePad = useSignaturePadPrimitive(props);
+  return { ...signaturePad, readOnly: props?.readOnly ?? field?.readOnly ?? false };
+}
+
+const SignaturePadContext = SignaturePadPrimitive.Context;
+const SignaturePadHiddenInput = SignaturePadPrimitive.HiddenInput;
+
+export {
+  SignaturePad,
+  SignaturePadCanvas,
+  SignaturePadClearTrigger,
+  SignaturePadContext,
+  SignaturePadControl,
+  SignaturePadGuide,
+  SignaturePadHiddenInput,
+  SignaturePadLabel,
+  SignaturePadRootProvider,
+  SignaturePadSegment,
+  useSignaturePad,
+  useSignaturePadContext,
+};

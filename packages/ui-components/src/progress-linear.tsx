@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/progress-linear';
+export * from './moduix/ui/progress-linear';

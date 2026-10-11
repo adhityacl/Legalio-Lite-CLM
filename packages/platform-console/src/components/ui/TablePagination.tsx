@@ -5,6 +5,8 @@ import {
   Pagination, PaginationFirstTrigger, PaginationItems, PaginationLastTrigger, PaginationNextTrigger, PaginationPrevTrigger,
 } from '@legalio/ui-components/pagination';
 
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Text } from '@legalio/ui-components/text';
 export interface TablePaginationProps {
   currentPage: number;
   totalPages: number;
@@ -23,28 +25,28 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
   const pages = Math.max(1, totalPages || 1);
   const page = Math.min(Math.max(1, currentPage || 1), pages);
   return (
-    <div className={`mobile-pagination flex flex-col items-center justify-between gap-4 border-t border-border px-4 py-3 sm:flex-row sm:px-6 ${className}`}>
-      <div className="flex items-center gap-2">
-        <NativeSelect
+    <div className={`flex flex-col items-center justify-between gap-g13 border-t border-border px-g13 py-g13 sm:flex-row sm:px-g21 ${className}`}>
+      <div className="flex items-center gap-g8">
+        <NativeSelect controlProps={{ className: 'w-g89' }}
           aria-label={t('pagination.rows_per_page', 'Rows per page')}
           value={rowsPerPage}
           onChange={e => onRowsPerPageChange(Number(e.target.value))}
-          className="w-20"
+          className="w-g89"
         >
           {rowsPerPageOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
         </NativeSelect>
-        <span className="text-sm text-muted-foreground">{t('pagination.rows_per_page', 'Rows per page')}</span>
+        <Text as="span" size="sm" tone="muted">{t('pagination.rows_per_page', 'Rows per page')}</Text>
       </div>
-      <div className="flex flex-wrap items-center justify-center gap-4">
-        <span className="text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-center gap-g13">
+        <Text as="span" size="sm" tone="muted">
           {t('pagination.page', 'Page')} {page} {t('pagination.of', 'of')} {pages}
-        </span>
+        </Text>
         <Pagination count={pages} pageSize={1} page={page} siblingCount={1} onPageChange={details => onPageChange(details.page)}>
-          <PaginationFirstTrigger aria-label={t('pagination.first_page', 'First Page')} title={t('pagination.first_page', 'First Page')} />
-          <PaginationPrevTrigger aria-label={t('pagination.prev_page', 'Previous Page')} title={t('pagination.prev_page', 'Previous Page')} />
+          <Tooltip><TooltipTrigger asChild><PaginationFirstTrigger aria-label={t('pagination.first_page', 'First Page')} /></TooltipTrigger><TooltipBody>{t('pagination.first_page', 'First Page')}</TooltipBody></Tooltip>
+          <Tooltip><TooltipTrigger asChild><PaginationPrevTrigger aria-label={t('pagination.prev_page', 'Previous Page')} /></TooltipTrigger><TooltipBody>{t('pagination.prev_page', 'Previous Page')}</TooltipBody></Tooltip>
           <PaginationItems />
-          <PaginationNextTrigger aria-label={t('pagination.next_page', 'Next Page')} title={t('pagination.next_page', 'Next Page')} />
-          <PaginationLastTrigger aria-label={t('pagination.last_page', 'Last Page')} title={t('pagination.last_page', 'Last Page')} />
+          <Tooltip><TooltipTrigger asChild><PaginationNextTrigger aria-label={t('pagination.next_page', 'Next Page')} /></TooltipTrigger><TooltipBody>{t('pagination.next_page', 'Next Page')}</TooltipBody></Tooltip>
+          <Tooltip><TooltipTrigger asChild><PaginationLastTrigger aria-label={t('pagination.last_page', 'Last Page')} /></TooltipTrigger><TooltipBody>{t('pagination.last_page', 'Last Page')}</TooltipBody></Tooltip>
         </Pagination>
       </div>
     </div>

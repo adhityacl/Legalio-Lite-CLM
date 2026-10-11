@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/typeset';
+export * from './moduix/ui/typeset';

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Upload,
   Download,
@@ -11,7 +11,6 @@ import {
   FileText,
   ClipboardCheck,
   CreditCard,
-  ChevronRight,
   RotateCcw,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -24,6 +23,15 @@ import { Button } from '@legalio/ui-components/button';
 import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
 import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
+import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { SegmentGroup, SegmentGroupIndicator, SegmentGroupItems } from '@legalio/ui-components/segment-group';
+import { FileUpload, FileUploadDropzone, FileUploadHiddenInput, FileUploadTrigger } from '@legalio/ui-components/file-upload';
+import { Text } from '@legalio/ui-components/text';
+import { Tag } from '@legalio/ui-components/tag';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Spinner } from '@legalio/ui-components/spinner';
+import { List, ListItem } from '@legalio/ui-components/list';
+import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ImportType = 'partners' | 'contracts' | 'ios' | 'evaluations' | 'spendings';
@@ -179,14 +187,15 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
   const [parseError, setParseError] = useState<string>('');
   const [isImporting, setIsImporting] = useState(false);
   const [report, setReport] = useState<ImportReport | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // FileUpload owns its accepted files; bumping the key clears it on reset.
+  const [uploadKey, setUploadKey] = useState(0);
 
-  const IMPORT_TYPES: { id: ImportType; label: string; icon: React.FC<{ className?: string }>; color: string }[] = [
-    { id: 'partners',    label: t('import.type_partner',    'Partner'),           icon: Building2,     color: 'text-accent-foreground' },
-    { id: 'contracts',   label: t('import.type_contract',   'Contract'),          icon: FileText,      color: 'text-status-info'  },
-    { id: 'ios',         label: t('import.type_io',         'IO'),                icon: FileSpreadsheet, color: 'text-status-special' },
-    { id: 'evaluations', label: t('import.type_evaluation', 'Evaluation'),        icon: ClipboardCheck, color: 'text-status-warning ' },
-    { id: 'spendings',   label: t('import.type_spending',   'Spending'),          icon: CreditCard,    color: 'text-status-danger'  },
+  const IMPORT_TYPES: { id: ImportType; label: string; icon: React.FC<{ className?: string }> }[] = [
+    { id: 'partners',    label: t('import.type_partner',    'Partner'),           icon: Building2 },
+    { id: 'contracts',   label: t('import.type_contract',   'Contract'),          icon: FileText },
+    { id: 'ios',         label: t('import.type_io',         'IO'),                icon: FileSpreadsheet },
+    { id: 'evaluations', label: t('import.type_evaluation', 'Evaluation'),        icon: ClipboardCheck },
+    { id: 'spendings',   label: t('import.type_spending',   'Spending'),          icon: CreditCard },
   ];
 
   const handleTypeChange = (type: ImportType) => {
@@ -196,11 +205,10 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
     setFileName('');
     setParseError('');
     setReport(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setUploadKey(k => k + 1);
   };
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = useCallback((file: File | undefined) => {
     if (!file) return;
     setFileName(file.name);
     setReport(null);
@@ -252,7 +260,7 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
     setFileName('');
     setParseError('');
     setReport(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setUploadKey(k => k + 1);
   };
 
   const activeTypeInfo = IMPORT_TYPES.find((item) => item.id === activeType)!;
@@ -266,8 +274,8 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
       rowClass: 'text-accent-foreground ',
       headerBg: 'bg-accent ',
       pillBg: 'bg-accent border-primary/30',
-      icon: <CheckCircle2 className="w-4 h-4 text-accent-foreground" />,
-      pillIcon: <CheckCircle2 className="w-6 h-6 text-accent-foreground mb-1" />,
+      icon: <CheckCircle2 className="w-g16 h-g16 text-accent-foreground" />,
+      pillIcon: <CheckCircle2 className="w-g26 h-g26 text-accent-foreground mb-g3" />,
     },
     {
       key: 'skipped' as const,
@@ -277,8 +285,8 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
       rowClass: 'text-status-warning ',
       headerBg: 'bg-status-warning-soft ',
       pillBg: 'bg-status-warning-soft  border-status-warning-border ',
-      icon: <AlertTriangle className="w-4 h-4 text-status-warning" />,
-      pillIcon: <AlertTriangle className="w-6 h-6 text-status-warning mb-1" />,
+      icon: <AlertTriangle className="w-g16 h-g16 text-status-warning" />,
+      pillIcon: <AlertTriangle className="w-g26 h-g26 text-status-warning mb-g3" />,
     },
     {
       key: 'failed' as const,
@@ -288,58 +296,41 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
       rowClass: 'text-status-danger ',
       headerBg: 'bg-status-danger-soft ',
       pillBg: 'bg-status-danger-soft  border-status-danger-border ',
-      icon: <XCircle className="w-4 h-4 text-status-danger" />,
-      pillIcon: <XCircle className="w-6 h-6 text-status-danger mb-1" />,
+      icon: <XCircle className="w-g16 h-g16 text-status-danger" />,
+      pillIcon: <XCircle className="w-g26 h-g26 text-status-danger mb-g3" />,
     },
   ];
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in-50 duration-200">
+    <div className="flex flex-col gap-g21 animate-in fade-in-50 duration-200">
 
       {/* ── Page Header ─────────────────────────────────────────────────────── */}
-      <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
-        <Heading as="h2" size="lg" weight="semibold">
+      <div className="flex flex-wrap items-center justify-between gap-g13">
+        <Heading as="h2" size="md" weight="semibold">
           {t('import.title', 'Import Data Massal (Excel / CSV)')}
         </Heading>
-      </Card>
+      </div>
 
       {/* ── Type Selector ────────────────────────────────────────────────────── */}
-      <Card className="p-6">
-        <div className="mobile-page-actions flex flex-wrap gap-2">
-          {IMPORT_TYPES.map((item) => {
+      <Card className="p-g13">
+        <SegmentGroup aria-label={t('import.type_label', 'Jenis data')} value={activeType}
+          onValueChange={details => details.value && handleTypeChange(details.value as ImportType)} className="max-w-full flex-wrap">
+          <SegmentGroupIndicator />
+          <SegmentGroupItems items={IMPORT_TYPES.map(item => {
             const Icon = item.icon;
-            const isActive = activeType === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleTypeChange(item.id)}
-                aria-pressed={isActive}
-                className={` cursor-pointer ${
- isActive
- ? ''
- : ''
- }`}
-              >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : item.color}`} />
-                <span>{item.label}</span>
-                {isActive && <ChevronRight className="w-3.5 h-3.5 text-white" />}
-              </button>
-            );
-          })}
-        </div>
+            return { value: item.id, label: <span className="inline-flex items-center gap-g5"><Icon className="size-g16" />{item.label}</span> };
+          })} />
+        </SegmentGroup>
       </Card>
 
       {/* ── Template Download + Upload ───────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-g13 items-stretch">
 
         {/* Template Download */}
-        <Card className="p-6 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-status-info-soft border border-status-info-border">
-                <Download className="w-5 h-5 text-status-info" />
-              </div>
+        <Card className="p-g21 flex flex-col justify-between">
+          <div className="space-y-g13">
+            <div className="flex items-center gap-g13">
+              <Avatar size="md" className="shrink-0 rounded-md border bg-status-info-soft border border-status-info-border"><AvatarFallback className="bg-transparent text-inherit"><Download className="w-g21 h-g21 text-status-info" /></AvatarFallback></Avatar>
               <div>
                 <Heading as="h3" size="sm" weight="semibold">
                   {t('import.download_template', 'Unduh Template CSV')}
@@ -347,32 +338,25 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
               </div>
             </div>
 
-            <Card className="p-3">
-              <p className="text-xs font-bold uppercase text-muted-foreground mb-2">{t('bulk_import.kolom_template', 'Kolom Template:')}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {templates[activeType].headers.map((h) => (
-                  <span
-                    key={h}
-                    className="text-xs font-semibold bg-card text-muted-foreground border border-border px-2 py-0.5 rounded-md"
-                  >
-                    {h}
-                  </span>
-                ))}
+            <Card variant="subtle" size="sm" className="gap-g8 p-g13">
+              <Text size="xs" weight="semibold" tone="muted">{t('bulk_import.kolom_template', 'Kolom Template:')}</Text>
+              <div className="flex flex-wrap gap-g5">
+                {templates[activeType].headers.map((h) => <Tag key={h} size="sm" variant="outline">{h}</Tag>)}
               </div>
             </Card>
 
-            <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-              {templates[activeType].notes.map((note) => <li key={note}>{note}</li>)}
-            </ul>
+            <List size="xs" tone="muted" marker="disc" className="space-y-g3">
+              {templates[activeType].notes.map((note) => <ListItem key={note}>{note}</ListItem>)}
+            </List>
           </div>
 
-          <div className="pt-4 mt-auto">
+          <div className="pt-g13 mt-auto">
             <Button variant="outline"
               type="button"
               onClick={() => downloadTemplate(activeType, templates[activeType])}
               className="w-full"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-g16 h-g16" />
               <span>
                 {t('bulk_import.download_template', 'Download {label} Template', { label: activeTypeInfo.label })}
               </span>
@@ -381,12 +365,10 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
         </Card>
 
         {/* Upload */}
-        <Card className="p-6 flex flex-col justify-between">
-          <div className="flex flex-1 flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-accent border border-primary/30">
-                <Upload className="w-5 h-5 text-accent-foreground" />
-              </div>
+        <Card className="p-g21 flex flex-col justify-between">
+          <div className="flex flex-1 flex-col gap-g13">
+            <div className="flex items-center gap-g13">
+              <Avatar size="md" className="shrink-0 rounded-md border bg-accent border border-primary/30"><AvatarFallback className="bg-transparent text-inherit"><Upload className="w-g21 h-g21 text-accent-foreground" /></AvatarFallback></Avatar>
               <div>
                 <Heading as="h3" size="sm" weight="semibold">
                   {t('import.upload_label', 'Unggah File CSV')}
@@ -394,32 +376,28 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
               </div>
             </div>
 
-            <label className="ds-upload flex w-full min-h-32 flex-1 flex-col items-center justify-center text-center cursor-pointer group">
-              <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFileChange} />
-              <FileSpreadsheet className="w-8 h-8 text-muted-foreground mx-auto mb-2 group-hover:text-accent-foreground/60 transition-colors" />
-              {fileName
-                ? <p className="text-xs font-bold text-accent-foreground truncate px-2">{fileName}</p>
-                : <p className="text-xs font-semibold text-muted-foreground">{t('import.choose_file', 'Pilih File CSV')} {t('bulk_import.csv', '(.csv)')}</p>
-              }
-            </label>
+            <FileUpload key={uploadKey} accept=".csv,text/csv" maxFiles={1} onFileAccept={details => handleFileChange(details.files[0])} className="flex-1">
+              <FileUploadDropzone aria-label={t('import.choose_file', 'Pilih File CSV')} className="min-h-g144 flex-1">
+                <FileSpreadsheet className="size-g34 text-muted-foreground" aria-hidden="true" />
+                {fileName
+                  ? <Text size="xs" weight="semibold" className="truncate px-g8 text-accent-foreground">{fileName}</Text>
+                  : <Text size="xs" tone="muted">{t('import.choose_file', 'Pilih File CSV')} {t('bulk_import.csv', '(.csv)')}</Text>}
+                <FileUploadTrigger asChild><Button variant="outline" size="sm">{t('form.contract.choose_file', 'Pilih File')}</Button></FileUploadTrigger>
+              </FileUploadDropzone>
+              <FileUploadHiddenInput aria-label={t('import.upload_label', 'Unggah File CSV')} />
+            </FileUpload>
 
             {parseError && (
-              <div className="flex items-start gap-2 p-3 rounded-xl bg-status-danger-soft border border-status-danger-border text-xs text-status-danger font-medium">
-                <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{parseError}</span>
-              </div>
+              <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{parseError}</AlertDescription></AlertContent></Alert>
             )}
 
             {parsedRows && parsedRows.length > 0 && !parseError && (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-accent border border-primary/30 text-xs text-accent-foreground font-bold">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>{parsedRows.length} {t('import.preview_rows', 'baris data ditemukan')}</span>
-              </div>
+              <Alert status="success" role="status"><AlertIndicator /><AlertContent><AlertDescription>{parsedRows.length} {t('import.preview_rows', 'baris data ditemukan')}</AlertDescription></AlertContent></Alert>
             )}
           </div>
 
-          <div className="pt-4 mt-auto">
-            <div className="mobile-page-actions flex items-center gap-2">
+          <div className="pt-g13 mt-auto">
+            <div className="flex items-center gap-g8">
               <Button
                 type="button"
                 onClick={handleImport}
@@ -427,18 +405,17 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
                 className="flex-1"
               >
                 {isImporting
-                  ? <><RefreshCw className="w-4 h-4 animate-spin" /><span>{t('import.importing', 'Mengimpor...')}</span></>
-                  : <><Upload className="w-4 h-4" /><span>{t('import.start_import', 'Mulai Import')}</span></>
+                  ? <><Spinner size="sm" decorative /><span>{t('import.importing', 'Mengimpor...')}</span></>
+                  : <><Upload className="w-g16 h-g16" /><span>{t('import.start_import', 'Mulai Import')}</span></>
                 }
               </Button>
               {(parsedRows || report) && (
-                <Button variant="outline" size="icon-md"
+                <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon-md"
                   type="button"
-                  onClick={handleReset}
-                  title={t('import.reset', 'Reset & Mulai Lagi')}
+                  onClick={handleReset} aria-label={t('import.reset', 'Reset & Mulai Lagi')}
                 >
-                  <RotateCcw className="w-4 h-4" />
-                </Button>
+                  <RotateCcw className="w-g16 h-g16" />
+                </Button></TooltipTrigger><TooltipBody>{t('import.reset', 'Reset & Mulai Lagi')}</TooltipBody></Tooltip>
               )}
             </div>
           </div>
@@ -448,24 +425,22 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
       {/* ── CSV Preview ──────────────────────────────────────────────────────── */}
       {parsedRows && parsedRows.length > 0 && !report && (
         <Card className="overflow-hidden">
-          <div className="p-4 border-b border-border flex items-center gap-3">
-            <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent size-8 bg-muted">
-              <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
-            </div>
+          <div className="p-g13 border-b border-border flex items-center gap-g13">
+            <Avatar size="md" className="shrink-0 rounded-md border bg-muted"><AvatarFallback className="bg-transparent text-inherit"><FileSpreadsheet className="w-g16 h-g16 text-muted-foreground" /></AvatarFallback></Avatar>
             <div>
               <Heading as="h3" size="sm" weight="semibold">
                 {t('import.preview_title', 'Pratinjau Data CSV')}
               </Heading>
-              <p className="text-xs text-muted-foreground">
+              <Text size="xs" tone="muted">
                 {parsedRows.length} {t('import.preview_rows', 'baris data ditemukan')} | {fileName}
-              </p>
+              </Text>
             </div>
           </div>
-          <TableScrollArea className="rounded-none border-0">
+          <TableScrollArea>
             <Table className="w-full text-left">
               <TableHeader>
                 <TableRow>
-                  <TableColumnHeader className="w-12">#</TableColumnHeader>
+                  <TableColumnHeader className="w-g42">#</TableColumnHeader>
                   {parsedHeaders.map((h) => (
                     <TableColumnHeader key={h} className="whitespace-nowrap">{h}</TableColumnHeader>
                   ))}
@@ -476,9 +451,9 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
                   <TableRow key={idx}>
                     <TableCell>{idx + 1}</TableCell>
                     {parsedHeaders.map((h) => (
-                      <TableCell key={h} className="max-w-[200px] truncate" title={row[h]}>
+                      <Tooltip key={h}><TooltipTrigger asChild><TableCell className="max-w-g233 truncate">
                         {row[h] || <span className="text-muted-foreground">-</span>}
-                      </TableCell>
+                      </TableCell></TooltipTrigger><TooltipBody>{row[h]}</TooltipBody></Tooltip>
                     ))}
                   </TableRow>
                 ))}
@@ -498,10 +473,8 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
       {/* ── Import Result Report ─────────────────────────────────────────────── */}
       {report && (
         <Card className="overflow-hidden">
-          <div className="p-6 border-b border-border flex items-center gap-3">
-            <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent bg-accent border border-primary/30">
-              <FileSpreadsheet className="w-5 h-5 text-accent-foreground" />
-            </div>
+          <div className="p-g21 border-b border-border flex items-center gap-g13">
+            <Avatar size="md" className="shrink-0 rounded-md border bg-accent border border-primary/30"><AvatarFallback className="bg-transparent text-inherit"><FileSpreadsheet className="w-g21 h-g21 text-accent-foreground" /></AvatarFallback></Avatar>
             <div>
               <Heading as="h3" size="sm" weight="semibold">
                 {t('import.result_title', 'Laporan Hasil Import')}
@@ -510,30 +483,30 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
           </div>
 
           {/* Summary Pills */}
-          <div className="p-6 grid grid-cols-3 gap-4">
+          <div className="p-g21 grid grid-cols-3 gap-g13">
             {RESULT_SECTIONS.map((s) => (
-              <div key={s.key} className={`flex flex-col items-center justify-center p-4 rounded-2xl border gap-1 ${s.pillBg}`}>
+              <Card key={s.key} className={`flex flex-col items-center justify-center p-g13 gap-g3 ${s.pillBg}`}>
                 {s.pillIcon}
                 <span className={`text-2xl font-extrabold ${s.rowClass}`}>{s.count}</span>
                 <span className={`text-xs font-bold text-center ${s.rowClass}`}>{s.label}</span>
-              </div>
+              </Card>
             ))}
           </div>
 
           {/* Detail Tables per category */}
           {RESULT_SECTIONS.filter((s) => s.items.length > 0).map((section) => (
             <div key={section.key} className="border-t border-border">
-              <div className={`px-6 py-3 flex items-center gap-2 ${section.headerBg}`}>
+              <div className={`px-g21 py-g13 flex items-center gap-g8 ${section.headerBg}`}>
                 {section.icon}
                 <span className={`text-xs font-extrabold ${section.rowClass}`}>
                   {section.label} ({section.items.length})
                 </span>
               </div>
-              <TableScrollArea className="rounded-none border-0">
+              <TableScrollArea>
                 <Table className="w-full text-left">
                   <TableHeader>
                     <TableRow>
-                      <TableColumnHeader className="w-16">{t('import.col_row', 'Baris')}</TableColumnHeader>
+                      <TableColumnHeader className="w-g68">{t('import.col_row', 'Baris')}</TableColumnHeader>
                       <TableColumnHeader>{t('import.col_identifier', 'Identifikasi')}</TableColumnHeader>
                       <TableColumnHeader>{t('import.col_reason', 'Keterangan')}</TableColumnHeader>
                     </TableRow>
@@ -542,8 +515,8 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
                     {section.items.map((item) => (
                       <TableRow key={item.rowIndex}>
                         <TableCell>{item.rowIndex}</TableCell>
-                        <TableCell className={` ${section.rowClass} max-w-[250px] truncate`} title={item.identifier}>{item.identifier}</TableCell>
-                        <TableCell className="max-w-[400px]">{item.message}</TableCell>
+                        <Tooltip><TooltipTrigger asChild><TableCell className={` ${section.rowClass} max-w-g233 truncate`}>{item.identifier}</TableCell></TooltipTrigger><TooltipBody>{item.identifier}</TooltipBody></Tooltip>
+                        <TableCell className="max-w-g377">{item.message}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -552,9 +525,9 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
             </div>
           ))}
 
-          <div className="p-6 border-t border-border flex justify-end">
+          <div className="p-g21 border-t border-border flex justify-end">
             <Button variant="outline" type="button" onClick={handleReset}>
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-g16 h-g16" />
               <span>{t('import.reset', 'Reset & Mulai Lagi')}</span>
             </Button>
           </div>

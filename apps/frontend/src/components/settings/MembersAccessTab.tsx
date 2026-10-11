@@ -11,6 +11,8 @@ import { Badge } from '@legalio/ui-components/badge';
 import { Skeleton } from '@legalio/ui-components/skeleton';
 import { ModalFrame } from '../ui/modal-frame';
 import { Table, TableBody, TableCell, TableColumnHeader, TableHeader, TableRow, TableScrollArea } from '@legalio/ui-components/table';
+import { TableEmptyState } from '../ui/table-empty-state';
+import { TablePagination } from '../ui/TablePagination';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 import { OrgApiError, orgApi, orgPath } from './orgApi';
 
@@ -20,8 +22,14 @@ import { NativeSelect } from '@legalio/ui-components/native-select';
 import { Card, CardHeader } from '@legalio/ui-components/card';
 import { DialogTitle } from '@legalio/ui-components/dialog';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
-import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Alert, AlertActions, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
+import { SegmentGroup, SegmentGroupIndicator, SegmentGroupItems } from '@legalio/ui-components/segment-group';
+import { Text } from '@legalio/ui-components/text';
+import { Clipboard, ClipboardControl, ClipboardInput, ClipboardLabel, ClipboardTrigger } from '@legalio/ui-components/clipboard';
+import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
+import { Spinner } from '@legalio/ui-components/spinner';
+import { List, ListItem } from '@legalio/ui-components/list';
 const LazyActivityLogsView = lazy(() => import('../ActivityLogsView').then((m) => ({ default: m.ActivityLogsView })));
 
 interface Member { id: string; userId: string; name: string; email: string; tenantRole: TenantRole; status: 'active' | 'suspended'; departmentIds: string[]; createdAt: string }
@@ -33,21 +41,20 @@ type Filter = 'active' | 'suspended' | 'pending';
 const PAGE_SIZE = 25;
 const RANK: Record<TenantRole, number> = { admin: 4, manager: 3, editor: 2, viewer: 1 };
 
-const labelClass = 'mb-1.5 block text-sm font-medium text-foreground ';
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /** Department checkboxes limited to the departments this context can see. */
 const DepartmentPicker: React.FC<{ departments: Department[]; value: string[]; onChange: (ids: string[]) => void; disabled?: boolean; legend: string; 'aria-describedby'?: string }> = ({ departments, value, onChange, disabled, legend, 'aria-describedby': ariaDescribedby }) => (
-  <fieldset className="m-0 min-w-0 border-0 p-0" disabled={disabled} aria-describedby={ariaDescribedby}>
-    <legend className={labelClass}>{legend}</legend>
-    <div className="grid max-h-48 gap-1 overflow-y-auto rounded-xl border border-border p-2 sm:grid-cols-2">
+  <Fieldset disabled={disabled} aria-describedby={ariaDescribedby}>
+    <FieldsetLegend className="pb-0 text-sm font-medium">{legend}</FieldsetLegend>
+    <Card className="grid max-h-g233 gap-g3 overflow-y-auto p-g8 sm:grid-cols-2">
       {departments.map((d) => (
         <Checkbox checked={value.includes(d.id)} onCheckedChange={(details) => onChange(details.checked === true ? [...value, d.id] : value.filter((id) => id !== d.id))}><CheckboxControl /><CheckboxLabel>{d.name}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
       ))}
-      {departments.length === 0 && <p className="p-2 text-sm text-muted-foreground">—</p>}
-    </div>
-  </fieldset>
+      {departments.length === 0 && <Text size="sm" tone="muted" className="p-g8">—</Text>}
+    </Card>
+  </Fieldset>
 );
 
 /**
@@ -172,23 +179,16 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <Card className="mobile-controls-bar flex flex-col items-stretch justify-between gap-3 p-4 lg:flex-row lg:items-center">
-        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-          <Card
-            role="group"
-            aria-label={t('tb.member_status_filter', 'Member status')}
-            className="flex h-10 shrink-0 items-center p-0.75"
-          >
-            {([['active', t('tb.filter_active', 'Active')], ['suspended', t('tb.filter_suspended', 'Suspended')], ...(can('tenant.invitation.read') ? [['pending', t('tb.filter_pending', 'Pending')]] : [])] as Array<[Filter, string]>).map(([value, label]) => (
-              <button key={value} type="button" aria-pressed={filter === value} onClick={() => { setFilter(value); setPage(0); }}
-                className={` cursor-pointer ${filter === value ? '' : ' '}`}>
-                {label}
-              </button>
-            ))}
-          </Card>
-          <InputGroup className="relative min-w-55 max-w-md flex-1">
-            <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+    <div className="flex min-w-0 flex-col gap-g13">
+      <Card className="flex flex-col items-stretch justify-between gap-g13 p-g13 lg:flex-row lg:items-center">
+        <div className="flex min-w-0 flex-1 flex-col gap-g13 sm:flex-row sm:flex-wrap sm:items-center">
+          <SegmentGroup aria-label={t('tb.member_status_filter', 'Member status')} value={filter}
+            onValueChange={details => { if (details.value) { setFilter(details.value as Filter); setPage(0); } }} className="shrink-0">
+            <SegmentGroupIndicator />
+            <SegmentGroupItems items={([['active', t('tb.filter_active', 'Active')], ['suspended', t('tb.filter_suspended', 'Suspended')], ...(can('tenant.invitation.read') ? [['pending', t('tb.filter_pending', 'Pending')]] : [])] as Array<[Filter, string]>).map(([value, label]) => ({ value, label }))} />
+          </SegmentGroup>
+          <InputGroup className="relative min-w-g233 max-w-g377 flex-1">
+            <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
             <InputGroupInput
               id={searchId}
               type="search"
@@ -200,24 +200,22 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
             />
           </InputGroup>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          {can('tenant.audit.read') && <Button type="button" variant="outline" onClick={() => setDialog({ kind: 'history' })}><History className="h-4 w-4" aria-hidden="true" />{t('tb.history', 'History')}</Button>}
-          {can('department.view') && <Button type="button" variant="outline" onClick={() => setDialog({ kind: 'departments' })}><Layers className="h-4 w-4" aria-hidden="true" />{t('tb.departments', 'Departments')}</Button>}
-          {(myRole === 'admin' || isPlatform) && <Button type="button" variant="outline" onClick={() => setDialog({ kind: 'invite', codeOnly: true })}><KeyRound className="h-4 w-4" aria-hidden="true" />{t('onboarding.generate_code', 'Generate invite code')}</Button>}
-          {can('tenant.member.invite') && <Button type="button" onClick={() => setDialog({ kind: 'invite' })}><Mail className="h-4 w-4" aria-hidden="true" />{t('tb.invite_member', 'Invite member')}</Button>}
+        <div className="flex shrink-0 flex-wrap gap-g8">
+          {can('tenant.audit.read') && <Button type="button" variant="outline" onClick={() => setDialog({ kind: 'history' })}><History className="h-g16 w-g16" aria-hidden="true" />{t('tb.history', 'History')}</Button>}
+          {can('department.view') && <Button type="button" variant="outline" onClick={() => setDialog({ kind: 'departments' })}><Layers className="h-g16 w-g16" aria-hidden="true" />{t('tb.departments', 'Departments')}</Button>}
+          {(myRole === 'admin' || isPlatform) && <Button type="button" variant="outline" onClick={() => setDialog({ kind: 'invite', codeOnly: true })}><KeyRound className="h-g16 w-g16" aria-hidden="true" />{t('onboarding.generate_code', 'Generate invite code')}</Button>}
+          {can('tenant.member.invite') && <Button type="button" onClick={() => setDialog({ kind: 'invite' })}><Mail className="h-g16 w-g16" aria-hidden="true" />{t('tb.invite_member', 'Invite member')}</Button>}
         </div>
       </Card>
 
       <Card className="overflow-hidden">
         {failed ? (
-          <div role="alert" className="flex flex-col items-start gap-3 p-5 text-sm text-status-danger">
-            {t('tb.members_load_error', 'Members could not be loaded.')}
-            <Button type="button" variant="outline" size="sm" onClick={() => refresh()}><RefreshCw className="h-4 w-4" aria-hidden="true" />{t('tb.retry', 'Retry')}</Button>
-          </div>
+          <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{t('tb.members_load_error', 'Members could not be loaded.')}</AlertDescription></AlertContent>
+            <AlertActions><Button type="button" variant="outline" size="sm" onClick={() => refresh()}><RefreshCw aria-hidden="true" />{t('tb.retry', 'Retry')}</Button></AlertActions></Alert>
         ) : loading ? (
-          <div className="space-y-2 p-4" aria-busy="true"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+          <div className="space-y-g8 p-g13" aria-busy="true"><Skeleton className="h-g42 w-full" /><Skeleton className="h-g42 w-full" /><Skeleton className="h-g42 w-full" /></div>
         ) : filter === 'pending' ? (
-          <TableScrollArea className="rounded-none border-0">
+          <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
             <Table>
               <TableHeader><TableRow>
                 <TableColumnHeader>{t('tb.col_email', 'Email')}</TableColumnHeader><TableColumnHeader>{t('tb.col_role', 'Role')}</TableColumnHeader>
@@ -227,26 +225,26 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
               <TableBody>
                 {(invitationsQuery.data?.invitations || []).map((inv) => (
                   <TableRow key={inv.id}>
-                    <TableCell className="font-medium">{inv.email || t('onboarding.invite_code', 'Invite code')}</TableCell>
+                    <TableCell>{inv.email || t('onboarding.invite_code', 'Invite code')}</TableCell>
                     <TableCell>{roleLabel(inv.tenantRole)}</TableCell>
                     <TableCell>{names(inv.departmentIds)}</TableCell>
                     <TableCell>{new Date(inv.expiresAt).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {can('tenant.invitation.resend') && <Button type="button" variant="ghost" size="sm" onClick={() => resend(inv)}><RefreshCw className="h-4 w-4" aria-hidden="true" />{t('tb.resend', 'Resend')}</Button>}
-                        {can('tenant.invitation.cancel') && <Button type="button" variant="ghost" size="sm" onClick={() => cancel(inv)}><X className="h-4 w-4" aria-hidden="true" />{t('tb.cancel_invitation', 'Cancel invitation')}</Button>}
+                      <div className="flex justify-end gap-g3">
+                        {can('tenant.invitation.resend') && <Button type="button" variant="ghost" size="sm" onClick={() => resend(inv)}><RefreshCw className="h-g16 w-g16" aria-hidden="true" />{t('tb.resend', 'Resend')}</Button>}
+                        {can('tenant.invitation.cancel') && <Button type="button" variant="ghost" size="sm" onClick={() => cancel(inv)}><X className="h-g16 w-g16" aria-hidden="true" />{t('tb.cancel_invitation', 'Cancel invitation')}</Button>}
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
                 {(invitationsQuery.data?.invitations || []).length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">{t('tb.no_invitations', 'No pending invitations.')}</TableCell></TableRow>
+                  <TableEmptyState colSpan={5} message={t('tb.no_invitations', 'No pending invitations.')} />
                 )}
               </TableBody>
             </Table>
           </TableScrollArea>
         ) : (
-          <TableScrollArea className="rounded-none border-0">
+          <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
             <Table>
               <TableHeader><TableRow>
                 <TableColumnHeader>{t('tb.col_name', 'Name')}</TableColumnHeader><TableColumnHeader>{t('tb.col_email', 'Email')}</TableColumnHeader><TableColumnHeader>{t('tb.col_role', 'Role')}</TableColumnHeader>
@@ -258,43 +256,35 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
                   const manage = canManage(m);
                   return (
                     <TableRow key={m.id}>
-                      <TableCell className="font-medium">{m.name || '—'}{m.userId === identity?.id && <span className="ml-2 text-xs text-muted-foreground">({t('tb.you', 'you')})</span>}</TableCell>
+                      <TableCell>{m.name || '—'}{m.userId === identity?.id && <Text as="span" size="xs" tone="muted" className="ml-g8">({t('tb.you', 'you')})</Text>}</TableCell>
                       <TableCell>{m.email}</TableCell>
                       <TableCell>{roleLabel(m.tenantRole)}</TableCell>
                       <TableCell>{m.tenantRole === 'admin' ? t('tb.all_departments', 'All departments') : names(m.departmentIds)}</TableCell>
                       <TableCell><Badge tone={m.status === 'active' ? 'success' : 'warning'}>{m.status === 'active' ? t('tb.status_active', 'Active') : t('tb.status_suspended', 'Suspended')}</Badge></TableCell>
                       <TableCell className="text-right">
                         {manage ? (
-                          <div className="flex justify-end gap-1">
+                          <div className="flex justify-end gap-g3">
                             {(can('tenant.member.role.update') || can('tenant.member.departments.update')) && (
-                              <Button type="button" variant="ghost" size="sm" onClick={() => setDialog({ kind: 'edit', member: m })} aria-label={t('tb.edit_access_for', 'Edit access for {name}', { name: m.name || m.email })}><Pencil className="h-4 w-4" aria-hidden="true" /></Button>
+                              <Button type="button" variant="ghost" size="sm" onClick={() => setDialog({ kind: 'edit', member: m })} aria-label={t('tb.edit_access_for', 'Edit access for {name}', { name: m.name || m.email })}><Pencil className="h-g16 w-g16" aria-hidden="true" /></Button>
                             )}
                             {can('tenant.member.status.update') && (m.status === 'active'
-                              ? <Button type="button" variant="ghost" size="sm" onClick={() => setStatus(m, 'suspended')} aria-label={t('tb.suspend_for', 'Suspend membership of {name}', { name: m.name || m.email })}><UserX className="h-4 w-4" aria-hidden="true" /></Button>
-                              : <Button type="button" variant="ghost" size="sm" onClick={() => setStatus(m, 'active')} aria-label={t('tb.reactivate_for', 'Reactivate membership of {name}', { name: m.name || m.email })}><UserCheck className="h-4 w-4" aria-hidden="true" /></Button>)}
-                            {can('tenant.member.remove') && <Button type="button" variant="ghost" size="sm" onClick={() => remove(m)} aria-label={t('tb.remove_for', 'Remove membership of {name}', { name: m.name || m.email })}><UserMinus className="h-4 w-4" aria-hidden="true" /></Button>}
+                              ? <Button type="button" variant="ghost" size="sm" onClick={() => setStatus(m, 'suspended')} aria-label={t('tb.suspend_for', 'Suspend membership of {name}', { name: m.name || m.email })}><UserX className="h-g16 w-g16" aria-hidden="true" /></Button>
+                              : <Button type="button" variant="ghost" size="sm" onClick={() => setStatus(m, 'active')} aria-label={t('tb.reactivate_for', 'Reactivate membership of {name}', { name: m.name || m.email })}><UserCheck className="h-g16 w-g16" aria-hidden="true" /></Button>)}
+                            {can('tenant.member.remove') && <Button type="button" variant="ghost" size="sm" onClick={() => remove(m)} aria-label={t('tb.remove_for', 'Remove membership of {name}', { name: m.name || m.email })}><UserMinus className="h-g16 w-g16" aria-hidden="true" /></Button>}
                           </div>
-                        ) : <MoreHorizontal className="ml-auto h-4 w-4 text-primary-foreground" aria-hidden="true" />}
+                        ) : <MoreHorizontal className="ml-auto h-g16 w-g16 text-primary-foreground" aria-hidden="true" />}
                       </TableCell>
                     </TableRow>
                   );
                 })}
                 {(membersQuery.data?.members || []).length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">{t('tb.no_members', 'No members match this view.')}</TableCell></TableRow>
+                  <TableEmptyState colSpan={6} message={t('tb.no_members', 'No members match this view.')} />
                 )}
               </TableBody>
             </Table>
           </TableScrollArea>
         )}
-        {pages > 1 && (
-          <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm">
-            <span className="text-muted-foreground">{t('tb.page_of', 'Page {page} of {pages}', { page: page + 1, pages })}</span>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>{t('tb.previous', 'Previous')}</Button>
-              <Button type="button" variant="outline" size="sm" disabled={page + 1 >= pages} onClick={() => setPage((p) => p + 1)}>{t('tb.next', 'Next')}</Button>
-            </div>
-          </div>
-        )}
+        {pages > 1 && <TablePagination currentPage={page + 1} totalPages={pages} rowsPerPage={PAGE_SIZE} rowsPerPageOptions={[PAGE_SIZE]} onPageChange={next => setPage(next - 1)} onRowsPerPageChange={() => undefined} />}
       </Card>
 
       {dialog?.kind === 'invite' && (
@@ -319,9 +309,9 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
 const DialogHeader: React.FC<{ title: string; onClose: () => void }> = ({ title, onClose }) => {
   const { t } = useLanguage();
   return (
-    <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border pb-4">
-      <DialogTitle className="flex items-center gap-2">{title}</DialogTitle>
-      <Button type="button" variant="ghost" size="icon-md" onClick={onClose} aria-label={t('common.close', 'Close')}><X className="h-4 w-4" aria-hidden="true" /></Button>
+    <CardHeader className="flex flex-row items-center justify-between gap-g13 border-b border-border pb-g13">
+      <DialogTitle className="flex items-center gap-g8">{title}</DialogTitle>
+      <Button type="button" variant="ghost" size="icon-md" onClick={onClose} aria-label={t('common.close', 'Close')}><X className="h-g16 w-g16" aria-hidden="true" /></Button>
     </CardHeader>
   );
 };
@@ -355,13 +345,13 @@ const InviteDialog: React.FC<{
   };
 
   return (
-    <ModalFrame onClose={onClose} className="max-w-xl">
+    <ModalFrame size="md" onClose={onClose} >
       <DialogHeader title={codeOnly ? t('onboarding.generate_code', 'Generate invite code') : t('tb.invite_member', 'Invite member')} onClose={onClose} />
-      <form onSubmit={submit} noValidate className="flex flex-col gap-4 overflow-y-auto p-5">
+      <form onSubmit={submit} noValidate className="flex flex-col gap-g13 overflow-y-auto p-g21">
         {!codeOnly && <Field>
           <FieldLabel htmlFor={ids.email}>{t('tb.col_email', 'Email')}</FieldLabel>
           <Input id={ids.email} type="email" autoComplete="off" value={email} aria-invalid={email.length > 0 && !emailValid} aria-describedby={email.length > 0 && !emailValid ? `${ids.email}-error` : undefined} onChange={(e) => setEmail(e.target.value)} />
-          {email.length > 0 && !emailValid && <p id={`${ids.email}-error`} className="mt-1.5 text-xs text-status-danger">{t('tb.invalid_email', 'Enter a valid email address.')}</p>}
+          {email.length > 0 && !emailValid && <Text size="xs" tone="destructive" className="mt-g5" id={`${ids.email}-error`}>{t('tb.invalid_email', 'Enter a valid email address.')}</Text>}
         </Field>}
         <Field>
           <FieldLabel htmlFor={ids.role}>{t('tb.col_role', 'Role')}</FieldLabel>
@@ -372,13 +362,13 @@ const InviteDialog: React.FC<{
         {role !== 'admin' && (
           <div>
             <DepartmentPicker departments={departments} value={departmentIds} onChange={setDepartmentIds} legend={t('tb.col_departments', 'Departments')} aria-describedby={!deptValid ? `invite-dept-error` : undefined} />
-            {!deptValid && <p id="invite-dept-error" className="mt-1.5 text-xs text-muted-foreground">{t('tb.department_required', 'Choose at least one department.')}</p>}
+            {!deptValid && <Text size="xs" tone="muted" className="mt-g5" id="invite-dept-error">{t('tb.department_required', 'Choose at least one department.')}</Text>}
           </div>
         )}
-        {error && <p role="alert" className="flex items-center gap-2 text-sm text-status-danger"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
-        <div className="flex justify-end gap-2">
+        {error && <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>}
+        <div className="flex justify-end gap-g8">
           <Button type="button" variant="outline" onClick={onClose}>{t('tb.cancel', 'Cancel')}</Button>
-          <Button type="submit" disabled={busy || !emailValid || !deptValid}>{busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Mail className="h-4 w-4" aria-hidden="true" />}{codeOnly ? t('onboarding.generate_code', 'Generate invite code') : t('tb.send_invitation', 'Send invitation')}</Button>
+          <Button type="submit" disabled={busy || !emailValid || !deptValid}>{busy ? <Spinner size="sm" decorative /> : <Mail className="h-g16 w-g16" aria-hidden="true" />}{codeOnly ? t('onboarding.generate_code', 'Generate invite code') : t('tb.send_invitation', 'Send invitation')}</Button>
         </div>
       </form>
     </ModalFrame>
@@ -388,21 +378,27 @@ const InviteDialog: React.FC<{
 const InviteLinkDialog: React.FC<{ url: string; code?: string; expiresAt?: string; onClose: () => void }> = ({ url, code, expiresAt, onClose }) => {
   const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
-  const id = useId();
+  const copyLabel = copied ? t('tb.copied', 'Copied') : code ? t('onboarding.copy_code', 'Copy code') : t('tb.copy_link', 'Copy link');
   return (
-    <ModalFrame onClose={onClose} className="max-w-xl">
+    <ModalFrame size="md" onClose={onClose} >
       <DialogHeader title={code ? t('onboarding.code_created', 'Invite code created') : t('tb.invitation_not_sent_title', 'Invitation created; email not sent')} onClose={onClose} />
-      <div className="flex flex-col gap-3 p-5">
-        <p className="text-sm text-foreground">{code ? t('onboarding.code_hint', 'Share this code with an approved account. It expires in 24 hours and can be used once.') : t('tb.invitation_not_sent', 'The invitation is saved, but no email was delivered. Share this link with the invited person yourself.')}</p>
-        <label htmlFor={id} className={labelClass}>{code ? t('onboarding.invite_code', 'Invite code') : t('tb.invitation_link', 'Invitation link')}</label>
-        <div className="flex items-center rounded-xl border border-border bg-card pr-1 focus-within:border-primary">
-          <input id={id} readOnly className="min-h-10 min-w-0 flex-1 rounded-md bg-transparent px-3 py-2.5 font-mono text-xs text-foreground focus:outline-none" value={code || url} onFocus={(e) => e.currentTarget.select()} />
-          <Button type="button" variant="ghost" className="shrink-0" aria-live="polite" onClick={async () => { await navigator.clipboard?.writeText(code || url).catch(() => {}); setCopied(true); }}>
-            <Copy className="h-4 w-4" aria-hidden="true" />{copied ? t('tb.copied', 'Copied') : code ? t('onboarding.copy_code', 'Copy code') : t('tb.copy_link', 'Copy link')}
-          </Button>
-        </div>
-        {expiresAt && <p className="text-sm text-muted-foreground">{t('tb.col_expires', 'Expires')}: {new Date(expiresAt).toLocaleString()}</p>}
-        <div className="flex justify-end gap-2">
+      <div className="flex flex-col gap-g13 p-g21">
+        <Text size="sm">{code ? t('onboarding.code_hint', 'Share this code with an approved account. It expires in 24 hours and can be used once.') : t('tb.invitation_not_sent', 'The invitation is saved, but no email was delivered. Share this link with the invited person yourself.')}</Text>
+        <Clipboard value={code || url} onStatusChange={details => setCopied(details.copied)}>
+          <ClipboardLabel>{code ? t('onboarding.invite_code', 'Invite code') : t('tb.invitation_link', 'Invitation link')}</ClipboardLabel>
+          <ClipboardControl>
+            <ClipboardInput readOnly className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+            <ClipboardTrigger asChild>
+              {/* zag labels the trigger "Copy to clipboard"; keep the accessible name equal to the visible text. */}
+              <Button type="button" variant="outline" className="shrink-0" aria-label={copyLabel}>
+                <Copy aria-hidden="true" />{copyLabel}
+              </Button>
+            </ClipboardTrigger>
+          </ClipboardControl>
+        </Clipboard>
+        <span role="status" className="sr-only">{copied ? t('tb.copied', 'Copied') : ''}</span>
+        {expiresAt && <Text size="sm" tone="muted">{t('tb.col_expires', 'Expires')}: {new Date(expiresAt).toLocaleString()}</Text>}
+        <div className="flex justify-end gap-g8">
           <Button type="button" onClick={onClose}>{t('tb.done', 'Done')}</Button>
         </div>
       </div>
@@ -444,26 +440,26 @@ const EditMemberDialog: React.FC<{
   };
 
   return (
-    <ModalFrame onClose={onClose} className="max-w-xl">
+    <ModalFrame size="md" onClose={onClose} >
       <DialogHeader title={t('tb.edit_access_for', 'Edit access for {name}', { name: member.name || member.email })} onClose={onClose} />
-      <form onSubmit={submit} noValidate className="flex flex-col gap-4 overflow-y-auto p-5">
+      <form onSubmit={submit} noValidate className="flex flex-col gap-g13 overflow-y-auto p-g21">
         <Field>
           <FieldLabel htmlFor={roleId}>{t('tb.col_role', 'Role')}</FieldLabel>
           <NativeSelect id={roleId} value={role} disabled={!canRole} onChange={(e) => setRole(e.target.value as TenantRole)}>
             {roles.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
           </NativeSelect>
-          {role === 'admin' && member.tenantRole !== 'admin' && <p className="mt-1.5 text-xs text-muted-foreground">{t('tb.admin_drops_departments', 'Administrators cover the whole organization; department assignments are removed.')}</p>}
+          {role === 'admin' && member.tenantRole !== 'admin' && <Text size="xs" tone="muted" className="mt-g5">{t('tb.admin_drops_departments', 'Administrators cover the whole organization; department assignments are removed.')}</Text>}
         </Field>
         {role !== 'admin' && (
           <div>
             <DepartmentPicker departments={departments} value={departmentIds} onChange={setDepartmentIds} disabled={!canDepartments} legend={t('tb.col_departments', 'Departments')} aria-describedby={needsDepartments ? `edit-dept-error` : undefined} />
-            {needsDepartments && <p id="edit-dept-error" className="mt-1.5 text-xs text-status-danger">{t('tb.department_required', 'Choose at least one department.')}</p>}
+            {needsDepartments && <Text size="xs" tone="destructive" className="mt-g5" id="edit-dept-error">{t('tb.department_required', 'Choose at least one department.')}</Text>}
           </div>
         )}
-        {error && <p role="alert" className="flex items-center gap-2 text-sm text-status-danger"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
-        <div className="flex justify-end gap-2">
+        {error && <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>}
+        <div className="flex justify-end gap-g8">
           <Button type="button" variant="outline" onClick={onClose}>{t('tb.cancel', 'Cancel')}</Button>
-          <Button type="submit" disabled={busy || needsDepartments}>{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{t('tb.save', 'Save')}</Button>
+          <Button type="submit" disabled={busy || needsDepartments}>{busy && <Spinner size="sm" decorative />}{t('tb.save', 'Save')}</Button>
         </div>
       </form>
     </ModalFrame>
@@ -496,49 +492,48 @@ const DepartmentsDialog: React.FC<{ organizationId: string; departments: Departm
     }
   };
   return (
-    <ModalFrame onClose={onClose} className="max-w-xl">
+    <ModalFrame size="md" onClose={onClose} >
       <DialogHeader title={t('tb.departments', 'Departments')} onClose={onClose} />
-      <div className="flex flex-col gap-4 overflow-y-auto p-5">
-        {!hasPermission('department.create') && <p className="text-sm text-muted-foreground">{t('tb.departments_readonly', 'You can see your assigned departments. Only administrators can change them.')}</p>}
+      <div className="flex flex-col gap-g13 overflow-y-auto p-g21">
+        {!hasPermission('department.create') && <Text size="sm" tone="muted">{t('tb.departments_readonly', 'You can see your assigned departments. Only administrators can change them.')}</Text>}
         {hasPermission('department.create') && (
-          <form className="flex items-end gap-2" onSubmit={async (e) => { e.preventDefault(); if (name.trim() && (await act(() => orgApi(orgPath(organizationId, '/departments'), { method: 'POST', body: { name: name.trim() } })))) setName(''); }}>
+          <form className="flex items-end gap-g8" onSubmit={async (e) => { e.preventDefault(); if (name.trim() && (await act(() => orgApi(orgPath(organizationId, '/departments'), { method: 'POST', body: { name: name.trim() } })))) setName(''); }}>
             <Field className="min-w-0 flex-1">
               <FieldLabel htmlFor={newId}>{t('tb.new_department', 'New department')}</FieldLabel>
               <Input id={newId} maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
-            <Button type="submit" disabled={busy || !name.trim()}><Plus className="h-4 w-4" aria-hidden="true" />{t('tb.add', 'Add')}</Button>
+            <Button type="submit" disabled={busy || !name.trim()}><Plus className="h-g16 w-g16" aria-hidden="true" />{t('tb.add', 'Add')}</Button>
           </form>
         )}
-        {error && <p role="alert" className="flex items-center gap-2 text-sm text-status-danger"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
-        {loading ? <Skeleton className="h-24 w-full" /> : (
-          <ul className="divide-y divide-border rounded-xl border border-border">
+        {error && <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>}
+        {loading ? <Skeleton className="h-g89 w-full" /> : (
+          <List marker="none" className="divide-y divide-border rounded-xl border border-border">
             {departments.map((d) => (
-              <li key={d.id} className="flex min-h-12 items-center justify-between gap-2 px-3 py-1.5">
+              <ListItem key={d.id} className="flex min-h-g42 items-center justify-between gap-g8 px-g13 py-g5">
                 {editing?.id === d.id ? (
-                  <form className="flex flex-1 items-center gap-2" onSubmit={async (e) => { e.preventDefault(); if (await act(() => orgApi(orgPath(organizationId, `/departments/${d.id}`), { method: 'PATCH', body: { name: editing.name.trim() } }))) setEditing(null); }}>
-                    <label className="sr-only" htmlFor={`rename-${d.id}`}>{t('tb.department_name', 'Department name')}</label>
-                    <Input id={`rename-${d.id}`} autoFocus maxLength={100} value={editing.name} onChange={(e) => setEditing({ id: d.id, name: e.target.value })} />
+                  <form className="flex flex-1 items-center gap-g8" onSubmit={async (e) => { e.preventDefault(); if (await act(() => orgApi(orgPath(organizationId, `/departments/${d.id}`), { method: 'PATCH', body: { name: editing.name.trim() } }))) setEditing(null); }}>
+                    <Input aria-label={t('tb.department_name', 'Department name')} id={`rename-${d.id}`} autoFocus maxLength={100} value={editing.name} onChange={(e) => setEditing({ id: d.id, name: e.target.value })} />
                     <Button type="submit" size="sm" disabled={busy || !editing.name.trim()}>{t('tb.save', 'Save')}</Button>
                     <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(null)}>{t('tb.cancel', 'Cancel')}</Button>
                   </form>
                 ) : (
                   <>
-                    <span className="text-sm text-foreground">{d.name}</span>
-                    <span className="flex gap-1">
-                      {hasPermission('department.edit') && <Button type="button" variant="ghost" size="sm" onClick={() => setEditing({ id: d.id, name: d.name })} aria-label={t('tb.rename_department', 'Rename {name}', { name: d.name })}><Pencil className="h-4 w-4" aria-hidden="true" /></Button>}
+                    <Text as="span" size="sm">{d.name}</Text>
+                    <span className="flex gap-g3">
+                      {hasPermission('department.edit') && <Button type="button" variant="ghost" size="sm" onClick={() => setEditing({ id: d.id, name: d.name })} aria-label={t('tb.rename_department', 'Rename {name}', { name: d.name })}><Pencil className="h-g16 w-g16" aria-hidden="true" /></Button>}
                       {hasPermission('department.delete') && (
                         <Button type="button" variant="ghost" size="sm" aria-label={t('tb.delete_department', 'Delete {name}', { name: d.name })}
                           onClick={async () => { if (await confirm({ description: t('tb.delete_department_confirm', 'Delete the department {name}?', { name: d.name }), tone: 'danger', confirmLabel: t('tb.delete', 'Delete') })) await act(() => orgApi(orgPath(organizationId, `/departments/${d.id}`), { method: 'DELETE' })); }}>
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          <Trash2 className="h-g16 w-g16" aria-hidden="true" />
                         </Button>
                       )}
                     </span>
                   </>
                 )}
-              </li>
+              </ListItem>
             ))}
-            {departments.length === 0 && <li className="px-3 py-4 text-sm text-muted-foreground">{t('tb.no_departments', 'No departments yet.')}</li>}
-          </ul>
+            {departments.length === 0 && <ListItem className="px-g13 py-g13 text-sm text-muted-foreground">{t('tb.no_departments', 'No departments yet.')}</ListItem>}
+          </List>
         )}
       </div>
     </ModalFrame>
@@ -557,19 +552,20 @@ const HistoryDialog: React.FC<{ organizationId: string; onClose: () => void }> =
   });
   const pages = Math.max(1, Math.ceil((audit.data?.total || 0) / 25));
   return (
-    <ModalFrame onClose={onClose} className="max-w-5xl">
+    <ModalFrame size="xl" onClose={onClose} >
       <DialogHeader title={t('tb.history', 'History')} onClose={onClose} />
-      <div className="overflow-y-auto p-5">
+      <div className="overflow-y-auto p-g21">
         <Tabs value={dataset} onValueChange={details => setDataset(details.value as 'admin' | 'activity')}>
           <TabsList aria-label={t('tb.history', 'History')}>
             <TabsTrigger value="admin">{t('tb.history_admin', 'Administrative changes')}</TabsTrigger>
             <TabsTrigger value="activity">{t('tb.history_activity', 'Operational activity')}</TabsTrigger>
           </TabsList>
-          <TabsContent value="admin" className="pt-3">
+          <TabsContent value="admin" className="pt-g13">
             {audit.isError ? (
-              <Alert status="error" role="alert"><AlertContent>{t('tb.history_load_error', 'History could not be loaded.')}</AlertContent></Alert>
-            ) : audit.isLoading ? <Skeleton className="h-32 w-full" /> : (
-              <div className="overflow-x-auto">
+              <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{t('tb.history_load_error', 'History could not be loaded.')}</AlertDescription></AlertContent></Alert>
+            ) : audit.isLoading ? <Skeleton className="h-g144 w-full" /> : (
+              <Card className="overflow-hidden">
+                <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
                 <Table>
                   <TableHeader><TableRow>
                     <TableColumnHeader>{t('tb.col_when', 'When')}</TableColumnHeader><TableColumnHeader>{t('tb.col_actor', 'By')}</TableColumnHeader>
@@ -579,25 +575,21 @@ const HistoryDialog: React.FC<{ organizationId: string; onClose: () => void }> =
                     {(audit.data?.events || []).map((e) => (
                       <TableRow key={e.id}>
                         <TableCell className="whitespace-nowrap">{new Date(e.createdAt).toLocaleString()}</TableCell>
-                        <TableCell>{e.actorName || '—'}{e.accessMode === 'platform' && <span className="ml-1 text-xs text-muted-foreground">({t('tb.platform_admin_short', 'platform')})</span>}</TableCell>
-                        <TableCell className="font-mono text-xs">{e.action}</TableCell>
-                        <TableCell className="text-xs">{e.changedFields.join(', ') || '—'}</TableCell>
+                        <TableCell>{e.actorName || '—'}{e.accessMode === 'platform' && <Text as="span" size="xs" tone="muted" className="ml-g3">({t('tb.platform_admin_short', 'platform')})</Text>}</TableCell>
+                        <TableCell className="font-mono">{e.action}</TableCell>
+                        <TableCell>{e.changedFields.join(', ') || '—'}</TableCell>
                       </TableRow>
                     ))}
-                    {(audit.data?.events || []).length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-muted-foreground">{t('tb.no_history', 'No administrative changes yet.')}</TableCell></TableRow>}
+                    {(audit.data?.events || []).length === 0 && <TableEmptyState colSpan={4} message={t('tb.no_history', 'No administrative changes yet.')} />}
                   </TableBody>
                 </Table>
-                {pages > 1 && (
-                  <div className="flex justify-end gap-2 pt-3">
-                    <Button type="button" variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>{t('tb.previous', 'Previous')}</Button>
-                    <Button type="button" variant="outline" size="sm" disabled={page + 1 >= pages} onClick={() => setPage((p) => p + 1)}>{t('tb.next', 'Next')}</Button>
-                  </div>
-                )}
-              </div>
+                </TableScrollArea>
+                {pages > 1 && <TablePagination currentPage={page + 1} totalPages={pages} rowsPerPage={25} rowsPerPageOptions={[25]} onPageChange={next => setPage(next - 1)} onRowsPerPageChange={() => undefined} />}
+                </Card>
             )}
           </TabsContent>
-          <TabsContent value="activity" className="pt-3">
-            <Suspense fallback={<Skeleton className="h-32 w-full" />}><LazyActivityLogsView /></Suspense>
+          <TabsContent value="activity" className="pt-g13">
+            <Suspense fallback={<Skeleton className="h-g144 w-full" />}><LazyActivityLogsView /></Suspense>
           </TabsContent>
         </Tabs>
       </div>

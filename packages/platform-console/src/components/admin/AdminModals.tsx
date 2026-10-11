@@ -39,10 +39,13 @@ import { useDepartments } from '../../hooks/useDepartments';
 import { Button } from '@legalio/ui-components/button';
 import { Input } from '@legalio/ui-components/input';
 import { DialogHeader, DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
-import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Alert, AlertContent, AlertDescription, AlertIndicator, AlertTitle } from '@legalio/ui-components/alert';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { Card } from '@legalio/ui-components/card';
-import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
+import { Checkbox, CheckboxControl, CheckboxGroup, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
+import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
+import { Text } from '@legalio/ui-components/text';
+import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
 // Add user modal
 
 interface AddUserModalProps {
@@ -162,22 +165,22 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
+    <ModalFrame size="md" onClose={onClose} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
 
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <UserPlus className="w-4 h-4 text-accent-foreground" />
-            <DialogTitle className="flex items-center gap-2">
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+          <div className="flex items-center gap-g8">
+            <UserPlus className="w-g16 h-g16 text-accent-foreground" />
+            <DialogTitle className="flex items-center gap-g8">
               {t('admin.modal_add_user', 'Tambah Pengguna Sistem Baru')}
             </DialogTitle>
           </div>
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
           {error && (
-            <Alert status="error" role="alert">
-              <AlertContent>{error}</AlertContent>
+            <Alert status="error" role="alert"><AlertIndicator />
+              <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
             </Alert>
           )}
 
@@ -226,11 +229,11 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
             </AlphabeticalSelect>
           </Field>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label htmlFor="admin-organization-1" className="block text-xs font-medium text-foreground">
+          <Field>
+            <div className="flex items-center justify-between mb-g3">
+              <FieldLabel htmlFor="admin-organization-1">
                 {t('admin.select_tenant_label', 'Organisasi / Tenant')} {role !== 'superuser' && role !== 'admin' && <span className="text-status-danger">*</span>}
-              </label>
+              </FieldLabel>
               {role !== 'superuser' && role !== 'admin' && (
                 <span className="text-xs text-status-warning font-medium">
                   {t('admin.must_one_tenant', '(Wajib Masuk ke 1 Tenant)')}
@@ -266,7 +269,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
                 </>
               )}
             </AlphabeticalSelect>
-          </div>
+          </Field>
 
           <Field>
             <FieldLabel htmlFor="adminmodals-field-4">
@@ -303,7 +306,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
             />
           </Field>
 
-          <div className="pt-2 flex items-center justify-end gap-2">
+          <div className="pt-g8 flex items-center justify-end gap-g8">
             <Button variant="ghost"
               type="button"
               onClick={onClose}
@@ -409,26 +412,26 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
+    <ModalFrame size="sm" onClose={onClose} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
 
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-status-special" />
-            <DialogTitle className="flex items-center gap-2">
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+          <div className="flex items-center gap-g8">
+            <Shield className="w-g16 h-g16 text-status-special" />
+            <DialogTitle className="flex items-center gap-g8">
               {t('admin.modal_edit_user', 'Ubah Informasi & Hak Akses Pengguna')}
             </DialogTitle>
           </div>
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
           {error && (
-            <Alert status="error" role="alert">
-              <AlertContent>{error}</AlertContent>
+            <Alert status="error" role="alert"><AlertIndicator />
+              <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
             </Alert>
           )}
 
-          <Card className="p-3 space-y-3">
+          <Card className="p-g13 space-y-g13">
             <Field>
               <FieldLabel htmlFor="adminmodals-field-6">
                 {t('admin.col_name', 'Nama Lengkap')}
@@ -472,11 +475,11 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             </AlphabeticalSelect>
           </Field>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label htmlFor="admin-organization-2" className="block text-xs font-medium text-foreground">
+          <Field>
+            <div className="flex items-center justify-between mb-g3">
+              <FieldLabel htmlFor="admin-organization-2">
                 {t('admin.select_tenant_label', 'Organisasi / Tenant')} {role !== 'superuser' && role !== 'admin' && <span className="text-status-danger">*</span>}
-              </label>
+              </FieldLabel>
               {role !== 'superuser' && role !== 'admin' && (
                 <span className="text-xs text-status-warning font-medium">
                   {t('admin.must_one_tenant', '(Wajib Masuk ke 1 Tenant)')}
@@ -512,7 +515,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                 </>
               )}
             </AlphabeticalSelect>
-          </div>
+          </Field>
 
           <Field>
             <FieldLabel htmlFor="adminmodals-field-9">
@@ -536,7 +539,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             </AlphabeticalSelect>
           </Field>
 
-          <div className="pt-2 flex items-center justify-end gap-2">
+          <div className="pt-g8 flex items-center justify-end gap-g8">
             <Button variant="ghost"
               type="button"
               onClick={onClose}
@@ -596,22 +599,22 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
+    <ModalFrame size="sm" onClose={onClose} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
 
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <KeyRound className="w-4 h-4 text-status-info" />
-            <DialogTitle className="flex items-center gap-2">
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+          <div className="flex items-center gap-g8">
+            <KeyRound className="w-g16 h-g16 text-status-info" />
+            <DialogTitle className="flex items-center gap-g8">
               {t('admin.modal_reset_pwd', 'Reset Kata Sandi Pengguna')}
             </DialogTitle>
           </div>
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
           {error && (
-            <Alert status="error" role="alert">
-              <AlertContent>{error}</AlertContent>
+            <Alert status="error" role="alert"><AlertIndicator />
+              <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
             </Alert>
           )}
 
@@ -636,7 +639,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
             />
           </Field>
 
-          <div className="pt-2 flex items-center justify-end gap-2">
+          <div className="pt-g8 flex items-center justify-end gap-g8">
             <Button variant="ghost"
               type="button"
               onClick={onClose}
@@ -716,22 +719,22 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
+    <ModalFrame size="md" onClose={onClose} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
 
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-accent-foreground" />
-            <DialogTitle className="flex items-center gap-2">
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+          <div className="flex items-center gap-g8">
+            <Building2 className="w-g16 h-g16 text-accent-foreground" />
+            <DialogTitle className="flex items-center gap-g8">
               {t('admin.modal_create_org', 'Buat Organisasi Enterprise Baru')}
             </DialogTitle>
           </div>
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
           {error && (
-            <Alert status="error" role="alert">
-              <AlertContent>{error}</AlertContent>
+            <Alert status="error" role="alert"><AlertIndicator />
+              <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
             </Alert>
           )}
 
@@ -756,29 +759,29 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
             onChange={setLogo}
           />
 
-          <div>
-            <label htmlFor="adminmodals-field-12" className="block text-xs font-medium text-foreground mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-12">
               {t('admin.org_slug_label', 'Identifier Slug (Unik)')}
-            </label>
+            </FieldLabel>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono">
+              <Text as="span" size="xs" tone="muted" className="absolute left-g13 top-1/2 -translate-y-1/2 font-mono">
                 @
-              </span>
+              </Text>
               <Input id="adminmodals-field-12"
                 type="text"
                 required
                 value={slug}
                 onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                 placeholder="fintek-mandiri"
-                className="w-full pl-7 pr-3"
+                className="w-full pl-g34 pr-g13"
               />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <Text size="xs" tone="muted" className="mt-g3">
               {t('admin.org_slug_hint', 'Digunakan untuk pemetaan folder root dan tenant routing')}: <code className="font-mono text-accent-foreground">{t('admin.vendors', '/{slug}/[vendors]', { slug })}</code>
-            </p>
-          </div>
+            </Text>
+          </Field>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
             <Field>
               <FieldLabel htmlFor="adminmodals-field-13">
                 {t('admin.org_currency_label', 'Mata Uang Utama')}
@@ -825,7 +828,7 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
             </Field>
           </div>
 
-          <div className="pt-2 flex items-center justify-end gap-2">
+          <div className="pt-g8 flex items-center justify-end gap-g8">
             <Button variant="ghost"
               type="button"
               onClick={onClose}
@@ -907,15 +910,13 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
+    <ModalFrame size="md" onClose={onClose} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
 
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="theme-soft w-7 h-7 rounded-lg flex items-center justify-center">
-              <Pencil className="w-3.5 h-3.5" />
-            </div>
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+          <div className="flex items-center gap-g8">
+            <Avatar size="sm" className="rounded-lg"><AvatarFallback className="bg-transparent text-inherit"><Pencil className="w-g13 h-g13" /></AvatarFallback></Avatar>
             <div>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-g8">
                 {t('admin.modal_edit_org_title', 'Edit Profil & Pengaturan Organisasi')}
               </DialogTitle>
             </div>
@@ -923,10 +924,10 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
           {error && (
-            <Alert status="error" role="alert">
-              <AlertContent>{error}</AlertContent>
+            <Alert status="error" role="alert"><AlertIndicator />
+              <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
             </Alert>
           )}
 
@@ -951,30 +952,30 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
             onChange={setLogo}
           />
 
-          <div>
-            <label htmlFor="adminmodals-field-16" className="block text-xs font-medium text-foreground mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-16">
               {t('admin.org_slug_label', 'Identifier Slug (Unik)')} <span className="text-status-danger">*</span>
-            </label>
+            </FieldLabel>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono">
+              <Text as="span" size="xs" tone="muted" className="absolute left-g13 top-1/2 -translate-y-1/2 font-mono">
                 @
-              </span>
+              </Text>
               <Input id="adminmodals-field-16"
                 type="text"
                 required
                 value={slug}
                 onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                 placeholder="acme"
-                className="w-full pl-7 pr-3"
+                className="w-full pl-g34 pr-g13"
               />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <Text size="xs" tone="muted" className="mt-g3">
               {t('admin.org_slug_hint', 'Pemetaan tenant routing')}: <code className="font-mono text-accent-foreground">/{slug || 'tenant'}{t('admin.vendors_2', '/[vendors]')}</code>
-            </p>
-          </div>
+            </Text>
+          </Field>
 
 
-          <Card className="p-3 text-xs space-y-1.5">
+          <Card className="p-g13 text-xs space-y-g5">
             <div className="flex items-center justify-between text-muted-foreground text-xs">
               <span>{t('admin.id_organisasi', 'ID Organisasi:')}</span>
               <code className="font-mono text-foreground">{org.id}</code>
@@ -985,7 +986,7 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
             </div>
           </Card>
 
-          <div className="pt-2 flex items-center justify-between gap-2">
+          <div className="pt-g8 flex items-center justify-between gap-g8">
             {onDelete && !org.metadata?.isDefault ? (
               <Button variant="ghost" size="sm"
                 type="button"
@@ -995,12 +996,12 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
                 }}
                 className="text-destructive"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-g13 h-g13" />
                 <span>{t('admin.btn_delete_org', 'Hapus Organisasi')}</span>
               </Button>
             ) : <div />}
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-g8">
               <Button variant="ghost"
                 type="button"
                 onClick={onClose}
@@ -1060,65 +1061,39 @@ export const DeleteOrganizationModal: React.FC<DeleteOrganizationModalProps> = (
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
+    <ModalFrame size="md" onClose={onClose} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
 
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-status-danger-soft flex items-center justify-center text-status-danger">
-              <Trash2 className="w-3.5 h-3.5" />
-            </div>
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+          <div className="flex items-center gap-g8">
+            <Avatar size="sm" className="rounded-lg bg-status-danger-soft text-status-danger"><AvatarFallback className="bg-transparent text-inherit"><Trash2 className="w-g13 h-g13" /></AvatarFallback></Avatar>
             <div>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-g8">
                 {t('admin.delete_org_title', 'Hapus Organisasi')}
               </DialogTitle>
-              <p className="text-xs text-muted-foreground">
+              <Text size="xs" tone="muted">
                 {org.name} (@{org.slug})
-              </p>
+              </Text>
             </div>
           </div>
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <div className="p-5 space-y-4">
+        <div className="p-g21 space-y-g13">
           {error && (
-            <Alert status="error" role="alert">
-              <AlertContent>{error}</AlertContent>
+            <Alert status="error" role="alert"><AlertIndicator />
+              <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
             </Alert>
           )}
 
           {isDefault ? (
-            <div className="p-3 rounded-lg bg-status-warning-soft border border-status-warning-border text-xs text-status-warning flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
-              <div>
-                <strong>{t('admin.cant_delete_default_org', 'Organisasi default sistem tidak dapat dihapus.')}</strong>
-                <p className="mt-1 text-xs opacity-90">
-                  {t('admin.organisasi_utama_ini_bertindak_sebagai_anchor', 'Organisasi utama ini bertindak sebagai anchor default untuk sistem dan tenant fallback.')}
-                </p>
-              </div>
-            </div>
+            <Alert status="warning"><AlertIndicator /><AlertContent><AlertTitle>{t('admin.cant_delete_default_org', 'Organisasi default sistem tidak dapat dihapus.')}</AlertTitle><AlertDescription>{t('admin.organisasi_utama_ini_bertindak_sebagai_anchor', 'Organisasi utama ini bertindak sebagai anchor default untuk sistem dan tenant fallback.')}</AlertDescription></AlertContent></Alert>
           ) : isActive ? (
-            <div className="p-3 rounded-lg bg-status-warning-soft border border-status-warning-border text-xs text-status-warning flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
-              <div>
-                <strong>{t('admin.cant_delete_active_org', 'Beralih ke organisasi lain terlebih dahulu sebelum menghapus.')}</strong>
-                <p className="mt-1 text-xs opacity-90">
-                  {t('admin.organisasi_ini_sedang_digunakan_pada_sesi', 'Organisasi ini sedang digunakan pada sesi aktif saat ini. Beralihlah ke organisasi lain untuk dapat menghapusnya.')}
-                </p>
-              </div>
-            </div>
+            <Alert status="warning"><AlertIndicator /><AlertContent><AlertTitle>{t('admin.cant_delete_active_org', 'Beralih ke organisasi lain terlebih dahulu sebelum menghapus.')}</AlertTitle><AlertDescription>{t('admin.organisasi_ini_sedang_digunakan_pada_sesi', 'Organisasi ini sedang digunakan pada sesi aktif saat ini. Beralihlah ke organisasi lain untuk dapat menghapusnya.')}</AlertDescription></AlertContent></Alert>
           ) : (
             <>
-              <div className="p-3 rounded-lg bg-status-danger-soft border border-status-danger-border text-xs text-status-danger flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-status-danger shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold">{t('admin.delete_org_confirm_msg', 'Apakah Anda yakin ingin menghapus organisasi ini secara permanen?')}</p>
-                  <p className="mt-1 text-xs opacity-90">
-                    {t('admin.delete_org_warning', 'Tindakan ini tidak dapat dibatalkan. Seluruh data tim, undangan, dan relasi pengguna dalam organisasi ini akan dihapus.')}
-                  </p>
-                </div>
-              </div>
+              <Alert status="error"><AlertIndicator /><AlertContent><AlertTitle>{t('admin.delete_org_confirm_msg', 'Apakah Anda yakin ingin menghapus organisasi ini secara permanen?')}</AlertTitle><AlertDescription>{t('admin.delete_org_warning', 'Tindakan ini tidak dapat dibatalkan. Seluruh data tim, undangan, dan relasi pengguna dalam organisasi ini akan dihapus.')}</AlertDescription></AlertContent></Alert>
 
-              <Card className="p-3 text-xs space-y-1.5">
+              <Card className="p-g13 text-xs space-y-g5">
                 <div className="flex items-center justify-between text-muted-foreground text-xs">
                   <span>{t('admin.nama_organisasi', 'Nama Organisasi:')}</span>
                   <span className="font-semibold text-foreground">{org.name}</span>
@@ -1135,7 +1110,7 @@ export const DeleteOrganizationModal: React.FC<DeleteOrganizationModalProps> = (
             </>
           )}
 
-          <div className="pt-2 flex items-center justify-end gap-2">
+          <div className="pt-g8 flex items-center justify-end gap-g8">
             <Button variant="ghost"
               type="button"
               onClick={onClose}
@@ -1148,7 +1123,7 @@ export const DeleteOrganizationModal: React.FC<DeleteOrganizationModalProps> = (
                 onClick={handleDelete}
                 disabled={isDeleting}
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-g13 h-g13" />
                 <span>{isDeleting ? t('admin.deleting', 'Menghapus...') : t('admin.btn_confirm_delete', 'Hapus Permanen')}</span>
               </Button>
             )}
@@ -1197,24 +1172,24 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
+    <ModalFrame size="sm" onClose={onClose} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
 
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-status-warning" />
-            <DialogTitle className="flex items-center gap-2">
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+          <div className="flex items-center gap-g8">
+            <Layers className="w-g16 h-g16 text-status-warning" />
+            <DialogTitle className="flex items-center gap-g8">
               {t('admin.modal_create_team', 'Buat Tim / Divisi Baru')}
             </DialogTitle>
           </div>
           <Button variant="ghost" size="icon-sm" aria-label={t('common.close', 'Tutup')} type="button" onClick={() => { setErrorMsg(null); onClose(); }}>
-            <X className="w-4 h-4" />
+            <X className="w-g16 h-g16" />
           </Button>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
           {errorMsg && (
-            <Alert status="error" role="alert">
-              <AlertContent>{errorMsg}</AlertContent>
+            <Alert status="error" role="alert"><AlertIndicator />
+              <AlertContent><AlertDescription>{errorMsg}</AlertDescription></AlertContent>
             </Alert>
           )}
 
@@ -1239,7 +1214,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
             />
           </Field>
 
-          <div className="pt-2 flex items-center justify-end gap-2">
+          <div className="pt-g8 flex items-center justify-end gap-g8">
             <Button variant="ghost"
               type="button"
               onClick={() => { setErrorMsg(null); onClose(); }}
@@ -1305,34 +1280,32 @@ export const EditDepartmentModal: React.FC<EditDepartmentModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
+    <ModalFrame size="sm" onClose={onClose} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
 
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-status-warning-soft border border-status-warning-border flex items-center justify-center text-status-warning">
-              <Layers className="w-3.5 h-3.5" />
-            </div>
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+          <div className="flex items-center gap-g8">
+            <Avatar size="sm" className="rounded-lg bg-status-warning-soft border border-status-warning-border text-status-warning"><AvatarFallback className="bg-transparent text-inherit"><Layers className="w-g13 h-g13" /></AvatarFallback></Avatar>
             <div>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-g8">
                 {t('admin.edit_department_title', 'Edit Tim / Departemen')}
               </DialogTitle>
-              <p className="text-xs text-muted-foreground">
+              <Text size="xs" tone="muted">
                 {team.name}
-              </p>
+              </Text>
             </div>
           </div>
           <Button variant="secondary" size="icon-sm" aria-label={t('common.close', 'Tutup')}
             type="button"
             onClick={() => { setErrorMsg(null); onClose(); }}
           >
-            <X className="w-4 h-4" />
+            <X className="w-g16 h-g16" />
           </Button>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
           {errorMsg && (
-            <Alert status="error" role="alert">
-              <AlertContent>{errorMsg}</AlertContent>
+            <Alert status="error" role="alert"><AlertIndicator />
+              <AlertContent><AlertDescription>{errorMsg}</AlertDescription></AlertContent>
             </Alert>
           )}
 
@@ -1349,7 +1322,7 @@ export const EditDepartmentModal: React.FC<EditDepartmentModalProps> = ({
             />
           </Field>
 
-          <Card className="p-3 text-xs space-y-1">
+          <Card className="p-g13 text-xs space-y-g3">
             <div className="flex items-center justify-between text-muted-foreground text-xs">
               <span>{t('admin.col_members', 'Jumlah Anggota')}:</span>
               <span className="font-semibold text-foreground">{team.members.length}</span>
@@ -1360,7 +1333,7 @@ export const EditDepartmentModal: React.FC<EditDepartmentModalProps> = ({
             </div>
           </Card>
 
-          <div className="pt-2 flex items-center justify-between gap-2">
+          <div className="pt-g8 flex items-center justify-between gap-g8">
             {onDelete ? (
               <Button variant="ghost" size="sm"
                 type="button"
@@ -1370,12 +1343,12 @@ export const EditDepartmentModal: React.FC<EditDepartmentModalProps> = ({
                 }}
                 className="text-destructive"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-g13 h-g13" />
                 <span>{t('admin.btn_delete', 'Hapus')}</span>
               </Button>
             ) : <div />}
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-g8">
               <Button variant="ghost"
                 type="button"
                 onClick={() => { setErrorMsg(null); onClose(); }}
@@ -1430,43 +1403,33 @@ export const DeleteDepartmentModal: React.FC<DeleteDepartmentModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
+    <ModalFrame size="md" onClose={onClose} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
 
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-status-danger-soft flex items-center justify-center text-status-danger">
-              <Trash2 className="w-3.5 h-3.5" />
-            </div>
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+          <div className="flex items-center gap-g8">
+            <Avatar size="sm" className="rounded-lg bg-status-danger-soft text-status-danger"><AvatarFallback className="bg-transparent text-inherit"><Trash2 className="w-g13 h-g13" /></AvatarFallback></Avatar>
             <div>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-g8">
                 {t('admin.delete_department_title', 'Hapus Departemen / Tim')}
               </DialogTitle>
-              <p className="text-xs text-muted-foreground">
+              <Text size="xs" tone="muted">
                 {team.name}
-              </p>
+              </Text>
             </div>
           </div>
           <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
         </DialogHeader>
 
-        <div className="p-5 space-y-4">
+        <div className="p-g21 space-y-g13">
           {error && (
-            <Alert status="error" role="alert">
-              <AlertContent>{error}</AlertContent>
+            <Alert status="error" role="alert"><AlertIndicator />
+              <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
             </Alert>
           )}
 
-          <div className="p-3 rounded-lg bg-status-danger-soft border border-status-danger-border text-xs text-status-danger flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-status-danger shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold">{t('admin.delete_department_confirm_msg', 'Apakah Anda yakin ingin menghapus departemen ini secara permanen?')}</p>
-              <p className="mt-1 text-xs opacity-90">
-                {t('admin.delete_department_warning', 'Tindakan ini tidak dapat dibatalkan. Seluruh anggota dalam departemen ini akan dilepaskan dari penugasan tim.')}
-              </p>
-            </div>
-          </div>
+          <Alert status="error"><AlertIndicator /><AlertContent><AlertTitle>{t('admin.delete_department_confirm_msg', 'Apakah Anda yakin ingin menghapus departemen ini secara permanen?')}</AlertTitle><AlertDescription>{t('admin.delete_department_warning', 'Tindakan ini tidak dapat dibatalkan. Seluruh anggota dalam departemen ini akan dilepaskan dari penugasan tim.')}</AlertDescription></AlertContent></Alert>
 
-          <Card className="p-3 text-xs space-y-1.5">
+          <Card className="p-g13 text-xs space-y-g5">
             <div className="flex items-center justify-between text-muted-foreground text-xs">
               <span>{t('admin.team_name_label', 'Nama Departemen')}:</span>
               <span className="font-semibold text-foreground">{team.name}</span>
@@ -1489,7 +1452,7 @@ export const DeleteDepartmentModal: React.FC<DeleteDepartmentModalProps> = ({
             </div>
           </Card>
 
-          <div className="pt-2 flex items-center justify-end gap-2">
+          <div className="pt-g8 flex items-center justify-end gap-g8">
             <Button variant="ghost"
               type="button"
               onClick={onClose}
@@ -1501,7 +1464,7 @@ export const DeleteDepartmentModal: React.FC<DeleteDepartmentModalProps> = ({
               onClick={handleDelete}
               disabled={isDeleting}
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-g13 h-g13" />
               <span>{isDeleting ? t('admin.deleting', 'Menghapus...') : t('admin.btn_confirm_delete_department', 'Hapus Departemen')}</span>
             </Button>
           </div>
@@ -1551,30 +1514,30 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
+    <ModalFrame size="sm" onClose={onClose} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
 
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-accent-foreground" />
-            <DialogTitle className="flex items-center gap-2">
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+          <div className="flex items-center gap-g8">
+            <Layers className="w-g16 h-g16 text-accent-foreground" />
+            <DialogTitle className="flex items-center gap-g8">
               {t('admin.modal_add_team_member', 'Tambah Anggota ke Tim')}
             </DialogTitle>
           </div>
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
           <div>
             <div className="text-xs text-muted-foreground">{t('admin.target_team', 'Tim Tujuan')}:</div>
             <div className="font-semibold text-sm text-foreground">{team.name}</div>
           </div>
 
-          <div>
-            <label htmlFor="adminmodals-field-21" className="block text-xs font-medium text-foreground mb-1">
+          <Field>
+            <FieldLabel htmlFor="adminmodals-field-21">
               {t('admin.select_user', 'Pilih Pengguna')}
-            </label>
+            </FieldLabel>
             {availableUsers.length === 0 ? (
-              <div className="text-xs text-muted-foreground p-3 bg-card rounded-lg">
+              <div className="text-xs text-muted-foreground p-g13 bg-card rounded-lg">
                 {t('admin.all_users_in_team', 'Semua pengguna yang terdaftar sudah tergabung dalam tim ini.')}
               </div>
             ) : (
@@ -1592,9 +1555,9 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({
                 ))}
               </AlphabeticalSelect>
             )}
-          </div>
+          </Field>
 
-          <div className="pt-2 flex items-center justify-end gap-2">
+          <div className="pt-g8 flex items-center justify-end gap-g8">
             <Button variant="ghost"
               type="button"
               onClick={onClose}
@@ -1652,27 +1615,27 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
+    <ModalFrame size="sm" onClose={onClose} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
 
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Mail className="w-4 h-4 text-accent-foreground" />
-            <DialogTitle className="flex items-center gap-2">
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+          <div className="flex items-center gap-g8">
+            <Mail className="w-g16 h-g16 text-accent-foreground" />
+            <DialogTitle className="flex items-center gap-g8">
               {t('admin.modal_create_inv', 'Undang Anggota Organisasi')}
             </DialogTitle>
           </div>
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <Card className="p-3 text-xs text-muted-foreground space-y-1">
-            <p className="font-semibold text-foreground flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-accent-foreground" />
+        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
+          <Card className="p-g13 text-xs text-muted-foreground space-y-g3">
+            <Text size="sm" weight="semibold" className="flex items-center gap-g5">
+              <Mail className="w-g13 h-g13 text-accent-foreground" />
               <span>{t('admin.pengiriman_via_email_smtp_relay', 'Pengiriman via Email (SMTP Relay)')}</span>
-            </p>
-            <p className="text-xs leading-relaxed text-muted-foreground">
+            </Text>
+            <Text size="xs" tone="muted" className="leading-relaxed">
               {t('admin.undangan_akan_dikirimkan_langsung_ke_inbox', 'Undangan akan dikirimkan langsung ke inbox email calon anggota menggunakan server SMTP yang terkonfigurasi.')}
-            </p>
+            </Text>
           </Card>
 
           <Field>
@@ -1724,7 +1687,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
             </AlphabeticalSelect>
           </Field>
 
-          <div className="pt-2 flex items-center justify-end gap-2">
+          <div className="pt-g8 flex items-center justify-end gap-g8">
             <Button variant="ghost"
               type="button"
               onClick={onClose}
@@ -1777,12 +1740,6 @@ export const GenerateApiKeyModal: React.FC<GenerateApiKeyModalProps> = ({
     { id: 'report:read', label: t('admin.scope_report_read', 'Ekspor Laporan Keuangan') },
   ];
 
-  const handleToggleScope = (scopeId: string) => {
-    setSelectedScopes((prev) =>
-      prev.includes(scopeId) ? prev.filter((s) => s !== scopeId) : [...prev, scopeId]
-    );
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -1819,42 +1776,37 @@ export const GenerateApiKeyModal: React.FC<GenerateApiKeyModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={handleFinish} className="w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 max-h-[92dvh] overflow-y-auto">
+    <ModalFrame size="md" onClose={handleFinish} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
 
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-status-info" />
-            <DialogTitle className="flex items-center gap-2">
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+          <div className="flex items-center gap-g8">
+            <Lock className="w-g16 h-g16 text-status-info" />
+            <DialogTitle className="flex items-center gap-g8">
               {generatedSecret
                 ? t('admin.key_generated_success', 'API Key Berhasil Dibuat')
                 : t('admin.modal_gen_key', 'Generate API Key Baru')}
             </DialogTitle>
           </div>
           <Button variant="ghost" size="icon-sm" type="button" onClick={handleFinish} aria-label={t('redline.close', 'Tutup')}>
-            <X className="w-4 h-4" />
+            <X className="w-g16 h-g16" />
           </Button>
         </DialogHeader>
 
         {error && (
-          <Alert status="error" role="alert">
-            <AlertContent>{error}</AlertContent>
+          <Alert status="error" role="alert"><AlertIndicator />
+            <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
           </Alert>
         )}
 
         {generatedSecret ? (
-          <div className="p-5 space-y-4">
-            <div className="p-3 rounded-lg bg-status-warning-soft border border-status-warning-border text-xs text-status-warning flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div>
-                <strong>{t('admin.key_save_now', 'Simpan kunci ini sekarang!')}</strong> {t('admin.key_copy_warn', 'Kunci rahasia ini hanya ditampilkan sekali demi keamanan.')}
-              </div>
-            </div>
+          <div className="p-g21 space-y-g13">
+            <Alert status="warning"><AlertIndicator /><AlertContent><AlertTitle>{t('admin.key_save_now', 'Simpan kunci ini sekarang!')}</AlertTitle><AlertDescription>{t('admin.key_copy_warn', 'Kunci rahasia ini hanya ditampilkan sekali demi keamanan.')}</AlertDescription></AlertContent></Alert>
 
-            <div>
-              <label htmlFor="adminmodals-field-25" className="block text-xs font-medium text-foreground mb-1">
+            <Field>
+              <FieldLabel htmlFor="adminmodals-field-25">
                 {t('admin.api_secret_label', 'API Secret Key')}
-              </label>
-              <div className="flex items-center gap-2">
+              </FieldLabel>
+              <div className="flex items-center gap-g8">
                 <Input id="adminmodals-field-25"
                   type="text"
                   readOnly
@@ -1866,13 +1818,13 @@ export const GenerateApiKeyModal: React.FC<GenerateApiKeyModalProps> = ({
                   onClick={handleCopy}
                   className="shrink-0"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? <Check className="w-g13 h-g13" /> : <Copy className="w-g13 h-g13" />}
                   {copied ? t('admin.copied', 'Tersalin') : t('admin.copy', 'Salin')}
                 </Button>
               </div>
-            </div>
+            </Field>
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-g8 flex justify-end">
               <Button variant="ghost"
                 type="button"
                 onClick={handleFinish}
@@ -1882,7 +1834,7 @@ export const GenerateApiKeyModal: React.FC<GenerateApiKeyModalProps> = ({
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
             <Field>
               <FieldLabel htmlFor="adminmodals-field-26">
                 {t('admin.api_name_label', 'Nama Kunci / Sistem Pengguna')}
@@ -1897,23 +1849,20 @@ export const GenerateApiKeyModal: React.FC<GenerateApiKeyModalProps> = ({
               />
             </Field>
 
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-2">
-                {t('admin.api_col_scopes', 'Cakupan Izin (Permission Scopes)')}
-              </label>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+            <Fieldset>
+              <FieldsetLegend>{t('admin.api_col_scopes', 'Cakupan Izin (Permission Scopes)')}</FieldsetLegend>
+              <CheckboxGroup value={selectedScopes} onValueChange={next => setSelectedScopes(next)} className="max-h-g233 overflow-y-auto">
                 {availableScopes.map((scope) => (
-                  <Checkbox checked={selectedScopes.includes(scope.id)} onCheckedChange={() => handleToggleScope(scope.id)}><CheckboxControl /><CheckboxLabel><div>
-                      <div className="font-medium text-foreground font-mono text-xs">
-                        {scope.id}
-                      </div>
-                      <div className="text-xs text-muted-foreground">{scope.label}</div>
-                    </div></CheckboxLabel><CheckboxHiddenInput /></Checkbox>
+                  <Checkbox key={scope.id} value={scope.id} className="items-start">
+                    <CheckboxControl className="mt-g2" />
+                    <CheckboxLabel className="flex flex-col items-start gap-0"><span className="font-mono text-xs font-medium">{scope.id}</span><Text as="span" size="xs" tone="muted">{scope.label}</Text></CheckboxLabel>
+                    <CheckboxHiddenInput />
+                  </Checkbox>
                 ))}
-              </div>
-            </div>
+              </CheckboxGroup>
+            </Fieldset>
 
-            <div className="pt-2 flex items-center justify-end gap-2">
+            <div className="pt-g8 flex items-center justify-end gap-g8">
               <Button variant="ghost"
                 type="button"
                 onClick={handleFinish}

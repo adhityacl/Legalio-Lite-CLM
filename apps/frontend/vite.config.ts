@@ -38,6 +38,10 @@ export default defineConfig(() => {
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {
+        // Containers and WSL bind mounts often drop file-change events, which leaves
+        // the dev server serving stale modules; polling keeps edits visible.
+        usePolling: true,
+        interval: 300,
         // SQLite writes to its -wal/-shm files (and the app rewrites
         // data_store.json) continuously during normal use — none of that is
         // source code, so it must never trigger a client page reload.

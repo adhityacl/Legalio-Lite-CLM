@@ -133,6 +133,9 @@ import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 import { Empty, EmptyActions, EmptyContent, EmptyDescription, EmptyIcon, EmptyTitle } from '@legalio/ui-components/empty';
 import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuItemGroup, MenuItemGroupLabel, MenuItemIndicator, MenuItemText, MenuPositioner, MenuSeparator, MenuTrigger, MenuViewport } from '@legalio/ui-components/menu';
+import { Toggle } from '@legalio/ui-components/toggle';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Text } from '@legalio/ui-components/text';
 interface HierarchyTreemapViewProps {
   partners: Partner[];
   contracts: Contract[];
@@ -229,19 +232,19 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
   const totalIODocs = ios.filter((i) => i.link_file_io || i.fileName).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-g21">
       {/* Top Header Banner */}
-      <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-g13">
         <div>
-          <Heading as="h2" size="lg" weight="semibold">
+          <Heading as="h2" size="md" weight="semibold">
             <span>{t('hierarchy.title', 'Struktur Dokumen')}</span>
           </Heading>
         </div>
-      </Card>
+      </div>
 
       {/* Control toolbar and view switcher */}
-      <Tabs value={viewMode} onValueChange={details => setViewMode(details.value as typeof viewMode)} className="flex flex-col gap-6">
-      <Card className="flex-row flex-wrap items-center justify-between gap-4 p-4">
+      <Tabs value={viewMode} onValueChange={details => setViewMode(details.value as typeof viewMode)} className="flex flex-col gap-g21">
+      <Card className="flex-row flex-wrap items-center justify-between gap-g13 p-g13">
         <TabsList aria-label={t('hierarchy.title')} className="w-full sm:w-auto">
           <TabsTrigger value="treemap"><GitFork aria-hidden="true" />{t('hierarchy.tree_view', 'Tampilan Pohon')}</TabsTrigger>
           <TabsTrigger value="audit"><FileSpreadsheet aria-hidden="true" />{t('hierarchy.audit_view', 'Tampilan Tabel')}</TabsTrigger>
@@ -249,8 +252,8 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
         </TabsList>
 
         {/* Search Input */}
-        {viewMode !== 'calendar' && <InputGroup className="relative w-full sm:w-72">
-          <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+        {viewMode !== 'calendar' && <InputGroup className="relative w-full sm:w-g233">
+          <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
           <InputGroupInput aria-label={t('hierarchy.search_placeholder', 'Cari partner, nomor kontrak, atau IO...')}
             type="text"
             placeholder={t('hierarchy.search_placeholder', 'Cari partner, nomor kontrak, atau IO...')}
@@ -266,7 +269,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
 
       {/* VIEW MODE 1: VISUAL TREEMAP */}
       {viewMode === 'treemap' && (
-        <div className="space-y-4">
+        <div className="space-y-g13">
           {filteredPartners.length === 0 ? (
             <Card>
               <TableEmptyMessage icon={Building2} />
@@ -287,18 +290,18 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                   className="overflow-hidden hover:border-border"
                 >
                   {/* LEVEL 1: CAMPAIGN HEADER (PARTNER) */}
-                  <div className="p-4 border-b border-border text-foreground flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <Button size="sm"
+                  <div className="p-g13 border-b border-border text-foreground flex flex-col md:flex-row md:items-center justify-between gap-g13">
+                    <div className="flex items-center gap-g13">
+                      <Button variant="ghost" size="icon-sm"
                         type="button"
                         aria-label={`${isPartnerExpanded ? t('nav.tutup_submenu', 'Tutup Submenu') : t('nav.buka_submenu', 'Buka Submenu')}: ${partner.nama_partner}`}
                         aria-expanded={isPartnerExpanded}
                         onClick={() => togglePartner(partner.partner_id)}
                       >
                         {isPartnerExpanded ? (
-                          <ChevronDown className="w-5 h-5 text-accent-foreground" />
+                          <ChevronDown aria-hidden="true" />
                         ) : (
-                          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                          <ChevronRight aria-hidden="true" />
                         )}
                       </Button>
 
@@ -309,11 +312,11 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end md:self-center">
+                    <div className="flex items-center gap-g8 self-end md:self-center">
                       <Button size="sm"
                         onClick={() => onOpenAddContract(partner.partner_id)}
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-g13 h-g13" />
                         <span>{t('hierarchy.kontrak_induk_short', 'New Contract')}</span>
                       </Button>
                     </div>
@@ -321,36 +324,36 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
 
                   {/* LEVEL 1 DUE DILIGENCE EXPANDED SUMMARY */}
                   {isPartnerExpanded && (
-                    <div className="bg-card border-b border-border p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                          <FileCheck className="w-3.5 h-3.5 text-accent-foreground" />
+                    <div className="bg-card border-b border-border p-g13">
+                      <div className="flex items-center justify-between mb-g8">
+                        <Text as="span" size="xs" weight="bold" className="uppercase tracking-wider flex items-center gap-g5">
+                          <FileCheck className="w-g13 h-g13 text-accent-foreground" />
                           {t('hierarchy.dd_verification_title', 'Verifikasi Dokumen Legal Due Diligence (Level 1 Checklist):')}
-                        </span>
-                        <span className="text-xs font-semibold text-muted-foreground">
+                        </Text>
+                        <Text as="span" size="xs" weight="semibold" tone="muted">
                           {partnerContracts.length} {t('hierarchy.contracts_linked', 'Kontrak Terhubung')}
-                        </span>
+                        </Text>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-g8 text-xs">
                         {ddDocs.length > 0 ? (
                           ddDocs.map((doc, idx) => {
                             const displayName = localizeDueDiligenceDocument(doc, policy.dueDiligenceChecklist, language);
                             return (
                               <Card
                                 key={idx}
-                                size="sm" className={`flex-row items-center justify-between p-2.5 ${doc.status === 'Available' ? 'border-status-success-border bg-status-success-soft' : ''}`}
+                                size="sm" className={`flex-row items-center justify-between p-g8 ${doc.status === 'Available' ? 'border-status-success-border bg-status-success-soft' : ''}`}
                               >
-                                <div className="truncate pr-1">
-                                  <span className="font-bold block truncate text-foreground" title={displayName}>{displayName}</span>
-                                  <span className="text-xs text-muted-foreground">
+                                <div className="truncate pr-g3">
+                                  <Tooltip><TooltipTrigger asChild><span className="font-bold block truncate text-foreground">{displayName}</span></TooltipTrigger><TooltipBody>{displayName}</TooltipBody></Tooltip>
+                                  <Text as="span" size="xs" tone="muted">
                                     {doc.status === 'Available' ? (doc.nomorDokumen || t('status.doc_available', 'Available')) : t('hierarchy.no_document', 'No Document')}
-                                  </span>
+                                  </Text>
                                 </div>
                                 {doc.status === 'Available' ? (
-                                  <CheckCircle2 className="w-4 h-4 text-accent-foreground shrink-0" />
+                                  <CheckCircle2 className="w-g16 h-g16 text-accent-foreground shrink-0" />
                                 ) : (
-                                  <AlertTriangle className="w-4 h-4 text-status-warning shrink-0" />
+                                  <AlertTriangle className="w-g16 h-g16 text-status-warning shrink-0" />
                                 )}
                               </Card>
                             );
@@ -366,13 +369,13 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
 
                   {/* LEVEL 2 & LEVEL 3 EXPANDED LIST */}
                   {isPartnerExpanded && (
-                    <div className="p-4 sm:p-6 space-y-4">
+                    <div className="p-g13 sm:p-g21 space-y-g13">
                       {partnerContracts.length === 0 ? (
                         <Empty><EmptyIcon><FileText aria-hidden="true" /></EmptyIcon><EmptyContent><EmptyTitle>{t('hierarchy.no_master_contract_for_partner', 'Belum ada Kontrak Induk terdaftar untuk Partner')} ({partner.nama_partner})</EmptyTitle><EmptyDescription>{t('hierarchy.commercial_contract_hint', 'Setiap kerjasama komersial membutuhkan kontrak induk sebelum rincian IO.')}</EmptyDescription></EmptyContent><EmptyActions><Button variant="ghost" size="sm"
                             onClick={() => onOpenAddContract(partner.partner_id)}
-                            className="mt-3"
+                            className="mt-g13"
                           >
-                            <Plus className="w-3.5 h-3.5" />
+                            <Plus className="w-g13 h-g13" />
                             <span>{t('hierarchy.create_new_master_contract', 'Buat Kontrak Induk Baru')}</span>
                           </Button></EmptyActions></Empty>
                       ) : (
@@ -389,26 +392,26 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                           return (
                             <div
                               key={contract.contract_id}
-                              className={`ml-0 sm:ml-4 border-l-2 pl-3 sm:pl-4 space-y-3 ${
+                              className={`ml-0 sm:ml-g13 border-l-2 pl-g13 sm:pl-g13 space-y-g13 ${
  isContractAddendum ? 'border-status-special-border ' : 'border-primary'
  }`}
                             >
                               {/* LEVEL 2: CONTRACT CARD */}
-                              <Card className="p-4 transition-all">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                                  <div className="flex items-center gap-2.5">
+                              <Card className="p-g13 transition-all">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-g13">
+                                  <div className="flex items-center gap-g8">
                                     <Button variant="ghost" size="icon-sm" aria-expanded={isContractExpanded} aria-label={`${isContractExpanded ? t('nav.tutup_submenu', 'Tutup Submenu') : t('nav.buka_submenu', 'Buka Submenu')}: ${contract.nomor_kontrak}`} onClick={() => toggleContract(contract.contract_id)}>
                                       {isContractExpanded ? (
-                                        <ChevronDown className={`w-4 h-4 ${isContractAddendum ? 'text-status-special ' : 'text-accent-foreground'}`} />
+                                        <ChevronDown className={`w-g16 h-g16 ${isContractAddendum ? 'text-status-special ' : 'text-accent-foreground'}`} />
                                       ) : (
-                                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                        <ChevronRight className="w-g16 h-g16 text-muted-foreground" />
                                       )}
                                     </Button>
 
                                     <Badge tone={isContractAddendum ? 'special' : 'info'} className="font-mono">L2</Badge>
 
                                     <div>
-                                      <div className="flex items-center gap-2 flex-wrap">
+                                      <div className="flex items-center gap-g8 flex-wrap">
                                         {isContractAddendum ? (
                                           <Badge tone="special">{t('hierarchy.agreement_addendum_badge', 'AGREEMENT ADDENDUM')}</Badge>
                                         ) : (
@@ -417,13 +420,13 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                                         <Badge className="font-mono">{contract.nomor_kontrak}</Badge>
                                         <Badge tone={statusTone(contract.status)}>{t(`status.${(contract.status || '').toLowerCase().replace(' ', '_')}`, contract.status)}</Badge>
                                       </div>
-                                      <Heading as="h4" size="xs" weight="semibold" className="mt-1">{contract.judul_kontrak}</Heading>
+                                      <Heading as="h4" size="xs" weight="semibold" className="mt-g3">{contract.judul_kontrak}</Heading>
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-2 self-end md:self-center">
+                                  <div className="flex items-center gap-g8 self-end md:self-center">
                                     {contract.link_file_kontrak && (
-                                      <Button asChild variant="outline" size="sm"><a href={contract.link_file_kontrak} target="_blank" rel="noopener noreferrer" title={t('hierarchy.download_contract_doc', 'Unduh Dokumen Kontrak')}><FileDown aria-hidden="true" />{t('hierarchy.download_doc', 'Unduh Dokumen')}</a></Button>
+                                      <Button asChild variant="outline" size="sm"><Tooltip><TooltipTrigger asChild><a href={contract.link_file_kontrak} target="_blank" rel="noopener noreferrer"><FileDown aria-hidden="true" />{t('hierarchy.download_doc', 'Unduh Dokumen')}</a></TooltipTrigger><TooltipBody>{t('hierarchy.download_contract_doc', 'Unduh Dokumen Kontrak')}</TooltipBody></Tooltip></Button>
                                     )}
 
                                     {hasPermission('document.edit') && (
@@ -437,32 +440,32 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                                     <Button size="sm"
                                       onClick={() => onOpenAddIO(contract.contract_id, contract.partner_id)}
                                     >
-                                      <Plus className="w-3.5 h-3.5" />
+                                      <Plus className="w-g13 h-g13" />
                                       <span>{t('hierarchy.new_io', 'Insertion Order Baru')}</span>
                                     </Button>
                                   </div>
                                 </div>
 
                                 {/* Contract quick terms */}
-                                <div className="mt-3 pt-2.5 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-foreground">
+                                <div className="mt-g13 pt-g8 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-g8 text-xs text-foreground">
                                   <div>
-                                    <span className="text-xs text-muted-foreground block">{t('hierarchy.commercial_value', 'Nilai Komersial:')}</span>
+                                    <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.commercial_value', 'Nilai Komersial:')}</Text>
                                     <span className="font-bold text-accent-foreground">
                                       {formatMoney(contract.nilai_kontrak, contract.currency)}
                                     </span>
                                   </div>
                                   <div>
-                                    <span className="text-xs text-muted-foreground block">{t('hierarchy.validity_period', 'Masa Berlaku:')}</span>
+                                    <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.validity_period', 'Masa Berlaku:')}</Text>
                                     <span className="font-semibold text-foreground">
                                       {contract.tanggal_mulai} s/d {contract.tanggal_berakhir}
                                     </span>
                                   </div>
                                   <div>
-                                    <span className="text-xs text-muted-foreground block">{t('hierarchy.notice_period', 'Notice Period:')}</span>
+                                    <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.notice_period', 'Notice Period:')}</Text>
                                     <span className="font-semibold">{contract.notice_period_hari} {t('hierarchy.days', 'Hari')}</span>
                                   </div>
                                   <div>
-                                    <span className="text-xs text-muted-foreground block">{t('hierarchy.executions_detail', 'Rincian Executions (IOs):')}</span>
+                                    <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.executions_detail', 'Rincian Executions (IOs):')}</Text>
                                     <span className="font-semibold text-accent-foreground">
                                       {contractIOs.length} {t('hierarchy.executions_count', 'Executions')}
                                     </span>
@@ -471,15 +474,15 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
 
                                 {/* Contract Internal Notes */}
                                 {contract.internal_notes && (
-                                  <Card variant="subtle" size="sm" className="mt-2.5 flex-row items-start gap-2 p-2.5 text-xs">
-                                    <FileText className="w-3.5 h-3.5 text-accent-foreground mt-0.5 shrink-0" />
+                                  <Card variant="subtle" size="sm" className="mt-g8 flex-row items-start gap-g8 p-g8 text-xs">
+                                    <FileText className="w-g13 h-g13 text-accent-foreground mt-g2 shrink-0" />
                                     <div className="flex-1 min-w-0">
-                                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide block mb-0.5">
+                                      <Text as="span" size="xs" weight="bold" tone="muted" className="uppercase tracking-wide block mb-g2">
                                         {t('hierarchy.contract_notes', 'Catatan Kontrak / Internal Notes')}:
-                                      </span>
-                                      <p className="text-foreground text-xs whitespace-pre-line leading-relaxed">
+                                      </Text>
+                                      <Text size="xs" className="whitespace-pre-line leading-relaxed">
                                         {contract.internal_notes}
-                                      </p>
+                                      </Text>
                                     </div>
                                   </Card>
                                 )}
@@ -487,9 +490,9 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
 
                               {/* LEVEL 3: INSERTION ORDERS */}
                               {isContractExpanded && (
-                                <div className="ml-3 sm:ml-6 space-y-2 border-l-2 border-primary pl-3">
+                                <div className="ml-g13 sm:ml-g21 space-y-g8 border-l-2 border-primary pl-g13">
                                   {contractIOs.length === 0 ? (
-                                    <Empty className="py-4"><EmptyContent><EmptyDescription>{t('hierarchy.no_io_connected', 'Belum ada Insertion Order terhubung ke Kontrak ini.')}</EmptyDescription></EmptyContent><EmptyActions><Button variant="link"
+                                    <Empty className="py-g13"><EmptyContent><EmptyDescription>{t('hierarchy.no_io_connected', 'Belum ada Insertion Order terhubung ke Kontrak ini.')}</EmptyDescription></EmptyContent><EmptyActions><Button variant="link"
                                         onClick={() => onOpenAddIO(contract.contract_id, contract.partner_id)}
                                       >
                                         {t('hierarchy.add_new_io', 'Tambah IO Baru')}
@@ -502,24 +505,24 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                                       return (
                                         <Card
                                           key={io.io_id}
-                                          className="p-3 flex flex-col gap-2.5 transition-all"
+                                          className="p-g13 flex flex-col gap-g8 transition-all"
                                         >
-                                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                            <div className="flex items-center gap-2.5">
+                                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-g13">
+                                            <div className="flex items-center gap-g8">
                                               <Badge tone="info" className="font-mono">L3</Badge>
                                               <div>
-                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                <div className="flex items-center gap-g5 flex-wrap">
                                                   <Badge tone="info">{t('hierarchy.insertion_order_badge', 'INSERTION ORDER (IO)')}</Badge>
                                                   <Badge className="font-mono">{io.nomor_io}</Badge>
                                                   <Badge>{io.kanal_media}</Badge>
                                                 </div>
-                                                <Heading as="h5" size="xs" weight="semibold" className="mt-0.5">{io.judul_io}</Heading>
+                                                <Heading as="h5" size="xs" weight="semibold" className="mt-g2">{io.judul_io}</Heading>
                                               </div>
                                             </div>
 
-                                            <div className="flex items-center gap-2 text-xs self-end sm:self-center">
+                                            <div className="flex items-center gap-g8 text-xs self-end sm:self-center">
                                               {io.link_file_io && (
-                                                <Button asChild variant="outline" size="sm"><a href={io.link_file_io} target="_blank" rel="noopener noreferrer" title={t('hierarchy.download_io_doc', 'Unduh Dokumen Insertion Order')}><FileDown aria-hidden="true" />{t('hierarchy.download_doc', 'Unduh Dokumen')}</a></Button>
+                                                <Button asChild variant="outline" size="sm"><Tooltip><TooltipTrigger asChild><a href={io.link_file_io} target="_blank" rel="noopener noreferrer"><FileDown aria-hidden="true" />{t('hierarchy.download_doc', 'Unduh Dokumen')}</a></TooltipTrigger><TooltipBody>{t('hierarchy.download_io_doc', 'Unduh Dokumen Insertion Order')}</TooltipBody></Tooltip></Button>
                                               )}
 
                                               {hasPermission('document.edit') && (
@@ -533,28 +536,28 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                                           </div>
 
                                           {/* IO Quick Details: Commercial Value, Validity Period, Pricing Model, Charging Type */}
-                                          <div className="pt-2 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-foreground">
+                                          <div className="pt-g8 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-g8 text-xs text-foreground">
                                             <div>
-                                              <span className="text-xs text-muted-foreground block">{t('hierarchy.commercial_value', 'Nilai Komersial:')}</span>
+                                              <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.commercial_value', 'Nilai Komersial:')}</Text>
                                               <span className="font-bold text-accent-foreground">
                                                 {formatMoney(io.nilai_io, io.currency || io.mata_uang)}
                                               </span>
                                             </div>
                                             <div>
-                                              <span className="text-xs text-muted-foreground block">{t('hierarchy.validity_period', 'Masa Berlaku:')}</span>
+                                              <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.validity_period', 'Masa Berlaku:')}</Text>
                                               <span className="font-semibold text-foreground">
                                                 {io.tanggal_mulai} s/d {io.tanggal_berakhir}
                                               </span>
                                             </div>
                                             <div>
-                                              <span className="text-xs text-muted-foreground block">{t('hierarchy.pricing_model', 'Model Biaya (Pricing Model):')}</span>
-                                              <div className="mt-0.5">
+                                              <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.pricing_model', 'Model Biaya (Pricing Model):')}</Text>
+                                              <div className="mt-g2">
                                                 <Badge tone="info">{io.pricing_model || 'Fixed'}</Badge>
                                               </div>
                                             </div>
                                             <div>
-                                              <span className="text-xs text-muted-foreground block">{t('hierarchy.charging_type', 'Skema Penagihan (Charging Type):')}</span>
-                                              <div className="mt-0.5">
+                                              <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.charging_type', 'Skema Penagihan (Charging Type):')}</Text>
+                                              <div className="mt-g2">
                                                 <Badge>{io.charging_type || io.skema_pembayaran || '-'}</Badge>
                                               </div>
                                             </div>
@@ -562,15 +565,15 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
 
                                           {/* IO Notes / Deliverables */}
                                           {ioNoteContent && (
-                                            <Card variant="subtle" size="sm" className="mt-0.5 flex-row items-start gap-2 p-2.5 text-xs">
-                                              <FileText className="w-3.5 h-3.5 text-accent-foreground mt-0.5 shrink-0" />
+                                            <Card variant="subtle" size="sm" className="mt-g2 flex-row items-start gap-g8 p-g8 text-xs">
+                                              <FileText className="w-g13 h-g13 text-accent-foreground mt-g2 shrink-0" />
                                               <div className="flex-1 min-w-0">
-                                                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide block mb-0.5">
+                                                <Text as="span" size="xs" weight="bold" tone="muted" className="uppercase tracking-wide block mb-g2">
                                                   {t('hierarchy.io_notes', 'Catatan Deliverables / Scope IO')}:
-                                                </span>
-                                                <p className="text-foreground text-xs whitespace-pre-line leading-relaxed">
+                                                </Text>
+                                                <Text size="xs" className="whitespace-pre-line leading-relaxed">
                                                   {ioNoteContent}
-                                                </p>
+                                                </Text>
                                               </div>
                                             </Card>
                                           )}
@@ -636,7 +639,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
            if (['vendorName', 'vendorType', 'vendorChannelName', 'vendorCodename', 'vendorStatus', 'vendorStartDate', 'vendorEndDate', 'vendorDuration', 'vendorPicName', 'vendorPicEmail', 'vendorPicPhone', 'vendorPicAlamat', 'vendorPicInternal', 'vendorBadanHukum', 'vendorStatusDD', 'vendorLinkNDA', 'vendorLinkCOR', 'vendorLinkDGT', 'vendorLinkTermination', 'vendorLinkAssessment', 'vendorLinkPlacement', 'vendorLinkInvoice', 'vendorLinkNIB', 'vendorLinkLicense', 'vendorLinkNPWP', 'vendorLinkAkta'].includes(colId)) {
               if (!row.isFirstForPartner) return null; // Skip rendering, covered by rowSpan
               const rowSpan = row.partnerRowSpan || 1;
-              const className = "border border-border  p-2 align-top";
+              const className = "border border-border  p-g8 align-top";
 
               if (colId === 'vendorName') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.vendorName}</TableCell>;
               if (colId === 'vendorType') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.vendorType || '-'}</TableCell>;
@@ -658,20 +661,20 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
               if (colId === 'vendorBadanHukum') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.vendorBadanHukum || '-'}</TableCell>;
               if (colId === 'vendorStatusDD') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.vendorStatusDD || '-'}</TableCell>;
 
-              if (colId === 'vendorLinkNDA') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkNDA ? <a href={row.vendorLinkNDA} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
-              if (colId === 'vendorLinkCOR') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkCOR ? <a href={row.vendorLinkCOR} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
-              if (colId === 'vendorLinkDGT') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkDGT ? <a href={row.vendorLinkDGT} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
-              if (colId === 'vendorLinkTermination') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkTermination ? <a href={row.vendorLinkTermination} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
-              if (colId === 'vendorLinkAssessment') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkAssessment ? <a href={row.vendorLinkAssessment} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
-              if (colId === 'vendorLinkPlacement') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkPlacement ? <a href={row.vendorLinkPlacement} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
-              if (colId === 'vendorLinkInvoice') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkInvoice ? <a href={row.vendorLinkInvoice} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
-              if (colId === 'vendorLinkNIB') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkNIB ? <a href={row.vendorLinkNIB} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
-              if (colId === 'vendorLinkLicense') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkLicense ? <a href={row.vendorLinkLicense} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
-              if (colId === 'vendorLinkNPWP') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkNPWP ? <a href={row.vendorLinkNPWP} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
-              if (colId === 'vendorLinkAkta') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkAkta ? <a href={row.vendorLinkAkta} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
+              if (colId === 'vendorLinkNDA') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkNDA ? <Button asChild variant="link"><a href={row.vendorLinkNDA} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'vendorLinkCOR') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkCOR ? <Button asChild variant="link"><a href={row.vendorLinkCOR} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'vendorLinkDGT') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkDGT ? <Button asChild variant="link"><a href={row.vendorLinkDGT} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'vendorLinkTermination') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkTermination ? <Button asChild variant="link"><a href={row.vendorLinkTermination} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'vendorLinkAssessment') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkAssessment ? <Button asChild variant="link"><a href={row.vendorLinkAssessment} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'vendorLinkPlacement') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkPlacement ? <Button asChild variant="link"><a href={row.vendorLinkPlacement} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'vendorLinkInvoice') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkInvoice ? <Button asChild variant="link"><a href={row.vendorLinkInvoice} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'vendorLinkNIB') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkNIB ? <Button asChild variant="link"><a href={row.vendorLinkNIB} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'vendorLinkLicense') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkLicense ? <Button asChild variant="link"><a href={row.vendorLinkLicense} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'vendorLinkNPWP') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkNPWP ? <Button asChild variant="link"><a href={row.vendorLinkNPWP} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'vendorLinkAkta') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.vendorLinkAkta ? <Button asChild variant="link"><a href={row.vendorLinkAkta} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
            }
 
-           const className = "border border-border  p-2 align-top";
+           const className = "border border-border  p-g8 align-top";
 
            // Evaluation Group (Not grouped)
            if (colId.startsWith('eval')) {
@@ -699,8 +702,8 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                      : convertToUsdWithFallback(Number(row.spending.total_amount) || 0, row.spending.currency || 'USD');
                   return <TableCell key={colId} className={`${className} whitespace-nowrap text-right`}>{amtUsd ? t('hierarchy.us', 'US$ {value}', { value: amtUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }) : '-'}</TableCell>;
                }
-              if (colId === 'spendInvoiceLink') return <TableCell key={colId} className={`${className} text-center`}>{row.spending.invoice_file_url ? <a href={row.spending.invoice_file_url} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
-              if (colId === 'spendBillingLink') return <TableCell key={colId} className={`${className} text-center`}>{row.spending.billing_file_url ? <a href={row.spending.billing_file_url} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
+              if (colId === 'spendInvoiceLink') return <TableCell key={colId} className={`${className} text-center`}>{row.spending.invoice_file_url ? <Button asChild variant="link"><a href={row.spending.invoice_file_url} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'spendBillingLink') return <TableCell key={colId} className={`${className} text-center`}>{row.spending.billing_file_url ? <Button asChild variant="link"><a href={row.spending.billing_file_url} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
            }
 
            // Contract Group (Grouped)
@@ -726,7 +729,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
               if (colId === 'contractNoticePeriod') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.notice_period_hari || '-'}</TableCell>;
               if (colId === 'contractStatusApproval') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.status_approval || '-'}</TableCell>;
               if (colId === 'contractInternalNotes') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.internal_notes || '-'}</TableCell>;
-              if (colId === 'contractLink') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.contract.link_file_kontrak ? <a href={row.contract.link_file_kontrak} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
+              if (colId === 'contractLink') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.contract.link_file_kontrak ? <Button asChild variant="link"><a href={row.contract.link_file_kontrak} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
            }
 
            // IO Group (Grouped)
@@ -751,7 +754,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                      : convertToUsdWithFallback(Number(row.io.nilai_io) || 0, row.io.currency || 'USD');
                   return <TableCell key={colId} rowSpan={rowSpan} className={`${className} whitespace-nowrap text-right`}>{ioUsd ? t('hierarchy.us', 'US$ {value}', { value: ioUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }) : '-'}</TableCell>;
                }
-              if (colId === 'ioLink') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.io.link_file_io ? <a href={row.io.link_file_io} target="_blank" rel="noreferrer" className="text-status-info hover:underline">{t('hierarchy.link', 'Link')}</a> : '-'}</TableCell>;
+              if (colId === 'ioLink') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.io.link_file_io ? <Button asChild variant="link"><a href={row.io.link_file_io} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
            }
 
            return <TableCell key={colId} className={className}>-</TableCell>;
@@ -1053,26 +1056,21 @@ const exportToCSV = () => {
         };
 
         return (
-          <div className={`bg-card rounded-2xl border border-border shadow-xs overflow-hidden flex flex-col ${baseRows.length === 0 ? '' : 'h-[calc(100vh-190px)]'}`}>
-            <div className="p-4 bg-background border-b border-border flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-accent-foreground" />
-                <Heading as="h3" size="sm" weight="semibold">{t('hierarchy.audit_table_title', 'Tabel Audit Lengkap')}</Heading>
-              </div>
-              <div className="mobile-page-actions flex flex-wrap items-center gap-3">
-                <Button variant={auditFlatMode ? 'secondary' : 'outline'} aria-pressed={auditFlatMode}
-                  onClick={() => setAuditFlatMode(!auditFlatMode)}
-                >
-                  <ArrowUpDown className="w-3.5 h-3.5" />
+          <Card className={`overflow-hidden flex flex-col ${baseRows.length === 0 ? '' : 'h-g987'}`}>
+            <div className="p-g13 bg-card border-b border-border flex flex-col md:flex-row gap-g13 items-start md:items-center justify-between">
+              <Heading as="h3" size="sm" weight="semibold">{t('hierarchy.audit_table_title', 'Tabel Audit Lengkap')}</Heading>
+              <div className="flex flex-wrap items-center gap-g13">
+                <Toggle variant="outline" pressed={auditFlatMode} onPressedChange={pressed => setAuditFlatMode(pressed)}>
+                  <ArrowUpDown aria-hidden="true" />
                   {auditFlatMode ? t('hierarchy.view_flat', 'Tampilan: Datar (Bisa di-Sort)') : t('hierarchy.view_grouped', 'Tampilan: Grouping Row')}
-                </Button>
+                </Toggle>
                 <Menu closeOnSelect={false} positioning={{ placement: 'bottom-end', gutter: 8 }} open={showColPicker} onOpenChange={details => setShowColPicker(details.open)}>
                   <MenuTrigger asChild>
                     <Button variant="outline"><SlidersHorizontal aria-hidden="true" />{t('hierarchy.custom_columns', 'Kustom Kolom')}</Button>
                   </MenuTrigger>
                   <MenuPositioner>
-                    <MenuContent className="w-64">
-                      <MenuViewport className="max-h-80">
+                    <MenuContent className="w-g233">
+                      <MenuViewport className="max-h-g377">
                         <MenuItemGroup>
                           <MenuItemGroupLabel>{t('hierarchy.custom_columns_title', 'Kustomisasi Kolom')}</MenuItemGroupLabel>
                           <MenuCheckboxItem value="__all" checked={Object.keys(INITIAL_AUDIT_COLS).every(k => auditVisibleCols[k])} onCheckedChange={checked => {
@@ -1104,13 +1102,13 @@ const exportToCSV = () => {
                     onClick={exportToCSV}
                     disabled={baseRows.length === 0}
                   >
-                    <FileDown className="w-3.5 h-3.5" />
+                    <FileDown className="w-g13 h-g13" />
                     {t('hierarchy.export_csv', 'Ekspor CSV')}
                   </Button>
                 )}
               </div>
             </div>
-            <TableScrollArea className="@container flex-1 rounded-none border-0">
+            <TableScrollArea className="@container flex-1">
               <Table className="w-full text-left">
                 <TableHeader className="sticky top-0 z-10">
                   <TableRow>
@@ -1154,13 +1152,12 @@ const exportToCSV = () => {
                         className="whitespace-nowrap"
                       >
                         {auditFlatMode ? (
-                          <Button variant="ghost" size="sm" onClick={() => handleSort(col.id)}
-                            title={t('hierarchy.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label: t(`audit_col_${col.id}`, col.label) })}>
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" onClick={() => handleSort(col.id)}>
                             {t(`audit_col_${col.id}`, col.label)}
                             {auditSortConfig?.key === col.id
                               ? (auditSortConfig.direction === 'asc' ? <ArrowUp aria-hidden="true" /> : <ArrowDown aria-hidden="true" />)
                               : <ArrowUpDown aria-hidden="true" className="text-muted-foreground" />}
-                          </Button>
+                          </Button></TooltipTrigger><TooltipBody>{t('hierarchy.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label: t(`audit_col_${col.id}`, col.label) })}</TooltipBody></Tooltip>
                         ) : t(`audit_col_${col.id}`, col.label)}
                       </TableColumnHeader>
                     ))}
@@ -1179,7 +1176,7 @@ const exportToCSV = () => {
                 </TableBody>
               </Table>
             </TableScrollArea>
-          </div>
+          </Card>
         );
       })()}
       </TabsContent>

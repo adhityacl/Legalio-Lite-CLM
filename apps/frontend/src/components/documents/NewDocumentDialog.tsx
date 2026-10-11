@@ -15,7 +15,9 @@ import {
 import { Button } from '@legalio/ui-components/button';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
-import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { Heading } from '@legalio/ui-components/heading';
+import { Text } from '@legalio/ui-components/text';
 /** What the new document starts from; `null` means a blank document. */
 export type NewDocumentChoice = { name: string; contentId: string; customFields: any[] } | null;
 
@@ -79,21 +81,22 @@ export const NewDocumentDialog: React.FC<{
 
   const visible = templates.filter((tpl) => tpl.name.toLowerCase().includes(query.trim().toLowerCase()));
   const dateLocale = language === 'ID' ? 'id-ID' : language === 'ZH' ? 'zh-CN' : 'en-US';
-  const cardClass =
-    'ds-choice';
+  // Template tiles: moduix outline Buttons laid out as a card grid.
+  const cardClass = 'h-auto min-h-g110 w-full flex-col items-start justify-start gap-g8 whitespace-normal p-g13 text-start';
+  const gridClass = 'grid grid-cols-1 gap-g13 sm:grid-cols-2 lg:grid-cols-3';
 
   return (
-    <ModalFrame onClose={onClose} className="max-w-3xl">
-      <div className="flex items-center justify-between gap-4 px-6 pt-5 pb-3">
-        <DialogTitle className="flex items-center gap-2">
+    <ModalFrame size="lg" onClose={onClose} >
+      <div className="flex items-center justify-between gap-g13 px-g21 pt-g21 pb-g13">
+        <DialogTitle className="flex items-center gap-g8">
           {t('documents.new_dialog.title', 'Buat dokumen')}
         </DialogTitle>
         <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
       </div>
 
-      <div className="overflow-y-auto px-6 pb-6 space-y-5">
+      <div className="overflow-y-auto px-g21 pb-g21 space-y-g21">
         <InputGroup className="relative">
-          <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+          <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
           <InputGroupInput
             type="search"
             value={query}
@@ -104,55 +107,55 @@ export const NewDocumentDialog: React.FC<{
         </InputGroup>
 
         <section aria-labelledby="new-doc-scratch">
-          <h3 id="new-doc-scratch" className="mb-2 text-sm font-semibold text-foreground">
+          <Heading as="h3" size="xs" weight="semibold" id="new-doc-scratch" className="mb-g8">
             {t('documents.new_dialog.scratch', 'Mulai dari awal')}
-          </h3>
-          <div>
+          </Heading>
+          <div className={gridClass}>
             <Button variant="outline"
               type="button"
               onClick={() => onSelect(null)}
-              className={`${cardClass} `}
+              className={cardClass}
             >
-              <Plus className="h-5 w-5" aria-hidden />
+              <Plus className="h-g21 w-g21" aria-hidden />
               {t('documents.new_dialog.blank', 'Dokumen kosong')}
             </Button>
           </div>
         </section>
 
         <section aria-labelledby="new-doc-templates">
-          <h3 id="new-doc-templates" className="mb-2 text-sm font-semibold text-foreground">
+          <Heading as="h3" size="xs" weight="semibold" id="new-doc-templates" className="mb-g8">
             {t('documents.new_dialog.templates', 'Template')}
-          </h3>
+          </Heading>
           {visible.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('documents.new_dialog.no_match', 'Tidak ada template yang cocok.')}</p>
+            <Text size="sm" tone="muted">{t('documents.new_dialog.no_match', 'Tidak ada template yang cocok.')}</Text>
           ) : (
-            <div>
+            <div className={gridClass}>
               {visible.map((tpl) => (
                 <Button variant="outline"
                   key={tpl.id}
                   type="button"
                   onClick={() => onSelect(tpl.load())}
-                  className={`${cardClass} `}
+                  className={cardClass}
                 >
-                  <FileText className="h-7 w-7 text-accent-foreground" aria-hidden />
+                  <FileText className="size-g26 text-accent-foreground" aria-hidden />
                   <span className="line-clamp-2">{tpl.name}</span>
-                  <span className="text-xs font-medium text-muted-foreground">
+                  <Text as="span" size="xs" weight="medium" tone="muted">
                     {tpl.builtIn
                       ? t('documents.new_dialog.built_in', 'Template bawaan')
                       : tpl.updatedAt
                         ? new Date(tpl.updatedAt).toLocaleDateString(dateLocale, { day: 'numeric', month: 'short', year: 'numeric' })
                         : ''}
-                  </span>
+                  </Text>
                 </Button>
               ))}
             </div>
           )}
           {status === 'loading' && (
-            <p role="status" className="mt-3 text-xs text-muted-foreground">{t('common.loading', 'Loading…')}</p>
+            <Text size="xs" tone="muted" className="mt-g13" role="status">{t('common.loading', 'Loading…')}</Text>
           )}
           {status === 'error' && (
-            <Alert status="error" role="alert">
-              <AlertContent>{t('documents.new_dialog.load_failed', 'Template organisasi gagal dimuat. Template bawaan tetap tersedia.')}</AlertContent>
+            <Alert status="error" role="alert"><AlertIndicator />
+              <AlertContent><AlertDescription>{t('documents.new_dialog.load_failed', 'Template organisasi gagal dimuat. Template bawaan tetap tersedia.')}</AlertDescription></AlertContent>
             </Alert>
           )}
         </section>

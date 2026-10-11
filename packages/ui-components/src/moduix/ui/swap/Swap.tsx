@@ -1,0 +1,71 @@
+'use client';
+
+import { Swap as SwapPrimitive, useSwap, useSwapContext } from '@ark-ui/react/swap';
+import type { ComponentProps, ComponentRef } from 'react';
+import { forwardRef } from 'react';
+import { cn } from '../../lib/cn';
+
+type SwapAnimation = 'fade' | 'scale' | 'rotate' | 'flip' | (string & {});
+
+type SwapProps = ComponentProps<typeof SwapPrimitive.Root> & {
+  animation?: SwapAnimation;
+};
+
+type SwapRootProviderProps = ComponentProps<typeof SwapPrimitive.RootProvider> & {
+  animation?: SwapAnimation;
+};
+
+const Swap = forwardRef<ComponentRef<typeof SwapPrimitive.Root>, SwapProps>(function Swap(
+  { animation = 'scale', className, ...props },
+  ref,
+) {
+  return (
+    <SwapPrimitive.Root
+      ref={ref}
+      className={cn(
+        "group/swap place-items-center align-middle [grid-template-areas:'swap'] data-[animation=flip]:[perspective:var(--spacing-g377)]",
+        className,
+      )}
+      {...props}
+      data-animation={animation}
+      data-slot="swap-root"
+    />
+  );
+});
+
+const SwapRootProvider = forwardRef<
+  ComponentRef<typeof SwapPrimitive.RootProvider>,
+  SwapRootProviderProps
+>(function SwapRootProvider({ animation = 'scale', className, ...props }, ref) {
+  return (
+    <SwapPrimitive.RootProvider
+      ref={ref}
+      className={cn(
+        "group/swap place-items-center align-middle [grid-template-areas:'swap'] data-[animation=flip]:[perspective:var(--spacing-g377)]",
+        className,
+      )}
+      {...props}
+      data-animation={animation}
+      data-slot="swap-root-provider"
+    />
+  );
+});
+
+const SwapIndicator = forwardRef<
+  ComponentRef<typeof SwapPrimitive.Indicator>,
+  ComponentProps<typeof SwapPrimitive.Indicator>
+>(function SwapIndicator({ className, ...props }, ref) {
+  return (
+    <SwapPrimitive.Indicator
+      ref={ref}
+      className={cn(
+        'items-center justify-center text-inherit group-data-[animation=flip]/swap:[backface-visibility:hidden] group-data-[animation=fade]/swap:data-[state=closed]:animate-moduix-swap-fade-exit group-data-[animation=flip]/swap:data-[state=closed]:animate-moduix-swap-flip-exit group-data-[animation=rotate]/swap:data-[state=closed]:animate-moduix-swap-rotate-exit group-data-[animation=scale]/swap:data-[state=closed]:animate-moduix-swap-scale-exit group-data-[animation=fade]/swap:data-[state=open]:animate-moduix-swap-fade-enter group-data-[animation=flip]/swap:data-[state=open]:animate-moduix-swap-flip-enter group-data-[animation=rotate]/swap:data-[state=open]:animate-moduix-swap-rotate-enter group-data-[animation=scale]/swap:data-[state=open]:animate-moduix-swap-scale-enter motion-reduce:[animation-delay:0ms] motion-reduce:[animation-duration:1ms]',
+        className,
+      )}
+      {...props}
+      data-slot="swap-indicator"
+    />
+  );
+});
+
+export { Swap, SwapIndicator, SwapRootProvider, useSwap, useSwapContext, type SwapAnimation };

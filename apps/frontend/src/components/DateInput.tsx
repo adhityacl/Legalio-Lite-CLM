@@ -68,7 +68,7 @@ function toDateValue(iso: string | undefined): DateValue | undefined {
 }
 
 /** Month and year grids shared by the picker views. */
-function GridView({ view }: { view: 'month' | 'year' }) {
+export function GridView({ view }: { view: 'month' | 'year' }) {
   return (
     <DatePickerView view={view}>
       <DatePickerContext>

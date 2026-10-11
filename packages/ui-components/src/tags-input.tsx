@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/tags-input';
+export * from './moduix/ui/tags-input';

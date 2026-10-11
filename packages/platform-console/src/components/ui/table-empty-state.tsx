@@ -30,7 +30,7 @@ export const TableEmptyState: React.FC<EmptyContentProps & { colSpan: number }> 
   // TableEmpty renders its own row. The sticky wrapper keeps the message centered
   // in the visible area when a wide table scrolls sideways.
   <TableEmpty colSpan={colSpan}>
-    <div className="sticky left-0 w-full max-w-[min(100cqw,calc(100vw-2rem))]">
+    <div className="sticky left-0 w-full max-w-full">
       <EmptyState {...content} framed={false} />
     </div>
   </TableEmpty>

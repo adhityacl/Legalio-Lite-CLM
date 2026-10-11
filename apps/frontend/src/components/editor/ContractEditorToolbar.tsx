@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
   Undo2,
@@ -42,38 +42,36 @@ import { useAlertToast } from '../../context/AlertToastContext';
 import { insertPricingTable, recalculatePricingTable } from '../../lib/tiptapPricingTable';
 
 import { Button } from '@legalio/ui-components/button';
-import { Card } from '@legalio/ui-components/card';
+import { Toggle } from '@legalio/ui-components/toggle';
+import { Separator } from '@legalio/ui-components/separator';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Popover, PopoverBody, PopoverContent, PopoverFooter, PopoverPositioner, PopoverTitle, PopoverTrigger } from '@legalio/ui-components/popover';
+import { Input } from '@legalio/ui-components/input';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { Text } from '@legalio/ui-components/text';
 interface ContractEditorToolbarProps {
   editor: Editor | null;
 }
 
+/** Icon-only toolbar action: moduix Toggle for formatting state (aria-pressed), Button otherwise, each with a Tooltip. */
 const ToolbarButton: React.FC<{
   onClick: () => void;
   active?: boolean;
   disabled?: boolean;
-  title: string;
+  label: string;
   children: React.ReactNode;
-}> = ({ onClick, active, disabled, title, children }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    title={title}
-    aria-label={title}
-    aria-pressed={active}
-    className={`min-w-10 min-h-10 lg:min-w-8 lg:min-h-8 inline-flex items-center justify-center p-1.5 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
- active
- ? 'bg-status-success-soft text-status-success '
- : 'text-foreground hover:bg-muted '
- }`}
-  >
-    {children}
-  </button>
+}> = ({ onClick, active, disabled, label: title, children }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      {active === undefined
+        ? <Button type="button" variant="ghost" size="icon-sm" onClick={onClick} disabled={disabled} aria-label={title}>{children}</Button>
+        : <Toggle variant="ghost" size="icon-sm" pressed={active} onPressedChange={onClick} disabled={disabled} aria-label={title}>{children}</Toggle>}
+    </TooltipTrigger>
+    <TooltipBody>{title}</TooltipBody>
+  </Tooltip>
 );
 
-const Divider = () => (
-  <div className="w-px self-stretch bg-muted mx-1" />
-);
+const Divider = () => <Separator orientation="vertical" className="mx-g3 self-stretch" />;
 
 const GRID_MAX = 8;
 
@@ -94,37 +92,24 @@ const TableGridPicker: React.FC<{
   const [hovered, setHovered] = useState({ row: 0, col: 0 });
 
   return (
-    <div className="p-2.5">
-      <div
-        className="grid gap-[3px] w-fit mx-auto"
-        style={{ gridTemplateColumns: `repeat(${GRID_MAX}, 16px)`, gridAutoRows: '16px' }}
-        onMouseLeave={() => setHovered({ row: 0, col: 0 })}
-      >
+    <div className="grid gap-g8">
+      <div className="grid w-fit grid-cols-8 gap-g2" onMouseLeave={() => setHovered({ row: 0, col: 0 })}>
         {Array.from({ length: GRID_MAX * GRID_MAX }).map((_, i) => {
           const row = Math.floor(i / GRID_MAX);
           const col = i % GRID_MAX;
           const isActive = row < hovered.row && col < hovered.col;
           return (
-            <Button variant="outline"
-              key={i}
-              type="button"
+            <Toggle key={i} variant="outline" size="icon-sm" pressed={isActive}
+              aria-label={`${row + 1} x ${col + 1}`}
               onMouseEnter={() => setHovered({ row: row + 1, col: col + 1 })}
-              onClick={() => onPick(row + 1, col + 1)}
-              className={`w-full ${
- isActive
- ? ''
- : ' '
- }`}
-            />
+              onFocus={() => setHovered({ row: row + 1, col: col + 1 })}
+              onPressedChange={() => onPick(row + 1, col + 1)} className="size-g21 min-h-0 min-w-0" />
           );
         })}
       </div>
-      <div className="flex items-center justify-center gap-1 mt-2 text-xs font-semibold text-muted-foreground bg-card rounded-lg py-1">
-        <Table className="w-3 h-3" />
-        <span>{hovered.row || 1}</span>
-        <span className="text-muted-foreground">x</span>
-        <span>{hovered.col || 1}</span>
-      </div>
+      <Text size="xs" tone="muted" className="inline-flex items-center justify-center gap-g3">
+        <Table aria-hidden="true" className="size-g13" />{hovered.row || 1} x {hovered.col || 1}
+      </Text>
     </div>
   );
 };
@@ -136,6 +121,9 @@ export const ContractEditorToolbar: React.FC<ContractEditorToolbarProps> = ({
   const showAlert = useAlertToast();
   const [showTableMenu, setShowTableMenu] = useState(false);
   const [showAllTools, setShowAllTools] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const linkInputId = useId();
 
   if (!editor) return null;
 
@@ -161,10 +149,8 @@ export const ContractEditorToolbar: React.FC<ContractEditorToolbarProps> = ({
     });
   };
 
-  const setLink = () => {
-    const previousUrl = editor.getAttributes('link').href as string | undefined;
-    const url = window.prompt(t('editor.masukkan_url_tautan', 'Masukkan URL tautan:'), previousUrl || 'https://');
-    if (url === null) return;
+  const setLink = (url: string) => {
+    setLinkOpen(false);
     if (url === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
       return;
@@ -173,147 +159,175 @@ export const ContractEditorToolbar: React.FC<ContractEditorToolbarProps> = ({
   };
 
   return (
-    <div className="bg-card border-b border-border px-2 py-1 shrink-0 z-10">
-      <div className="flex items-center gap-1 lg:hidden">
-        <ToolbarButton title={t('editor.undo_ctrl_z')} onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()}><Undo2 className="w-4 h-4" /></ToolbarButton>
-        <ToolbarButton title={t('editor.tebal_ctrl_b')} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}><Bold className="w-4 h-4" /></ToolbarButton>
-        <ToolbarButton title={t('editor.miring_ctrl_i')} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}><Italic className="w-4 h-4" /></ToolbarButton>
-        <Button variant="ghost" type="button" aria-expanded={showAllTools} onClick={() => setShowAllTools(!showAllTools)} className="ml-auto">{t(showAllTools ? 'ui.fewer_tools' : 'ui.more_tools')}</Button>
+    <div role="toolbar" aria-label={t('editor.toolbar', 'Format dokumen')} className="z-10 shrink-0 border-b border-border bg-card px-g8 py-g3">
+      <div className="flex items-center gap-g3 lg:hidden">
+        <ToolbarButton label={t('editor.undo_ctrl_z')} onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()}><Undo2 /></ToolbarButton>
+        <ToolbarButton label={t('editor.tebal_ctrl_b')} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}><Bold /></ToolbarButton>
+        <ToolbarButton label={t('editor.miring_ctrl_i')} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}><Italic /></ToolbarButton>
+        <Button variant="ghost" size="sm" type="button" aria-expanded={showAllTools} onClick={() => setShowAllTools(!showAllTools)} className="ms-auto">{t(showAllTools ? 'ui.fewer_tools' : 'ui.more_tools')}</Button>
       </div>
-      <div className={`${showAllTools ? 'flex' : 'hidden'} lg:flex flex-wrap items-center gap-0.5`}>
+      <div className={`${showAllTools ? 'flex' : 'hidden'} lg:flex flex-wrap items-center gap-g2`}>
       {/* History */}
-      <ToolbarButton title={t('editor.undo_ctrl_z', 'Undo (Ctrl+Z)')} onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()}>
-        <Undo2 className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.undo_ctrl_z', 'Undo (Ctrl+Z)')} onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()}>
+        <Undo2 />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.redo_ctrl_y', 'Redo (Ctrl+Y)')} onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()}>
-        <Redo2 className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.redo_ctrl_y', 'Redo (Ctrl+Y)')} onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()}>
+        <Redo2 />
       </ToolbarButton>
 
       <Divider />
 
       {/* Block type */}
       <ToolbarButton
-        title={t('editor.heading_1_judul_utama', 'Heading 1 (Judul Utama)')}
+        label={t('editor.heading_1_judul_utama', 'Heading 1 (Judul Utama)')}
+        active={editor.isActive('heading', { level: 1 })}
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
       >
-        <Heading1 className="w-3.5 h-3.5" />
+        <Heading1 />
       </ToolbarButton>
       <ToolbarButton
-        title={t('editor.heading_2_judul_pasal', 'Heading 2 (Judul Pasal)')}
+        label={t('editor.heading_2_judul_pasal', 'Heading 2 (Judul Pasal)')}
+        active={editor.isActive('heading', { level: 2 })}
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
       >
-        <Heading2 className="w-3.5 h-3.5" />
+        <Heading2 />
       </ToolbarButton>
       <ToolbarButton
-        title={t('editor.heading_3', 'Heading 3')}
+        label={t('editor.heading_3', 'Heading 3')}
+        active={editor.isActive('heading', { level: 3 })}
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
       >
-        <Heading3 className="w-3.5 h-3.5" />
+        <Heading3 />
       </ToolbarButton>
       <ToolbarButton
-        title={t('editor.teks_normal_paragraf', 'Teks Normal Paragraf')}
+        label={t('editor.teks_normal_paragraf', 'Teks Normal Paragraf')}
         onClick={() => editor.chain().focus().setParagraph().run()}
       >
-        <span className="text-xs font-bold px-0.5">P</span>
+        <Text as="span" size="xs" weight="bold">P</Text>
       </ToolbarButton>
       <ToolbarButton
-        title={t('editor.kutipan_blockquote', 'Kutipan (Blockquote)')}
-        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        label={t('editor.kutipan_blockquote', 'Kutipan (Blockquote)')}
+        active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}
       >
-        <Quote className="w-3.5 h-3.5" />
+        <Quote />
       </ToolbarButton>
       <ToolbarButton
-        title={t('editor.blok_kode', 'Blok Kode')}
-        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+        label={t('editor.blok_kode', 'Blok Kode')}
+        active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()}
       >
-        <Code2 className="w-3.5 h-3.5" />
+        <Code2 />
       </ToolbarButton>
 
       <Divider />
 
       {/* Text styling */}
-      <ToolbarButton title={t('editor.tebal_ctrl_b', 'Tebal (Ctrl+B)')} onClick={() => editor.chain().focus().toggleBold().run()}>
-        <Bold className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.tebal_ctrl_b', 'Tebal (Ctrl+B)')} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
+        <Bold />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.miring_ctrl_i', 'Miring (Ctrl+I)')} onClick={() => editor.chain().focus().toggleItalic().run()}>
-        <Italic className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.miring_ctrl_i', 'Miring (Ctrl+I)')} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
+        <Italic />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.garis_bawah_ctrl_u', 'Garis Bawah (Ctrl+U)')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
-        <Underline className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.garis_bawah_ctrl_u', 'Garis Bawah (Ctrl+U)')} active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+        <Underline />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.coret_strikethrough', 'Coret (Strikethrough)')} onClick={() => editor.chain().focus().toggleStrike().run()}>
-        <Strikethrough className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.coret_strikethrough', 'Coret (Strikethrough)')} active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
+        <Strikethrough />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.sorot_teks_highlight', 'Sorot Teks (Highlight)')} onClick={() => editor.chain().focus().toggleHighlight().run()}>
-        <Highlighter className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.sorot_teks_highlight', 'Sorot Teks (Highlight)')} active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight().run()}>
+        <Highlighter />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.tautan_link', 'Tautan (Link)')} onClick={setLink}>
-        <Link2 className="w-3.5 h-3.5" />
-      </ToolbarButton>
+      <Popover ids={{ trigger: 'editor-link-trigger' }} open={linkOpen} onOpenChange={(details) => {
+        setLinkOpen(details.open);
+        if (details.open) setLinkUrl((editor.getAttributes('link').href as string | undefined) || 'https://');
+      }}>
+        <Tooltip ids={{ trigger: 'editor-link-trigger' }}>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Toggle variant="ghost" size="icon-sm" pressed={editor.isActive('link')} aria-label={t('editor.tautan_link', 'Tautan (Link)')}><Link2 /></Toggle>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipBody>{t('editor.tautan_link', 'Tautan (Link)')}</TooltipBody>
+        </Tooltip>
+        <PopoverPositioner>
+          <PopoverContent>
+            <form onSubmit={(event) => { event.preventDefault(); setLink(linkUrl.trim()); }} className="grid gap-g13">
+              <PopoverTitle>{t('editor.tautan_link', 'Tautan (Link)')}</PopoverTitle>
+              <Field>
+                <FieldLabel htmlFor={linkInputId}>{t('editor.masukkan_url_tautan', 'Masukkan URL tautan:')}</FieldLabel>
+                <Input id={linkInputId} type="url" value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} autoFocus />
+              </Field>
+              <PopoverFooter className="mt-0">
+                <Button type="button" variant="outline" size="sm" onClick={() => setLinkOpen(false)}>{t('common.cancel', 'Batal')}</Button>
+                <Button type="submit" size="sm">{t('admin.btn_apply', 'Terapkan')}</Button>
+              </PopoverFooter>
+            </form>
+          </PopoverContent>
+        </PopoverPositioner>
+      </Popover>
       <ToolbarButton
-        title={t('editor.hapus_tautan', 'Hapus Tautan')}
+        label={t('editor.hapus_tautan', 'Hapus Tautan')}
         disabled={!editor.isActive('link')}
         onClick={() => editor.chain().focus().unsetLink().run()}
       >
-        <Unlink className="w-3.5 h-3.5" />
+        <Unlink />
       </ToolbarButton>
 
       <Divider />
 
       {/* Alignment */}
-      <ToolbarButton title={t('editor.rata_kiri', 'Rata Kiri')} onClick={() => editor.chain().focus().setTextAlign('left').run()}>
-        <AlignLeft className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.rata_kiri', 'Rata Kiri')} active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()}>
+        <AlignLeft />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.rata_tengah', 'Rata Tengah')} onClick={() => editor.chain().focus().setTextAlign('center').run()}>
-        <AlignCenter className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.rata_tengah', 'Rata Tengah')} active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()}>
+        <AlignCenter />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.rata_kanan', 'Rata Kanan')} onClick={() => editor.chain().focus().setTextAlign('right').run()}>
-        <AlignRight className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.rata_kanan', 'Rata Kanan')} active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()}>
+        <AlignRight />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.rata_kanan_kiri_justify', 'Rata Kanan-Kiri (Justify)')} onClick={() => editor.chain().focus().setTextAlign('justify').run()}>
-        <AlignJustify className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.rata_kanan_kiri_justify', 'Rata Kanan-Kiri (Justify)')} active={editor.isActive({ textAlign: 'justify' })} onClick={() => editor.chain().focus().setTextAlign('justify').run()}>
+        <AlignJustify />
       </ToolbarButton>
 
       <Divider />
 
       {/* Lists */}
-      <ToolbarButton title={t('editor.bullet_list', 'Bullet List')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
-        <List className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.bullet_list', 'Bullet List')} active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+        <List />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.numbered_list', 'Numbered List')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
-        <ListOrdered className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.numbered_list', 'Numbered List')} active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+        <ListOrdered />
       </ToolbarButton>
       <ToolbarButton
-        title={t('editor.kurangi_indentasi', 'Kurangi Indentasi')}
+        label={t('editor.kurangi_indentasi', 'Kurangi Indentasi')}
         disabled={!editor.can().liftListItem('listItem')}
         onClick={() => editor.chain().focus().liftListItem('listItem').run()}
       >
-        <IndentDecrease className="w-3.5 h-3.5" />
+        <IndentDecrease />
       </ToolbarButton>
       <ToolbarButton
-        title={t('editor.tambah_indentasi', 'Tambah Indentasi')}
+        label={t('editor.tambah_indentasi', 'Tambah Indentasi')}
         disabled={!editor.can().sinkListItem('listItem')}
         onClick={() => editor.chain().focus().sinkListItem('listItem').run()}
       >
-        <IndentIncrease className="w-3.5 h-3.5" />
+        <IndentIncrease />
       </ToolbarButton>
 
       <Divider />
 
       {/* Table */}
-      <div className="relative">
-        <ToolbarButton
-          title={t('partners.table_view', 'Tabel')}
-          active={showTableMenu}
-          onClick={() => setShowTableMenu((v) => !v)}
-        >
-          <Table className="w-3.5 h-3.5" />
-        </ToolbarButton>
-        {showTableMenu && (
-          <Card
-            className="absolute top-full left-0 mt-1 w-fit z-30"
-            onMouseLeave={() => setShowTableMenu(false)}
-          >
+      <Popover ids={{ trigger: 'editor-table-trigger' }} open={showTableMenu} onOpenChange={(details) => setShowTableMenu(details.open)} positioning={{ placement: 'bottom-start' }}>
+        <Tooltip ids={{ trigger: 'editor-table-trigger' }}>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Toggle variant="ghost" size="icon-sm" pressed={showTableMenu} aria-label={t('partners.table_view', 'Tabel')}><Table /></Toggle>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipBody>{t('partners.table_view', 'Tabel')}</TooltipBody>
+        </Tooltip>
+        <PopoverPositioner>
+          <PopoverContent className="w-fit min-w-0">
+            <PopoverTitle className="sr-only">{t('partners.table_view', 'Tabel')}</PopoverTitle>
+            <PopoverBody className="grid gap-g8">
             <TableGridPicker
               onPick={(rows, cols) => {
                 editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
@@ -322,112 +336,79 @@ export const ContractEditorToolbar: React.FC<ContractEditorToolbarProps> = ({
             />
 
             {insideTable && (
-              <div className="p-1.5 space-y-0.5 border-t border-border">
-                <button
-                  type="button"
-                  onClick={() => editor.chain().focus().addRowAfter().run()}
-                  className="w-full text-left px-2.5 py-1.5 text-xs font-medium rounded-md hover:bg-muted text-muted-foreground flex items-center gap-2 whitespace-nowrap"
-                >
-                  <Rows3 className="w-3.5 h-3.5" /> {t('editor.tambah_baris', 'Tambah Baris')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => editor.chain().focus().addColumnAfter().run()}
-                  className="w-full text-left px-2.5 py-1.5 text-xs font-medium rounded-md hover:bg-muted text-muted-foreground flex items-center gap-2 whitespace-nowrap"
-                >
-                  <Columns3 className="w-3.5 h-3.5" /> {t('editor.tambah_kolom', 'Tambah Kolom')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => editor.chain().focus().toggleHeaderRow().run()}
-                  className="w-full text-left px-2.5 py-1.5 text-xs font-medium rounded-md hover:bg-muted text-muted-foreground flex items-center gap-2 whitespace-nowrap"
-                >
-                  <Rows3 className="w-3.5 h-3.5" /> {t('editor.toggle_baris_header', 'Toggle Baris Header')}
-                </button>
-                <div className="h-px bg-muted my-1" />
-                <button
-                  type="button"
-                  disabled={!editor.can().mergeCells()}
-                  onClick={() => editor.chain().focus().mergeCells().run()}
-                  className="w-full text-left px-2.5 py-1.5 text-xs font-medium rounded-md hover:bg-muted text-muted-foreground flex items-center gap-2 whitespace-nowrap disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <Combine className="w-3.5 h-3.5" /> {t('editor.gabung_sel_merge', 'Gabung Sel (Merge)')}
-                </button>
-                <button
-                  type="button"
-                  disabled={!editor.can().splitCell()}
-                  onClick={() => editor.chain().focus().splitCell().run()}
-                  className="w-full text-left px-2.5 py-1.5 text-xs font-medium rounded-md hover:bg-muted text-muted-foreground flex items-center gap-2 whitespace-nowrap disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <SplitSquareHorizontal className="w-3.5 h-3.5" /> {t('editor.pisah_sel_split', 'Pisah Sel (Split)')}
-                </button>
-                <div className="px-2.5 py-1.5">
-                  <div className="flex items-center gap-1 text-xs font-bold text-muted-foreground mb-1.5">
-                    <PaintBucket className="w-3 h-3" /> {t('editor.warna_sel', 'Warna Sel')}
-                  </div>
-                  <div className="flex items-center gap-1.5">
+              <div className="grid gap-g2 border-t border-border pt-g8">
+                <Button type="button" variant="ghost" size="sm" className="justify-start" onClick={() => { editor.chain().focus().addRowAfter().run(); setShowTableMenu(false); }}>
+                  <Rows3 aria-hidden="true" />{t('editor.tambah_baris', 'Tambah Baris')}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="justify-start" onClick={() => { editor.chain().focus().addColumnAfter().run(); setShowTableMenu(false); }}>
+                  <Columns3 aria-hidden="true" />{t('editor.tambah_kolom', 'Tambah Kolom')}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="justify-start" onClick={() => { editor.chain().focus().toggleHeaderRow().run(); setShowTableMenu(false); }}>
+                  <Rows3 aria-hidden="true" />{t('editor.toggle_baris_header', 'Toggle Baris Header')}
+                </Button>
+                <Separator className="my-g3" />
+                <Button type="button" variant="ghost" size="sm" className="justify-start" disabled={!editor.can().mergeCells()} onClick={() => { editor.chain().focus().mergeCells().run(); setShowTableMenu(false); }}>
+                  <Combine aria-hidden="true" />{t('editor.gabung_sel_merge', 'Gabung Sel (Merge)')}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="justify-start" disabled={!editor.can().splitCell()} onClick={() => { editor.chain().focus().splitCell().run(); setShowTableMenu(false); }}>
+                  <SplitSquareHorizontal aria-hidden="true" />{t('editor.pisah_sel_split', 'Pisah Sel (Split)')}
+                </Button>
+                <div className="grid gap-g5 px-g8 py-g5">
+                  <Text size="xs" weight="semibold" tone="muted" className="inline-flex items-center gap-g3">
+                    <PaintBucket aria-hidden="true" className="size-g13" /> {t('editor.warna_sel', 'Warna Sel')}
+                  </Text>
+                  <div className="flex items-center gap-g5">
                     {CELL_COLORS.map((c) => (
-                      <button
-                        key={c.key}
-                        type="button"
-                        title={t(c.key, c.label)}
-                        aria-label={t(c.key, c.label)}
-                        onClick={() => editor.chain().focus().setCellAttribute('backgroundColor', c.value).run()}
-                        className="w-5 h-5 rounded-full border border-border shrink-0"
-                        style={{ backgroundColor: c.value || 'transparent' }}
-                      />
+                      <Tooltip key={c.key}>
+                        <TooltipTrigger asChild>
+                          {/* Swatch fill is document content colour, not a UI token. */}
+                          <Button type="button" variant="outline" size="icon-sm" aria-label={t(c.key, c.label)}
+                            onClick={() => editor.chain().focus().setCellAttribute('backgroundColor', c.value).run()}
+                            className="rounded-full" style={{ backgroundColor: c.value || undefined }} />
+                        </TooltipTrigger>
+                        <TooltipBody>{t(c.key, c.label)}</TooltipBody>
+                      </Tooltip>
                     ))}
                   </div>
                 </div>
-                <div className="h-px bg-muted my-1" />
-                <button
-                  type="button"
-                  onClick={() => editor.chain().focus().deleteRow().run()}
-                  className="w-full text-left px-2.5 py-1.5 text-xs font-medium rounded-md hover:bg-status-danger-soft text-status-danger flex items-center gap-2 whitespace-nowrap"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> {t('editor.hapus_baris', 'Hapus Baris')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => editor.chain().focus().deleteColumn().run()}
-                  className="w-full text-left px-2.5 py-1.5 text-xs font-medium rounded-md hover:bg-status-danger-soft text-status-danger flex items-center gap-2 whitespace-nowrap"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> {t('editor.hapus_kolom', 'Hapus Kolom')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => editor.chain().focus().deleteTable().run()}
-                  className="w-full text-left px-2.5 py-1.5 text-xs font-bold rounded-md hover:bg-status-danger-soft text-status-danger flex items-center gap-2 whitespace-nowrap"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> {t('editor.hapus_seluruh_tabel', 'Hapus Seluruh Tabel')}
-                </button>
+                <Separator className="my-g3" />
+                <Button type="button" variant="ghost" size="sm" className="justify-start text-destructive" onClick={() => { editor.chain().focus().deleteRow().run(); setShowTableMenu(false); }}>
+                  <Trash2 aria-hidden="true" />{t('editor.hapus_baris', 'Hapus Baris')}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="justify-start text-destructive" onClick={() => { editor.chain().focus().deleteColumn().run(); setShowTableMenu(false); }}>
+                  <Trash2 aria-hidden="true" />{t('editor.hapus_kolom', 'Hapus Kolom')}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="justify-start text-destructive" onClick={() => { editor.chain().focus().deleteTable().run(); setShowTableMenu(false); }}>
+                  <Trash2 aria-hidden="true" />{t('editor.hapus_seluruh_tabel', 'Hapus Seluruh Tabel')}
+                </Button>
               </div>
             )}
-          </Card>
-        )}
-      </div>
+            </PopoverBody>
+          </PopoverContent>
+        </PopoverPositioner>
+      </Popover>
 
-      <ToolbarButton title={t('editor.pricing_table.insert', 'Insert Pricing Table')} onClick={handleInsertPricingTable}>
-        <Sigma className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.pricing_table.insert', 'Insert Pricing Table')} onClick={handleInsertPricingTable}>
+        <Sigma />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.pricing_table.recalculate', 'Recalculate Totals')} onClick={handleRecalculatePricingTable} disabled={!insideTable}>
-        <Calculator className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.pricing_table.recalculate', 'Recalculate Totals')} onClick={handleRecalculatePricingTable} disabled={!insideTable}>
+        <Calculator />
       </ToolbarButton>
 
       <Divider />
 
       {/* Misc */}
-      <ToolbarButton title={t('editor.superscript_pangkat_atas', 'Superscript (Pangkat Atas)')} onClick={() => editor.chain().focus().toggleSuperscript().run()}>
-        <Superscript className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.superscript_pangkat_atas', 'Superscript (Pangkat Atas)')} active={editor.isActive('superscript')} onClick={() => editor.chain().focus().toggleSuperscript().run()}>
+        <Superscript />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.subscript_pangkat_bawah', 'Subscript (Pangkat Bawah)')} onClick={() => editor.chain().focus().toggleSubscript().run()}>
-        <Subscript className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.subscript_pangkat_bawah', 'Subscript (Pangkat Bawah)')} active={editor.isActive('subscript')} onClick={() => editor.chain().focus().toggleSubscript().run()}>
+        <Subscript />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.garis_horizontal', 'Garis Horizontal')} onClick={() => editor.chain().focus().setHorizontalRule().run()}>
-        <Minus className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.garis_horizontal', 'Garis Horizontal')} onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+        <Minus />
       </ToolbarButton>
-      <ToolbarButton title={t('editor.hapus_format_teks', 'Hapus Format Teks')} onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}>
-        <Eraser className="w-3.5 h-3.5" />
+      <ToolbarButton label={t('editor.hapus_format_teks', 'Hapus Format Teks')} onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}>
+        <Eraser />
       </ToolbarButton>
       </div>
     </div>

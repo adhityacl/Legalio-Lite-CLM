@@ -15,12 +15,12 @@ export interface CalendarEvent {
 
 /** One palette for indicators, chips, filters and the legend, in both themes. */
 export const EVENT_TYPE_CONFIG: Record<EventType, { labelKey: string; dot: string; chip: string }> = {
-  contract_start: { labelKey: 'calendar.contract_start', dot: 'bg-info', chip: 'bg-info-soft text-info' },
-  cancellation_notice: { labelKey: 'calendar.cancellation_notice', dot: 'bg-warning', chip: 'bg-warning-soft text-warning' },
-  contract_end: { labelKey: 'calendar.contract_end', dot: 'bg-danger', chip: 'bg-danger-soft text-danger' },
-  renewal: { labelKey: 'calendar.renewal', dot: 'bg-success', chip: 'bg-success-soft text-success' },
+  contract_start: { labelKey: 'calendar.contract_start', dot: 'bg-status-info', chip: 'bg-status-info-soft text-status-info' },
+  cancellation_notice: { labelKey: 'calendar.cancellation_notice', dot: 'bg-status-warning', chip: 'bg-status-warning-soft text-status-warning' },
+  contract_end: { labelKey: 'calendar.contract_end', dot: 'bg-status-special', chip: 'bg-status-special-soft text-status-special' },
+  renewal: { labelKey: 'calendar.renewal', dot: 'bg-status-success', chip: 'bg-status-success-soft text-status-success' },
   termination: { labelKey: 'calendar.termination', dot: 'bg-muted-foreground', chip: 'bg-muted text-foreground' },
-  task: { labelKey: 'calendar.task', dot: 'text-finance', chip: 'bg-finance-soft text-finance' },
+  task: { labelKey: 'calendar.task', dot: 'text-status-finance', chip: 'bg-status-finance-soft text-status-finance' },
 };
 
 export const EVENT_TYPES = Object.keys(EVENT_TYPE_CONFIG) as EventType[];

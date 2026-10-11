@@ -8,12 +8,13 @@ import { ModalFrame } from '../ui/modal-frame';
 
 import { Input } from '@legalio/ui-components/input';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
-import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell } from '@legalio/ui-components/table';
+import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
 import { NativeSelect } from '@legalio/ui-components/native-select';
 import { Card } from '@legalio/ui-components/card';
 import { DialogHeader, DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
 import { Field, FieldLabel, FieldHelperText } from '@legalio/ui-components/field';
-import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { Text } from '@legalio/ui-components/text';
 /** Platform identity DTO from `GET /api/auth-console/users` (no tenant roles or memberships). */
 export interface PlatformUser {
   id: string;
@@ -54,10 +55,10 @@ export const PlatformUsersTab: React.FC<{
   }, [users, search]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card className="mobile-controls-bar flex flex-col items-stretch justify-between gap-3 p-4 sm:flex-row sm:items-center">
-        <InputGroup className="relative min-w-55 max-w-md flex-1">
-          <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+    <div className="flex flex-col gap-g13">
+      <Card className="flex flex-col items-stretch justify-between gap-g13 p-g13 sm:flex-row sm:items-center">
+        <InputGroup className="relative min-w-g233 max-w-g377 flex-1">
+          <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
           <InputGroupInput
             id={searchId}
             type="search"
@@ -67,44 +68,45 @@ export const PlatformUsersTab: React.FC<{
             onChange={(e) => setSearch(e.target.value)}
           />
         </InputGroup>
-        <Button variant="ghost"
+        <Button
           type="button"
           onClick={() => setDialog({ kind: 'create' })}
         >
-          <Plus className="h-4 w-4" aria-hidden="true" />
+          <Plus className="h-g16 w-g16" aria-hidden="true" />
           <span>{t('tb.create_account', 'Create account')}</span>
         </Button>
       </Card>
-      <Card className="overflow-x-auto">
-        <Table className="w-full text-left">
+      <Card className="overflow-hidden">
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
+        <Table>
           <TableHeader><TableRow>
-            <TableColumnHeader scope="col" className="text-left align-middle">{t('tb.col_name', 'Name')}</TableColumnHeader><TableColumnHeader scope="col" className="text-left align-middle">{t('tb.col_email', 'Email')}</TableColumnHeader>
-            <TableColumnHeader scope="col" className="text-left align-middle">{t('tb.col_platform_role', 'Platform role')}</TableColumnHeader><TableColumnHeader scope="col" className="text-left align-middle">{t('tb.col_organizations', 'Organizations')}</TableColumnHeader>
-            <TableColumnHeader scope="col" className="text-left align-middle">{t('tb.col_account_status', 'Account status')}</TableColumnHeader><TableColumnHeader scope="col" className="text-right align-middle">{t('tb.col_action', 'Action')}</TableColumnHeader>
+            <TableColumnHeader scope="col">{t('tb.col_name', 'Name')}</TableColumnHeader><TableColumnHeader scope="col">{t('tb.col_email', 'Email')}</TableColumnHeader>
+            <TableColumnHeader scope="col">{t('tb.col_platform_role', 'Platform role')}</TableColumnHeader><TableColumnHeader scope="col">{t('tb.col_organizations', 'Organizations')}</TableColumnHeader>
+            <TableColumnHeader scope="col">{t('tb.col_account_status', 'Account status')}</TableColumnHeader><TableColumnHeader scope="col" className="text-right">{t('tb.col_action', 'Action')}</TableColumnHeader>
           </TableRow></TableHeader>
           <TableBody>
             {filtered.map((u) => {
               const self = u.id === identity?.id;
               return (
                 <TableRow key={u.id}>
-                  <TableCell className="text-left align-middle">{u.name}{self && <span className="ml-2 text-xs text-muted-foreground">({t('tb.you', 'you')})</span>}</TableCell>
-                  <TableCell className="text-left align-middle">{u.email}</TableCell>
-                  <TableCell className="text-left align-middle">{u.platformRole === 'superuser'
-                    ? <Badge tone="special"><ShieldCheck className="mr-1 h-3 w-3" aria-hidden="true" />{t('tb.platform_administrator', 'Platform administrator')}</Badge>
+                  <TableCell>{u.name}{self && <Text as="span" size="xs" tone="muted" className="ml-g8">({t('tb.you', 'you')})</Text>}</TableCell>
+                  <TableCell>{u.email}</TableCell>
+                  <TableCell>{u.platformRole === 'superuser'
+                    ? <Badge tone="special"><ShieldCheck className="mr-g3 h-g13 w-g13" aria-hidden="true" />{t('tb.platform_administrator', 'Platform administrator')}</Badge>
                     : <Badge tone="neutral">{t('tb.platform_user', 'User')}</Badge>}</TableCell>
-                  <TableCell className="text-left align-middle">{u.membershipCount}</TableCell>
-                  <TableCell className="text-left align-middle">{u.banned
+                  <TableCell>{u.membershipCount}</TableCell>
+                  <TableCell>{u.banned
                     ? <Badge tone="danger">{u.banReason === 'PENDING_APPROVAL' ? t('tb.pending_approval', 'Pending approval') : t('tb.disabled', 'Disabled')}</Badge>
                     : <Badge tone="success">{t('tb.status_active', 'Active')}</Badge>}</TableCell>
-                  <TableCell className="text-right align-middle">
+                  <TableCell className="text-right">
                     {!self && (
-                      <div className="flex items-center justify-end gap-1">
-                        <Button type="button" variant="ghost" size="icon-md" onClick={() => setDialog({ kind: 'edit', user: u })} aria-label={t('tb.edit_account_for', 'Edit account of {name}', { name: u.name })}><Pencil className="h-3.5 w-3.5" aria-hidden="true" /></Button>
-                        <Button type="button" variant="ghost" size="icon-md" onClick={() => setDialog({ kind: 'password', user: u })} aria-label={t('tb.set_password_for', 'Set password for {name}', { name: u.name })}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" /></Button>
-                        <Button type="button" variant="ghost" size="icon-md" className={u.banned && u.banReason === 'PENDING_APPROVAL' ? 'w-auto' : undefined} onClick={() => onToggleBan(u)} aria-label={u.banned && u.banReason === 'PENDING_APPROVAL' ? t('onboarding.approve_account_for', 'Approve account of {name}', { name: u.name }) : u.banned ? t('tb.enable_account_for', 'Enable account of {name}', { name: u.name }) : t('tb.disable_account_for', 'Disable account of {name}', { name: u.name })}>
-                          {u.banned ? <UserCheck className="h-3.5 w-3.5" aria-hidden="true" /> : <Ban className="h-3.5 w-3.5" aria-hidden="true" />}{u.banned && u.banReason === 'PENDING_APPROVAL' && t('onboarding.approve', 'Approve')}
+                      <div className="flex items-center justify-end gap-g3">
+                        <Button type="button" variant="ghost" size="icon-sm" onClick={() => setDialog({ kind: 'edit', user: u })} aria-label={t('tb.edit_account_for', 'Edit account of {name}', { name: u.name })}><Pencil className="h-g13 w-g13" aria-hidden="true" /></Button>
+                        <Button type="button" variant="ghost" size="icon-sm" onClick={() => setDialog({ kind: 'password', user: u })} aria-label={t('tb.set_password_for', 'Set password for {name}', { name: u.name })}><KeyRound className="h-g13 w-g13" aria-hidden="true" /></Button>
+                        <Button type="button" variant="ghost" size="icon-sm" className={u.banned && u.banReason === 'PENDING_APPROVAL' ? 'w-auto' : undefined} onClick={() => onToggleBan(u)} aria-label={u.banned && u.banReason === 'PENDING_APPROVAL' ? t('onboarding.approve_account_for', 'Approve account of {name}', { name: u.name }) : u.banned ? t('tb.enable_account_for', 'Enable account of {name}', { name: u.name }) : t('tb.disable_account_for', 'Disable account of {name}', { name: u.name })}>
+                          {u.banned ? <UserCheck className="h-g13 w-g13" aria-hidden="true" /> : <Ban className="h-g13 w-g13" aria-hidden="true" />}{u.banned && u.banReason === 'PENDING_APPROVAL' && t('onboarding.approve', 'Approve')}
                         </Button>
-                        <Button type="button" variant="ghost" size="icon-md" onClick={() => onDelete(u)} aria-label={t('tb.delete_account_for', 'Delete account of {name}', { name: u.name })}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /></Button>
+                        <Button type="button" variant="ghost" size="icon-sm" onClick={() => onDelete(u)} aria-label={t('tb.delete_account_for', 'Delete account of {name}', { name: u.name })}><Trash2 className="h-g13 w-g13" aria-hidden="true" /></Button>
                       </div>
                     )}
                   </TableCell>
@@ -113,6 +115,7 @@ export const PlatformUsersTab: React.FC<{
             })}
           </TableBody>
         </Table>
+        </TableScrollArea>
       </Card>
       {dialog?.kind === 'create' && <AccountDialog title={t('tb.create_account', 'Create account')} withPassword onClose={() => setDialog(null)}
         onSubmit={async (v) => { await onCreate(v); setDialog(null); }} />}
@@ -127,9 +130,9 @@ export const PlatformUsersTab: React.FC<{
 const DialogShell: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({ title, onClose, children }) => {
   const { t } = useLanguage();
   return (
-    <ModalFrame onClose={onClose} className="max-w-lg">
-      <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-        <DialogTitle className="flex items-center gap-2">{title}</DialogTitle>
+    <ModalFrame size="md" onClose={onClose} >
+      <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+        <DialogTitle className="flex items-center gap-g8">{title}</DialogTitle>
         <DialogCloseIcon aria-label={t('common.close', 'Close')} />
       </DialogHeader>
       {children}
@@ -152,7 +155,7 @@ const AccountDialog: React.FC<{
   const valid = name.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && (!password || password.length >= 8);
   return (
     <DialogShell title={title} onClose={onClose}>
-      <form noValidate className="flex flex-col gap-4 p-5" onSubmit={async (e) => {
+      <form noValidate className="flex flex-col gap-g13 p-g21" onSubmit={async (e) => {
         e.preventDefault();
         if (!valid) return;
         setBusy(true);
@@ -175,8 +178,8 @@ const AccountDialog: React.FC<{
             <FieldHelperText id={`${ids.password}-hint`}>{t('tb.password_hint', 'At least 8 characters.')}</FieldHelperText>
           </Field>
         )}
-        {error && <Alert status="error" role="alert"><AlertContent>{error}</AlertContent></Alert>}
-        <div className="flex justify-end gap-2">
+        {error && <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>}
+        <div className="flex justify-end gap-g8">
           <Button type="button" variant="outline" onClick={onClose}>{t('tb.cancel', 'Cancel')}</Button>
           <Button type="submit" disabled={!valid || busy}>{t('tb.save', 'Save')}</Button>
         </div>
@@ -192,7 +195,7 @@ const PasswordDialog: React.FC<{ user: PlatformUser; onClose: () => void; onSubm
   const id = useId();
   return (
     <DialogShell title={t('tb.set_password_for', 'Set password for {name}', { name: user.name })} onClose={onClose}>
-      <form noValidate className="flex flex-col gap-4 p-5" onSubmit={async (e) => {
+      <form noValidate className="flex flex-col gap-g13 p-g21" onSubmit={async (e) => {
         e.preventDefault();
         if (password.length < 8) return;
         try { await onSubmit(password); } catch (err) { setError((err as Error).message); }
@@ -202,8 +205,8 @@ const PasswordDialog: React.FC<{ user: PlatformUser; onClose: () => void; onSubm
           <Input id={id} type="password" autoComplete="new-password" value={password} aria-invalid={password.length > 0 && password.length < 8} aria-describedby={`${id}-hint`} onChange={(e) => setPassword(e.target.value)} />
           <FieldHelperText id={`${id}-hint`}>{t('tb.password_hint', 'At least 8 characters.')}</FieldHelperText>
         </Field>
-        {error && <Alert status="error" role="alert"><AlertContent>{error}</AlertContent></Alert>}
-        <div className="flex justify-end gap-2">
+        {error && <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>}
+        <div className="flex justify-end gap-g8">
           <Button type="button" variant="outline" onClick={onClose}>{t('tb.cancel', 'Cancel')}</Button>
           <Button type="submit" disabled={password.length < 8}>{t('tb.save', 'Save')}</Button>
         </div>

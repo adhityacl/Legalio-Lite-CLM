@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/date-input';
+export * from './moduix/ui/date-input';

@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/hover-card';
+export * from './moduix/ui/hover-card';

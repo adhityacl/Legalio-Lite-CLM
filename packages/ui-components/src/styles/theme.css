@@ -1,6 +1,6 @@
 /*
  * Legalio theme for moduix (https://moduix.dev/docs/tokens).
- * Loaded after @moduix/react-tailwind/style.css. Only theme primitives are set here;
+ * Loaded after ./moduix.css (in-tree copy of the moduix foundation). Only theme primitives are set here;
  * moduix derives its semantic aliases, component sizes and Tailwind utilities from them.
  * Dark values come from light-dark(), driven by data-moduix-color-scheme on <html>.
  */
@@ -56,12 +56,38 @@
   --moduix-font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   --moduix-font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  /* Control scale: every button, input, select and trigger is 40px; popup rows are 32px. */
-  --moduix-size-xs: 24px;
-  --moduix-size-sm: 32px;
-  --moduix-size-md: 40px;
-  --moduix-size-lg: 40px;
-  --moduix-size-xl: 48px;
+  /* docs/design-system/STANDARD.md — pure golden ratio. Every size is on the golden ladder (8·φⁿ ∪ 16·φⁿ). */
+  /* §3 control heights. */
+  --moduix-size-xs: 21px;
+  --moduix-size-sm: 26px;
+  --moduix-size-md: 34px;
+  --moduix-size-lg: 42px;
+  --moduix-size-xl: 55px;
+
+  /* §1 type scale; line height = next golden step. */
+  --moduix-text-xs: 13px;  --moduix-line-height-text-xs: 21px;
+  --moduix-text-sm: 13px;  --moduix-line-height-text-sm: 21px;
+  --moduix-text-md: 16px;  --moduix-line-height-text-md: 26px;
+  --moduix-text-lg: 21px;  --moduix-line-height-text-lg: 34px;
+  --moduix-text-xl: 26px;  --moduix-line-height-text-xl: 42px;
+  --moduix-text-2xl: 34px; --moduix-line-height-text-2xl: 55px;
+  --moduix-text-3xl: 42px; --moduix-line-height-text-3xl: 68px;
+  --moduix-tracking-text-sm: 0em;
+  --moduix-tracking-text-xs: 0em;
+
+  /* §6 shape, elevation and motion. */
+  --moduix-radius-xs: 3px;
+  --moduix-radius-sm: 5px;
+  --moduix-radius-md: 8px;
+  --moduix-radius-lg: 13px;
+  --moduix-radius-xl: 21px;
+  --moduix-shadow-sm: 0 2px 5px 0 #0000001a, 0 1px 2px 0 #0000000f;
+  --moduix-shadow-md: 0 3px 8px -1px #0000001a, 0 2px 3px -2px #0000001a;
+  --moduix-shadow-lg: 0 8px 21px -3px #0000001a, 0 3px 8px -3px #0000001a;
+  --moduix-duration-fast: 144ms;
+  --moduix-duration-normal: 233ms;
+  --moduix-duration-slow: 377ms;
+  --moduix-duration-slower: 377ms;
 
   /* Product status palette (moduix ships destructive, success and warning only). */
   --legalio-info: light-dark(#2455ad, #a8c5ff);
@@ -83,9 +109,46 @@
 
 @media (prefers-reduced-motion: reduce) {
   :root { --moduix-duration-fast: 0ms; --moduix-duration-normal: 0ms; --moduix-duration-slow: 0ms; --moduix-duration-slower: 0ms; }
+  /* moduix's data-[state=open]:animate-* outranks its motion-reduce:animate-none; stop Ark part enter/exit motion here. */
+  [data-scope][data-part] { animation: none !important; }
 }
 
 @theme inline {
+  /* STANDARD.md §0 — the golden ladder: p-g13, gap-g21, h-g42, w-g233, max-w-g610, … */
+  --spacing-g2: 2px;
+  --spacing-g3: 3px;
+  --spacing-g5: 5px;
+  --spacing-g8: 8px;
+  --spacing-g13: 13px;
+  --spacing-g16: 16px;
+  --spacing-g21: 21px;
+  --spacing-g26: 26px;
+  --spacing-g34: 34px;
+  --spacing-g42: 42px;
+  --spacing-g55: 55px;
+  --spacing-g68: 68px;
+  --spacing-g89: 89px;
+  --spacing-g110: 110px;
+  --spacing-g144: 144px;
+  --spacing-g233: 233px;
+  --spacing-g377: 377px;
+  --spacing-g610: 610px;
+  --spacing-g987: 987px;
+  --spacing-g1597: 1597px;
+  --spacing-form-wide: 720px; /* a decided width, not a ladder step: dialogs with option pills (STANDARD.md §4.3) */
+  --text-4xl: 68px; --text-4xl--line-height: 110px;
+  --leading-relaxed: 1.618; /* reading track (×φ) */
+  --leading-snug: 1.272;    /* large headings (×√φ) */
+  /* Sign-in page backdrop: a fixed dark scene in both themes (STANDARD.md §4.3 Sign-in page). */
+  --color-auth-ink: #08090d;
+  --color-auth-navy: #0f172a;
+  --color-auth-zinc: #18181b;
+  --color-auth-foreground: #fafafa;
+  --color-auth-muted: #d4d4d8;
+  --color-auth-glow-blue: rgb(56 189 248 / 0.3);
+  --color-auth-glow-violet: rgb(139 92 246 / 0.29);
+  --aspect-golden: 1.618;   /* media, preview and stat tiles: width ÷ height = φ (STANDARD.md §4.3) */
+
   --color-status-success: var(--moduix-color-success);
   --color-status-success-soft: var(--legalio-success-soft);
   --color-status-success-border: var(--legalio-success-border);
@@ -104,4 +167,15 @@
   --color-status-finance: var(--legalio-finance);
   --color-status-finance-soft: var(--legalio-finance-soft);
   --color-status-finance-border: var(--legalio-finance-border);
+}
+
+/* Sign-in page scene (STANDARD.md §4.3). */
+@utility auth-backdrop {
+  background-image: linear-gradient(-120deg, var(--color-auth-ink) 15%, var(--color-auth-navy) 54%, var(--color-auth-zinc) 85%);
+}
+@utility auth-glow-blue {
+  background-image: radial-gradient(closest-side, var(--color-auth-glow-blue), transparent);
+}
+@utility auth-glow-violet {
+  background-image: radial-gradient(closest-side, var(--color-auth-glow-violet), transparent);
 }

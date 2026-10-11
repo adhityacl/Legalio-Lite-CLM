@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/card';
+export * from './moduix/ui/card';

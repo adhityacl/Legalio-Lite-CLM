@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/toggle-group';
+export * from './moduix/ui/toggle-group';

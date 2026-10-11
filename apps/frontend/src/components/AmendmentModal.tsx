@@ -17,6 +17,7 @@ import { Text } from '@legalio/ui-components/text';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
 import { ToggleGroup, ToggleGroupItem } from '@legalio/ui-components/toggle-group';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 interface AmendmentModalProps {
   initialParent?: Contract | InsertionOrder;
   contracts: Contract[];
@@ -201,13 +202,13 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
   };
 
   return (
-    <ModalFrame onClose={onClose} className="max-w-4xl w-full max-h-[92dvh] flex flex-col overflow-hidden">
+    <ModalFrame size="form" onClose={onClose} className="flex flex-col overflow-hidden">
 
         {/* Header */}
-        <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
+        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
           <div>
-            <DialogTitle className="flex items-center gap-2">
-              <GitCommit className="w-5 h-5 text-accent-foreground" />
+            <DialogTitle className="flex items-center gap-g8">
+              <GitCommit className="w-g21 h-g21 text-accent-foreground" />
               <span>{t('amendments.tambah_addendum_amendment_baru', 'Tambah Addendum / Amendment Baru')}</span>
             </DialogTitle>
           </div>
@@ -215,8 +216,8 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <DialogBody className="mt-0 flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-5 text-foreground">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <DialogBody className="mt-0 flex flex-1 flex-col gap-g13 overflow-y-auto px-g21 py-g21 text-foreground">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
               <Field>
                 <FieldLabel>{t('amendments.tipe_induk_perjanjian', 'Tipe Induk Perjanjian *')}</FieldLabel>
                 <AlphabeticalSelect
@@ -255,7 +256,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
               </Field>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
               <Field>
                 <FieldLabel>{t('form.contract.nomor_addendum', 'Nomor Addendum *')}</FieldLabel>
                 <Input
@@ -309,7 +310,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
               </FileUploadDropzone>
               <FileUploadHiddenInput />
             </FileUpload>
-            {fileData && <Button variant="outline" onClick={handleParseAmendment} loading={isParsing} className="self-start">{isParsing ? t('amendments.parsing', 'Parsing...') : t('amendments.parse_file', 'Parse File')}</Button>}
+            {fileData && <Button variant="secondary" onClick={handleParseAmendment} loading={isParsing} className="self-start">{isParsing ? t('amendments.parsing', 'Parsing...') : t('amendments.parse_file', 'Parse File')}</Button>}
 
             {parseSuccessMsg && (
               <Alert status="success" role="status"><AlertIndicator /><AlertContent><AlertDescription>{parseSuccessMsg}</AlertDescription></AlertContent></Alert>
@@ -320,19 +321,18 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
             )}
           </DialogBody>
 
-          <DialogFooter className="mt-0 flex-wrap items-center justify-between border-t border-border px-6 py-4">
+          <DialogFooter className="mt-0 flex-wrap items-center justify-between border-t border-border px-g21 py-g13">
             <Text size="xs" tone="muted" className="hidden sm:block">{t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}</Text>
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center gap-g8 ml-auto">
               <Button variant="outline" onClick={onClose}>
                 {t('eval.btn_cancel', 'Batal')}
               </Button>
-              <Button
+              <Tooltip disabled={!(!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : '')}><TooltipTrigger asChild><Button
                 type="submit"
                 disabled={submitting || !isFormValid}
-                title={!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : ''}
               >
                 {submitting ? t('eval.btn_saving', 'Menyimpan...') : t('amendments.simpan_track_change_addendum', 'Simpan Track-Change Addendum')}
-              </Button>
+              </Button></TooltipTrigger><TooltipBody>{!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : ''}</TooltipBody></Tooltip>
             </div>
           </DialogFooter>
         </form>

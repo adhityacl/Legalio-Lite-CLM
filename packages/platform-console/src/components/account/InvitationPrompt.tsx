@@ -7,7 +7,9 @@ import { ModalFrame } from '../ui/modal-frame';
 import { Button } from '@legalio/ui-components/button';
 
 import { DialogHeader, DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
-import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { Spinner } from '@legalio/ui-components/spinner';
+import { Text } from '@legalio/ui-components/text';
 const KEY = 'pendingInvitation';
 
 /** Captures `?accept_invite=<token>` once and keeps it through sign-in (sessionStorage, this tab only). */
@@ -81,33 +83,30 @@ export const InvitationPrompt: React.FC = () => {
   };
 
   return (
-    <ModalFrame onClose={close} className="max-w-md">
-      <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-        <DialogTitle className="flex items-center gap-2">{t('tb.invitation_title', 'Organization invitation')}</DialogTitle>
+    <ModalFrame size="md" onClose={close} >
+      <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+        <DialogTitle className="flex items-center gap-g8">{t('tb.invitation_title', 'Organization invitation')}</DialogTitle>
         <DialogCloseIcon aria-label={t('common.close', 'Close')} />
       </DialogHeader>
-      <div className="flex flex-col gap-4 p-5 text-sm">
-        <p className="text-foreground">
+      <div className="flex flex-col gap-g13 p-g21 text-sm">
+        <Text size="sm">
           {t('tb.invitation_body', 'You are invited to join {org} as {role}.', { org: preview.organizationName, role: preview.tenantRole })}
-        </p>
-        {preview.status !== 'pending' && <Alert status="error" role="alert"><AlertContent>{t('tb.invitation_not_pending', 'This invitation can no longer be accepted.')}</AlertContent></Alert>}
-        {state.kind === 'done' && <p role="status" className="flex items-center gap-2 text-status-success"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />{t('tb.invitation_accepted', 'You joined the organization.')}</p>}
+        </Text>
+        {preview.status !== 'pending' && <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{t('tb.invitation_not_pending', 'This invitation can no longer be accepted.')}</AlertDescription></AlertContent></Alert>}
+        {state.kind === 'done' && <Text size="sm" className="flex items-center gap-g8 text-status-success" role="status"><CheckCircle2 className="h-g16 w-g16" aria-hidden="true" />{t('tb.invitation_accepted', 'You joined the organization.')}</Text>}
         {state.kind === 'error' && (
-          <p role="alert" className="flex items-start gap-2 text-status-danger">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            {state.code === 'INVITATION_IDENTITY_MISMATCH'
+          <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{state.code === 'INVITATION_IDENTITY_MISMATCH'
                 ? t('tb.invitation_other_account', 'This invitation was sent to a different account. Sign in with the invited email address.')
-                : state.message}
-          </p>
+                : state.message}</AlertDescription></AlertContent></Alert>
         )}
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-g8">
           {state.kind === 'done' ? (
             <Button type="button" onClick={close}>{t('tb.done', 'Done')}</Button>
           ) : (
             <>
               <Button type="button" variant="outline" onClick={close}>{t('tb.not_now', 'Not now')}</Button>
               <Button type="button" onClick={accept} disabled={preview.status !== 'pending' || state.kind === 'busy'}>
-                {state.kind === 'busy' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{t('tb.accept_invitation', 'Accept invitation')}
+                {state.kind === 'busy' && <Spinner size="sm" decorative />}{t('tb.accept_invitation', 'Accept invitation')}
               </Button>
             </>
           )}

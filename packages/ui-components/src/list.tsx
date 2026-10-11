@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/list';
+export * from './moduix/ui/list';

@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/marquee';
+export * from './moduix/ui/marquee';

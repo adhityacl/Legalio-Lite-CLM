@@ -1,10 +1,10 @@
 import * as React from 'react';
-import { Badge as ModuixBadge } from '@moduix/react-tailwind/badge';
-import { cn } from './utils';
+import { Badge as ModuixBadge } from './moduix/ui/badge';
+import { cn } from './moduix/lib/cn';
 
-export { BadgeDot, BadgeLabel } from '@moduix/react-tailwind/badge';
+export * from './moduix/ui/badge';
 
-/** Product status tones. moduix Badge ships neutral variants only, so tones are consumer utilities. */
+/** Product status tones. */
 export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'special' | 'finance' | 'neutral';
 
 const toneClasses: Record<StatusTone, string> = {
@@ -18,12 +18,12 @@ const toneClasses: Record<StatusTone, string> = {
 };
 
 const statusWords: Array<[StatusTone, (s: string) => boolean]> = [
-  ['success', s => ['aktif', 'active', 'lengkap', 'complete', 'available', 'recommended', 'berjalan', 'signed', 'success', 'excellent', 'sangat baik', 'bhi', 'never'].includes(s)],
-  ['warning', s => ['akan berakhir', 'expiring', 'warning', 'belum lengkap', 'incomplete', 'missing', 'recommended with notes', 'review', 'fair', 'baik', 'moderate', 'rare', 'pending'].includes(s) || s.includes('hari lagi') || s.includes('days left')],
-  ['danger', s => ['expired', 'kadaluarsa', 'terminated', 'not recommended', 'inactive', 'nonaktif', 'ditolak', 'danger', 'kurang baik', 'frequent', 'expensive', 'delete'].includes(s)],
-  ['info', s => ['legal', 'good', 'info', 'selesai', 'cheap', 'bha', 'create', 'io', 'contract'].includes(s)],
-  ['special', s => ['admin', 'addendum', 'auth', 'add_user'].includes(s)],
-  ['finance', s => ['finance', 'spending', 'invoice'].includes(s)],
+  ['success', (s) => ['aktif', 'active', 'lengkap', 'complete', 'available', 'recommended', 'berjalan', 'signed', 'success', 'excellent', 'sangat baik', 'bhi', 'never'].includes(s)],
+  ['warning', (s) => ['akan berakhir', 'expiring', 'warning', 'belum lengkap', 'incomplete', 'missing', 'recommended with notes', 'review', 'fair', 'baik', 'moderate', 'rare', 'pending'].includes(s) || s.includes('hari lagi') || s.includes('days left')],
+  ['danger', (s) => ['expired', 'kadaluarsa', 'terminated', 'not recommended', 'inactive', 'nonaktif', 'ditolak', 'danger', 'kurang baik', 'frequent', 'expensive', 'delete'].includes(s)],
+  ['info', (s) => ['legal', 'good', 'info', 'selesai', 'cheap', 'bha', 'create', 'io', 'contract'].includes(s)],
+  ['special', (s) => ['admin', 'addendum', 'auth', 'add_user'].includes(s)],
+  ['finance', (s) => ['finance', 'spending', 'invoice'].includes(s)],
 ];
 
 /** Maps a stored status label (any supported language) to its tone. */
@@ -36,8 +36,8 @@ export interface BadgeProps extends React.ComponentPropsWithoutRef<typeof Moduix
   tone?: StatusTone;
 }
 
-/** moduix Badge with a product status tone. */
-export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(({ tone = 'neutral', className, ...props }, ref) => (
-  <ModuixBadge ref={ref} variant="outline" data-tone={tone} className={cn(toneClasses[tone], className)} {...props} />
+/** moduix Badge with a product status tone (moduix ships neutral variants only). */
+export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(({ tone = 'neutral', variant = 'outline', className, ...props }, ref) => (
+  <ModuixBadge ref={ref} variant={variant} data-tone={tone} className={cn(toneClasses[tone], className)} {...props} />
 ));
 Badge.displayName = 'Badge';

@@ -23,6 +23,9 @@ import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Spinner } from '@legalio/ui-components/spinner';
+import { Text } from '@legalio/ui-components/text';
 export const ActivityLogsView: React.FC = () => {
   const { user } = useAuth();
   const { activeTenantId } = useTenant();
@@ -128,11 +131,11 @@ export const ActivityLogsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-g21">
       {/* Header */}
-      <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-g13">
         <div>
-          <Heading as="h2" size="lg" weight="semibold">
+          <Heading as="h2" size="md" weight="semibold">
             <span>{t('logs.title', 'Log Aktivitas Sesi System')}</span>
           </Heading>
         </div>
@@ -140,19 +143,19 @@ export const ActivityLogsView: React.FC = () => {
         <Button
           onClick={loadLogs}
           disabled={loading}
-          className="mobile-page-action shrink-0"
+          className="shrink-0"
         >
-          <RefreshCw className={`w-4 h-4 text-white ${loading ? 'animate-spin' : ''}`} />
+          {loading ? <Spinner size="sm" decorative /> : <RefreshCw aria-hidden="true" />}
           <span>{t('logs.refresh_btn', 'Refresh Log')}</span>
         </Button>
-      </Card>
+      </div>
 
       {/* Filter Bar with 3 Dropdowns */}
-      <Card className="p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5">
-        <div className="mobile-filter-grid flex flex-1 flex-wrap items-center gap-2 w-full">
+      <Card className="flex flex-col items-start justify-between gap-g13 p-g13 md:flex-row md:items-center">
+        <div className="flex flex-1 flex-wrap items-center gap-g13 w-full">
           {/* 1 Box Search */}
-          <InputGroup className="relative flex-1 min-w-[200px] md:max-w-xs">
-            <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+          <InputGroup className="relative flex-1 min-w-g233 md:max-w-g377">
+            <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
             <InputGroupInput aria-label={t('logs.search_placeholder', 'Cari aktivitas, email, atau deskripsi...')}
               type="text"
               placeholder={t('logs.search_placeholder', 'Cari aktivitas, email, atau deskripsi...')}
@@ -171,7 +174,7 @@ export const ActivityLogsView: React.FC = () => {
               setFilterModule(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[140px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('logs.all_modules', 'Semua Modul')}</option>
             {moduleOptions.map((mod) => (
@@ -188,7 +191,7 @@ export const ActivityLogsView: React.FC = () => {
               setSelectedAction(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[140px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('logs.all_actions', 'Semua Jenis Aksi')}</option>
             <option value="LOGIN">{t('logs.login', 'LOGIN')}</option>
@@ -209,7 +212,7 @@ export const ActivityLogsView: React.FC = () => {
               setSelectedTimeRange(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[140px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('notifications.all_time_periods', 'Semua Periode Waktu')}</option>
             <option value="TODAY">{t('notifications.time_today', 'Hari Ini (24 Jam Terakhir)')}</option>
@@ -220,9 +223,6 @@ export const ActivityLogsView: React.FC = () => {
 
         {/* View Toggle */}
         <TableViewMenu className="ml-auto" title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
-          <div className="px-3.5 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 border-b border-border">
-            {t('io.toggle_columns', 'Toggle Kolom')}
-          </div>
           {Object.keys(visibleColumns).map((col) => {
             let label = col;
             if (col === 'time') label = 'Waktu';
@@ -240,38 +240,34 @@ export const ActivityLogsView: React.FC = () => {
 
       {/* Table */}
       <Card className="overflow-hidden">
-        <TableScrollArea className="rounded-none border-0">
-          <Table className="w-full text-left">
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
+          <Table>
             <TableHeader>
               <TableRow>
-                <TableColumnHeader scope="col" className="w-12 text-left align-middle">
+                <TableColumnHeader scope="col" className="w-g42">
                   <div className="flex items-center justify-start">
                     <Checkbox checked={selectedRows.length > 0 && selectedRows.length === currentLogs.length} aria-label={t('logs.pilih_semua_log_aktivitas', 'Pilih semua log aktivitas')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
                 </TableColumnHeader>
-                {visibleColumns.time && <TableColumnHeader scope="col" className="text-left align-middle">{t('logs.col_time', 'Waktu')}</TableColumnHeader>}
-                {visibleColumns.user && <TableColumnHeader scope="col" className="text-left align-middle">{t('logs.col_user', 'Pengguna')}</TableColumnHeader>}
-                {visibleColumns.action && <TableColumnHeader scope="col" className="text-left align-middle">{t('logs.col_action', 'Jenis Aksi')}</TableColumnHeader>}
-                {visibleColumns.module && <TableColumnHeader scope="col" className="text-left align-middle">{t('logs.col_module', 'Modul')}</TableColumnHeader>}
-                {visibleColumns.detail && <TableColumnHeader scope="col" className="text-left align-middle">{t('logs.col_detail', 'Rincian Deskripsi')}</TableColumnHeader>}
-                <TableColumnHeader scope="col" className="text-right w-20 align-middle">
+                {visibleColumns.time && <TableColumnHeader scope="col">{t('logs.col_time', 'Waktu')}</TableColumnHeader>}
+                {visibleColumns.user && <TableColumnHeader scope="col">{t('logs.col_user', 'Pengguna')}</TableColumnHeader>}
+                {visibleColumns.action && <TableColumnHeader scope="col">{t('logs.col_action', 'Jenis Aksi')}</TableColumnHeader>}
+                {visibleColumns.module && <TableColumnHeader scope="col">{t('logs.col_module', 'Modul')}</TableColumnHeader>}
+                {visibleColumns.detail && <TableColumnHeader scope="col">{t('logs.col_detail', 'Rincian Deskripsi')}</TableColumnHeader>}
+                <TableColumnHeader scope="col" className="text-right w-g89">
                   <div className="flex items-center justify-end">{t('dashboard.action', 'Aksi')}</div>
                 </TableColumnHeader>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} className="text-center">
-                    {t('logs.loading', 'Memuat log aktivitas...')}
-                  </TableCell>
-                </TableRow>
+                <TableEmptyState colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} message={t('logs.loading', 'Memuat log aktivitas...')} />
               ) : currentLogs.length === 0 ? (
                 <TableEmptyState colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} />
               ) : (
                 currentLogs.map((log) => (
                   <TableRow key={log.id}>
-                    <TableCell className="text-left align-middle">
+                    <TableCell>
                       <div className="flex items-center justify-start">
                         <Checkbox aria-label={t('logs.pilih_log_oleh', 'Pilih log {actionType} oleh {userEmail}', { actionType: log.actionType, userEmail: log.userName || log.userEmail })} checked={selectedRows.includes(log.id || '')} onCheckedChange={() => handleSelectRow(log.id || '')}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                       </div>
@@ -279,7 +275,7 @@ export const ActivityLogsView: React.FC = () => {
 
                     {/* 1. Waktu */}
                     {visibleColumns.time && (
-                      <TableCell className="whitespace-nowrap text-left">
+                      <TableCell className="whitespace-nowrap">
                         {new Date(log.timestamp).toLocaleString(getActiveFormattingLocale(), {
                           dateStyle: 'medium',
                           timeStyle: 'short',
@@ -289,14 +285,14 @@ export const ActivityLogsView: React.FC = () => {
 
                     {/* 2. Pengguna */}
                     {visibleColumns.user && (
-                      <TableCell className="whitespace-nowrap text-left">
+                      <TableCell className="whitespace-nowrap">
                         {log.userName || log.userEmail}
                       </TableCell>
                     )}
 
                     {/* 3. Jenis Aksi */}
                     {visibleColumns.action && (
-                      <TableCell className="text-left">
+                      <TableCell>
                         <Badge
                           tone={getActionBadge(
  log.actionType
@@ -309,7 +305,7 @@ export const ActivityLogsView: React.FC = () => {
 
                     {/* 4. Modul */}
                     {visibleColumns.module && (
-                      <TableCell className="uppercase whitespace-nowrap text-left">
+                      <TableCell className="whitespace-nowrap">
                         <Badge tone={statusTone(log.module)}>
                           {log.module}
                         </Badge>
@@ -318,19 +314,19 @@ export const ActivityLogsView: React.FC = () => {
 
                     {/* 5. Rincian Deskripsi */}
                     {visibleColumns.detail && (
-                      <TableCell className="max-w-sm text-left">
-                        <p className="line-clamp-1" title={log.description}>{log.description}</p>
+                      <TableCell className="max-w-g377">
+                        <Tooltip><TooltipTrigger asChild><Text size="sm" className="line-clamp-1">{log.description}</Text></TooltipTrigger><TooltipBody>{log.description}</TooltipBody></Tooltip>
                       </TableCell>
                     )}
 
                     {/* 6. Aksi */}
-                    <TableCell className="text-right align-middle w-20">
+                    <TableCell className="text-right w-g89">
                       <div className="flex items-center justify-end">
                         <ActionMenu
                           items={[
                             {
                               label: t('io.action_detail', 'Detail'),
-                              icon: <Eye className="w-3.5 h-3.5" />,
+                              icon: <Eye className="w-g13 h-g13" />,
                               onClick: () => setSelectedLogForDetail(log),
                             },
                           ]}
@@ -358,12 +354,12 @@ export const ActivityLogsView: React.FC = () => {
 
       {/* Detail Modal */}
       {selectedLogForDetail && (
-        <ModalFrame onClose={() => setSelectedLogForDetail(null)} className="max-w-lg w-full overflow-hidden">
+        <ModalFrame onClose={() => setSelectedLogForDetail(null)} className="max-w-g610 w-full overflow-hidden">
 
-            <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
+            <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
               <div>
-                <DialogTitle className="flex items-center gap-2">{t('logs.rincian_log_aktivitas', 'Rincian Log Aktivitas')}</DialogTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">{t('logs.id', 'ID: {id}', { id: selectedLogForDetail.id })}</p>
+                <DialogTitle className="flex items-center gap-g8">{t('logs.rincian_log_aktivitas', 'Rincian Log Aktivitas')}</DialogTitle>
+                <Text size="xs" tone="muted" className="mt-g2">{t('logs.id', 'ID: {id}', { id: selectedLogForDetail.id })}</Text>
               </div>
               <Button variant="ghost" aria-label={t('common.close', 'Tutup')}
                 onClick={() => setSelectedLogForDetail(null)}
@@ -372,10 +368,10 @@ export const ActivityLogsView: React.FC = () => {
               </Button>
             </DialogHeader>
 
-            <div className="p-6 space-y-4 text-xs">
-              <Card className="grid grid-cols-2 gap-4 p-4">
+            <div className="p-g21 space-y-g13 text-xs">
+              <Card className="grid grid-cols-2 gap-g13 p-g13">
                 <div>
-                  <span className="text-muted-foreground font-medium block mb-1">{t('notifications.col_time', 'Waktu')}</span>
+                  <span className="text-muted-foreground font-medium block mb-g3">{t('notifications.col_time', 'Waktu')}</span>
                   <span className="font-semibold text-foreground">
                     {new Date(selectedLogForDetail.timestamp).toLocaleString(getActiveFormattingLocale(), {
                       dateStyle: 'full',
@@ -384,19 +380,19 @@ export const ActivityLogsView: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground font-medium block mb-1">{t('admin.generic_user', 'Pengguna')}</span>
+                  <span className="text-muted-foreground font-medium block mb-g3">{t('admin.generic_user', 'Pengguna')}</span>
                   <span className="font-semibold text-foreground">
                     {selectedLogForDetail.userName || selectedLogForDetail.userEmail} ({selectedLogForDetail.role})
                   </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground font-medium block mb-1">{t('logs.col_action', 'Jenis Aksi')}</span>
+                  <span className="text-muted-foreground font-medium block mb-g3">{t('logs.col_action', 'Jenis Aksi')}</span>
                   <Badge tone={getActionBadge(selectedLogForDetail.actionType)}>
                     {selectedLogForDetail.actionType}
                   </Badge>
                 </div>
                 <div>
-                  <span className="text-muted-foreground font-medium block mb-1">{t('settings.region.modules', 'Modul')}</span>
+                  <span className="text-muted-foreground font-medium block mb-g3">{t('settings.region.modules', 'Modul')}</span>
                   <Badge tone={statusTone(selectedLogForDetail.module)}>
                     {selectedLogForDetail.module}
                   </Badge>
@@ -404,21 +400,21 @@ export const ActivityLogsView: React.FC = () => {
               </Card>
 
               <div>
-                <span className="text-muted-foreground font-semibold block mb-1.5">{t('logs.deskripsi_detail_teknis', 'Deskripsi / Detail Teknis:')}</span>
-                <div className="p-3.5 bg-foreground text-primary-foreground rounded-xl font-mono text-xs leading-relaxed wrap-break-word whitespace-pre-wrap max-h-48 overflow-y-auto">
+                <span className="text-muted-foreground font-semibold block mb-g5">{t('logs.deskripsi_detail_teknis', 'Deskripsi / Detail Teknis:')}</span>
+                <div className="p-g13 bg-foreground text-primary-foreground rounded-xl font-mono text-xs leading-relaxed wrap-break-word whitespace-pre-wrap max-h-g233 overflow-y-auto">
                   {selectedLogForDetail.description}
                 </div>
               </div>
 
               {(selectedLogForDetail.ipAddress || selectedLogForDetail.userAgent) && (
-                <div className="pt-2 border-t border-border space-y-1 text-xs text-muted-foreground">
+                <div className="pt-g8 border-t border-border space-y-g3 text-xs text-muted-foreground">
                   {selectedLogForDetail.ipAddress && <div><span className="font-semibold">{t('logs.ip_address', 'IP Address:')}</span> {selectedLogForDetail.ipAddress}</div>}
                   {selectedLogForDetail.userAgent && <div className="truncate"><span className="font-semibold">{t('logs.user_agent', 'User Agent:')}</span> {selectedLogForDetail.userAgent}</div>}
                 </div>
               )}
             </div>
 
-            <div className="p-4 bg-card border-t border-border flex justify-end">
+            <div className="p-g13 bg-card border-t border-border flex justify-end">
               <Button variant="ghost" size="sm"
                 onClick={() => setSelectedLogForDetail(null)}
               >

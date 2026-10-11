@@ -4,6 +4,11 @@ import { AlertTriangle, RefreshCw, RotateCcw } from 'lucide-react';
 import { translateStatic as t } from '../context/LanguageContext';
 
 import { Card } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
+import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { Text } from '@legalio/ui-components/text';
+import { Button } from '@legalio/ui-components/button';
+import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
 interface Props {
   children: ReactNode;
   resetPath?: string;
@@ -50,46 +55,37 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen w-full flex items-center justify-center p-4 bg-background text-foreground font-sans">
-          <Card className="w-full max-w-lg p-6 sm:p-8 space-y-6 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-status-warning-soft border border-status-warning-border flex items-center justify-center text-status-warning shadow-xs">
-              <AlertTriangle className="w-7 h-7" />
-            </div>
+        <div className="min-h-screen w-full flex items-center justify-center p-g13 bg-background text-foreground font-sans">
+          <Card className="w-full max-w-g610 p-g21 sm:p-g34 space-y-g21 text-center">
+            <Avatar size="lg" className="mx-auto rounded-xl bg-status-warning-soft border border-status-warning-border text-status-warning"><AvatarFallback className="bg-transparent text-inherit"><AlertTriangle className="w-g26 h-g26" /></AvatarFallback></Avatar>
 
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-foreground ">
+            <div className="space-y-g8">
+              <Heading as="h2" size="lg" weight="bold">
                 {t('error_boundary.title', 'Terjadi Kendala Memuat Tampilan')}
-              </h2>
-              <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+              </Heading>
+              <Text size="sm" tone="muted" className="mx-auto max-w-g377">
                 {t('error_boundary.description', 'Aplikasi mengalami galat saat memuat komponen antarmuka. Anda dapat memuat ulang halaman atau membersihkan cache sesi lokal.')}
-              </p>
+              </Text>
             </div>
 
             {this.state.error && (
-              <Card className="p-3 text-left overflow-hidden">
-                <p className="font-mono text-xs text-status-danger wrap-break-word font-semibold">
+              <Alert status="error" className="text-start">
+                <AlertIndicator />
+                <AlertContent><AlertDescription className="font-mono text-xs wrap-break-word">
                   {this.state.error.message || t('error_boundary.unknown_error', 'Galat tampilan yang tidak diketahui')}
-                </p>
-              </Card>
+                </AlertDescription></AlertContent>
+              </Alert>
             )}
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={this.handleReload}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>{t('error_boundary.reload', 'Muat Ulang Halaman')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={this.handleResetCache}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-muted hover:bg-muted text-foreground text-xs font-semibold transition-all border border-border flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>{t('error_boundary.reset', 'Reset Sesi & Cache')}</span>
-              </button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-g13 pt-g8">
+              <Button onClick={this.handleReload} className="w-full sm:w-auto">
+                <RefreshCw aria-hidden="true" />
+                {t('error_boundary.reload', 'Muat Ulang Halaman')}
+              </Button>
+              <Button variant="outline" onClick={this.handleResetCache} className="w-full sm:w-auto">
+                <RotateCcw aria-hidden="true" />
+                {t('error_boundary.reset', 'Reset Sesi & Cache')}
+              </Button>
             </div>
           </Card>
         </div>

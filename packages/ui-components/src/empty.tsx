@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/empty';
+export * from './moduix/ui/empty';

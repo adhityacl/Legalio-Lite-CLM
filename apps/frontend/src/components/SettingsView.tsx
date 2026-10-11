@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Building2, Plug, Users, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Building2, Users, type LucideIcon } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTenant } from '../context/TenantContext';
 import { useNavigation } from '../context/NavigationContext';
@@ -12,25 +12,26 @@ import { Button } from '@legalio/ui-components/button';
 import { ContextHeader } from '@legalio/ui-components/blocks';
 import { OrganizationTab } from './settings/OrganizationTab';
 import { MembersAccessTab } from './settings/MembersAccessTab';
-import { IntegrationsTab } from './settings/IntegrationsTab';
 
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 /**
- * Tenant Settings (PRD §6.1): one screen, at most three tabs —
- * Organization, Members & Access, Integrations — filtered by the selected
+ * Tenant Settings (PRD §6.1): one screen, at most two tabs —
+ * Organization and Members & Access — filtered by the selected
  * organization's capabilities. Hidden tabs are never mounted or fetched.
  */
 export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
   const { t } = useLanguage();
   const { activeTenant, activeTenantId, leaveOrganization } = useTenant();
-  const { setActiveTab, consumeIntent } = useNavigation();
+  const { setActiveTab, intent: pendingIntent, consumeIntent } = useNavigation();
   const confirm = useConfirm();
   const { hasPermission, accessMode, tenantRole } = usePermissions();
-  const [intent] = useState(() => consumeIntent());
+  // Read the alias intent during render, clear it after commit: clearing it while rendering could drop it if React re-renders.
+  const [intent] = useState(pendingIntent);
+  useEffect(() => { if (pendingIntent) consumeIntent(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tabs: Array<{ id: SettingsTabId; label: string; icon: LucideIcon; visible: boolean }> = [
     { id: 'settings-organization', label: t('tb.tab_organization', 'Organization'), icon: Building2, visible: hasPermission('tenant.settings.read') },
     { id: 'settings-access', label: t('tb.tab_access', 'Members & Access'), icon: Users, visible: hasPermission('tenant.member.read') },
-    { id: 'settings-integrations', label: t('tb.tab_integrations', 'Integrations'), icon: Plug, visible: hasPermission('tenant.integration.read') },
   ];
   const visible = tabs.filter((item) => item.visible);
   const orgName = activeTenant?.name || '';
@@ -62,20 +63,20 @@ export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
   } as Record<string, string>)[tenantRole] : '';
 
   return (
-    <Tabs variant="line" value={tab} onValueChange={details => void go(details.value as SettingsTabId)} lazyMount unmountOnExit id="settings" className="min-w-0 gap-6">
+    <Tabs value={tab} onValueChange={details => void go(details.value as SettingsTabId)} lazyMount unmountOnExit id="settings" className="min-w-0 gap-g21">
       <ContextHeader
         icon={<Building2 />}
-        title={t('tb.settings_title', 'Settings — {org}', { org: orgName })}
+        title={t('tb.settings_title', 'Settings / {org}', { org: orgName })}
         description={accessMode !== 'platform' ? t('tb.role_in_org', 'Role in this organization: {role}', { role: roleLabel }) : undefined}
         actions={accessMode === 'platform' && (
-          <Button size="sm" variant="ghost" onClick={async () => { if (await leaveOrganization()) setActiveTab('admin-system-organizations'); }}
-            aria-label={t('tb.back_to_system_admin', 'Back to System Admin')} title={t('tb.back_to_system_admin', 'Back to System Admin')}>
+          <Tooltip><TooltipTrigger asChild><Button size="sm" variant="ghost" onClick={async () => { if (await leaveOrganization()) setActiveTab('admin-system-organizations'); }}
+            aria-label={t('tb.back_to_system_admin', 'Back to System Admin')}>
             <ArrowLeft aria-hidden="true" />
             <span className="hidden sm:inline">{t('tb.back_to_system_admin', 'Back to System Admin')}</span>
-          </Button>
+          </Button></TooltipTrigger><TooltipBody>{t('tb.back_to_system_admin', 'Back to System Admin')}</TooltipBody></Tooltip>
         )}
       >
-        <TabsList aria-label={t('tb.settings_sections', 'Settings sections')} className="admin-tab-list overflow-x-auto border-t border-border px-4">
+        <TabsList aria-label={t('tb.settings_sections', 'Settings sections')} className="mx-g21 mb-g21 w-fit max-w-full overflow-x-auto">
           {visible.map(item => {
             const Icon = item.icon;
             return (
@@ -94,9 +95,6 @@ export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
       </TabsContent>
       <TabsContent value="settings-access">
         {hasPermission('tenant.member.read') && <MembersAccessTab key={activeTenantId} organizationId={activeTenantId} intent={intent} />}
-      </TabsContent>
-      <TabsContent value="settings-integrations">
-        {hasPermission('tenant.integration.read') && <IntegrationsTab key={activeTenantId} organizationId={activeTenantId} />}
       </TabsContent>
     </Tabs>
   );

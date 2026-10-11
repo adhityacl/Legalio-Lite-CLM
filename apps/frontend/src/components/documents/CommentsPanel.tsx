@@ -20,7 +20,16 @@ import { RelativeTime } from './RelativeTime';
 
 import { Textarea } from '@legalio/ui-components/textarea';
 import { Button } from '@legalio/ui-components/button';
-import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { Heading } from '@legalio/ui-components/heading';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { Badge, type StatusTone } from '@legalio/ui-components/badge';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Card } from '@legalio/ui-components/card';
+import { Empty, EmptyContent, EmptyDescription } from '@legalio/ui-components/empty';
+import { Text } from '@legalio/ui-components/text';
+import { List, ListItem } from '@legalio/ui-components/list';
+import { Skeleton } from '@legalio/ui-components/skeleton';
 interface CommentsPanelProps {
   editor: Editor | null;
   documentId: string | null;
@@ -41,13 +50,11 @@ interface Composer {
   newText: string;
 }
 
-const SMALL_BUTTON =
-  'inline-flex items-center gap-1 px-2 min-h-10 sm:min-h-8 rounded-md text-xs font-bold border border-border  text-foreground  hover:bg-muted  disabled:opacity-50 cursor-pointer';
-const STATUS_BADGE: Record<CommentStatus, string> = {
-  open: 'bg-status-warning-soft text-status-warning border-status-warning-border   ',
-  resolved: 'bg-muted text-foreground border-border   ',
-  accepted: 'bg-status-success-soft text-status-success border-status-success-border   ',
-  rejected: 'bg-status-danger-soft text-status-danger border-status-danger-border   ',
+const STATUS_TONE: Record<CommentStatus, StatusTone> = {
+  open: 'warning',
+  resolved: 'neutral',
+  accepted: 'success',
+  rejected: 'danger',
 };
 
 export const CommentsPanel: React.FC<CommentsPanelProps> = ({
@@ -250,76 +257,71 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
     const isBusy = busy === comment.id || busy === 'bulk';
     const replies = repliesOf(comment.id);
     return (
-      <li key={comment.id} className="editor-panel-card p-4 rounded-xl border border-border bg-card space-y-1.5 text-xs" aria-busy={isBusy}>
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-xs">
+      <Card asChild key={comment.id}><li className="p-g13 space-y-g5 text-xs" aria-busy={isBusy}>
+        <div className="flex items-start justify-between gap-g8">
+          <Text size="xs">
             <span className="font-bold text-foreground ">{comment.author_name || '—'}</span>{' '}
             <span className="text-muted-foreground">
               · {isSuggestion ? t('documents.comments.suggestion', 'Usulan') : t('documents.comments.comment', 'Komentar')} ·{' '}
               <RelativeTime iso={comment.created_at} />
             </span>
-          </p>
-          <span className={`shrink-0 px-1.5 py-0.5 rounded-full border text-xs font-bold ${STATUS_BADGE[comment.status]}`}>{statusLabel(comment.status)}</span>
+          </Text>
+          <Badge tone={STATUS_TONE[comment.status]} className="shrink-0">{statusLabel(comment.status)}</Badge>
         </div>
 
         {comment.quote && (
-          <button
-            type="button"
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm"
             onClick={() => jumpTo(comment)}
-            className="block w-full text-left border-l-2 border-status-warning-border pl-2 text-xs text-muted-foreground hover:bg-card rounded-r cursor-pointer"
-            title={t('documents.comments.jump', 'Lompat ke teks di dokumen')}
+            className="h-auto w-full justify-start whitespace-normal rounded-s-none border-s-2 border-status-warning-border py-g3 text-start text-xs font-normal text-muted-foreground"
           >
             {isSuggestion ? <del className="text-status-danger">{comment.quote}</del> : <q>{comment.quote}</q>}
-          </button>
+          </Button></TooltipTrigger><TooltipBody>{t('documents.comments.jump', 'Lompat ke teks di dokumen')}</TooltipBody></Tooltip>
         )}
         {isSuggestion && (
-          <p className="text-xs">
+          <Text size="xs">
             →{' '}
             {comment.new_text ? (
               <ins className="text-status-success font-semibold">{comment.new_text}</ins>
             ) : (
               <em className="text-muted-foreground">{t('documents.comments.deletion', '(hapus teks)')}</em>
             )}
-          </p>
+          </Text>
         )}
-        {comment.body && <p className="whitespace-pre-wrap text-foreground">{comment.body}</p>}
+        {comment.body && <Text size="sm" className="whitespace-pre-wrap">{comment.body}</Text>}
         {comment.resolved_at && (
-          <p className="text-xs text-muted-foreground">
+          <Text size="xs" tone="muted">
             {statusLabel(comment.status)} · {comment.resolved_by_name || '—'} · <RelativeTime iso={comment.resolved_at} />
-          </p>
+          </Text>
         )}
 
         {replies.length > 0 && (
-          <ul className="space-y-1 pl-3 border-l border-border">
+          <List marker="none" className="space-y-g3 pl-g13 border-l border-border">
             {replies.map((reply) => (
-              <li key={reply.id} className="text-xs">
+              <ListItem key={reply.id} className="text-xs">
                 <span className="font-bold text-foreground ">{reply.author_name || '—'}</span>{' '}
                 <span className="text-muted-foreground">
                   · <RelativeTime iso={reply.created_at} />
                 </span>
-                <p className="whitespace-pre-wrap text-foreground">{reply.body}</p>
-              </li>
+                <Text size="sm" className="whitespace-pre-wrap">{reply.body}</Text>
+              </ListItem>
             ))}
-          </ul>
+          </List>
         )}
 
         {replyTo?.id === comment.id ? (
-          <form onSubmit={submitReply} className="space-y-1">
-            <label htmlFor={`${idPrefix}-reply-${comment.id}`} className="sr-only">
-              {t('documents.comments.reply', 'Balas')}
-            </label>
-            <Textarea
+          <form onSubmit={submitReply} className="space-y-g3">
+            <Textarea aria-label={t('documents.comments.reply', 'Balas')}
               id={`${idPrefix}-reply-${comment.id}`}
               autoFocus
               rows={2}
               value={replyTo.body}
               onChange={(e) => setReplyTo({ id: comment.id, body: e.target.value })}
             />
-            <div className="flex gap-1">
-              <Button type="submit" disabled={isBusy || !replyTo.body.trim()} className={`${SMALL_BUTTON} `}>
+            <div className="flex gap-g3">
+              <Button type="submit" size="sm" disabled={isBusy || !replyTo.body.trim()}>
                 {t('documents.comments.send', 'Kirim')}
               </Button>
-              <Button variant="ghost" type="button" onClick={() => setReplyTo(null)} className={SMALL_BUTTON}>
+              <Button variant="ghost" type="button" onClick={() => setReplyTo(null)} size="sm">
                 {t('common.cancel', 'Batal')}
               </Button>
             </div>
@@ -327,80 +329,80 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
         ) : (
           canEdit &&
           documentId && (
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-g3">
               {comment.status === 'open' && isSuggestion && (
                 <>
-                  <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'accept')} className={SMALL_BUTTON}>
-                    <Check className="w-3 h-3 text-status-success" aria-hidden /> {t('documents.comments.accept', 'Terima')}
+                  <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'accept')} size="sm">
+                    <Check className="w-g13 h-g13 text-status-success" aria-hidden /> {t('documents.comments.accept', 'Terima')}
                   </Button>
-                  <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'reject')} className={SMALL_BUTTON}>
-                    <X className="w-3 h-3 text-status-danger" aria-hidden /> {t('documents.comments.reject', 'Tolak')}
+                  <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'reject')} size="sm">
+                    <X className="w-g13 h-g13 text-status-danger" aria-hidden /> {t('documents.comments.reject', 'Tolak')}
                   </Button>
                 </>
               )}
               {comment.status === 'open' && !isSuggestion && (
-                <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'resolve')} className={SMALL_BUTTON}>
-                  <CheckCheck className="w-3 h-3" aria-hidden /> {t('documents.comments.resolve', 'Selesaikan')}
+                <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'resolve')} size="sm">
+                  <CheckCheck className="w-g13 h-g13" aria-hidden /> {t('documents.comments.resolve', 'Selesaikan')}
                 </Button>
               )}
               {comment.status === 'resolved' && (
-                <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'reopen')} className={SMALL_BUTTON}>
-                  <RotateCcw className="w-3 h-3" aria-hidden /> {t('documents.comments.reopen', 'Buka lagi')}
+                <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'reopen')} size="sm">
+                  <RotateCcw className="w-g13 h-g13" aria-hidden /> {t('documents.comments.reopen', 'Buka lagi')}
                 </Button>
               )}
-              <Button variant="ghost" type="button" onClick={() => setReplyTo({ id: comment.id, body: '' })} className={SMALL_BUTTON}>
+              <Button variant="ghost" type="button" onClick={() => setReplyTo({ id: comment.id, body: '' })} size="sm">
                 {t('documents.comments.reply', 'Balas')}
               </Button>
             </div>
           )
         )}
-      </li>
+      </li></Card>
     );
   };
 
   return (
-    <div className="editor-comments space-y-4">
+    <div className="space-y-g13">
       {canEdit && !composer && (
-        <div className="editor-comment-actions grid grid-cols-2 gap-2">
-          <Button variant="ghost" type="button" onClick={() => startComposer('comment')} className={`${SMALL_BUTTON} `}>
-            <MessageSquarePlus className="w-3.5 h-3.5" aria-hidden /> {t('documents.comments.add_comment', 'Komentar')}
+        <div className="grid grid-cols-2 gap-g8">
+          <Button variant="outline" type="button" onClick={() => startComposer('comment')}>
+            <MessageSquarePlus className="size-g16" aria-hidden /> {t('documents.comments.add_comment', 'Komentar')}
           </Button>
-          <Button variant="ghost" type="button" onClick={() => startComposer('suggestion')} className={`${SMALL_BUTTON} `}>
-            <PenLine className="w-3.5 h-3.5" aria-hidden /> {t('documents.comments.add_suggestion', 'Usulkan Perubahan')}
+          <Button variant="outline" type="button" onClick={() => startComposer('suggestion')}>
+            <PenLine className="size-g16" aria-hidden /> {t('documents.comments.suggest_button', 'Suggest')}
           </Button>
           <Button variant="outline"
             type="button"
             disabled={busy === 'ai-redline'}
             aria-busy={busy === 'ai-redline'}
             onClick={runAiRedlining}
-            className={`${SMALL_BUTTON} col-span-2 `}
+            className="col-span-2"
           >
-            <AiIcon className={`w-3.5 h-3.5 ${busy === 'ai-redline' ? 'animate-pulse' : ''}`} />
+            <AiIcon className={`size-g16 ${busy === 'ai-redline' ? 'animate-pulse' : ''}`} />
             {busy === 'ai-redline' ? t('documents.comments.ai_redline_running', 'Meninjau dokumen…') : t('documents.comments.ai_redline', 'AI Redlining')}
           </Button>
         </div>
       )}
 
       {composer && (
-        <form onSubmit={submitComposer} className="space-y-2 editor-panel-card p-4 rounded-xl border border-status-success-border bg-status-success-soft/30 " aria-busy={busy === 'composer'}>
-          <p className="text-xs font-bold text-foreground">
+        <Card asChild><form onSubmit={submitComposer} className="space-y-g8 p-g13" aria-busy={busy === 'composer'}>
+          <Text size="xs" weight="bold">
             {composer.mode === 'suggestion' ? t('documents.comments.add_suggestion', 'Usulkan Perubahan') : t('documents.comments.add_comment', 'Komentar')}
-          </p>
+          </Text>
           {composer.range ? (
-            <blockquote className="border-l-2 border-status-warning-border pl-2 text-xs text-muted-foreground line-clamp-3">{composer.range.text}</blockquote>
+            <blockquote className="border-l-2 border-status-warning-border pl-g8 text-xs text-muted-foreground line-clamp-3">{composer.range.text}</blockquote>
           ) : (
-            <p className="text-xs text-muted-foreground">{t('documents.comments.general', 'Komentar umum (tanpa teks terpilih).')}</p>
+            <Text size="xs" tone="muted">{t('documents.comments.general', 'Komentar umum (tanpa teks terpilih).')}</Text>
           )}
           {composer.mode === 'suggestion' && (
-            <label className="block space-y-1 text-xs font-semibold text-muted-foreground">
-              <span>{t('documents.comments.replace_with', 'Ganti menjadi (kosongkan untuk menghapus)')}</span>
+            <Field>
+              <FieldLabel>{t('documents.comments.replace_with', 'Ganti menjadi (kosongkan untuk menghapus)')}</FieldLabel>
               <Textarea rows={2} value={composer.newText} onChange={(e) => setComposer({ ...composer, newText: e.target.value })} />
-            </label>
+            </Field>
           )}
-          <label className="block space-y-1 text-xs font-semibold text-muted-foreground">
-            <span>
+          <Field required={composer.mode === 'comment'}>
+            <FieldLabel>
               {composer.mode === 'suggestion' ? t('documents.comments.reason', 'Alasan (opsional)') : t('documents.comments.comment_text', 'Komentar')}
-            </span>
+            </FieldLabel>
             <Textarea
               autoFocus={composer.mode === 'comment'}
               required={composer.mode === 'comment'}
@@ -408,83 +410,83 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
               value={composer.body}
               onChange={(e) => setComposer({ ...composer, body: e.target.value })}
             />
-          </label>
-          <div className="flex gap-1">
-            <Button type="submit" disabled={busy === 'composer'} className={`${SMALL_BUTTON} `}>
+          </Field>
+          <div className="flex gap-g3">
+            <Button type="submit" disabled={busy === 'composer'} size="sm">
               {busy === 'composer' ? t('common.saving', 'Menyimpan…') : t('documents.comments.send', 'Kirim')}
             </Button>
-            <Button variant="ghost" type="button" onClick={() => setComposer(null)} className={SMALL_BUTTON}>
+            <Button variant="ghost" type="button" onClick={() => setComposer(null)} size="sm">
               {t('common.cancel', 'Batal')}
             </Button>
           </div>
-        </form>
+        </form></Card>
       )}
 
       {state.status === 'loading' && (
-        <div role="status" className="space-y-2">
+        <div role="status" className="space-y-g8">
           <span className="sr-only">{t('common.loading', 'Memuat…')}</span>
           {[0, 1].map((i) => (
-            <div key={i} className="h-24 rounded-lg bg-muted animate-pulse motion-reduce:animate-none" />
+            <Skeleton key={i} className="h-g89 w-full" />
           ))}
         </div>
       )}
 
       {state.status === 'error' && (
-        <Alert status="error" role="alert">
-          <AlertContent><p>{state.message}</p>
-          <Button variant="ghost" type="button" onClick={reload} className={SMALL_BUTTON}>
-            <RefreshCw className="w-3 h-3" aria-hidden /> {t('common.retry', 'Coba lagi')}
-          </Button></AlertContent>
+        <Alert status="error" role="alert"><AlertIndicator />
+          <AlertContent><AlertDescription><p>{state.message}</p>
+          <Button variant="ghost" type="button" onClick={reload} size="sm">
+            <RefreshCw className="w-g13 h-g13" aria-hidden /> {t('common.retry', 'Coba lagi')}
+          </Button></AlertDescription></AlertContent>
         </Alert>
       )}
 
       {state.status === 'ready' && (
         <>
-          <section aria-labelledby={`${idPrefix}-summary`} className="editor-panel-card p-4 space-y-2">
-            <h3 id={`${idPrefix}-summary`} className="text-xs font-bold text-foreground">
+          <Card asChild><section aria-labelledby={`${idPrefix}-summary`} className="gap-g13 p-g13">
+            <Heading as="h3" size="sm" weight="bold" id={`${idPrefix}-summary`}>
               {t('documents.comments.summary', 'Ringkasan Perubahan')}
-            </h3>
-            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-foreground">
+            </Heading>
+            <dl className="grid grid-cols-2 gap-x-g13 gap-y-g8 text-sm text-foreground">
               <dt>{t('documents.comments.total', 'Total')}</dt>
-              <dd className="text-right font-bold">{topLevel.length}</dd>
+              <dd className="text-right font-semibold tabular-nums">{topLevel.length}</dd>
               <dt>{statusLabel('open')}</dt>
-              <dd className="text-right font-bold">{count('open')}</dd>
+              <dd className="text-right font-semibold tabular-nums">{count('open')}</dd>
               <dt>{statusLabel('accepted')}</dt>
-              <dd className="text-right font-bold">{count('accepted')}</dd>
+              <dd className="text-right font-semibold tabular-nums">{count('accepted')}</dd>
               <dt>{statusLabel('rejected')}</dt>
-              <dd className="text-right font-bold">{count('rejected')}</dd>
+              <dd className="text-right font-semibold tabular-nums">{count('rejected')}</dd>
               <dt>{statusLabel('resolved')}</dt>
-              <dd className="text-right font-bold">{count('resolved')}</dd>
+              <dd className="text-right font-semibold tabular-nums">{count('resolved')}</dd>
             </dl>
             {canEdit && openSuggestions.length > 1 && (
-              <div className="grid grid-cols-2 gap-1">
-                <Button variant="ghost" type="button" disabled={busy === 'bulk'} onClick={() => bulk('accept')} className={`${SMALL_BUTTON} `}>
-                  <Check className="w-3 h-3 text-status-success" aria-hidden /> {t('documents.comments.accept_all', 'Terima Semua')}
+              <div className="grid grid-cols-2 gap-g8">
+                <Button variant="outline" type="button" disabled={busy === 'bulk'} onClick={() => bulk('accept')}>
+                  <Check className="w-g13 h-g13 text-status-success" aria-hidden /> {t('documents.comments.accept_all', 'Terima Semua')}
                 </Button>
-                <Button variant="ghost" type="button" disabled={busy === 'bulk'} onClick={() => bulk('reject')} className={`${SMALL_BUTTON} `}>
-                  <X className="w-3 h-3 text-status-danger" aria-hidden /> {t('documents.comments.reject_all', 'Tolak Semua')}
+                <Button variant="outline" type="button" disabled={busy === 'bulk'} onClick={() => bulk('reject')}>
+                  <X className="w-g13 h-g13 text-status-danger" aria-hidden /> {t('documents.comments.reject_all', 'Tolak Semua')}
                 </Button>
               </div>
             )}
             {documentId && (
-              <Button variant="ghost" type="button" onClick={() => onExportRedline(comments)} className={`${SMALL_BUTTON} w-full`}>
-                <FileDown className="w-3 h-3" aria-hidden /> {t('documents.comments.export_redline', 'Unduh dengan Redline (.doc)')}
+              <Button variant="outline" type="button" onClick={() => onExportRedline(comments)} className="w-full">
+                <FileDown className="size-g16" aria-hidden /> {t('documents.comments.export_redline', 'Unduh dengan Redline (.doc)')}
               </Button>
             )}
-          </section>
+          </section></Card>
 
           {open.length === 0 ? (
-            <p className="text-xs text-muted-foreground editor-panel-empty text-center py-8 border border-dashed border-border rounded-lg">
-              {t('documents.comments.empty', 'Tidak ada komentar atau usulan terbuka.')}
-            </p>
+            <Empty>
+              <EmptyContent><EmptyDescription>{t('documents.comments.empty', 'Tidak ada komentar atau usulan terbuka.')}</EmptyDescription></EmptyContent>
+            </Empty>
           ) : (
-            <ul className="space-y-2" aria-label={statusLabel('open')}>
+            <List marker="none" className="space-y-g8" aria-label={statusLabel('open')}>
               {open.map(renderCard)}
-            </ul>
+            </List>
           )}
 
           {closed.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-g8">
               <Button variant="link" size="sm"
                 type="button"
                 onClick={() => setShowClosed((v) => !v)}
@@ -494,35 +496,35 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
                   ? t('documents.comments.hide_closed', 'Sembunyikan yang selesai')
                   : t('documents.comments.show_closed', 'Tampilkan yang selesai ({n})', { n: closed.length })}
               </Button>
-              {showClosed && <ul className="space-y-2 opacity-90">{closed.map(renderCard)}</ul>}
+              {showClosed && <List marker="none" className="space-y-g8 opacity-90">{closed.map(renderCard)}</List>}
             </div>
           )}
 
           {topLevel.length > 0 && (
-            <section className="space-y-1.5 pt-2 border-t border-border">
+            <section className="space-y-g5 pt-g8 border-t border-border">
               <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => setShowTimeline((v) => !v)}
                 aria-expanded={showTimeline}
               >
-                <History className="w-3.5 h-3.5 text-muted-foreground" aria-hidden />
+                <History className="w-g13 h-g13 text-muted-foreground" aria-hidden />
                 {t('documents.comments.timeline', 'Riwayat Redline')}
               </Button>
               {showTimeline && (
-                <ol className="space-y-1 text-xs text-muted-foreground">
+                <List as="ol" size="xs" tone="muted" marker="none" className="space-y-g3">
                   {[...topLevel]
                     .sort((a, b) => (b.resolved_at ?? b.created_at).localeCompare(a.resolved_at ?? a.created_at))
                     .map((c) => (
-                      <li key={c.id}>
+                      <ListItem key={c.id}>
                         <strong className="text-foreground">{c.author_name || '—'}</strong>:{' '}
                         {c.comment_type === 'suggestion'
                           ? `“${c.quote}” → “${c.new_text ?? ''}”`
                           : c.body.slice(0, 80)}{' '}
                         (<RelativeTime iso={c.created_at} />) — <strong>{statusLabel(c.status).toUpperCase()}</strong>
                         {c.resolved_by_name && ` · ${c.resolved_by_name}`}
-                      </li>
+                      </ListItem>
                     ))}
-                </ol>
+                </List>
               )}
             </section>
           )}

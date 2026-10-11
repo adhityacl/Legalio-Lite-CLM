@@ -12,7 +12,7 @@ Baca sumber berikut sebelum mengubah sistem:
 2. [`apps/frontend/src/lib/appRoutes.ts`](apps/frontend/src/lib/appRoutes.ts) — daftar route SPA, alias lama, dan keputusan akses halaman.
 3. [`apps/backend/src/routePolicies.ts`](apps/backend/src/routePolicies.ts) — daftar izin untuk setiap endpoint API. Endpoint yang tidak terdaftar ditolak.
 4. [`apps/backend/src/rbac.ts`](apps/backend/src/rbac.ts) — katalog permission, role platform/tenant, dan aturan scope organisasi/departemen.
-5. [`docs/button-sizes.md`](docs/button-sizes.md) — standar tinggi field dan tombol.
+5. [`docs/design-system/STANDARD.md`](docs/design-system/STANDARD.md) — standar UI (ukuran, spacing, tipografi, layout).
 6. [`docs/AUDIT-GLOBAL-OSS-READINESS.md`](docs/AUDIT-GLOBAL-OSS-READINESS.md) — inventori risiko dan asumsi lokal.
 
 Audit OSS dibuat pada 24 September 2026. Gunakan sebagai daftar pemeriksaan historis, lalu verifikasi setiap temuan terhadap kode terbaru sebelum menyatakan statusnya masih terbuka atau sudah selesai.
@@ -266,14 +266,12 @@ Jangan mengarahkan suite E2E ke database produksi atau `auth.db` workspace.
 
 ### Design system
 
-- Gunakan token di `apps/frontend/src/index.css`; jangan menambah warna brand mentah bila token sudah tersedia.
-- Gunakan komponen `src/components/ui/` sebelum membuat primitive baru.
-- Ikuti [`docs/button-sizes.md`](docs/button-sizes.md).
-- Field satu baris dan primary/form actions berukuran 44 px.
-- Toolbar tanpa field dapat memakai tombol medium 36 px.
-- Aksi tabel/kartu yang ringkas dapat memakai 28 px.
-- Pada mobile, target sentuh minimum 44 px.
-- Jangan memaksa ukuran `Button` dengan kombinasi `h-*`, `min-h-*`, `py-*`, dan radius acak. Gunakan `size="lg|md|sm"`.
+- Rujukan utama: ikuti panduan terpusat di [`docs/design-system/README.md`](docs/design-system/README.md).
+- Gunakan token di `apps/frontend/src/index.css`; dilarang menambah warna brand mentah atau raw hex bila token sudah tersedia.
+- Selalu gunakan komponen dari `@legalio/ui-components/` (`packages/ui-components/`) sebelum membuat primitive baru.
+- Ikuti [`docs/design-system/STANDARD.md`](docs/design-system/STANDARD.md) (kontrol 24/32/40/48/64 px lewat `size`, spacing `gr-*`).
+- Pada mobile, target sentuh minimum 40–44 px.
+- Jangan memaksa ukuran `Button` dengan kombinasi `h-*`, `min-h-*`, `py-*`, dan radius acak. Gunakan `size="md"` (default 40px) atau `size="sm"` (compact 32px).
 - Gunakan Lucide atau ikon bersama yang sudah tersedia. Jangan menggambar SVG baru tanpa kebutuhan khusus.
 
 ### Pola tampilan

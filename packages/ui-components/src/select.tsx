@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/select';
+export * from './moduix/ui/select';

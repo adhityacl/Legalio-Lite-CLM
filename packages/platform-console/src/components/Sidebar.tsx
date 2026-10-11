@@ -52,6 +52,9 @@ import { Collapsible, CollapsibleContent, CollapsibleIndicator, CollapsibleTrigg
 import { Menu, MenuContent, MenuItem, MenuPositioner, MenuTrigger, MenuViewport } from '@legalio/ui-components/menu';
 import { Drawer, DrawerBackdrop, DrawerBody, DrawerCloseIcon, DrawerContent, DrawerFooter, DrawerHeader, DrawerPositioner, DrawerTitle } from '@legalio/ui-components/drawer';
 
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { CommandPalette, CommandPaletteCombobox, CommandPaletteEmpty, CommandPaletteItem, CommandPaletteItemGroup, CommandPaletteItemGroupLabel, CommandPaletteItemIcon, CommandPaletteItemLabel, CommandPaletteItemText, CommandPaletteList, CommandPalettePanel, CommandPaletteSearch } from '@legalio/ui-components/command-palette';
+import { useFilter, useListCollection } from '@legalio/ui-components/combobox';
 export interface AppNavigationProps {
   showSystemAdmin?: boolean;
   activeTab: string;
@@ -70,7 +73,7 @@ interface NavEntry extends NavLeaf { badge?: number; children?: NavLeaf[]; targe
 interface NavSection { id: string; title: string; items: NavEntry[] }
 
 const DESKTOP_QUERY = '(min-width: 768px)';
-const SIZE_KEY = 'sidebar_size';
+const SIZE_KEY = 'sidebar_size_v2'; // v2: STANDARD.md widths; older saved sizes are ignored
 
 function useIsDesktop() {
   const [desktop, setDesktop] = useState(() => typeof window === 'undefined' || window.matchMedia(DESKTOP_QUERY).matches);
@@ -111,7 +114,6 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
     { id: 'admin-system-ai', label: t('settings.nav_ai', 'AI Model & Parser'), icon: AiIcon },
     { id: 'admin-system-smtp', label: t('tb.config_smtp', 'SMTP relay'), icon: Mail },
     { id: 'admin-system-ui-texts', label: t('tb.config_texts_short', 'UI texts'), icon: Languages },
-    { id: 'admin-system-design-system', label: t('designSystem.title', 'Design System'), icon: Sliders },
     { id: 'admin-system-backups', label: t('backup.title', 'Backup & Restore'), icon: Database },
     { id: 'admin-system-database', label: t('tb.config_maintenance', 'Database & reset'), icon: Database },
   ].map(item => ({ ...item, active: item.id === 'admin-system-dashboard' ? systemDashboardTabs.includes(activeTab) : activeTab === item.id }));
@@ -142,8 +144,46 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
   ].filter(section => section.items.length > 0);
 }
 
-function NavigationGroups({ sections, onNavigate, rail }: { sections: NavSection[]; onNavigate: (tab: string) => void; rail: boolean }) {
+/**
+ * A navigation entry with children: activating it from another section opens its first page and
+ * expands the submenu; inside the section it only toggles the submenu.
+ */
+function NavigationGroupItem({ item, onNavigate, withTooltip }: {
+  item: NavEntry;
+  onNavigate: (tab: string) => void;
+  withTooltip: (item: NavEntry, node: React.ReactElement) => React.ReactNode;
+}) {
   const { t } = useLanguage();
+  const [open, setOpen] = useState(item.active);
+  useEffect(() => { if (item.active) setOpen(true); }, [item.active]);
+  return (
+    <Collapsible open={open} onOpenChange={details => setOpen(item.active ? details.open : true)}>
+      {withTooltip(item, (
+        <CollapsibleTrigger asChild>
+          <SidebarNavigationButton active={item.active} aria-label={item.label} onClick={() => { if (!item.active) onNavigate(item.target || item.children![0].id); }}>
+            <item.icon aria-hidden />
+            <SidebarLabel>{item.label}</SidebarLabel>
+            <CollapsibleIndicator aria-label={t('nav.buka_submenu', 'Buka Submenu')} />
+          </SidebarNavigationButton>
+        </CollapsibleTrigger>
+      ))}
+      <CollapsibleContent>
+        <SidebarNavigationSubList>
+          {item.children!.map(child => (
+            <SidebarNavigationSubItem key={child.id}>
+              {/* moduix renders an <a>; without an href it is not focusable, so use a real button. */}
+              <SidebarNavigationSubButton asChild active={child.active} aria-current={child.active ? 'page' : undefined}>
+                <button type="button" onClick={() => onNavigate(child.id)}>{child.label}</button>
+              </SidebarNavigationSubButton>
+            </SidebarNavigationSubItem>
+          ))}
+        </SidebarNavigationSubList>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function NavigationGroups({ sections, onNavigate, rail }: { sections: NavSection[]; onNavigate: (tab: string) => void; rail: boolean }) {
   const leaf = (item: NavEntry) => (
     <SidebarNavigationButton active={item.active} onClick={() => onNavigate(item.target || item.id)}>
       <item.icon aria-hidden />
@@ -151,35 +191,11 @@ function NavigationGroups({ sections, onNavigate, rail }: { sections: NavSection
     </SidebarNavigationButton>
   );
   const withTooltip = (item: NavEntry, node: React.ReactElement) => rail ? <SidebarTooltip content={item.label}>{node}</SidebarTooltip> : node;
-  const subList = (item: NavEntry) => (
-    <SidebarNavigationSubList>
-      {item.children!.map(child => (
-        <SidebarNavigationSubItem key={child.id}>
-          <SidebarNavigationSubButton active={child.active} aria-current={child.active ? 'page' : undefined} onClick={() => onNavigate(child.id)}>
-            {child.label}
-          </SidebarNavigationSubButton>
-        </SidebarNavigationSubItem>
-      ))}
-    </SidebarNavigationSubList>
-  );
-  const group = (item: NavEntry) => (
-    <Collapsible defaultOpen={item.active}>
-      {withTooltip(item, (
-        <CollapsibleTrigger asChild>
-          <SidebarNavigationButton active={item.active} aria-label={item.label}>
-            <item.icon aria-hidden />
-            <SidebarLabel>{item.label}</SidebarLabel>
-            <CollapsibleIndicator aria-label={t('nav.buka_submenu', 'Buka Submenu')} />
-          </SidebarNavigationButton>
-        </CollapsibleTrigger>
-      ))}
-      <CollapsibleContent>{subList(item)}</CollapsibleContent>
-    </Collapsible>
-  );
+  const group = (item: NavEntry) => <NavigationGroupItem item={item} onNavigate={onNavigate} withTooltip={withTooltip} />;
   return (
     <>
-      {sections.map(section => (
-        <SidebarGroup key={section.id} aria-label={section.title}>
+      {sections.map((section, index) => (
+        <SidebarGroup key={section.id} aria-label={section.title} className={index === 0 ? 'pt-g34' : undefined}>
           <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
           <SidebarNavigationList>
             {section.items.map(item => (
@@ -193,12 +209,12 @@ function NavigationGroups({ sections, onNavigate, rail }: { sections: NavSection
                   <>
                     <SidebarExpandedContent>{group(item)}</SidebarExpandedContent>
                     <SidebarCollapsedContent>
-                      <Menu positioning={{ placement: 'right-start', gutter: 8 }} onSelect={details => onNavigate(details.value)}>
-                        <MenuTrigger asChild>
-                          <SidebarNavigationButton active={item.active} aria-label={item.label} title={item.label}>
+                      <Menu ids={{ trigger: `rail-${item.id}-trigger` }} positioning={{ placement: 'right-start', gutter: 8 }} onSelect={details => onNavigate(details.value)}>
+                        <Tooltip ids={{ trigger: `rail-${item.id}-trigger` }}><TooltipTrigger asChild><MenuTrigger asChild>
+                          <SidebarNavigationButton active={item.active} aria-label={item.label}>
                             <item.icon aria-hidden />
                           </SidebarNavigationButton>
-                        </MenuTrigger>
+                        </MenuTrigger></TooltipTrigger><TooltipBody>{item.label}</TooltipBody></Tooltip>
                         <MenuPositioner>
                           <MenuContent>
                             <MenuViewport>
@@ -232,10 +248,51 @@ function StatusFooter({ googleConfig }: { googleConfig?: GoogleSheetsConfig }) {
     ? ['bg-status-warning', `Google Drive: Token akan kadaluarsa (Sisa ~${minutes} menit)`]
     : ['bg-status-success', `Google Drive: Terhubung & Siap (Sisa ~${minutes} menit)`];
   return (
-    <div className="flex items-center justify-between gap-2 px-2 text-xs text-muted-foreground">
-      <span data-sidebar-icon title={tooltip} role="img" aria-label={tooltip} className={`size-2.5 shrink-0 rounded-full ${tone}`} />
-      <SidebarLabel>{t('nav.version', 'v2.5.0 • ACL')}</SidebarLabel>
+    <div className="flex items-center justify-between gap-g8 px-g8 text-xs text-muted-foreground">
+      <Tooltip><TooltipTrigger asChild><span data-sidebar-icon role="img" aria-label={tooltip} className={`size-g8 shrink-0 rounded-full ${tone}`} /></TooltipTrigger><TooltipBody>{tooltip}</TooltipBody></Tooltip>
+      <SidebarLabel>{new Date().getFullYear()} ACL</SidebarLabel>
     </div>
+  );
+}
+
+/** moduix App header block search: a CommandPalette over every navigation destination the user can open. */
+function NavigationCommandPalette({ sections, onNavigate }: { sections: NavSection[]; onNavigate: (tab: string) => void }) {
+  const { t } = useLanguage();
+  const items = React.useMemo(() => sections.flatMap(section => section.items.flatMap(item => (
+    item.children?.length
+      ? item.children.map(child => ({ id: child.id, label: child.label, section: section.title, icon: child.icon }))
+      : [{ id: item.target || item.id, label: item.label, section: section.title, icon: item.icon }]
+  ))), [sections]);
+  const { contains } = useFilter({ sensitivity: 'base' });
+  const { collection, filter, set } = useListCollection({
+    initialItems: items, itemToString: item => `${item.label} ${item.section}`, itemToValue: item => item.id,
+    filter: contains, groupBy: item => item.section,
+  });
+  useEffect(() => { set(items); }, [items, set]);
+  return (
+    <CommandPalettePanel>
+      <CommandPaletteCombobox collection={collection} onInputValueChange={details => filter(details.inputValue)}
+        onSelect={details => onNavigate(details.itemValue)}>
+        <CommandPaletteSearch placeholder={t('nav.search_placeholder', 'Cari menu...')} />
+        <CommandPaletteList>
+          <CommandPaletteEmpty>{t('nav.search_empty', 'Menu tidak ditemukan.')}</CommandPaletteEmpty>
+          {collection.group().map(([section, group]) => (
+            <CommandPaletteItemGroup key={section}>
+              <CommandPaletteItemGroupLabel>{section}</CommandPaletteItemGroupLabel>
+              {group.map(item => {
+                const Icon = item.icon;
+                return (
+                  <CommandPaletteItem key={item.id} item={item}>
+                    <CommandPaletteItemIcon><Icon aria-hidden /></CommandPaletteItemIcon>
+                    <CommandPaletteItemText><CommandPaletteItemLabel>{item.label}</CommandPaletteItemLabel></CommandPaletteItemText>
+                  </CommandPaletteItem>
+                );
+              })}
+            </CommandPaletteItemGroup>
+          ))}
+        </CommandPaletteList>
+      </CommandPaletteCombobox>
+    </CommandPalettePanel>
   );
 }
 
@@ -258,48 +315,49 @@ export function AppShell({ navigation, header, children, className }: {
     <WorkspaceSwitcher isCollapsed={false} onNavigateToSettings={() => navigate('settings')} />
   );
 
-  if (desktop) {
-    return (
+  // One tree for every breakpoint: swapping layouts at 768px would remount the page and drop its state.
+  // Below md the panel (left empty) and its triggers are hidden and the navigation lives in a Drawer.
+  // The CommandPalette root spans the shell so the header's search trigger and the palette share state.
+  return (
+    <CommandPalette aria-label={t('nav.search_label', 'Cari menu')} onOpenChange={details => { if (!details.open) return; }}>
       <Sidebar className={`h-screen w-full ${className ?? ''}`} defaultSize={savedSize()} onResizeEnd={details => localStorage.setItem(SIZE_KEY, JSON.stringify(details.size))}>
-        <SidebarPanel aria-label={t('nav.main_title', 'Menu Utama')}>
-          <SidebarHeader>{switcher}</SidebarHeader>
-          <SidebarContent>
-            <NavigationGroups sections={sections} onNavigate={navigate} rail />
-          </SidebarContent>
-          <SidebarFooter><StatusFooter googleConfig={googleConfig} /></SidebarFooter>
+        <SidebarPanel role="navigation" aria-label={t('nav.main_title', 'Menu Utama')} className="hidden bg-muted md:flex">
+          {desktop && <>
+            <SidebarHeader className="h-g42 border-b border-border py-0">{switcher}</SidebarHeader>
+            <SidebarContent>
+              <NavigationGroups sections={sections} onNavigate={navigate} rail />
+            </SidebarContent>
+            <SidebarFooter><StatusFooter googleConfig={googleConfig} /></SidebarFooter>
+          </>}
         </SidebarPanel>
-        <SidebarResizeTrigger aria-label={t('nav.resize_menu', 'Ubah lebar menu')} />
-        <SidebarTrigger aria-label={t('nav.collapse_menu', 'Kecilkan Menu')} />
+        <SidebarResizeTrigger aria-label={t('nav.resize_menu', 'Ubah lebar menu')} className="hidden md:flex" />
+        <SidebarTrigger aria-label={t('nav.collapse_menu', 'Kecilkan Menu')} className="hidden md:inline-flex" />
         <SidebarInset className="flex min-w-0 flex-col overflow-hidden">
           {header}
           {children}
         </SidebarInset>
       </Sidebar>
-    );
-  }
-
-  return (
-    <div className={`flex h-screen w-full flex-col overflow-hidden ${className ?? ''}`}>
-      {header}
-      {children}
-      <Drawer swipeDirection="start" open={isMobileOpen} onOpenChange={details => { if (!details.open) onCloseMobile?.(); }}>
-        <DrawerBackdrop />
-        <DrawerPositioner>
-          <DrawerContent className="mobile-drawer w-72 max-w-[85vw]">
-            <DrawerHeader>
-              <DrawerTitle className="sr-only">{t('nav.menu_navigasi_mobile', 'Menu Navigasi Mobile')}</DrawerTitle>
-              {switcher}
-              <DrawerCloseIcon aria-label={t('nav.tutup_menu', 'Tutup Menu')} />
-            </DrawerHeader>
-            <DrawerBody>
-              <nav aria-label={t('nav.main_title', 'Menu Utama')}>
-                <NavigationGroups sections={sections} onNavigate={navigate} rail={false} />
-              </nav>
-            </DrawerBody>
-            <DrawerFooter><StatusFooter googleConfig={googleConfig} /></DrawerFooter>
-          </DrawerContent>
-        </DrawerPositioner>
-      </Drawer>
-    </div>
+      {!desktop && (
+        <Drawer swipeDirection="start" open={isMobileOpen} onOpenChange={details => { if (!details.open) onCloseMobile?.(); }}>
+          <DrawerBackdrop />
+          <DrawerPositioner>
+            <DrawerContent className="w-g233 max-w-5/6">
+              <DrawerHeader>
+                <DrawerTitle className="sr-only">{t('nav.menu_navigasi_mobile', 'Menu Navigasi Mobile')}</DrawerTitle>
+                {switcher}
+                <DrawerCloseIcon aria-label={t('nav.tutup_menu', 'Tutup Menu')} />
+              </DrawerHeader>
+              <DrawerBody>
+                <nav aria-label={t('nav.main_title', 'Menu Utama')}>
+                  <NavigationGroups sections={sections} onNavigate={navigate} rail={false} />
+                </nav>
+              </DrawerBody>
+              <DrawerFooter><StatusFooter googleConfig={googleConfig} /></DrawerFooter>
+            </DrawerContent>
+          </DrawerPositioner>
+        </Drawer>
+      )}
+      <NavigationCommandPalette sections={sections} onNavigate={navigate} />
+    </CommandPalette>
   );
 }

@@ -1,0 +1,143 @@
+'use client';
+
+import {
+  PinInput as PinInputPrimitive,
+  usePinInput as usePinInputPrimitive,
+  usePinInputContext,
+  type UsePinInputProps,
+} from '@ark-ui/react/pin-input';
+import type { ComponentProps, ComponentRef } from 'react';
+import { forwardRef } from 'react';
+import { cn } from '../../lib/cn';
+import { SeparatorMarkIcon } from '../../lib/icons/ui';
+
+const PinInput = forwardRef<
+  ComponentRef<typeof PinInputPrimitive.Root>,
+  ComponentProps<typeof PinInputPrimitive.Root>
+>(function PinInput({ className, count, placeholder = '', ...props }, ref) {
+  return (
+    <PinInputPrimitive.Root
+      ref={ref}
+      className={cn(
+        'inline-flex w-auto max-w-none flex-col items-start gap-g8 data-disabled:opacity-50',
+        className,
+      )}
+      count={count}
+      placeholder={placeholder}
+      {...props}
+      data-slot="pin-input-root"
+    />
+  );
+});
+
+const PinInputRootProvider = forwardRef<
+  ComponentRef<typeof PinInputPrimitive.RootProvider>,
+  ComponentProps<typeof PinInputPrimitive.RootProvider>
+>(function PinInputRootProvider({ className, ...props }, ref) {
+  return (
+    <PinInputPrimitive.RootProvider
+      ref={ref}
+      className={cn(
+        'inline-flex w-auto max-w-none flex-col items-start gap-g8 data-disabled:opacity-50',
+        className,
+      )}
+      {...props}
+      data-slot="pin-input-root-provider"
+    />
+  );
+});
+
+const PinInputLabel = forwardRef<
+  ComponentRef<typeof PinInputPrimitive.Label>,
+  ComponentProps<typeof PinInputPrimitive.Label>
+>(function PinInputLabel({ className, ...props }, ref) {
+  return (
+    <PinInputPrimitive.Label
+      ref={ref}
+      className={cn('text-sm font-medium text-foreground', className)}
+      {...props}
+      data-slot="pin-input-label"
+    />
+  );
+});
+
+const PinInputControl = forwardRef<
+  ComponentRef<typeof PinInputPrimitive.Control>,
+  ComponentProps<typeof PinInputPrimitive.Control>
+>(function PinInputControl({ className, ...props }, ref) {
+  return (
+    <PinInputPrimitive.Control
+      ref={ref}
+      className={cn('inline-flex items-center gap-g8', className)}
+      {...props}
+      data-slot="pin-input-control"
+    />
+  );
+});
+
+const PinInputInput = forwardRef<
+  ComponentRef<typeof PinInputPrimitive.Input>,
+  ComponentProps<typeof PinInputPrimitive.Input>
+>(function PinInputInput({ className, ...props }, ref) {
+  return (
+    <PinInputPrimitive.Input
+      ref={ref}
+      className={cn(
+        'size-control-md flex-none rounded-md border border-border bg-background px-0 py-0 text-center text-lg font-medium text-foreground tabular-nums outline-1 -outline-offset-1 outline-transparent transition-[border-color,outline-color,background-color] duration-200 ease-in-out placeholder:text-muted-foreground focus-visible:outline-ring disabled:pointer-events-none data-disabled:pointer-events-none data-invalid:border-destructive data-invalid:focus-visible:outline-destructive motion-reduce:transition-none',
+        className,
+      )}
+      {...props}
+      data-slot="pin-input-input"
+    />
+  );
+});
+
+function PinInputInputs({ className }: { className?: string }) {
+  const { items } = usePinInputContext();
+
+  return items.map((index) => <PinInputInput key={index} index={index} className={className} />);
+}
+
+const PinInputSeparator = forwardRef<HTMLSpanElement, ComponentProps<'span'>>(
+  function PinInputSeparator(
+    { className, 'aria-hidden': ariaHidden = true, role = 'presentation', children, ...props },
+    ref,
+  ) {
+    return (
+      <span
+        ref={ref}
+        aria-hidden={ariaHidden}
+        role={role}
+        className={cn(
+          'pointer-events-none inline-flex size-g16 flex-none items-center justify-center leading-none text-muted-foreground [&>svg]:size-full [&>svg]:flex-none',
+          className,
+        )}
+        {...props}
+        data-slot="pin-input-separator"
+      >
+        {children ?? <SeparatorMarkIcon />}
+      </span>
+    );
+  },
+);
+
+function usePinInput(props: UsePinInputProps = {}) {
+  return usePinInputPrimitive({ placeholder: '', ...props });
+}
+
+const PinInputContext = PinInputPrimitive.Context;
+const PinInputHiddenInput = PinInputPrimitive.HiddenInput;
+
+export {
+  PinInput,
+  PinInputContext,
+  PinInputControl,
+  PinInputHiddenInput,
+  PinInputInput,
+  PinInputInputs,
+  PinInputLabel,
+  PinInputRootProvider,
+  PinInputSeparator,
+  usePinInput,
+  usePinInputContext,
+};

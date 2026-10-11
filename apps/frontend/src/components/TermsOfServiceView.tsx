@@ -8,12 +8,7 @@ interface TermsOfServiceViewProps {
 }
 
 const ACCENT = {
-  icon: <Scale aria-hidden="true" className="w-4 h-4 text-status-info" />,
-  num: 'text-status-info ',
-  toc: 'bg-status-info-soft/70  border-status-info-border ',
-  tocTitle: 'text-status-info ',
-  button: 'bg-status-info hover:bg-status-info',
-  link: 'text-status-info ',
+  icon: <Scale aria-hidden="true" className="w-g16 h-g16 text-accent-foreground" />,
 };
 
 export const TermsOfServiceView: React.FC<TermsOfServiceViewProps> = ({ onBack }) => (

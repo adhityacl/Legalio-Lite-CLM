@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/tooltip';
+export * from './moduix/ui/tooltip';

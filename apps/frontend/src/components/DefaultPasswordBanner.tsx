@@ -94,9 +94,9 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
   const hasError = state.kind === 'error';
 
   return (
-    <Alert status="warning" role={passwordActive ? 'alert' : 'status'} className="mb-4">
+    <Alert status="warning" role={passwordActive ? 'alert' : 'status'} className="mb-g13">
       <AlertIndicator />
-      <AlertContent>
+      <AlertContent><AlertDescription>
         {passwordActive ? (
           <AlertDescription>
             {t('security.default_password_warning', 'You are signed in with the default administrator password. Change it before using this workspace with real data.')}
@@ -116,7 +116,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
             </CollapsibleContent>
           </Collapsible>
         )}
-      </AlertContent>
+      </AlertDescription></AlertContent>
       <AlertActions>
         {passwordActive && (
           <Dialog open={open} onOpenChange={details => { setOpen(details.open); if (!details.open) setState({ kind: 'idle' }); }}>
@@ -132,7 +132,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
                   <DialogDescription>{t('security.change_password_desc', 'Other sessions will be signed out after the change.')}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} noValidate aria-busy={state.kind === 'saving'}>
-                  <DialogBody className="grid gap-4">
+                  <DialogBody className="grid gap-g13">
                     {[
                       { id: currentId, label: t('security.current_password', 'Current password'), value: current, set: setCurrent, auto: 'current-password' as const },
                       { id: nextId, label: t('security.new_password', 'New password'), value: next, set: setNext, auto: 'new-password' as const },

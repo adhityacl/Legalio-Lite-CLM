@@ -1,0 +1,32 @@
+:root {
+  /* Duration */
+  --moduix-duration-fast: 144ms;
+  --moduix-duration-normal: 233ms;
+  --moduix-duration-slow: 377ms;
+  --moduix-duration-slower: 377ms;
+
+  /* Easing */
+  --moduix-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --moduix-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --moduix-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --moduix-ease-standard: ease;
+  --moduix-ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --moduix-ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Composed (shorthand) */
+  --moduix-transition-default: var(--moduix-duration-normal) var(--moduix-ease-in-out);
+  --moduix-transition-fast: var(--moduix-duration-fast) var(--moduix-ease-in-out);
+  --moduix-transition-slow: var(--moduix-duration-slow) var(--moduix-ease-in-out);
+  --moduix-transition-slower: var(--moduix-duration-slower) var(--moduix-ease-in-out);
+  --moduix-transition-spring: var(--moduix-duration-slower) var(--moduix-ease-spring);
+  --moduix-transition-emphasized: var(--moduix-duration-slower) var(--moduix-ease-emphasized);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --moduix-duration-fast: 0.01ms;
+    --moduix-duration-normal: 0.01ms;
+    --moduix-duration-slow: 0.01ms;
+    --moduix-duration-slower: 0.01ms;
+  }
+}

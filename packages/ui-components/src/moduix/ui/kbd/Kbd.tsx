@@ -1,0 +1,45 @@
+import type { HTMLArkProps } from '@ark-ui/react/factory';
+import { ark } from '@ark-ui/react/factory';
+import { forwardRef } from 'react';
+import { cn } from '../../lib/cn';
+
+const Kbd = forwardRef<HTMLElement, HTMLArkProps<'kbd'>>(function Kbd(
+  { className, ...props },
+  ref,
+) {
+  return (
+    <ark.kbd
+      ref={ref}
+      {...props}
+      data-scope="kbd"
+      data-part="root"
+      data-slot="kbd-root"
+      className={cn(
+        'box-border inline-flex min-h-control-xs max-w-full min-w-control-xs flex-none items-center justify-center rounded-sm border border-border bg-muted px-g8 py-0 text-center align-middle font-mono text-xs font-medium wrap-anywhere text-foreground tabular-nums shadow-[inset_0_-1px_0_color-mix(in_oklab,currentColor_12%,transparent)] select-none',
+        className,
+      )}
+    />
+  );
+});
+
+const KbdGroup = forwardRef<HTMLElement, HTMLArkProps<'span'>>(function KbdGroup(
+  { className, ...props },
+  ref,
+) {
+  return (
+    <ark.span
+      ref={ref}
+      {...props}
+      role="group"
+      data-scope="kbd"
+      data-part="group"
+      data-slot="kbd-group"
+      className={cn(
+        'box-border inline-flex max-w-full flex-wrap items-center gap-g5 border-0 bg-transparent p-0 align-middle text-muted-foreground shadow-none',
+        className,
+      )}
+    />
+  );
+});
+
+export { Kbd, KbdGroup };

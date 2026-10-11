@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { formatDateTime, formatRelativeTime } from '@legalio/types/documents';
 
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 interface RelativeTimeProps {
   iso: string;
   className?: string;
@@ -16,8 +17,8 @@ export const RelativeTime: React.FC<RelativeTimeProps> = ({ iso, className }) =>
     return () => clearInterval(id);
   }, []);
   return (
-    <time dateTime={iso} title={formatDateTime(iso, language)} className={className}>
+    <Tooltip><TooltipTrigger asChild><time dateTime={iso} className={className}>
       {formatRelativeTime(iso, language, now)}
-    </time>
+    </time></TooltipTrigger><TooltipBody>{formatDateTime(iso, language)}</TooltipBody></Tooltip>
   );
 };

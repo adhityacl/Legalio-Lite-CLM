@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/password-input';
+export * from './moduix/ui/password-input';

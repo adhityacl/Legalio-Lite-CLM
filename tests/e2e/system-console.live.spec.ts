@@ -160,11 +160,11 @@ test('first superuser can be created through /sys on a fresh installation', asyn
 test('console reuses the approved frontend header and grouped sidebar', async ({ page }, testInfo) => {
   await signIn(page, 'super');
   await page.goto('/sys?tab=admin-system-organizations');
-  await expect(page.locator('header.app-header')).toBeVisible();
+  await expect(page.locator('header')).toBeVisible();
   const sidebar = page.locator('aside');
   await expect(sidebar.getByRole('button', { name: 'System Admin', exact: true })).toBeVisible();
   await expect(sidebar.getByRole('button', { name: 'Google & storage', exact: true })).toBeVisible();
-  await expect(page.locator('header .app-header-control:visible')).toHaveCount(4);
+  await expect(page.locator('header [data-slot="button-root"]:visible')).toHaveCount(4);
   await expect(page.locator('header select')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create Organization', exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('sys-approved-shell.png'), fullPage: true });
@@ -291,48 +291,8 @@ test('design system tokens reach backup controls and portalled dialogs in both t
   await page.evaluate(async () => { await Promise.all(document.getAnimations().filter(animation => animation.effect?.getTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => {}))); });
   await page.screenshot({ path: testInfo.outputPath('backup-mobile-dark.png'), fullPage: true });
   await page.keyboard.press('Escape');
-  await page.goto('/sys?tab=admin-system-design-system');
-  await expect(page.getByRole('heading', { name: 'Design System', exact: true })).toBeVisible();
-  await page.getByRole('tab', { name: 'Blocks', exact: true }).click();
-  await expect(page.getByRole('cell', { name: 'Example record' })).toBeVisible();
-  await page.getByRole('tab', { name: 'Components', exact: true }).click();
-  await page.getByRole('button', { name: 'Open example dialog' }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Open example dialog' })).toBeFocused();
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.locator('#sys-content').evaluate(el => { el.scrollTop = 0; });
-  await page.evaluate(async () => { await Promise.all(document.getAnimations().filter(animation => animation.effect?.getTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => {}))); });
-  await page.screenshot({ path: testInfo.outputPath('design-system-desktop.png'), fullPage: true });
   expect(errors).toEqual([]);
 });
-
-test('catalog controls, outlines and neighboring panels share their tokens', async ({ page }, testInfo) => {
-  await signIn(page, 'super');
-  await page.goto('/sys?tab=admin-system-design-system');
-  await page.getByRole('tab', { name: 'Blocks', exact: true }).click();
-  for (const width of [1440, 768, 375]) {
-    await page.setViewportSize({ width, height: 1000 });
-    for (const dark of [false, true]) {
-      await page.evaluate(dark => { document.documentElement.classList.toggle('dark', dark); document.documentElement.dataset.moduixColorScheme = dark ? 'dark' : 'light'; }, dark);
-      const controls = page.getByTestId('aligned-controls').locator('input, select, button');
-      await expect(controls).toHaveCount(4);
-      for (const control of await controls.all()) {
-        expect((await control.boundingBox())!.height).toBe(40);
-        await expect(control).toHaveCSS('border-radius', '8px');
-        await expect(control).toHaveCSS('border-top-width', '1px');
-      }
-      const borders = await page.getByTestId('aligned-controls').locator('input, select, .ds-button-outline').evaluateAll(elements => elements.map(element => getComputedStyle(element).borderTopColor));
-      expect(new Set(borders).size).toBe(1);
-      const panels = await page.getByTestId('aligned-panels').locator('.ds-card').evaluateAll(elements => elements.map(element => ({ height: element.getBoundingClientRect().height, top: element.getBoundingClientRect().top, radius: getComputedStyle(element).borderRadius })));
-      expect(panels.map(panel => panel.radius)).toEqual(['12px', '12px']);
-      if (width >= 640) { expect(panels[0].top).toBe(panels[1].top); expect(panels[0].height).toBe(panels[1].height); }
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    }
-    await page.screenshot({ path: testInfo.outputPath(`catalog-geometry-${width}.png`), fullPage: true });
-  }
-});
-
 
 test('system UI text editor traps focus and restores its trigger', async ({ page }) => {
   await signIn(page, 'super');

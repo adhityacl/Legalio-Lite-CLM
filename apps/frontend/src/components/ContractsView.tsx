@@ -10,7 +10,7 @@ import { Contract, Partner, InsertionOrder } from '@legalio/types';
 import { formatMoney } from '@legalio/shared/currencyUtils';
 import { ActionMenu } from './ui/action-menu';
 import { TablePagination } from './ui/TablePagination';
-import { Badge, statusTone } from '@legalio/ui-components/badge';
+import { Badge, BadgeDot, statusTone } from '@legalio/ui-components/badge';
 import { getSavedColumnPreferences, saveColumnPreferences } from '../lib/tablePreferences';
 import {
   FileSpreadsheet,
@@ -56,6 +56,8 @@ import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Text } from '@legalio/ui-components/text';
 interface ContractsViewProps {
   contracts: Contract[];
   partners: Partner[];
@@ -255,24 +257,22 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
       <TableColumnHeader
         scope="col"
         aria-sort={isSorted ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className="text-left align-middle"
        data-numeric={field === 'value'}>
-        <Button variant="ghost" size="sm"
+        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="-ms-g13 font-semibold text-muted-foreground"
           type="button"
           onClick={() => handleSort(field)}
-          title={t('contracts.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}
         >
           <span>{label}</span>
           {isSorted ? (
             sortOrder === 'asc' ? (
-              <ArrowUp className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
+              <ArrowUp className="w-g13 h-g13 text-accent-foreground shrink-0" />
             ) : (
-              <ArrowDown className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
+              <ArrowDown className="w-g13 h-g13 text-accent-foreground shrink-0" />
             )
           ) : (
-            <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <ArrowUpDown className="w-g13 h-g13 text-muted-foreground shrink-0" />
           )}
-        </Button>
+        </Button></TooltipTrigger><TooltipBody>{t('contracts.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}</TooltipBody></Tooltip>
       </TableColumnHeader>
     );
   };
@@ -345,45 +345,44 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in-50 duration-200">
+    <div className="flex flex-col gap-g21 animate-in fade-in-50 duration-200">
       {/* Header Bar */}
-      <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-g13">
         <div>
-          <Heading as="h2" size="lg" weight="semibold">
+          <Heading as="h2" size="md" weight="semibold">
             <span>{t('contracts.title')}</span>
           </Heading>
         </div>
 
-        <div className="contracts-mobile-actions flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-g8 shrink-0">
           {hasPermission('export.csv') && (
-            <Button variant="outline"
+            <Tooltip><TooltipTrigger asChild><Button variant="outline"
               onClick={handleExportCSV}
-              disabled={filteredContracts.length === 0}
-              title={t('contracts.export_csv', 'Ekspor CSV')}
+              disabled={filteredContracts.length === 0} aria-label={t('contracts.export_csv', 'Ekspor CSV')}
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-g16 h-g16" />
               <span>{t('contracts.export_csv', 'Ekspor CSV')}</span>
-            </Button>
+            </Button></TooltipTrigger><TooltipBody>{t('contracts.export_csv', 'Ekspor CSV')}</TooltipBody></Tooltip>
           )}
 
           {canCreateContract(user) && (
             <Button
               onClick={onAddContract}
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-g16 h-g16" />
               <span>{t('ui.add_contract')}</span>
             </Button>
           )}
         </div>
-      </Card>
+      </div>
 
       {/* Search and Filters */}
       {/* Search & Filters Bar - Justified Responsive Grid/Flex */}
-      <Card className="p-4 sm:p-5">
-        <div className="contracts-mobile-filters flex flex-wrap items-center gap-2.5 w-full">
+      <Card className="p-g13">
+        <div className="flex w-full flex-wrap items-center gap-g13">
           {/* Search Input */}
-          <InputGroup className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-            <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+          <InputGroup className="relative flex-1 min-w-g233 sm:min-w-g233">
+            <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
             <InputGroupInput
               type="text"
               placeholder={t('contracts.search_placeholder')}
@@ -400,7 +399,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
             aria-label={t('ui.filter_type')}
               value={selectedJenisDokumen}
             onChange={(e) => setSelectedJenisDokumen(e.target.value)}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('contracts.all_types')}</option>
             <option value="Master Agreement">{t('contracts.master_agreement', 'Master Agreement')}</option>
@@ -411,7 +410,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
             aria-label={t('ui.filter_category')}
               value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('contracts.all_categories')}</option>
             {allCategories.map((cat) => (
@@ -425,7 +424,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
             aria-label={t('ui.filter_status')}
               value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('contracts.all_status')}</option>
             <option value="Active">{t('contracts.active')}</option>
@@ -436,9 +435,6 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
           {/* Column Toggle */}
           <TableViewMenu title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
-            <div className="px-3.5 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 border-b border-border">
-              {t('io.toggle_columns', 'Toggle Kolom')}
-            </div>
             {Object.keys(visibleColumns).map((col) => {
               let label = col;
               if (col === 'jenis_dokumen') label = t('contracts.col_doc_type', 'Jenis Dokumen');
@@ -463,12 +459,12 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
       {/* Contracts Data Table */}
       <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_type'), value: selectedJenisDokumen, active: selectedJenisDokumen !== 'ALL' }, { label: t('ui.filter_category'), value: selectedCategory, active: selectedCategory !== 'ALL' }, { label: t('ui.filter_status'), value: selectedStatus, active: selectedStatus !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedJenisDokumen('ALL'); setSelectedCategory('ALL'); setSelectedStatus('ALL'); }} />
-        <p className="mobile-table-hint px-4 py-2 text-xs text-muted-foreground md:hidden">{t('ui.scroll_table')}</p>
-        <TableScrollArea className="data-table-scroll rounded-none border-0" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
-          <Table className="app-data-table w-full text-left">
+        <Text size="xs" tone="muted" className="px-g13 py-g8 md:hidden">{t('ui.scroll_table')}</Text>
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
+          <Table>
             <TableHeader>
               <TableRow>
-                <TableColumnHeader scope="col" className="w-12 text-left align-middle">
+                <TableColumnHeader scope="col" className="w-g42">
                   <div className="flex items-center justify-start">
                     <Checkbox checked={selectedRows.length > 0 && selectedRows.length === currentContracts.length} aria-label={t('contracts.select_all', 'Pilih semua kontrak')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
@@ -476,24 +472,24 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                 {visibleColumns.jenis_dokumen && renderSortHeader(t('contracts.col_doc_type', 'Jenis'), 'doc_type')}
                 {visibleColumns.nomor_kontrak && renderSortHeader(t('contracts.col_no', 'Agreement No.'), 'no')}
                 {visibleColumns.judul_kontrak && (
-                  <TableColumnHeader scope="col" className="text-left align-middle">{t('contracts.col_title', 'Judul')}</TableColumnHeader>
+                  <TableColumnHeader scope="col">{t('contracts.col_title', 'Judul')}</TableColumnHeader>
                 )}
                 {visibleColumns.partner && renderSortHeader(t('contracts.col_partner', 'Partner'), 'partner')}
                 {visibleColumns.kategori && (
-                  <TableColumnHeader scope="col" className="text-left align-middle">{t('contracts.col_category', 'Kategori')}</TableColumnHeader>
+                  <TableColumnHeader scope="col">{t('contracts.col_category', 'Kategori')}</TableColumnHeader>
                 )}
                 {visibleColumns.nilai && renderSortHeader(t('contracts.col_value', 'Nilai'), 'value')}
                 {visibleColumns.tanggal_mulai && (
-                  <TableColumnHeader scope="col" className="text-left align-middle">{t('contracts.col_start_date', 'Tanggal Mulai')}</TableColumnHeader>
+                  <TableColumnHeader scope="col">{t('contracts.col_start_date', 'Tanggal Mulai')}</TableColumnHeader>
                 )}
                 {visibleColumns.tanggal_selesai && (
-                  <TableColumnHeader scope="col" className="text-left align-middle">{t('contracts.col_end_date', 'Tanggal Selesai')}</TableColumnHeader>
+                  <TableColumnHeader scope="col">{t('contracts.col_end_date', 'Tanggal Selesai')}</TableColumnHeader>
                 )}
                 {visibleColumns.status && renderSortHeader(t('contracts.col_status', 'Status'), 'status')}
                 {visibleColumns.file && (
-                  <TableColumnHeader scope="col" className="text-left align-middle">{t('contracts.col_document', 'File')}</TableColumnHeader>
+                  <TableColumnHeader scope="col">{t('contracts.col_document', 'File')}</TableColumnHeader>
                 )}
-                <TableColumnHeader data-actions="true" scope="col" className="text-right w-20 align-middle">
+                <TableColumnHeader data-actions="true" scope="col" className="text-right w-g89">
                   <div className="flex items-center justify-end">{t('contracts.col_action', 'Aksi')}</div>
                 </TableColumnHeader>
               </TableRow>
@@ -511,7 +507,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
                   return (
                     <TableRow key={ctr.contract_id}>
-                      <TableCell className="text-left align-middle">
+                      <TableCell>
                         <div className="flex items-center justify-start">
                           <Checkbox checked={selectedRows.includes(ctr.contract_id)} aria-label={t('contracts.pilih_kontrak', 'Pilih kontrak {nomor_kontrak}', { nomor_kontrak: ctr.nomor_kontrak })} onCheckedChange={() => handleSelectRow(ctr.contract_id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                         </div>
@@ -519,7 +515,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
                       {/* Jenis Dokumen */}
                       {visibleColumns.jenis_dokumen && (
-                        <TableCell className="text-left">
+                        <TableCell>
                           {isAddendum ? (
                             <Badge tone={statusTone('Addendum')}>
                               {t('contracts.agreement_addendum', 'Agreement Addendum')}
@@ -533,26 +529,26 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                       )}
                       {/* Nomor Kontrak */}
                       {visibleColumns.nomor_kontrak && (
-                        <TableCell className="text-left">
+                        <TableCell>
                           {ctr.nomor_kontrak}
                         </TableCell>
                       )}
                       {/* Judul Kontrak */}
                       {visibleColumns.judul_kontrak && (
-                        <TableCell className="text-left max-w-[200px]">
-                          <span className="line-clamp-2" title={ctr.judul_kontrak}>{ctr.judul_kontrak}</span>
+                        <TableCell className="max-w-g233">
+                          <Tooltip><TooltipTrigger asChild><span className="block truncate">{ctr.judul_kontrak}</span></TooltipTrigger><TooltipBody>{ctr.judul_kontrak}</TooltipBody></Tooltip>
                         </TableCell>
                       )}
 
                       {/* 2. Partner */}
                       {visibleColumns.partner && (
-                        <TableCell className="text-left">{ctr.partner_nama}</TableCell>
+                        <TableCell>{ctr.partner_nama}</TableCell>
                       )}
 
                       {/* Kategori */}
                       {visibleColumns.kategori && (
-                        <TableCell className="text-left">
-                          <div className="flex flex-wrap gap-1">
+                        <TableCell>
+                          <div className="flex flex-wrap gap-g3">
                             {(ctr.kategori_kerjasama || []).map((cat) => (
                               <Badge
                                 key={cat}
@@ -573,20 +569,20 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
                       {/* Tanggal Mulai */}
                       {visibleColumns.tanggal_mulai && (
-                        <TableCell className="text-left whitespace-nowrap">
+                        <TableCell className="whitespace-nowrap">
                           {formatBusinessDate(ctr.tanggal_mulai)}
                         </TableCell>
                       )}
                       {/* Tanggal Selesai */}
                       {visibleColumns.tanggal_selesai && (
-                        <TableCell className="text-left whitespace-nowrap">
+                        <TableCell className="whitespace-nowrap">
                           {formatBusinessDate(ctr.tanggal_berakhir)}
                         </TableCell>
                       )}
 
                       {/* Status */}
                       {visibleColumns.status && (
-                        <TableCell className="text-left whitespace-nowrap">
+                        <TableCell className="whitespace-nowrap">
                           <Badge
                             tone={getStatusBadge(
  ctr.status
@@ -598,16 +594,15 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                       )}
                       {/* File */}
                       {visibleColumns.file && (
-                        <TableCell className="text-left">
+                        <TableCell>
                           {ctr.link_file_kontrak ? (
-                            <a
-                              href={ctr.link_file_kontrak}
+                            <Button asChild variant="link"><a href={ctr.link_file_kontrak}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-accent-foreground hover:text-accent-foreground font-normal hover:underline"
+                              
                             >
-                              <FileDown className="w-3.5 h-3.5" /> {t('contracts.pdf', 'PDF')}
-                            </a>
+                              <FileDown className="w-g13 h-g13" /> {t('contracts.pdf', 'PDF')}
+                            </a></Button>
                           ) : (
                             <span className="text-primary-foreground">-</span>
                           )}
@@ -615,25 +610,25 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                       )}
 
                       {/* 6. Aksi */}
-                      <TableCell data-actions="true" className="text-right align-middle w-20">
+                      <TableCell data-actions="true" className="text-right w-g89">
                         <div className="flex items-center justify-end">
                           <ActionMenu
                             items={[
                               {
                                 label: t('io.action_detail', 'Detail'),
-                                icon: <ExternalLink className="w-3.5 h-3.5" />,
+                                icon: <ExternalLink className="w-g13 h-g13" />,
                                 onClick: () => setDetailContract(ctr),
                               },
                               {
                                 label: t('contracts.action_redline', 'Redlining'),
-                                icon: <Scale className="w-3.5 h-3.5" />,
+                                icon: <Scale className="w-g13 h-g13" />,
                                 onClick: () => setRedliningContract(ctr),
                               },
                               ...(canEditContract(ctr, partners, user)
                                 ? [
                                     {
                                       label: t('hierarchy.edit_btn', 'Edit'),
-                                      icon: <Edit2 className="w-3.5 h-3.5" />,
+                                      icon: <Edit2 className="w-g13 h-g13" />,
                                       onClick: () => onEditContract(ctr),
                                     },
                                   ]
@@ -642,7 +637,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                                 ? [
                                     {
                                       label: t('io.action_delete', 'Hapus'),
-                                      icon: <Trash2 className="w-3.5 h-3.5" />,
+                                      icon: <Trash2 className="w-g13 h-g13" />,
                                       onClick: () => onDeleteContract(ctr.contract_id),
                                       variant: 'danger' as const,
                                       dividerBefore: true,
@@ -675,29 +670,29 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
       {/* Contract Timeline Detail Modal */}
       {detailContract && (
-        <ModalFrame onClose={() => setDetailContract(null)} className="max-w-4xl w-full max-h-[92dvh] flex flex-col overflow-hidden transition-colors">
+        <ModalFrame onClose={() => setDetailContract(null)} className="max-w-g987 w-full flex flex-col overflow-hidden transition-colors">
 
             {/* Header */}
-            <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
+            <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
               <div>
-                <DialogTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-accent-foreground" />
+                <DialogTitle className="flex items-center gap-g8">
+                  <FileText className="w-g21 h-g21 text-accent-foreground" />
                   <span>{detailContract.nomor_kontrak}</span>
                 </DialogTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">{detailContract.judul_kontrak}</p>
+                <Text size="xs" tone="muted" className="mt-g2">{detailContract.judul_kontrak}</Text>
               </div>
 
               <Button variant="secondary" size="icon-sm" aria-label={t('common.close', 'Tutup')}
                 type="button"
                 onClick={() => setDetailContract(null)}
               >
-                <X className="w-5 h-5" />
+                <X className="w-g21 h-g21" />
               </Button>
             </DialogHeader>
 
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1">
+            <div className="p-g21 sm:p-g21 overflow-y-auto space-y-g13 text-xs flex-1">
               <ContractEndingSummary contract={detailContract} />
-              <Card className="grid grid-cols-2 gap-3 p-3.5 bg-background">
+              <Card className="grid grid-cols-2 gap-g13 p-g13 bg-background">
                 <div>
                   <span className="text-muted-foreground block">{t('contracts.jenis_dokumen', 'Jenis Dokumen:')}</span>
                   <span className="font-bold text-foreground">
@@ -715,9 +710,9 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                   <span className="font-bold text-accent-foreground">
                     {formatMoney(detailContract.nilai_kontrak, detailContract.currency)}
                     {(detailContract.currency || 'USD') !== 'USD' && (
-                      <span className="text-muted-foreground text-xs font-mono ml-1.5 font-normal">
+                      <Text as="span" size="xs" tone="muted" className="font-mono ml-g5">
                         (≈ {formatMoney(detailContract.nilai_kontrak_usd, 'USD')})
-                      </span>
+                      </Text>
                     )}
                   </span>
                 </div>
@@ -742,14 +737,14 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                   </div>
                 )}
                 {detailContract.internal_notes && (
-                  <Card className="col-span-1 md:col-span-2 p-3.5">
-                    <span className="text-muted-foreground font-bold text-xs block mb-1.5 flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-accent-foreground" />
+                  <Card className="col-span-1 md:col-span-2 p-g13">
+                    <Text as="span" size="xs" weight="bold" tone="muted" className="block mb-g5 flex items-center gap-g5">
+                      <FileText className="w-g13 h-g13 text-accent-foreground" />
                       {t('contracts.rangkuman_internal_notes_kontrak', 'Rangkuman / Internal Notes Kontrak:')}
-                    </span>
-                    <p className="text-foreground text-xs leading-relaxed whitespace-pre-line font-normal">
+                    </Text>
+                    <Text size="xs" className="leading-relaxed whitespace-pre-line">
                       {detailContract.internal_notes}
-                    </p>
+                    </Text>
                   </Card>
                 )}
               </Card>
@@ -757,18 +752,18 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               {/* Child Agreement Addendums */}
               {detailContract.jenis_dokumen !== 'Agreement Addendum' && (
                 <div>
-                  <h4 className="font-bold text-status-special mb-2.5 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                    <Link2 className="w-4 h-4 text-status-special" />
+                  <Heading as="h4" size="xs" weight="bold" className="text-status-special mb-g8 uppercase tracking-wider flex items-center gap-g5">
+                    <Link2 className="w-g16 h-g16 text-status-special" />
                     <span>{t('contract.addendum_list', 'Daftar Agreement Addendum Turunan')}</span>
-                  </h4>
+                  </Heading>
                   {contracts.filter(
                     (c) => c.jenis_dokumen === 'Agreement Addendum' && c.parent_contract_id === detailContract.contract_id
                   ).length === 0 ? (
-                    <Card className="p-3 text-muted-foreground text-center text-xs">
+                    <Card className="p-g13 text-muted-foreground text-center text-xs">
                       {t('contracts.belum_ada_agreement_addendum_turunan_untuk', 'Belum ada Agreement Addendum turunan untuk kontrak induk ini.')}
                     </Card>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-g8">
                       {contracts
                         .filter(
                           (c) => c.jenis_dokumen === 'Agreement Addendum' && c.parent_contract_id === detailContract.contract_id
@@ -776,35 +771,32 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                         .map((add) => (
                           <div
                             key={add.contract_id}
-                            className="p-3 bg-status-special-soft/70 border border-status-special-border rounded-xl flex items-center justify-between gap-3 hover:border-status-special-border transition-colors"
+                            className="p-g13 bg-status-special-soft/70 border border-status-special-border rounded-xl flex items-center justify-between gap-g13 hover:border-status-special-border transition-colors"
                           >
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
+                              <div className="flex items-center gap-g8 flex-wrap">
                                 <span className="font-bold text-status-special block font-mono text-xs tracking-tight">{add.nomor_kontrak}</span>
                                 {add.status && (
-                                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-status-special-soft text-status-special border border-status-special-border ">
-                                    {add.status}
-                                  </span>
+                                  <Badge tone="special">{add.status}</Badge>
                                 )}
                               </div>
-                              <span className="text-foreground text-xs block mt-0.5 truncate">{add.judul_kontrak}</span>
-                              <span className="text-muted-foreground text-xs block mt-0.5">
+                              <Text as="span" size="xs" truncate className="block mt-g2">{add.judul_kontrak}</Text>
+                              <Text as="span" size="xs" tone="muted" className="block mt-g2">
                                 {t('contracts.validity', 'Validity:')}{' '}
                                 {formatBusinessDate(add.tanggal_mulai)}{' '}
                                 -{' '}
                                 {formatBusinessDate(add.tanggal_berakhir)}
-                              </span>
+                              </Text>
                             </div>
                             {add.link_file_kontrak && (
-                              <a
-                                href={add.link_file_kontrak}
+                              <Button asChild variant="outline" size="sm" className="shrink-0"><a href={add.link_file_kontrak}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card text-status-special border border-status-special-border hover:bg-status-special-soft font-semibold text-xs transition-colors shrink-0 shadow-2xs"
+                                
                               >
-                                <FileDown className="w-3.5 h-3.5" />
+                                <FileDown className="w-g13 h-g13" />
                                 <span>{t('contracts.pdf', 'PDF')}</span>
-                              </a>
+                              </a></Button>
                             )}
                           </div>
                         ))}
@@ -815,19 +807,19 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
               {/* Addendum Timeline (Track-Change) */}
               <div>
-                <h4 className="font-bold text-status-special mb-2.5 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <GitCommit className="w-4 h-4 text-status-special" />
+                <Heading as="h4" size="xs" weight="bold" className="text-status-special mb-g8 uppercase tracking-wider flex items-center gap-g5">
+                  <GitCommit className="w-g16 h-g16 text-status-special" />
                   <span>{t('contracts.histori_perubahan_amendment_track_change', 'Histori Perubahan (Amendment Track-Change)')}</span>
-                </h4>
+                </Heading>
 
                 {contracts.filter(
                   (a) => a.jenis_dokumen === 'Agreement Addendum' && a.parent_contract_id === detailContract.contract_id
                 ).length === 0 ? (
-                  <Card className="p-4 text-muted-foreground text-center">
+                  <Card className="p-g13 text-muted-foreground text-center">
                     {t('contracts.belum_ada_addendum_amendment_tercatat_untuk', 'Belum ada addendum/amendment tercatat untuk kontrak ini.')}
                   </Card>
                 ) : (
-                  <div className="space-y-3 relative border-l-2 border-status-special-border ml-3 pl-4 pt-1">
+                  <div className="space-y-g13 relative border-l-2 border-status-special-border ml-g13 pl-g13 pt-g3">
                     {contracts
                       .filter((a) => a.jenis_dokumen === 'Agreement Addendum' && a.parent_contract_id === detailContract.contract_id)
                       .map((add) => {
@@ -838,27 +830,25 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                           : [];
 
                         return (
-                          <Card key={add.contract_id} className="relative p-3.5">
-                            <span className="absolute -left-[23px] top-4 w-3 h-3 bg-status-special rounded-full border-2 border-white" />
-                            <div className="flex items-center justify-between mb-1.5">
+                          <Card key={add.contract_id} className="relative p-g13">
+                            <BadgeDot className="size-g13 absolute -left-g26 top-g16 text-status-special border-2 border-card" />
+                            <div className="flex items-center justify-between mb-g5">
                               <span className="font-bold text-status-special text-xs font-mono">{add.nomor_kontrak}</span>
-                              <span className="text-xs text-muted-foreground font-mono">
+                              <Text as="span" size="xs" tone="muted" className="font-mono">
                                 {formatBusinessDate(add.tanggal_mulai)}
-                              </span>
+                              </Text>
                             </div>
                             {fieldsChanged.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mb-2">
+                              <div className="flex flex-wrap gap-g3 mb-g8">
                                 {fieldsChanged.map((f) => (
-                                  <span key={f} className="bg-status-warning-soft text-status-warning border border-status-warning-border text-xs font-semibold px-2 py-0.5 rounded-md">
-                                    {f}
-                                  </span>
+                                  <Badge key={f} tone="warning">{f}</Badge>
                                 ))}
                               </div>
                             )}
                             {add.ringkasan_perubahan && (
-                              <p className="text-foreground text-xs leading-relaxed bg-card p-2.5 rounded-lg border border-border font-mono text-xs whitespace-pre-wrap">
+                              <Card asChild><Text size="xs" className="leading-relaxed p-g8 font-mono whitespace-pre-wrap">
                                 {add.ringkasan_perubahan}
-                              </p>
+                              </Text></Card>
                             )}
                           </Card>
                         );
@@ -869,28 +859,28 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
               {/* Linked IOs */}
               <div>
-                <h4 className="font-bold text-status-success mb-2.5 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <FileSpreadsheet className="w-4 h-4 text-status-success" />
+                <Heading as="h4" size="xs" weight="bold" className="text-status-success mb-g8 uppercase tracking-wider flex items-center gap-g5">
+                  <FileSpreadsheet className="w-g16 h-g16 text-status-success" />
                   <span>{t('contracts.insertion_orders_io_turunan', 'Insertion Orders (IO) Turunan')}</span>
-                </h4>
+                </Heading>
 
                 {ios.filter((i) => i.contract_id === detailContract.contract_id).length === 0 ? (
-                  <Card className="p-3 text-muted-foreground text-center text-xs">
+                  <Card className="p-g13 text-muted-foreground text-center text-xs">
                     {t('contracts.tidak_ada_io_turunan_di_bawah', 'Tidak ada IO turunan di bawah kontrak ini.')}
                   </Card>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-g8">
                     {ios
                       .filter((i) => i.contract_id === detailContract.contract_id)
                       .map((io) => (
-                        <Card key={io.io_id} className="p-3 flex items-center justify-between gap-3">
+                        <Card key={io.io_id} className="p-g13 flex items-center justify-between gap-g13">
                           <div>
                             <div className="font-bold text-foreground text-xs font-mono">{io.nomor_io}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">{io.judul_io}</div>
+                            <div className="text-xs text-muted-foreground mt-g2">{io.judul_io}</div>
                           </div>
                           <div className="text-right shrink-0">
                             <div className="font-bold text-status-success text-xs">{formatMoney(Number(io.nilai_io) || 0, io.currency || io.mata_uang)}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">{io.pricing_model || 'Fixed'} • {io.charging_type || '-'}</div>
+                            <div className="text-xs text-muted-foreground mt-g2">{io.pricing_model || 'Fixed'} • {io.charging_type || '-'}</div>
                           </div>
                         </Card>
                       ))}
@@ -899,7 +889,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               </div>
             </div>
 
-            <div className="p-4 sm:p-5 bg-card border-t border-border flex justify-end shrink-0">
+            <div className="p-g13 sm:p-g21 bg-card border-t border-border flex justify-end shrink-0">
               <Button variant="ghost" size="sm"
                 onClick={() => setDetailContract(null)}
               >

@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/separator';
+export * from './moduix/ui/separator';

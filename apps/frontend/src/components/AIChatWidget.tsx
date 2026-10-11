@@ -7,12 +7,14 @@ import { useLanguage } from '../context/LanguageContext';
 import { Button } from '@legalio/ui-components/button';
 import { Table, TableColumnHeader, TableCell, TableScrollArea } from '@legalio/ui-components/table';
 import { Input } from '@legalio/ui-components/input';
-import { Card, CardAction, CardBody, CardFooter, CardHeader, CardTitle } from '@legalio/ui-components/card';
+import { Card } from '@legalio/ui-components/card';
 import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
 import { Text } from '@legalio/ui-components/text';
 import { Typeset } from '@legalio/ui-components/typeset';
 import { CloseButton } from '@legalio/ui-components/close-button';
 import { Spinner } from '@legalio/ui-components/spinner';
+import { Popover, PopoverBody, PopoverContent, PopoverFooter, PopoverHeader, PopoverPositioner, PopoverTitle, PopoverTrigger } from '@legalio/ui-components/popover';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 interface Message {
   id: string;
   role: 'user' | 'ai';
@@ -193,38 +195,46 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
   const openLabel = t('ai_chat.buka_asisten_ai_silegal', 'Buka Asisten AI Legalio');
 
   return (
-    <div className="fixed bottom-3 right-3 z-30 sm:bottom-6 sm:right-6">
-      {isOpen && (
-        <Card role="dialog" aria-label={t('ai_chat.silegal_ai', 'Legalio AI')}
-          className="absolute bottom-16 right-0 flex h-[520px] max-h-[calc(100dvh-6rem)] w-[calc(100vw-1.5rem)] flex-col overflow-hidden shadow-lg sm:w-[410px]">
-          <CardHeader className="items-center border-b border-border pb-4">
-            <CardTitle className="flex items-center gap-2"><AiIcon size={18} className="text-accent-foreground" />{t('ai_chat.silegal_ai', 'Legalio AI')}</CardTitle>
-            <CardAction className="items-center">
-              <Button variant="ghost" size="icon-sm" onClick={handleResetSession}
-                aria-label={t('ai_chat.reset_sesi_percakapan_hapus_konteks', 'Reset Sesi Percakapan (Hapus Konteks)')}
-                title={t('ai_chat.reset_sesi_percakapan_hapus_konteks', 'Reset Sesi Percakapan (Hapus Konteks)')}>
+    <div className="fixed bottom-g13 right-g13 z-30 sm:bottom-g26 sm:right-g26">
+      {/* Non-modal moduix Popover anchored to the launcher: the chat stays open while the page is used. */}
+      <Popover ids={{ trigger: 'ai-chat-trigger' }} open={isOpen} onOpenChange={details => setIsOpen(details.open)} modal={false} closeOnInteractOutside={false} lazyMount unmountOnExit
+        positioning={{ placement: 'top-end', gutter: 12 }}>
+      <Tooltip ids={{ trigger: 'ai-chat-trigger' }}><TooltipTrigger asChild><PopoverTrigger asChild>
+        <Button size="icon-lg" aria-label={isOpen ? closeLabel : openLabel}
+          className="size-g55 rounded-full shadow-lg">
+          <MessageSquare className="size-g21" aria-hidden="true" />
+        </Button>
+      </PopoverTrigger></TooltipTrigger><TooltipBody>{isOpen ? closeLabel : openLabel}</TooltipBody></Tooltip>
+      <PopoverPositioner>
+        <PopoverContent data-testid="ai-chat-panel"
+          className="flex h-g610 max-h-(--available-height) w-g377 max-w-full max-w-none flex-col overflow-hidden p-0 ">
+          <PopoverHeader className="flex items-center justify-between gap-g8 border-b border-border p-g13">
+            <PopoverTitle className="flex items-center gap-g8"><AiIcon size={18} className="text-accent-foreground" />{t('ai_chat.silegal_ai', 'Legalio AI')}</PopoverTitle>
+            <div className="flex items-center gap-g3">
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" onClick={handleResetSession}
+                aria-label={t('ai_chat.reset_sesi_percakapan_hapus_konteks', 'Reset Sesi Percakapan (Hapus Konteks)')}>
                 <RotateCcw aria-hidden="true" />
-              </Button>
+              </Button></TooltipTrigger><TooltipBody>{t('ai_chat.reset_sesi_percakapan_hapus_konteks', 'Reset Sesi Percakapan (Hapus Konteks)')}</TooltipBody></Tooltip>
               <CloseButton onClick={() => setIsOpen(false)} aria-label={t('ai_chat.tutup_chat', 'Tutup Chat')} />
-            </CardAction>
-          </CardHeader>
+            </div>
+          </PopoverHeader>
 
-          <CardBody className="flex flex-1 flex-col gap-3 overflow-y-auto pt-4">
+          <PopoverBody className="flex flex-1 flex-col gap-g13 overflow-y-auto p-g13">
             {messages.map((msg) => (
-              <div key={msg.id} className={`flex max-w-[88%] gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse self-end' : 'self-start'}`}>
+              <div key={msg.id} className={`flex max-w-7/8 gap-g8 ${msg.role === 'user' ? 'flex-row-reverse self-end' : 'self-start'}`}>
                 {msg.role === 'user'
                   ? <Avatar size="sm"><AvatarFallback className="bg-primary text-primary-foreground"><User size={14} /></AvatarFallback></Avatar>
                   : assistantAvatar}
                 {msg.role === 'user' ? (
-                  <Card size="sm" className="border-primary bg-primary p-3 text-sm whitespace-pre-wrap text-primary-foreground">{msg.text}</Card>
+                  <Card size="sm" className="border-primary bg-primary p-g13 text-sm whitespace-pre-wrap text-primary-foreground">{msg.text}</Card>
                 ) : (
-                  <Card size="sm" className="gap-2 p-3">
+                  <Card size="sm" className="gap-g8 p-g13">
                     <Typeset className="text-sm">
                       <ReactMarkdown
                         components={{
                           a: ({ node, ...props }) => <a target="_blank" rel="noopener noreferrer" {...props} />,
                           table: ({ node, ...props }) => (
-                            <TableScrollArea>
+                            <TableScrollArea className="rounded-md border border-border">
                               <Table size="sm" {...props} />
                             </TableScrollArea>
                           ),
@@ -235,12 +245,11 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
                         {displayText(msg)}
                       </ReactMarkdown>
                     </Typeset>
-                    <Button variant="ghost" size="sm" className="self-start" onClick={() => handleCopy(msg)}
-                      aria-label={copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}
-                      title={copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}>
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="self-start" onClick={() => handleCopy(msg)}
+                      aria-label={copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}>
                       {copiedId === msg.id ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
                       <span aria-live="polite">{copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin')}</span>
-                    </Button>
+                    </Button></TooltipTrigger><TooltipBody>{copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}</TooltipBody></Tooltip>
                   </Card>
                 )}
               </div>
@@ -248,10 +257,10 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
 
             {/* Suggested prompts when starting fresh */}
             {isInitialOnly && (
-              <div className="mt-2 flex w-full flex-col gap-2 border-t border-border pt-3">
+              <div className="mt-g8 flex w-full flex-col gap-g8 border-t border-border pt-g13">
                 <Text size="xs" weight="semibold" tone="muted">{t('ai_chat.saran_pertanyaan', 'Saran Pertanyaan:')}</Text>
                 {SUGGESTED_PROMPTS.map(([key, fallback]) => t(key, fallback)).map((prompt) => (
-                  <Button key={prompt} variant="outline" size="sm" onClick={() => handleSend(prompt)} className="h-auto justify-start py-2 text-start whitespace-normal">
+                  <Button key={prompt} variant="outline" size="sm" onClick={() => handleSend(prompt)} className="h-auto justify-start py-g8 text-start whitespace-normal">
                     {prompt}
                   </Button>
                 ))}
@@ -259,18 +268,18 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
             )}
 
             {isLoading && (
-              <div className="flex max-w-[85%] gap-2.5 self-start" role="status">
+              <div className="flex max-w-5/6 gap-g8 self-start" role="status">
                 {assistantAvatar}
-                <Card size="sm" className="flex-row items-center gap-2 p-3 text-sm text-muted-foreground">
+                <Card size="sm" className="flex-row items-center gap-g8 p-g13 text-sm text-muted-foreground">
                   <Spinner size="sm" decorative />{t('ai_chat.menganalisis_data_konteks_sesi', 'Menganalisis data & konteks sesi...')}
                 </Card>
               </div>
             )}
             <div ref={messagesEndRef} />
-          </CardBody>
+          </PopoverBody>
 
-          <CardFooter className="border-t border-border pt-4">
-            <form onSubmit={(e) => handleSend(undefined, e)} className="flex w-full items-center gap-2">
+          <PopoverFooter className="mt-0 border-t border-border p-g13">
+            <form onSubmit={(e) => handleSend(undefined, e)} className="flex w-full items-center gap-g8">
               <Input aria-label={t('ai_chat.tanya_seputar_data_atau_lanjutkan_konteks', 'Tanya seputar data atau lanjutkan konteks...')}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -278,20 +287,15 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
                 className="flex-1"
                 disabled={isLoading}
               />
-              <Button size="icon-md" type="submit" disabled={!input.trim() || isLoading}
-                aria-label={t('ai_chat.kirim_pesan', 'Kirim Pesan')} title={t('ai_chat.kirim_pesan', 'Kirim Pesan')}>
+              <Tooltip><TooltipTrigger asChild><Button size="icon-md" type="submit" disabled={!input.trim() || isLoading}
+                aria-label={t('ai_chat.kirim_pesan', 'Kirim Pesan')}>
                 <Send aria-hidden="true" />
-              </Button>
+              </Button></TooltipTrigger><TooltipBody>{t('ai_chat.kirim_pesan', 'Kirim Pesan')}</TooltipBody></Tooltip>
             </form>
-          </CardFooter>
-        </Card>
-      )}
-
-      <Button size="icon-lg" aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}
-        aria-label={isOpen ? closeLabel : openLabel} title={isOpen ? closeLabel : openLabel}
-        className="size-13 rounded-full shadow-lg">
-        <MessageSquare className="size-5" aria-hidden="true" />
-      </Button>
+          </PopoverFooter>
+        </PopoverContent>
+      </PopoverPositioner>
+      </Popover>
     </div>
   );
 };

@@ -6,6 +6,11 @@ import { useAlertToast } from '../../context/AlertToastContext';
 import { Button } from '@legalio/ui-components/button';
 import { Input } from '@legalio/ui-components/input';
 import { Card } from '@legalio/ui-components/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@legalio/ui-components/avatar';
+import { FileUpload, FileUploadDropzone, FileUploadHiddenInput } from '@legalio/ui-components/file-upload';
+import { Text } from '@legalio/ui-components/text';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 // Logo upload helper component
 interface LogoUploadFieldProps {
   logo: string;
@@ -24,12 +29,13 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
   const showAlert = useAlertToast();
   const [isUrlMode, setIsUrlMode] = useState(false);
   const [urlInput, setUrlInput] = useState(logo || '');
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  // Remounting the upload clears zag's accepted files so the same file can be picked again.
+  const [uploadKey, setUploadKey] = useState(0);
 
   const fallbackLetter = (name.trim() || 'O').charAt(0).toUpperCase();
 
   const handleFileChange = (file?: File | null) => {
+    setUploadKey(key => key + 1);
     if (!file) return;
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
       showAlert({ title: t('admin.logo_raster_type', 'PNG, JPG, WebP. Max 2 MB.'), variant: 'warning' });
@@ -51,129 +57,70 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileChange(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
+  const handleFileReject = (errors: readonly string[] = []) => {
+    setUploadKey(key => key + 1);
+    showAlert({
+      title: errors.includes('FILE_TOO_LARGE')
+        ? t('admin.err_image_size', 'Ukuran file gambar maksimal 2MB.')
+        : t('admin.logo_raster_type', 'PNG, JPG, WebP. Max 2 MB.'),
+      variant: 'warning',
+    });
   };
 
   const handleRemove = () => {
+    setUploadKey(key => key + 1);
     onChange('');
     setUrlInput('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleApplyUrl = () => {
     onChange(urlInput.trim());
   };
 
+  const fieldLabel = label || t('admin.org_logo_label', 'Logo Organisasi / Workspace');
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className="block text-xs font-medium text-foreground">
-          {label || t('admin.org_logo_label', 'Logo Organisasi / Workspace')}
-        </label>
-        <Button variant="link" size="sm"
-          type="button"
-          onClick={() => setIsUrlMode(!isUrlMode)}
-        >
-          <Link2 className="w-3 h-3" />
-          {isUrlMode
-            ? t('admin.logo_mode_upload', 'Unggah File Gambar')
-            : t('admin.logo_mode_url', 'Gunakan URL Gambar')}
+    <Field className="gap-g8">
+      <div className="flex items-center justify-between gap-g8">
+        <FieldLabel>{fieldLabel}</FieldLabel>
+        <Button variant="link" size="sm" onClick={() => setIsUrlMode(!isUrlMode)}>
+          <Link2 aria-hidden="true" />
+          {isUrlMode ? t('admin.logo_mode_upload', 'Unggah File Gambar') : t('admin.logo_mode_url', 'Gunakan URL Gambar')}
         </Button>
       </div>
 
-      <Card className="flex items-center gap-3.5 p-2">
-        {/* Preview Container */}
-        <div className="relative shrink-0 group">
-          <div className="w-14 h-14 rounded-full border border-border bg-card flex items-center justify-center overflow-hidden shadow-xs">
-            {logo ? (
-              <img
-                src={logo}
-                alt={name || t('admin.logo', 'Logo')}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.currentTarget as HTMLElement).style.display = 'none';
-                }}
-              />
-            ) : (
-              <div className="w-full h-full bg-linear-to-br from-indigo-500 to-purple-600 text-white font-bold text-lg flex items-center justify-center">
-                {fallbackLetter}
-              </div>
-            )}
-          </div>
+      <Card size="sm" className="flex-row items-center gap-g13 p-g8">
+        <div className="relative shrink-0">
+          <Avatar size="lg">
+            {logo && <AvatarImage src={logo} alt={name || t('admin.logo', 'Logo')} />}
+            <AvatarFallback className="bg-primary text-primary-foreground">{fallbackLetter}</AvatarFallback>
+          </Avatar>
           {logo && (
-            <button
-              type="button"
-              onClick={handleRemove}
-              title={t('admin.btn_remove_logo', 'Hapus Logo')}
-              className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-status-danger text-white hover:bg-status-danger shadow-md transition-all cursor-pointer"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
+            <Tooltip><TooltipTrigger asChild><Button variant="destructive" size="icon-sm" onClick={handleRemove} className="absolute -end-g8 -top-g8 size-g26 min-w-g26 rounded-full"
+              aria-label={t('admin.btn_remove_logo', 'Hapus Logo')}>
+              <Trash2 className="size-g13" aria-hidden="true" />
+            </Button></TooltipTrigger><TooltipBody>{t('admin.btn_remove_logo', 'Hapus Logo')}</TooltipBody></Tooltip>
           )}
         </div>
 
-        {/* Input / Dropzone Area */}
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           {!isUrlMode ? (
-            <Card
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onClick={() => fileInputRef.current?.click()}
-              className={` flex min-h-14 items-center justify-center p-2.5 text-center cursor-pointer transition-colors ${
- isDragging
- ? 'bg-accent'
- : ''
- }`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                aria-label={label || t('admin.org_logo_label', 'Logo Organisasi / Workspace')}
-                onChange={(e) => handleFileChange(e.target.files?.[0])}
-                className="hidden"
-              />
-              <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground font-medium">
-                <Upload className="w-3.5 h-3.5 text-accent-foreground" />
-                <span>{t('admin.logo_upload_cta', 'Pilih atau Tarik Logo')}</span>
-              </div>
-            </Card>
+            <FileUpload key={uploadKey} accept="image/png,image/jpeg,image/webp" maxFiles={1} maxFileSize={2 * 1024 * 1024}
+              onFileAccept={details => handleFileChange(details.files[0])}
+              onFileReject={details => handleFileReject(details.files[0]?.errors)}>
+              <FileUploadDropzone className="min-h-g55 flex-row gap-g5 p-g8">
+                <Upload className="size-g13 text-accent-foreground" aria-hidden="true" />
+                <Text as="span" size="xs" tone="muted">{t('admin.logo_upload_cta', 'Pilih atau Tarik Logo')}</Text>
+              </FileUploadDropzone>
+              <FileUploadHiddenInput aria-label={fieldLabel} />
+            </FileUpload>
           ) : (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <Input aria-label={t('admin.org_logo_label', 'Logo Organisasi / Workspace')}
-                  type="url"
-                  placeholder="https://example.com/logo.png"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  className="flex-1"
-                />
-                <Button variant="ghost"
-                  type="button"
-                  onClick={handleApplyUrl}
-                >
-                  {t('admin.btn_apply', 'Terapkan')}
-                </Button>
-              </div>
+            <div className="flex items-center gap-g5">
+              <Input aria-label={fieldLabel} type="url" placeholder="https://example.com/logo.png" value={urlInput} onChange={(e) => setUrlInput(e.target.value)} className="flex-1" />
+              <Button variant="outline" onClick={handleApplyUrl}>{t('admin.btn_apply', 'Terapkan')}</Button>
             </div>
           )}
         </div>
       </Card>
-    </div>
+    </Field>
   );
 };

@@ -86,7 +86,7 @@ test('year/month navigation, overflow and keyboard event click open existing rea
   await expect(calendar.locator('[data-current-month]')).toHaveCount(1);
   await calendar.getByRole('button', { name: /more events in June 2026/ }).click();
   await expect(calendar.getByTestId('calendar-month-grid')).toBeVisible();
-  await expect(calendar.getByRole('button', { name: 'Month view', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(calendar.getByRole('radio', { name: 'Month view', exact: true })).toHaveAttribute('aria-checked', 'true');
   await calendar.getByRole('button', { name: /more events on .*June 12, 2026/ }).click();
   const events = page.getByRole('dialog').filter({ hasText: 'Friday, June 12, 2026' });
   await expect(events.getByRole('button', { name: /Calendar Agreement/ })).toHaveCount(8);
@@ -157,12 +157,12 @@ test('responsive annual grid, themes, mobile month view and accessible tab keybo
   await page.keyboard.press('End');
   await expect(page.getByRole('tab', { name: 'Calendar View', exact: true })).toBeFocused();
   const grid = calendar.getByTestId('calendar-year-grid');
-  for (const [width, columns] of [[1440, 4], [900, 2], [390, 1], [320, 1]]) {
+  for (const [width, columns] of [[1440, 3], [900, 2], [390, 1], [320, 1]]) {
     await page.setViewportSize({ width, height: 900 });
     await expect.poll(() => grid.evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(columns);
     expect(await calendar.evaluate(element => element.getBoundingClientRect().right)).toBeLessThanOrEqual(width);
   }
-  await calendar.getByRole('button', { name: 'Month view', exact: true }).click();
+  await calendar.getByRole('radio', { name: 'Month view', exact: true }).click();
   await expect(calendar.locator('time[aria-current="date"]')).toHaveText('4');
   for (const dark of [false, true]) {
     await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), dark);
@@ -171,7 +171,7 @@ test('responsive annual grid, themes, mobile month view and accessible tab keybo
   expect(await calendar.evaluate(element => element.scrollWidth)).toBeLessThanOrEqual(await calendar.evaluate(element => element.clientWidth));
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.evaluate(() => document.documentElement.classList.remove('dark'));
-  await calendar.getByRole('button', { name: 'Year view', exact: true }).click();
+  await calendar.getByRole('radio', { name: 'Year view', exact: true }).click();
   await page.screenshot({ path: '/tmp/document-calendar-light.png' });
 });
 

@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/textarea';
+export * from './moduix/ui/textarea';

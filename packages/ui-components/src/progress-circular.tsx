@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/progress-circular';
+export * from './moduix/ui/progress-circular';

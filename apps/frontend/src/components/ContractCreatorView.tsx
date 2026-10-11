@@ -24,7 +24,7 @@ export const ContractCreatorView: React.FC<ContractCreatorViewProps> = (props) =
     </>;
   }
 
-  return <Suspense fallback={<div role="status" className="flex min-h-56 items-center justify-center text-sm text-muted-foreground">{t('common.loading', 'Loading…')}</div>}>
+  return <Suspense fallback={<div role="status" className="flex min-h-g233 items-center justify-center text-sm text-muted-foreground">{t('common.loading', 'Loading…')}</div>}>
     <DocumentEditor {...props} initialDocumentId={editorRequest.documentId} initialTemplate={editorRequest.template} />
   </Suspense>;
 };

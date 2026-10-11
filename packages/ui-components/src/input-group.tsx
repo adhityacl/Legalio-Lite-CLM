@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/input-group';
+export * from './moduix/ui/input-group';

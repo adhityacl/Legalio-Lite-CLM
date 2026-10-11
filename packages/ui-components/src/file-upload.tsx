@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/file-upload';
+export * from './moduix/ui/file-upload';

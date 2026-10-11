@@ -20,6 +20,7 @@ import { Dialog, DialogBackdrop, DialogBody, DialogCloseIcon, DialogCloseTrigger
 import { FileUpload, FileUploadDropzone, FileUploadHiddenInput, FileUploadTrigger } from '@legalio/ui-components/file-upload';
 import { Skeleton } from '@legalio/ui-components/skeleton';
 import { Text } from '@legalio/ui-components/text';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 interface GoogleCredentialsDialogProps {
   /** Element that opens the dialog (rendered through Dialog.Trigger asChild). */
   trigger: React.ReactElement;
@@ -52,6 +53,8 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [busy, setBusy] = useState<GoogleCredentialKind | null>(null);
   const [errors, setErrors] = useState<Partial<Record<GoogleCredentialKind, string>>>({});
+  // Remounting the upload clears zag's accepted files so the same file can be picked again.
+  const [uploadKey, setUploadKey] = useState(0);
 
   const load = () => {
     setState({ status: 'loading' });
@@ -77,6 +80,7 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
 
   const upload = async (kind: GoogleCredentialKind, file: File | undefined) => {
     if (!file) return;
+    setUploadKey((key) => key + 1);
     setError(kind, undefined);
     if (file.size > MAX_FILE_BYTES) return setError(kind, errorText('too_large'));
     let json: unknown;
@@ -110,6 +114,7 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
     setBusy(kind);
     try {
       setState({ status: 'ready', data: await requestStatus(`/${kind}`, { method: 'DELETE' }) });
+      setUploadKey((key) => key + 1);
     } catch (err) {
       setError(kind, (err as Error).message);
     } finally {
@@ -129,8 +134,8 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
     return (
       <Card key={kind} size="sm" aria-labelledby={`${inputId}-title`} aria-busy={busy === kind}>
         <CardHeader>
-          <CardTitle id={`${inputId}-title`} className="flex items-center gap-2 text-sm">
-            <FileJson className="size-4 text-muted-foreground" aria-hidden="true" />
+          <CardTitle id={`${inputId}-title`} className="flex items-center gap-g8 text-sm">
+            <FileJson className="size-g16 text-muted-foreground" aria-hidden="true" />
             {isSa ? t('google_setup.sa_title', '1. Service Account (JSON)') : t('google_setup.oauth_title', '2. OAuth Client (JSON)')}
           </CardTitle>
           <CardDescription>
@@ -139,8 +144,8 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
               : t('google_setup.oauth_help', 'Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Download JSON. Dipakai untuk menghubungkan akun Google pengguna.')}
           </CardDescription>
         </CardHeader>
-        <CardBody className="grid gap-3">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+        <CardBody className="grid gap-g13">
+          <div className="flex flex-wrap items-center gap-g8 text-sm text-foreground">
             <Badge tone={info.source ? 'success' : 'warning'}>
               {info.source === 'upload'
                 ? t('google_setup.source_upload', 'Terpasang dari file unggahan')
@@ -166,10 +171,11 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
             </Alert>
           )}
 
-          <FileUpload accept=".json,application/json" maxFiles={1} maxFileSize={MAX_FILE_BYTES} disabled={busy !== null}
+          <div className="flex items-start gap-g8">
+          <FileUpload key={uploadKey} ids={{ hiddenInput: inputId }} accept=".json,application/json" maxFiles={1} maxFileSize={MAX_FILE_BYTES} disabled={busy !== null}
             onFileAccept={details => upload(kind, details.files[0])}
-            onFileReject={details => upload(kind, details.files[0]?.file)}>
-            <FileUploadDropzone className="flex-row flex-wrap justify-start gap-2 p-3">
+            onFileReject={details => upload(kind, details.files[0]?.file)} className="min-w-0 flex-1">
+            <FileUploadDropzone aria-label={t('google_setup.drop_hint', 'atau seret file ke kotak ini')} className="flex-row flex-wrap justify-start gap-g8 p-g13">
               <FileUploadTrigger asChild>
                 <Button size="sm" loading={busy === kind}>
                   {busy === kind
@@ -180,15 +186,16 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
                 </Button>
               </FileUploadTrigger>
               <Text as="span" size="xs" tone="muted">{t('google_setup.drop_hint', 'atau seret file ke kotak ini')}</Text>
-              {info.source === 'upload' && (
-                <Button variant="ghost" size="icon-sm" onClick={() => remove(kind)} disabled={busy !== null} className="ms-auto text-destructive"
-                  aria-label={t('google_setup.reset', 'Reset file yang diunggah')} title={t('google_setup.reset', 'Reset file yang diunggah')}>
-                  <RotateCcw aria-hidden="true" />
-                </Button>
-              )}
             </FileUploadDropzone>
-            <FileUploadHiddenInput id={inputId} aria-describedby={errors[kind] ? errorId : undefined} />
+            <FileUploadHiddenInput aria-describedby={errors[kind] ? errorId : undefined} />
           </FileUpload>
+          {info.source === 'upload' && (
+            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" onClick={() => remove(kind)} disabled={busy !== null} className="mt-g8 shrink-0 text-destructive"
+              aria-label={t('google_setup.reset', 'Reset file yang diunggah')}>
+              <RotateCcw aria-hidden="true" />
+            </Button></TooltipTrigger><TooltipBody>{t('google_setup.reset', 'Reset file yang diunggah')}</TooltipBody></Tooltip>
+          )}
+          </div>
           {errors[kind] && (
             <Alert status="error" id={errorId} role="alert"><AlertIndicator /><AlertContent><AlertDescription>{errors[kind]}</AlertDescription></AlertContent></Alert>
           )}
@@ -210,17 +217,17 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogBackdrop />
       <DialogPositioner>
-        <DialogContent className="flex max-h-[calc(100vh-2rem)] w-[min(32rem,calc(100vw-2rem))] flex-col overflow-hidden p-0">
-          <DialogHeader className="border-b border-border px-6 py-4">
+        <DialogContent className="flex w-full max-w-g610 flex-col overflow-hidden p-0">
+          <DialogHeader className="border-b border-border px-g21 py-g13">
             <DialogTitle>{t('google_setup.title', 'Hubungkan Google')}</DialogTitle>
             <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
             <DialogDescription>
               {t('google_setup.description', 'Unggah dua file JSON yang diekspor dari Google Cloud Console. File disimpan di server, menggantikan variabel GOOGLE_* di .env, dan isinya yang rahasia tidak pernah ditampilkan lagi.')}
             </DialogDescription>
           </DialogHeader>
-          <DialogBody className="mt-0 grid gap-3 overflow-y-auto px-6 py-5">
+          <DialogBody className="mt-0 grid gap-g13 overflow-y-auto px-g21 py-g21">
             {state.status === 'loading' && (
-              <div role="status" className="grid gap-3">
+              <div role="status" className="grid gap-g13">
                 <span className="sr-only">{t('common.loading', 'Memuat…')}</span>
                 <Skeleton height={144} /><Skeleton height={144} />
               </div>
@@ -239,7 +246,7 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
               </>
             )}
           </DialogBody>
-          <DialogFooter className="mt-0 border-t border-border px-6 py-4">
+          <DialogFooter className="mt-0 border-t border-border px-g21 py-g13">
             <DialogCloseTrigger asChild><Button>{t('google_setup.done', 'Selesai')}</Button></DialogCloseTrigger>
           </DialogFooter>
         </DialogContent>

@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/checkbox';
+export * from './moduix/ui/checkbox';

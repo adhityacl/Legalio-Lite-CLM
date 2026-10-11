@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/input';
+export * from './moduix/ui/input';

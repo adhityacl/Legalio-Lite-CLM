@@ -10,6 +10,8 @@ import { useNavigation } from '@legalio/platform-console/context/NavigationConte
 import { SystemLogin } from './SystemLogin';
 
 import { Card } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
+import { Spinner } from '@legalio/ui-components/spinner';
 const AdminConsole = lazy(() => import('@legalio/platform-console/components/AdminUsersView').then((m) => ({ default: m.AdminUsersView })));
 export function SystemConsole() {
   const { identity, loading, logout } = useIdentity();
@@ -18,10 +20,10 @@ export function SystemConsole() {
   const [menuOpen, setMenuOpen] = useState(false);
   const validTab = SYSTEM_TABS.includes(activeTab);
   useEffect(() => { if (!validTab) replaceActiveTab('admin-system-dashboard'); }, [validTab, replaceActiveTab]);
-  if (loading || !validTab) return <div className="flex h-full items-center justify-center" role="status"><Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />{t('sys.loading', 'Loading…')}</div>;
+  if (loading || !validTab) return <div className="flex h-full items-center justify-center" role="status"><Spinner size="sm" decorative />{t('sys.loading', 'Loading…')}</div>;
   if (!identity) return <SystemLogin />;
   if (identity.platformRole !== 'superuser' || !identity.platformPermissions.includes('platform.access')) return (
-    <main className="flex h-full items-center justify-center bg-background p-6 text-foreground"><Card className="max-w-md space-y-4 p-6"><h1 className="text-xl font-semibold">{t('sys.access_denied', 'System Console access denied')}</h1><p>{t('sys.superuser_only', 'Sign in with a superuser account to access this console.')}</p><Button onClick={() => void logout()}>{t('sys.sign_out', 'Sign out')}</Button></Card></main>
+    <main className="flex h-full items-center justify-center bg-background p-g21 text-foreground"><Card className="max-w-g377 space-y-g13 p-g21"><Heading as="h1" size="lg" weight="semibold">{t('sys.access_denied', 'System Console access denied')}</Heading><p>{t('sys.superuser_only', 'Sign in with a superuser account to access this console.')}</p><Button onClick={() => void logout()}>{t('sys.sign_out', 'Sign out')}</Button></Card></main>
   );
   return (
     <div className="h-screen w-full bg-background font-sans text-foreground">
@@ -30,7 +32,7 @@ export function SystemConsole() {
         navigation={{ showSystemAdmin: true, activeTab, setActiveTab, unresolvedNotifsCount: 0, expiringContractsCount: 0, isMobileOpen: menuOpen, onCloseMobile: () => setMenuOpen(false) }}
         header={<Header notifications={[]} onRefreshData={() => {}} onNavigateToTab={setActiveTab} onOpenMobileMenu={() => setMenuOpen(true)} />}
       >
-        <main data-table-design="standard" id="sys-content" tabIndex={-1} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3.5 focus:outline-none sm:p-5 md:p-7">
+        <main id="sys-content" tabIndex={-1} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-g13 focus:outline-none sm:p-g21 md:p-g34">
           <Suspense fallback={<p role="status">{t('sys.loading', 'Loading…')}</p>}>
             {validTab && <AdminConsole initialTab={activeTab.slice('admin-system-'.length) as SystemSubmenu} onManageOrganization={async (org) => {
               // Open during the click so browser popup blockers allow the new tab.

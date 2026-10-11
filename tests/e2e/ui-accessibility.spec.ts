@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { controlSize } from './fixtures/controlSize';
 import { createTenantApi, fixtureOrganization, fulfillTenantApi, workspaceInit } from './fixtures/tenantApi';
 
 test('workspace fields and outline actions share geometry in both themes and viewport sizes', async ({ page }, testInfo) => {
@@ -9,25 +10,35 @@ test('workspace fields and outline actions share geometry in both themes and vie
       await page.setViewportSize({ width, height: 1000 });
       for (const dark of [false, true]) {
         await page.evaluate(dark => { document.documentElement.classList.toggle('dark', dark); document.documentElement.dataset.moduixColorScheme = dark ? 'dark' : 'light'; }, dark);
-        const fields = page.locator('main .ds-input:visible:not(textarea):not([type="file"])');
+        const fields = page.locator('main [data-slot="input-root"]:visible');
         await expect(fields.first()).toBeVisible();
-        const issues = await fields.evaluateAll(elements => elements.flatMap(element => {
-          const style = getComputedStyle(element), rect = element.getBoundingClientRect();
-          return rect.height === 40 && style.borderRadius === '8px' && style.borderTopWidth === '1px' ? [] : [`${element.tagName}: ${rect.height}px / ${style.borderRadius} / ${style.borderTopWidth}`];
-        }));
+        const md = await controlSize(page, 'md');
+        const issues = await fields.evaluateAll((elements, md) => elements.flatMap(element => {
+          // An input inside a moduix InputGroup is borderless; the group draws the visible field frame.
+          const frame = element.closest('[data-slot="input-group-root"]') ?? element;
+          const style = getComputedStyle(frame), rect = frame.getBoundingClientRect();
+          return rect.height === md && style.borderRadius === '8px' && style.borderTopWidth === '1px' ? [] : [`${element.tagName}: ${rect.height}px / ${style.borderRadius} / ${style.borderTopWidth}`];
+        }), md);
         expect(issues).toEqual([]);
-        for (const action of await page.locator('main .ds-button-outline:visible:not(.ds-button-sm)').all()) {
-          expect((await action.boundingBox())!.height).toBe(40);
+        for (const action of await page.locator('main [data-slot="button-root"][data-variant="outline"][data-size="md"]:visible').all()) {
+          expect((await action.boundingBox())!.height).toBe(md);
           await expect(action).toHaveCSS('border-radius', '8px');
           await expect(action).toHaveCSS('border-top-width', '1px');
-          expect(await action.evaluate(element => {
-            const probe = document.createElement('span'); probe.style.color = 'var(--input)'; document.body.appendChild(probe);
+          // Poll: moduix buttons transition border-color, so read it once the theme switch has settled.
+          await expect.poll(() => action.evaluate(element => {
+            // moduix fields and outline actions share the border-border token.
+            const probe = document.createElement('span'); probe.style.color = 'var(--color-border)'; document.body.appendChild(probe);
             const matches = getComputedStyle(element).borderTopColor === getComputedStyle(probe).color; probe.remove(); return matches;
           })).toBe(true);
         }
         await fields.first().focus();
-        await expect(fields.first()).toHaveCSS('outline-width', '2px');
-        await expect(fields.first()).toHaveCSS('outline-offset', '2px');
+        // moduix draws a visible ring-coloured outline on the field frame (the InputGroup when the input sits in one).
+        await expect.poll(() => fields.first().evaluate(element => {
+          const style = getComputedStyle(element.closest('[data-slot="input-group-root"]') ?? element);
+          const probe = document.createElement('span'); probe.style.color = 'var(--color-ring)'; document.body.appendChild(probe);
+          const ring = getComputedStyle(probe).color; probe.remove();
+          return style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) >= 1 && style.outlineColor === ring;
+        })).toBe(true);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       }
       await page.screenshot({ path: testInfo.outputPath(`geometry-${section.source.replace(/[^a-z]/gi, '')}-${width}.png`), fullPage: true });
@@ -99,7 +110,7 @@ test('mobile controls fit, drawer traps focus and restores its trigger', async (
       expect(box!.x + box!.width).toBeLessThanOrEqual(width);
     }
     await page.getByTitle(/Open.*AI|Buka Asisten AI/i).click();
-    const chat = page.locator('[class*="origin-bottom-right"]');
+    const chat = page.getByTestId('ai-chat-panel');
     await expect(chat).toBeVisible();
     const box = await chat.boundingBox();
     expect(box!.x).toBeGreaterThanOrEqual(0);
@@ -122,7 +133,7 @@ test('mobile controls fit, drawer traps focus and restores its trigger', async (
 
 test('contract form supports labels, keyboard focus, Escape and reduced motion', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  const card = page.locator('main button').filter({ hasText: /^ACTIVE CONTRACTS/i });
+  const card = page.locator('main .dashboard-metric').getByRole('link', { name: /^Active Contracts$/i });
   await card.focus();
   await page.keyboard.press('Enter');
   const add = page.getByRole('button', { name: /^(Add Contract|Tambah Kontrak)$/ });

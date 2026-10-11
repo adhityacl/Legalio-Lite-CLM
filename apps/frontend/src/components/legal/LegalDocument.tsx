@@ -4,6 +4,12 @@ import { LANGUAGE_OPTIONS, useLanguage } from '../../context/LanguageContext';
 
 import { Button } from '@legalio/ui-components/button';
 import { Card } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
+import { SegmentGroup, SegmentGroupIndicator, SegmentGroupItems } from '@legalio/ui-components/segment-group';
+import { Text } from '@legalio/ui-components/text';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Toc, TocContent, TocIndicator, TocItem, TocLink, TocList, TocNav, TocTitle } from '@legalio/ui-components/toc';
+import { List, ListItem } from '@legalio/ui-components/list';
 export type Clause = string | { text: string; items: string[] };
 export interface LegalSection { title: string; clauses: Clause[] }
 export interface LegalContent {
@@ -18,11 +24,6 @@ export type LegalCatalog = Record<'ID' | 'EN' | 'ZH', LegalContent>;
 
 export interface LegalAccent {
   icon: React.ReactNode;
-  num: string;
-  toc: string;
-  tocTitle: string;
-  button: string;
-  link: string;
 }
 
 const LABELS = {
@@ -48,124 +49,111 @@ export const LegalDocument: React.FC<{
   }, []);
 
   const renderClause = (clause: Clause, label: string) => (
-    <div key={label} className="flex gap-3">
-      <span className="shrink-0 w-10 font-semibold tabular-nums text-muted-foreground">{label}</span>
+    <div key={label} className="flex gap-g13">
+      <span className="shrink-0 w-g42 font-semibold tabular-nums text-muted-foreground">{label}</span>
       <div className="min-w-0 flex-1">
         <p>{typeof clause === 'string' ? clause : clause.text}</p>
         {typeof clause !== 'string' && (
-          <ol className="mt-2 space-y-1.5">
+          <List as="ol" marker="none" className="mt-g8 space-y-g5">
             {clause.items.map((item, i) => (
-              <li key={i} className="flex gap-2">
+              <ListItem key={i} className="flex gap-g8">
                 <span className="shrink-0 text-muted-foreground">({alpha(i)})</span>
                 <span>{item}</span>
-              </li>
+              </ListItem>
             ))}
-          </ol>
+          </List>
         )}
       </div>
     </div>
   );
 
   return (
-    <main lang={language.toLowerCase()} className="legal-page h-screen overflow-y-auto scroll-smooth bg-background text-foreground transition-colors px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-      <div className="max-w-6xl mx-auto">
-        <Card className="sticky top-3 z-30 flex flex-wrap items-center justify-between gap-3 backdrop-blur-md p-3 sm:p-4 print:hidden">
-          <div className="flex items-center gap-3">
+    <main lang={language.toLowerCase()} className="legal-page h-screen overflow-y-auto scroll-smooth bg-background text-foreground transition-colors px-g13 py-g13 sm:px-g21 sm:py-g21 lg:px-g34">
+      <div className="max-w-g987 mx-auto">
+        <Card className="sticky top-g13 z-30 flex flex-wrap items-center justify-between gap-g13 backdrop-blur-md p-g13 sm:p-g13 print:hidden">
+          <div className="flex items-center gap-g13">
             {onBack && (
               <Button variant="ghost"
                 type="button"
                 onClick={onBack}
               >
-                <ArrowLeft aria-hidden="true" className="w-4 h-4" />
+                <ArrowLeft aria-hidden="true" className="w-g16 h-g16" />
                 <span>{L.back}</span>
               </Button>
             )}
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <div className="flex items-center gap-g8 text-xs font-medium text-muted-foreground">
               {accent.icon}
               <span>{doc.navLabel}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Card role="group" aria-label="Language" className="inline-flex items-center p-1 text-xs font-semibold">
-              {LANGUAGE_OPTIONS.map((option) => (
-                <button
-                  key={option.code}
-                  type="button"
-                  lang={option.htmlLang}
-                  aria-pressed={language === option.code}
-                  onClick={() => setLanguage(option.code)}
-                  className={`min-h-10 px-4 py-1.5 rounded-md transition-colors cursor-pointer ${
- language === option.code
- ? 'bg-card text-foreground shadow-sm'
- : 'text-muted-foreground hover:text-foreground '
- }`}
-                >
-                  {option.nativeName}
-                </button>
-              ))}
-            </Card>
-            <Button variant="ghost" size="icon-md"
+          <div className="flex items-center gap-g8">
+            <SegmentGroup aria-label="Language" value={language} onValueChange={details => details.value && setLanguage(details.value as typeof language)}>
+              <SegmentGroupIndicator />
+              <SegmentGroupItems items={LANGUAGE_OPTIONS.map(option => ({ value: option.code, label: <span lang={option.htmlLang}>{option.nativeName}</span> }))} />
+            </SegmentGroup>
+            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-md"
               type="button"
               onClick={() => window.print()}
               aria-label={L.print}
-              title={L.print}
             >
-              <Printer aria-hidden="true" className="w-4 h-4" />
-            </Button>
+              <Printer aria-hidden="true" className="w-g16 h-g16" />
+            </Button></TooltipTrigger><TooltipBody>{L.print}</TooltipBody></Tooltip>
           </div>
         </Card>
 
-        <Card className="p-5 sm:p-8 lg:p-12">
-          <header className="pb-6 mb-8 border-b border-border">
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight text-balance">{doc.title}</h1>
-            <p className="mt-2 text-sm text-muted-foreground">{L.updated}: {doc.updated}</p>
+        <Card className="p-g21 sm:p-g34 lg:p-g55">
+          <header className="pb-g21 mb-g34 border-b border-border">
+            <Heading as="h1" size="2xl" weight="bold" className="sm:text-4xl text-balance">{doc.title}</Heading>
+            <Text size="sm" tone="muted" className="mt-g8">{L.updated}: {doc.updated}</Text>
           </header>
 
-          <div className="grid gap-8 lg:grid-cols-[minmax(220px,280px)_minmax(0,1fr)] lg:gap-12 lg:items-start">
-            <nav aria-label={L.toc} className={`p-4 rounded-2xl border lg:sticky lg:top-28 print:hidden ${accent.toc}`}>
-              <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${accent.tocTitle}`}>{L.toc}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-1 text-sm">
-                {doc.sections.map((s, i) => (
-                  <a key={i} href={`#${idPrefix}-${i + 1}`} className={`legal-toc-link ${accent.link}`}>
-                    {i + 1}. {s.title}
-                  </a>
-                ))}
-              </div>
-            </nav>
+          <Toc items={doc.sections.map((section, i) => ({ value: `${idPrefix}-${i + 1}`, depth: 2, label: `${i + 1}. ${section.title}` }))}
+            className="grid gap-g34 lg:grid-cols-4 lg:items-start lg:gap-g55">
+            <TocNav aria-label={L.toc} className="lg:sticky lg:top-g110 print:hidden">
+              <TocTitle>{L.toc}</TocTitle>
+              <TocList>
+                <TocIndicator />
+                {doc.sections.map((section, i) => {
+                  const item = { value: `${idPrefix}-${i + 1}`, depth: 2, label: `${i + 1}. ${section.title}` };
+                  return <TocItem key={item.value} item={item}><TocLink href={`#${item.value}`}>{item.label}</TocLink></TocItem>;
+                })}
+              </TocList>
+            </TocNav>
 
-            <article className="legal-document-body min-w-0 max-w-[80ch] text-foreground">
-              <div className="space-y-3 mb-10">{doc.intro.map((c, i) => renderClause(c, `0.${i + 1}`))}</div>
+            <TocContent className="min-w-0 lg:col-span-3">
+            <article className="min-w-0 max-w-g610 text-foreground">
+              <div className="space-y-g13 mb-g34">{doc.intro.map((c, i) => renderClause(c, `0.${i + 1}`))}</div>
 
               {doc.sections.map((s, i) => (
-                <section key={i} id={`${idPrefix}-${i + 1}`} className="scroll-mt-6 mb-10">
-                  <h2 className="font-bold uppercase tracking-wide text-foreground mb-3">
-                    <span className={`inline-block w-10 ${accent.num}`}>{i + 1}.</span>
+                <section key={i} className="scroll-mt-g21 mb-g34">
+                  <Heading as="h2" id={`${idPrefix}-${i + 1}`} size="lg" weight="bold" className="mb-g13 scroll-mt-g21">
+                    <span className="inline-block w-g42 text-accent-foreground">{i + 1}.</span>
                     {s.title}
-                  </h2>
-                  <div className="space-y-3">{s.clauses.map((c, j) => renderClause(c, `${i + 1}.${j + 1}`))}</div>
+                  </Heading>
+                  <div className="space-y-g13">{s.clauses.map((c, j) => renderClause(c, `${i + 1}.${j + 1}`))}</div>
                 </section>
               ))}
 
-              <section className="mt-12 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <section className="mt-g55 p-g21 flex flex-col sm:flex-row sm:items-center justify-between gap-g13">
                 <div>
-                  <h3 className="font-bold text-foreground ">{doc.contact.title}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">{doc.contact.text}</p>
+                  <Heading as="h3" size="sm" weight="bold">{doc.contact.title}</Heading>
+                  <Text size="sm" tone="muted" className="mt-g3">{doc.contact.text}</Text>
                 </div>
-                <a
-                  href={`mailto:${doc.contact.email}`}
-                  className={`inline-flex min-h-10 items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-colors shadow-sm ${accent.button}`}
-                >
-                  <Mail aria-hidden="true" className="w-4 h-4" />
-                  <span>{doc.contact.email}</span>
-                </a>
+                <Button asChild>
+                  <a href={`mailto:${doc.contact.email}`}>
+                    <Mail aria-hidden="true" className="w-g16 h-g16" />
+                    <span>{doc.contact.email}</span>
+                  </a>
+                </Button>
               </section>
             </article>
-          </div>
+            </TocContent>
+          </Toc>
 
-          <div className="mt-10 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground print:hidden">
+          <div className="mt-g34 pt-g21 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-g13 text-xs text-muted-foreground print:hidden">
             <p>© 2026 Legalio. All rights reserved.</p>
             {onBack && (
-              <Button variant="link" type="button" onClick={onBack} className={` ${accent.link}`}>
+              <Button variant="link" type="button" onClick={onBack}>
                 ← {L.back}
               </Button>
             )}

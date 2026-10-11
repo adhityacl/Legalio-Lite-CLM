@@ -37,10 +37,12 @@ async function open(page: Page, options: Partial<TenantApiOptions> & { tab?: str
   return { api, requests };
 }
 
-const sidebar = (page: Page) => page.locator('aside');
+const sidebar = (page: Page) => page.locator('[data-slot="sidebar-panel"]');
+// Organization switcher: moduix Menu with radio items in the sidebar header.
+const orgSwitcher = (page: Page) => sidebar(page).locator('button[aria-haspopup="menu"]').first();
 const tabs = (page: Page) => page.getByRole('tablist', { name: 'Settings sections' }).getByRole('tab');
 
-test('AC-001 admin sees one Settings entry and exactly three tabs, with no platform controls', async ({ page }) => {
+test('AC-001 admin sees one Settings entry and exactly two tabs, with no platform controls', async ({ page }) => {
   const { requests } = await open(page, { roles: { 'org-a': 'admin' } });
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
@@ -48,11 +50,13 @@ test('AC-001 admin sees one Settings entry and exactly three tabs, with no platf
     if (width < 768) await page.getByRole('button', { name: 'Open Navigation Menu', exact: true }).click();
     await expect(nav.getByRole('button', { name: 'Settings', exact: true })).toHaveCount(1);
     await expect(nav.getByRole('button', { name: /Organization Admin|System Admin/ })).toHaveCount(0);
-    await expect(nav.getByRole('button', { name: /^(Open|Close) Submenu$/ })).toHaveCount(width < 768 ? 1 : 1); // only the Partners submenu
+    // Only the Partners group expands (the redesigned sidebar names the toggle after its group).
+    await expect(nav.locator('button[aria-expanded]:not([aria-haspopup])')).toHaveCount(1);
+    await expect(nav.locator('button[aria-expanded]:not([aria-haspopup])')).toHaveAccessibleName('Partners');
     await nav.getByRole('button', { name: 'Settings', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Settings — Alpha Org' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Settings / Alpha Org' })).toBeVisible();
     await expect(page.getByText('Role in this organization: Admin')).toBeVisible();
-    await expect(tabs(page)).toHaveText(['Organization', 'Members & Access', 'Integrations']);
+    await expect(tabs(page)).toHaveText(['Organization', 'Members & Access']);
     await expect(page.getByRole('tab', { name: 'Organization', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByText(/Gemini|SMTP|SQLite|service account/i)).toHaveCount(0);
     await page.goto('/app?tab=dashboard');
@@ -76,7 +80,7 @@ test('AC-002 manager sees only Members & Access and never fetches organization, 
   await expect(departments.getByRole('button', { name: /Add|Delete|Rename/ })).toHaveCount(0);
   await page.keyboard.press('Escape');
   // Deep links to admin-only tabs are denied before mount.
-  for (const tab of ['settings-organization', 'settings-integrations', 'activity-logs']) {
+  for (const tab of ['settings-organization', 'activity-logs']) {
     await page.goto(`/app?tab=${tab}`);
     await expect(page.getByRole('heading', { name: 'You do not have access to this page' })).toBeVisible();
   }
@@ -114,7 +118,7 @@ test('AC-025 capability failure shows Retry with no inferred privileges; empty c
   expect(requests.filter(r => PRIVILEGED.test(r.split(' ')[1]) || r.endsWith('/api/init-data'))).toEqual([]);
   failing = false;
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
-  await expect(tabs(page)).toHaveText(['Organization', 'Members & Access', 'Integrations']);
+  await expect(tabs(page)).toHaveText(['Organization', 'Members & Access']);
 
   // An empty permission list is not an error and grants nothing.
   await page.route('**/api/organizations/*/capabilities', route => route.fulfill({ json: {
@@ -123,15 +127,6 @@ test('AC-025 capability failure shows Retry with no inferred privileges; empty c
   await page.reload();
   await expect(page.getByRole('heading', { name: 'You do not have access to this page' })).toBeVisible();
   await expect(sidebar(page).getByRole('button', { name: 'Settings', exact: true })).toHaveCount(0);
-});
-
-test('AC-025 missing provider shows an honest unavailable state with no hard-coded resources or sync action', async ({ page }) => {
-  await open(page, { roles: { 'org-a': 'admin' }, tab: 'settings-integrations' });
-  await expect(page.getByText('Not configured by the platform administrator.')).toBeVisible();
-  await expect(page.getByText('No folder or sheet is mapped yet.')).toBeVisible();
-  await expect(page.getByText(/Google synchronization is not available in this release/)).toBeVisible();
-  await expect(page.getByRole('button', { name: /Sync now/i })).toHaveCount(0);
-  await expect(page.getByLabel('Drive folder ID')).toHaveValue('');
 });
 
 test('AC-027 unsaved Organization changes ask Stay or Discard before leaving a tab or organization', async ({ page }) => {
@@ -148,15 +143,15 @@ test('AC-027 unsaved Organization changes ask Stay or Discard before leaving a t
   await expect(name).toHaveValue('Alpha Org renamed');
 
   // Switching organization asks too; Stay keeps the selection and the draft.
-  await page.locator('aside button[aria-haspopup="listbox"]').click();
-  await page.getByRole('listbox').getByRole('option', { name: /Beta Org/ }).click();
+  await orgSwitcher(page).click();
+  await page.getByRole('menu').getByRole('menuitemradio', { name: /Beta Org/ }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Stay', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Settings — Alpha Org' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Settings / Alpha Org' })).toBeVisible();
   await expect(name).toHaveValue('Alpha Org renamed');
 
-  await page.getByRole('tab', { name: 'Integrations', exact: true }).click();
+  await page.getByRole('tab', { name: 'Members & Access', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Discard changes', exact: true }).click();
-  await expect(page.getByRole('tab', { name: 'Integrations', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Members & Access', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('tab', { name: 'Organization', exact: true }).click();
   await expect(page.getByLabel('Organization name')).toHaveValue('Alpha Org');
   expect(requests.filter(r => r.startsWith('PATCH '))).toEqual([]);
@@ -168,7 +163,8 @@ test('AC-039 legacy aliases map to canonical tabs with replaceState; Back/Forwar
     ['settings', 'settings-organization', null],
     ['settings-region', 'settings-organization', null],
     ['settings-notifications', 'settings-organization', null],
-    ['settings-google', 'settings-integrations', null],
+    ['settings-google', 'settings-organization', null],
+    ['settings-integrations', 'settings-organization', null],
     ['admin-organization-users', 'settings-access', null],
     ['admin-organization-teams', 'settings-access', 'Departments'],
     ['admin-organization-invitations', 'settings-access', null],
@@ -194,9 +190,6 @@ test('AC-039 legacy aliases map to canonical tabs with replaceState; Back/Forwar
   await page.goto('/app?tab=dashboard');
   await sidebar(page).getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('tab', { name: 'Members & Access', exact: true }).click();
-  await page.getByRole('tab', { name: 'Integrations', exact: true }).click();
-  await page.goBack();
-  await expect(page.getByRole('tab', { name: 'Members & Access', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.goBack();
   await expect(page.getByRole('tab', { name: 'Organization', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.goBack();
@@ -233,11 +226,11 @@ for (const width of [1440, 390]) {
     await expect(access).toHaveAttribute('tabindex', '0');
     await expect(organization).toHaveAttribute('tabindex', '-1');
     await page.keyboard.press('End');
-    await expect(page.getByRole('tab', { name: 'Integrations', exact: true })).toBeFocused();
+    await expect(access).toBeFocused();
     await page.keyboard.press('Home');
     await expect(organization).toBeFocused();
     await page.keyboard.press('ArrowLeft');
-    await expect(page.getByRole('tab', { name: 'Integrations', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(access).toHaveAttribute('aria-selected', 'true');
 
     await page.getByRole('tab', { name: 'Members & Access', exact: true }).click();
     for (const name of ['Invite member', 'Departments', 'History']) {
@@ -246,7 +239,7 @@ for (const width of [1440, 390]) {
       await page.keyboard.press('Enter');
       const dialog = page.getByRole('dialog');
       await expect(dialog).toHaveAccessibleName(/.+/);
-      expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
+      await expect.poll(() => dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
       await page.keyboard.press('Escape');
       await expect(dialog).toBeHidden();
       await expect(trigger).toBeFocused();
@@ -295,9 +288,9 @@ test('AC-026 a slow response for the previous organization never overwrites the 
       await route.fallback().catch(() => {}); // the app may already have aborted it
     }),
   });
-  await expect(page.locator('aside button[aria-haspopup="listbox"]')).toContainText('Alpha Org');
-  await page.locator('aside button[aria-haspopup="listbox"]').click();
-  await page.getByRole('listbox').getByRole('option', { name: /Beta Org/ }).click();
+  await expect(orgSwitcher(page)).toContainText('Alpha Org');
+  await orgSwitcher(page).click();
+  await page.getByRole('menu').getByRole('menuitemradio', { name: /Beta Org/ }).click();
   await expect(page.locator('main').getByText('Beta Only Partner').first()).toBeVisible();
   releaseA();
   await expect.poll(() => aServed).toBe(true);
@@ -308,8 +301,8 @@ test('AC-026 a slow response for the previous organization never overwrites the 
 
 test('AC-034 language and theme preferences belong to the identity, not the browser', async ({ page }) => {
   const { api } = await open(page, { roles: { 'org-a': 'admin' } });
-  await page.locator('header button').filter({ hasText: /^(EN|ID|ZH)$/ }).click();
-  await page.getByRole('dialog').locator('button[lang="id"]').click();
+  await page.getByRole('button', { name: 'Switch Language', exact: true }).click();
+  await page.getByRole('menu').getByRole('menuitemradio', { name: 'Bahasa Indonesia' }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'id');
   await page.getByRole('button', { name: /Mode Gelap|Dark Mode/i }).click();
   await expect(page.locator('html')).toHaveClass(/dark/);

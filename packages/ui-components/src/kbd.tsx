@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/kbd';
+export * from './moduix/ui/kbd';

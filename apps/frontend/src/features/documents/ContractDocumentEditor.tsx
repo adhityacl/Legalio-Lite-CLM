@@ -15,7 +15,6 @@ import Highlight from '@tiptap/extension-highlight';
 import { TableKit } from '@tiptap/extension-table';
 import { CustomTableCell, CustomTableHeader } from '../../lib/tiptapTableCellBackground';
 import {
-  FileSignature,
   FileDown,
   Save,
   Printer,
@@ -47,6 +46,9 @@ import {
   Maximize2,
   Minimize2,
   X,
+  CloudAlert,
+  CloudCheck,
+  CloudOff,
 } from 'lucide-react';
 import { ContentIcon } from '../../components/icons/ContentIcon';
 import { GridDotsIcon } from '../../components/icons/GridDotsIcon';
@@ -85,17 +87,18 @@ import { Textarea } from '@legalio/ui-components/textarea';
 import { Input } from '@legalio/ui-components/input';
 import { Button } from '@legalio/ui-components/button';
 import { Card } from '@legalio/ui-components/card';
-import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { Field, FieldHelperText, FieldLabel } from '@legalio/ui-components/field';
 import { Text } from '@legalio/ui-components/text';
 import { Spinner } from '@legalio/ui-components/spinner';
 import { CloseButton } from '@legalio/ui-components/close-button';
 import { Alert, AlertActions, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 import { SegmentGroup, SegmentGroupIndicator, SegmentGroupItems } from '@legalio/ui-components/segment-group';
-import { Badge } from '@legalio/ui-components/badge';
+import { Badge, BadgeDot } from '@legalio/ui-components/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 import { Heading } from '@legalio/ui-components/heading';
 import { Collapsible, CollapsibleContent, CollapsibleIndicator, CollapsibleTrigger } from '@legalio/ui-components/collapsible';
 import { Empty, EmptyContent, EmptyDescription } from '@legalio/ui-components/empty';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 export interface ContractCreatorViewProps {
   initialDocumentId?: string | null;
   /** Starting point picked in the New document dialog; null/undefined = blank document. */
@@ -449,7 +452,6 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
   }, [customFields]);
 
   // Form states for creating custom fields
-  const [showAddCustomField, setShowAddCustomField] = useState(false);
   const [newFieldLabel, setNewFieldLabel] = useState('');
   const [newFieldType, setNewFieldType] = useState<'text' | 'date' | 'currency' | 'textarea' | 'email' | 'boolean' | 'select'>('text');
   const [newFieldPlaceholder, setNewFieldPlaceholder] = useState('');
@@ -512,7 +514,6 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     setNewFieldDescription('');
     setNewFieldIcon('⭐');
     setNewFieldOptions('');
-    setShowAddCustomField(false);
   };
 
   // Action status
@@ -1355,20 +1356,26 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     (key) => key === 'contractNo' || BUILT_IN_FIELD_KEYS.has(key) || customFields.some((f) => f.key === key),
   );
 
+  const saveIcon =
+    saveState.status === 'saving' ? <Spinner size="sm" decorative />
+    : saveState.status === 'error' ? <CloudAlert className="size-g16 text-status-danger" aria-hidden />
+    : hasUnsaved || !currentDoc ? <CloudOff className="size-g16 text-status-warning" aria-hidden />
+    : <CloudCheck className="size-g16 text-muted-foreground" aria-hidden />;
+
   const saveStatus =
     saveState.status === 'saving' ? (
       <>
-        <RefreshCw className="w-3 h-3 animate-spin motion-reduce:animate-none" aria-hidden />
+        <Spinner size="sm" decorative />
         {t('common.saving', 'Menyimpan…')}
       </>
     ) : saveState.status === 'error' ? (
-      <span className="text-status-danger inline-flex items-center gap-1">
-        <AlertCircle className="w-3 h-3" aria-hidden />
+      <span className="text-status-danger inline-flex items-center gap-g3">
+        <AlertCircle className="w-g13 h-g13" aria-hidden />
         {t('documents.save.failed', 'Gagal menyimpan')}: {saveState.message}
       </span>
     ) : hasUnsaved ? (
       <>
-        <span className="w-2 h-2 rounded-full bg-status-warning" aria-hidden />
+        <BadgeDot className="size-g8 text-status-warning" aria-hidden />
         {t('documents.save.unsaved', 'Perubahan belum disimpan')}
       </>
     ) : currentDoc ? (
@@ -1393,7 +1400,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
   const activeSidebarTab = sidebarTabs.find((tab) => tab.id === sidebarTab) ?? sidebarTabs[0];
 
   const renderPartyFields = (keys: readonly PartyFieldKey[]) => (
-    <div className="grid gap-3">
+    <div className="grid gap-g13">
       {keys.map((key) => {
         const field = COOPERATION_AGREEMENT_FIELDS.find((item) => item.key === key);
         if (!field) return null;
@@ -1412,7 +1419,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
         return (
           <Field key={key}>
-            <FieldLabel htmlFor={inputId}>{label}</FieldLabel>
+            <FieldLabel htmlFor={inputId} className="font-semibold">{label}</FieldLabel>
             {field.type === 'textarea' ? (
               <Textarea {...sharedProps} rows={3} />
             ) : (
@@ -1436,107 +1443,103 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
       )}
 
       {/* The editor stays mounted (hidden) while the explorer is shown so TipTap keeps its state. */}
-      {screen === 'loading' && <div role="status" className="flex min-h-56 items-center justify-center gap-2 text-sm text-muted-foreground"><Spinner size="sm" decorative />{t('common.loading', 'Loading…')}</div>}
+      {screen === 'loading' && <div role="status" className="flex min-h-g233 items-center justify-center gap-g8 text-sm text-muted-foreground"><Spinner size="sm" decorative />{t('common.loading', 'Loading…')}</div>}
       <div className={screen !== 'editor' ? 'hidden' : 'contents'}>
       {/* 1. TOP NAVBAR / HEADER */}
       {/* No z-index here: as a flex item (via the `contents` wrapper above) it applies even at
           position:static, and matching the app Header's z-20 let this later-in-DOM element win
           the tie-break and paint over the Header's user-menu dropdown. */}
-      <header className="editor-header bg-card border-b border-border px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0">
-        <div className="editor-header-identity flex items-center gap-2.5 min-w-0 max-w-full">
-          <Button variant="secondary" size="icon-sm"
+      <header className="bg-card border-b border-border px-g13 py-g8 flex flex-wrap items-center justify-between gap-g13 shrink-0">
+        <div className="flex items-center gap-g8 min-w-0 max-w-full">
+          <Tooltip><TooltipTrigger asChild><Button variant="secondary" size="icon-sm"
             type="button"
             onClick={backToExplorer}
             className="shrink-0"
             aria-label={t('documents.action.back', 'Kembali ke daftar dokumen')}
-            title={t('documents.action.back', 'Kembali ke daftar dokumen')}
           >
-            <ArrowLeft className="w-4 h-4" aria-hidden />
-          </Button>
-          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground" aria-hidden="true">
-            <FileSignature className="size-4" />
-          </span>
-          <div className="min-w-0 flex-1 flex flex-col">
-            <Input
-              ref={titleInputRef}
-              aria-label={t('contract_creator.title_input_placeholder', 'Judul Dokumen Perjanjian')}
-              type="text"
-              value={docTitle}
-              onChange={(e) => setDocTitle(e.target.value)}
-              className="w-full border-transparent bg-transparent px-1 font-semibold hover:border-border focus-visible:border-border sm:w-96 md:w-[460px] lg:w-[540px]"
-              title={t('contract_creator.title_input_title', 'Klik untuk mengubah judul dokumen')}
-              placeholder={t('contract_creator.title_input_placeholder', 'Judul Dokumen Perjanjian')}
-            />
-            <Text as="p" size="xs" tone="muted" className="inline-flex flex-wrap items-center gap-1 px-1" aria-live="polite">{saveStatus}</Text>
+            <ArrowLeft className="w-g16 h-g16" aria-hidden />
+          </Button></TooltipTrigger><TooltipBody>{t('documents.action.back', 'Kembali ke daftar dokumen')}</TooltipBody></Tooltip>
+          <div className="min-w-0 flex-1 flex items-center gap-g8">
+            {/* The hidden span mirrors the text so the box is exactly as wide as the title. */}
+            <span className="relative inline-grid min-w-0 max-w-full">
+              <span aria-hidden="true" className="invisible col-start-1 row-start-1 overflow-hidden whitespace-pre border px-g3 text-sm font-semibold">{docTitle || t('contract_creator.title_input_placeholder', 'Judul Dokumen Perjanjian')}</span>
+              <Tooltip><TooltipTrigger asChild><Input
+                ref={titleInputRef}
+                aria-label={t('contract_creator.title_input_placeholder', 'Judul Dokumen Perjanjian')}
+                type="text"
+                value={docTitle}
+                maxLength={80}
+                onChange={(e) => setDocTitle(e.target.value)}
+                className="col-start-1 row-start-1 w-full min-w-0 border-transparent bg-transparent px-g3 font-semibold hover:border-border focus-visible:border-border"
+                placeholder={t('contract_creator.title_input_placeholder', 'Judul Dokumen Perjanjian')}
+              /></TooltipTrigger><TooltipBody>{t('contract_creator.title_input_title', 'Klik untuk mengubah judul dokumen')}</TooltipBody></Tooltip>
+            </span>
+            <Tooltip><TooltipTrigger asChild><span role="status" aria-live="polite" className="inline-flex size-g26 shrink-0 items-center justify-center" aria-label={typeof saveStatus === 'string' ? saveStatus : undefined}>{saveIcon}</span></TooltipTrigger><TooltipBody><span className="inline-flex flex-wrap items-center gap-g3">{saveStatus}</span></TooltipBody></Tooltip>
           </div>
         </div>
 
         {/* Action Controls & Mode Switcher */}
-        <div className="editor-header-actions flex items-center gap-2 flex-wrap">
-
-          {canEdit && (
-            <Button variant="outline" size="sm"
-              type="button"
-              onClick={() => void saveNow('manual')}
-              disabled={saveState.status === 'saving'}
-              className="editor-header-save"
-              title={t('documents.save.manual_title', 'Simpan sebagai versi baru (Ctrl+S)')}
-            >
-              <Save className="w-3.5 h-3.5" aria-hidden />
-              <span>{t('common.save', 'Simpan')}</span>
-            </Button>
-          )}
+        <div className="flex items-center gap-g8 flex-wrap">
 
           {/* View Mode Toggle: Edit vs Pratinjau */}
           <SegmentGroup
-            className="editor-header-modes"
-            aria-label={t('contract_creator.mode_label', 'Mode tampilan')}
+                        aria-label={t('contract_creator.mode_label', 'Mode tampilan')}
             value={viewMode}
             onValueChange={details => details.value && switchViewMode(details.value as 'editor' | 'preview')}
           >
             <SegmentGroupIndicator />
             <SegmentGroupItems items={[
-              { value: 'editor', label: <span className="inline-flex items-center gap-1.5" title={t('contract_creator.mode_edit_title', 'Sunting langsung teks kontrak dalam Bahasa Indonesia')}><Edit3 className="size-3.5" aria-hidden="true" />{t('contract_creator.mode_edit_label', 'Edit')}</span> },
-              { value: 'preview', label: <span className="inline-flex items-center gap-1.5" title={t('contract_creator.mode_preview_title', 'Pratinjau tampilan dokumen final')}><FileText className="size-3.5" aria-hidden="true" />{t('contract_creator.mode_preview_label', 'Pratinjau')}</span> },
+              { value: 'editor', label: <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-g5"><Edit3 className="size-g16" aria-hidden="true" />{t('contract_creator.mode_edit_label', 'Edit')}</span></TooltipTrigger><TooltipBody>{t('contract_creator.mode_edit_title', 'Sunting langsung teks kontrak dalam Bahasa Indonesia')}</TooltipBody></Tooltip> },
+              { value: 'preview', label: <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-g5"><FileText className="size-g16" aria-hidden="true" />{t('contract_creator.mode_preview_label', 'Pratinjau')}</span></TooltipTrigger><TooltipBody>{t('contract_creator.mode_preview_title', 'Pratinjau tampilan dokumen final')}</TooltipBody></Tooltip> },
             ]} />
           </SegmentGroup>
 
+          {canEdit && (
+            <Tooltip><TooltipTrigger asChild><Button variant="outline"
+              type="button"
+              onClick={() => void saveNow('manual')}
+              disabled={saveState.status === 'saving'}
+              aria-label={t('documents.save.manual_title', 'Simpan sebagai versi baru (Ctrl+S)')}
+            >
+              <Save className="size-g16" aria-hidden />
+              <span>{t('common.save', 'Simpan')}</span>
+            </Button></TooltipTrigger><TooltipBody>{t('documents.save.manual_title', 'Simpan sebagai versi baru (Ctrl+S)')}</TooltipBody></Tooltip>
+          )}
+
+
           {/* Primary Export: Download DOCX */}
-          <Button variant="ghost" size="sm"
+          <Tooltip><TooltipTrigger asChild><Button variant="outline"
             type="button"
             onClick={handleDownloadIndonesianDocx}
             disabled={isDownloadingDocx}
-            title={t('contract_creator.download_title', 'Download file Word (.doc)')}
           >
-            {isDownloadingDocx ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+            {isDownloadingDocx ? <Spinner size="sm" decorative /> : <FileDown className="size-g16" aria-hidden="true" />}
             <span>{t('contract_creator.download_label', 'Download')}</span>
-          </Button>
+          </Button></TooltipTrigger><TooltipBody>{t('contract_creator.download_title', 'Download file Word (.doc)')}</TooltipBody></Tooltip>
 
           {/* Fullscreen Toggle */}
-          <Button variant="outline" size="icon-sm"
+          <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon-md"
             type="button"
             onClick={() => setIsFullscreen(!isFullscreen)}
             aria-label={isFullscreen ? t('contract_creator.exit_fullscreen', 'Keluar dari Fullscreen') : t('contract_creator.enter_fullscreen', 'Tampilan Fullscreen')}
-            title={isFullscreen ? t('contract_creator.exit_fullscreen', 'Keluar dari Fullscreen') : t('contract_creator.enter_fullscreen', 'Tampilan Fullscreen')}
           >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-          </Button>
+            {isFullscreen ? <Minimize2 className="size-g16" aria-hidden="true" /> : <Maximize2 className="size-g16" aria-hidden="true" />}
+          </Button></TooltipTrigger><TooltipBody>{isFullscreen ? t('contract_creator.exit_fullscreen', 'Keluar dari Fullscreen') : t('contract_creator.enter_fullscreen', 'Tampilan Fullscreen')}</TooltipBody></Tooltip>
 
           {/* Sidebar Toggle */}
-          <Button variant={sidebarOpen ? 'secondary' : 'outline'} size="icon-sm"
+          <Tooltip><TooltipTrigger asChild><Button variant={sidebarOpen ? 'secondary' : 'outline'} size="icon-md"
             aria-expanded={sidebarOpen}
             aria-label={t('contract_creator.sidebar_toggle_title', 'Buka / Tutup Panel Pintasan Form & Klausul')}
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            title={t('contract_creator.sidebar_toggle_title', 'Buka / Tutup Panel Pintasan Form & Klausul')}
           >
-            <SlidersHorizontal className="w-4 h-4" />
-          </Button>
+            <SlidersHorizontal className="size-g16" aria-hidden="true" />
+          </Button></TooltipTrigger><TooltipBody>{t('contract_creator.sidebar_toggle_title', 'Buka / Tutup Panel Pintasan Form & Klausul')}</TooltipBody></Tooltip>
         </div>
       </header>
 
       {/* Alert Notification Bar */}
       {exportMessage && (
-        <Alert status={exportMessage.type === 'success' ? 'success' : exportMessage.type === 'error' ? 'error' : 'info'} className="rounded-none border-x-0 border-t-0">
+        <Alert status={exportMessage.type === 'success' ? 'success' : exportMessage.type === 'error' ? 'error' : 'info'} className="rounded-none border-x-0 border-t-0"><AlertIndicator />
           {exportMessage.type === 'info' ? <Spinner size="sm" decorative /> : <AlertIndicator />}
           <AlertContent><AlertDescription>{exportMessage.text}</AlertDescription></AlertContent>
           <AlertActions><CloseButton aria-label={t('common.close', 'Tutup')} onClick={() => setExportMessage(null)} /></AlertActions>
@@ -1549,15 +1552,14 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
           <div className="flex-1 min-w-0">
             <ContractEditorToolbar editor={editor} />
           </div>
-          <div className="flex items-center bg-card border-b border-border pr-3 pl-1 shrink-0">
-            <Button variant="secondary" size="sm"
+          <div className="flex items-center bg-card border-b border-border pr-g13 pl-g3 shrink-0">
+            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm"
               type="button"
-              onClick={handleResetDocument}
-              title={t('contract_creator.reset_template_title', 'Kembalikan isi ke template awal 15 pasal Perjanjian Kerjasama')}
+              onClick={handleResetDocument} aria-label={t('contract_creator.reset_template_title', 'Kembalikan isi ke template awal 15 pasal Perjanjian Kerjasama')}
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="size-g16" aria-hidden="true" />
               <span>{t('contract_creator.reset_template_label', 'Reset Template')}</span>
-            </Button>
+            </Button></TooltipTrigger><TooltipBody>{t('contract_creator.reset_template_title', 'Kembalikan isi ke template awal 15 pasal Perjanjian Kerjasama')}</TooltipBody></Tooltip>
           </div>
         </div>
       )}
@@ -1567,18 +1569,18 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
         {/* VIEW MODE A: WYSIWYG CANVAS WORKSPACE (Versi Bahasa Indonesia) */}
         <div
-          className={`flex-1 min-w-0 overflow-y-auto p-2 sm:p-6 md:p-8 justify-center items-start bg-muted/70 ${
+          className={`flex-1 min-w-0 overflow-y-auto p-g8 sm:p-g21 md:p-g34 justify-center items-start bg-muted/70 ${
  viewMode === 'editor' ? 'flex' : 'hidden'
  }`}
         >
           <div
             style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
-            className="transition-transform duration-150 w-full max-w-[850px] h-fit mb-16"
+            className="transition-transform duration-150 w-full max-w-g987 h-fit mb-g55"
           >
             {/* White Paper Sheet */}
             <Card
               ref={paperSheetRef}
-              className={` text-foreground min-h-[900px] p-5 sm:p-12 md:p-16 relative ${
+              className={` text-foreground min-h-g987 p-g21 sm:p-g55 md:p-g55 relative ${
  highlightFillable ? 'highlight-fillable-mode' : ''
  }`}
             >
@@ -1586,7 +1588,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
               {/* Editable WYSIWYG Content Canvas */}
               <EditorContent
                 editor={editor}
-                className="outline-none min-h-[900px] font-sans leading-relaxed text-foreground focus:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-[900px] selection:bg-status-success-soft "
+                className="outline-none min-h-g987 font-sans leading-relaxed text-foreground focus:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-g987 selection:bg-status-success-soft "
               />
               <TableSelectionOverlay editor={editor} containerRef={paperSheetRef} />
             </Card>
@@ -1595,13 +1597,13 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
         {/* VIEW MODE B: READ-ONLY DOCUMENT PREVIEW (mirrors the editor paper, slots as plain text) */}
         <div
-          className={`flex-1 min-w-0 overflow-y-auto p-2 sm:p-6 md:p-8 justify-center items-start bg-muted/70 ${
+          className={`flex-1 min-w-0 overflow-y-auto p-g8 sm:p-g21 md:p-g34 justify-center items-start bg-muted/70 ${
  viewMode === 'preview' ? 'flex' : 'hidden'
  }`}
         >
-          <div className="w-full max-w-[850px] h-fit mb-16">
+          <div className="w-full max-w-g987 h-fit mb-g55">
             {previewOverride && (
-              <Alert status="info" role="status" className="mb-3">
+              <Alert status="info" role="status" className="mb-g13">
                 <AlertIndicator />
                 <AlertContent>
                   <AlertDescription>
@@ -1619,14 +1621,14 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
               </Alert>
             )}
             {/* White Paper Sheet */}
-            <Card className="text-foreground min-h-[900px] p-5 sm:p-12 md:p-16 relative">
-              <div className="min-h-[900px] font-sans leading-relaxed text-foreground">
+            <Card className="text-foreground min-h-g987 p-g21 sm:p-g55 md:p-g55 relative">
+              <div className="min-h-g987 font-sans leading-relaxed text-foreground">
                 {/* "ProseMirror" class reused so this read-only preview picks up the exact
                     same heading/paragraph/table typography rules as the live editor content. */}
                 {previewOverride?.kind === 'diff' ? (
                   <div className="ProseMirror">
                     {previewOverride.parts.every((part) => part.kind === 'same') && (
-                      <p className="font-semibold text-muted-foreground">{t('documents.preview.no_diff', 'Tidak ada perbedaan teks.')}</p>
+                      <Text size="sm" weight="semibold" tone="muted">{t('documents.preview.no_diff', 'Tidak ada perbedaan teks.')}</Text>
                     )}
                     {previewOverride.parts.map((part, i) =>
                       part.kind === 'same' ? (
@@ -1661,28 +1663,31 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
         {sidebarOpen && (
           <EditorSidePanel onClose={() => setSidebarOpen(false)}>
             <Tabs orientation="vertical" value={sidebarTab} onValueChange={details => setSidebarTab(details.value as typeof sidebarTab)} className="flex min-h-0 min-w-0 flex-1 flex-row gap-0">
-            <TabsList aria-label={t('contract_creator.panel_title', 'Panel Asisten Kontrak')} className="editor-panel-nav w-14 shrink-0 items-center border-r border-border bg-card py-3">
+            <TabsList aria-label={t('contract_creator.panel_title', 'Panel Asisten Kontrak')} className="group-data-[orientation=vertical]/tabs:w-g55 group-data-[orientation=vertical]/tabs:min-w-g55 shrink-0 items-center rounded-none border-0 border-e border-border bg-card px-g5 py-g13">
               {sidebarTabs.map(tab => {
                 const Icon = tab.icon;
                 return (
-                  <TabsTrigger key={tab.id} value={tab.id} aria-label={tab.label} title={tab.label} className="size-10 justify-center p-0">
-                    <Icon className="size-[18px]" aria-hidden="true" />
-                  </TabsTrigger>
+                  <Tooltip key={tab.id}><TooltipTrigger asChild><TabsTrigger value={tab.id} aria-label={tab.label} className="size-g42 justify-center p-0">
+                    <Icon className="size-g16" aria-hidden="true" />
+                  </TabsTrigger></TooltipTrigger><TooltipBody>{tab.label}</TooltipBody></Tooltip>
                 );
               })}
             </TabsList>
 
             <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-            <div className="editor-panel-header flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
+            <div className="flex min-h-g68 shrink-0 items-center justify-between gap-g13 border-b border-border px-g13">
               <Heading as="h2" size="sm" weight="semibold" id={`${panelIdPrefix}-title`}>{activeSidebarTab.label}</Heading>
               <CloseButton className="hidden shrink-0 lg:inline-flex" onClick={() => setSidebarOpen(false)} aria-label={t('common.close', 'Close')} />
             </div>
 
-            {/* One content region; its body follows the selected tab. */}
+            {/* One panel per tab so every trigger's aria-controls resolves; only the selected one renders its body. */}
+            {sidebarTabs.map(tab => (
             <TabsContent
-              value={sidebarTab}
-              className="editor-panel-content mt-0 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4"
+              key={tab.id}
+              value={tab.id}
+              className="mt-0 flex min-h-0 flex-1 flex-col gap-g13 overflow-y-auto overscroll-contain p-g13"
             >
+            {tab.id === sidebarTab && (<>
 
               {sidebarTab === 'history' && (
                 <DraftHistoryPanel
@@ -1720,7 +1725,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
               {/* TAB 1: QUICK FILL FORM (Baris yang harus diisi) */}
               {sidebarTab === 'fields' && (
-                <div className="space-y-2">
+                <div className="space-y-g13">
                   {panelFieldKeys.length === 0 && (
                     <Empty><EmptyContent><EmptyDescription>{t('contract_creator.fields_empty', 'Belum ada kolom isian yang dimasukkan ke dokumen ini.')}</EmptyDescription></EmptyContent></Empty>
                   )}
@@ -1730,25 +1735,23 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                     if (key === 'contractNo') {
                       return (
                     <React.Fragment key="contractNo">
-                    <Field className="editor-field-card rounded-lg border border-border bg-card p-3"
-                      title={t('contract_creator.field.contract_no.title', 'Nomor referensi atau nomor surat resmi perjanjian kerjasama')}
+                    <Tooltip><TooltipTrigger asChild><Field className="rounded-lg border border-border bg-card p-g13"
                     >
-                      <div className="flex items-center justify-between">
-                        <FieldLabel htmlFor={`${panelIdPrefix}-contract-number`}>
+                      <div className="flex w-full items-start justify-between gap-g8">
+                        <FieldLabel htmlFor={`${panelIdPrefix}-contract-number`} className="min-w-0 flex-1 pt-g3 font-semibold">
                           {t('contract_creator.field.contract_no.label', 'Nomor Perjanjian Kerjasama')}
                         </FieldLabel>
-                        <div className="flex items-center gap-1">
+                        <div className="flex shrink-0 items-center gap-g3">
                           {contractNumber && contractNumber.trim() && !contractNumber.startsWith('[') && (
                             <Badge tone="success"><Check aria-hidden="true" />{t('contract_creator.filled_badge', 'Terisi')}</Badge>
                           )}
-                          <Button variant="ghost" size="icon-sm"
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm"
                             type="button"
                             onClick={() => handleFocusSlot('contractNo')}
                             aria-label={t('contract_creator.jump_to_slot', 'Lompat ke posisi isian di dokumen')}
-                            title={t('contract_creator.jump_to_slot', 'Lompat ke posisi isian di dokumen')}
                           >
-                            <GridDotsIcon className="w-3.5 h-3.5" />
-                          </Button>
+                            <GridDotsIcon className="w-g13 h-g13" />
+                          </Button></TooltipTrigger><TooltipBody>{t('contract_creator.jump_to_slot', 'Lompat ke posisi isian di dokumen')}</TooltipBody></Tooltip>
                         </div>
                       </div>
                       <Input
@@ -1763,7 +1766,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                         className="w-full"
                         placeholder={defaultContractNo}
                       />
-                    </Field>
+                    </Field></TooltipTrigger><TooltipBody>{t('contract_creator.field.contract_no.title', 'Nomor referensi atau nomor surat resmi perjanjian kerjasama')}</TooltipBody></Tooltip>
                     </React.Fragment>
                       );
                     }
@@ -1777,26 +1780,24 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                     const fieldDescription = t(`contract_creator.field.${field.key}.description`, field.description);
 
                     return (
-                      <Field key={field.key}
-                        className="editor-field-card rounded-lg border border-border bg-card p-3"
-                        title={fieldDescription}
+                      <Tooltip key={field.key}><TooltipTrigger asChild><Field
+                        className="rounded-lg border border-border bg-card p-g13"
                       >
-                        <div className="flex items-center justify-between">
-                          <FieldLabel htmlFor={`${panelIdPrefix}-field-${field.key}`}>
+                        <div className="flex w-full items-start justify-between gap-g8">
+                          <FieldLabel htmlFor={`${panelIdPrefix}-field-${field.key}`} className="min-w-0 flex-1 pt-g3 font-semibold">
                             {fieldLabel}
                           </FieldLabel>
-                          <div className="flex items-center gap-1">
+                          <div className="flex shrink-0 items-center gap-g3">
                             {isFilled && (
                               <Badge tone="success"><Check aria-hidden="true" />{t('contract_creator.filled_badge', 'Terisi')}</Badge>
                             )}
-                            <Button variant="ghost" size="icon-sm"
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm"
                               type="button"
                               onClick={() => handleFocusSlot(field.key)}
                               aria-label={t('contract_creator.jump_to_slot', 'Lompat ke posisi isian di dokumen')}
-                              title={t('contract_creator.jump_to_slot', 'Lompat ke posisi isian di dokumen')}
                             >
-                              <GridDotsIcon className="w-3.5 h-3.5" />
-                            </Button>
+                              <GridDotsIcon className="w-g13 h-g13" />
+                            </Button></TooltipTrigger><TooltipBody>{t('contract_creator.jump_to_slot', 'Lompat ke posisi isian di dokumen')}</TooltipBody></Tooltip>
                           </div>
                         </div>
 
@@ -1819,7 +1820,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                             className="w-full"
                           />
                         )}
-                      </Field>
+                      </Field></TooltipTrigger><TooltipBody>{fieldDescription}</TooltipBody></Tooltip>
                     );
                     }
                     const field = customFields.find((f) => f.key === key);
@@ -1828,50 +1829,22 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                         const isFilled = currentVal && currentVal.trim() && !currentVal.startsWith('[');
 
                         return (
-                          <Field
-                            key={field.key}
-                            className="editor-field-card rounded-lg border border-dashed border-status-success-border bg-card p-3"
-                            title={field.description}
-                          >
-                            <div className="flex items-center justify-between">
-                              <FieldLabel htmlFor={`${panelIdPrefix}-field-${field.key}`} className="min-w-0 flex-1">
+                          <Card key={field.key} size="sm" className="p-g13"><Field>
+                            <div className="flex w-full items-start justify-between gap-g8">
+                              <FieldLabel htmlFor={`${panelIdPrefix}-field-${field.key}`} className="min-w-0 flex-1 pt-g3 font-semibold">
                                 {field.label}
                               </FieldLabel>
-                              <div className="flex items-center gap-1">
+                              <div className="flex shrink-0 items-center gap-g3">
                                 {isFilled && (
                                   <Badge tone="success"><Check aria-hidden="true" />{t('contract_creator.filled_badge', 'Terisi')}</Badge>
                                 )}
-                                <Button variant="ghost" size="icon-sm"
+                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm"
                                   type="button"
                                   onClick={() => handleFocusSlot(field.key)}
                                   aria-label={t('contract_creator.jump_to_slot', 'Lompat ke posisi isian di dokumen')}
-                                  title={t('contract_creator.jump_to_slot', 'Lompat ke posisi isian di dokumen')}
                                 >
-                                  <GridDotsIcon className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button variant="ghost" size="icon-sm"
-                                  type="button"
-                                  onClick={async () => {
-                                    const ok = await confirmDialog({
-                                      description: `${t('contract_creator.delete_custom_field_title', 'Hapus kolom isian kustom')} "${field.label}"?`,
-                                      tone: 'danger',
-                                      confirmLabel: t('contract_creator.confirm.delete_label', 'Hapus'),
-                                    });
-                                    if (ok) {
-                                      setCustomFields((prev) => prev.filter((f) => f.key !== field.key));
-                                      setFieldValues((prev) => {
-                                        const next = { ...prev };
-                                        delete next[field.key];
-                                        return next;
-                                      });
-                                    }
-                                  }}
-                                  className="text-destructive"
-                                  aria-label={t('contract_creator.delete_custom_field_title', 'Hapus kolom isian kustom')}
-                                  title={t('contract_creator.delete_custom_field_title', 'Hapus kolom isian kustom')}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
+                                  <GridDotsIcon className="w-g13 h-g13" />
+                                </Button></TooltipTrigger><TooltipBody>{t('contract_creator.jump_to_slot', 'Lompat ke posisi isian di dokumen')}</TooltipBody></Tooltip>
                               </div>
                             </div>
 
@@ -1911,7 +1884,8 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                                 className="w-full"
                               />
                             )}
-                          </Field>
+                          {field.description && <FieldHelperText>{field.description}</FieldHelperText>}
+                          </Field></Card>
                         );
                   })}
                 </div>
@@ -1919,24 +1893,23 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
               {/* TAB 2: AGREEMENT PARTIES */}
               {sidebarTab === 'partners' && (
-                <div className="space-y-4">
-                  <Collapsible defaultOpen className="rounded-lg border border-border bg-card p-4">
-                    <CollapsibleTrigger className="w-full justify-between gap-3">
-                      <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-                        <Building2 className="size-4 shrink-0 text-accent-foreground" aria-hidden="true" />
+                <div className="space-y-g13">
+                  <Collapsible defaultOpen className="rounded-lg border border-border bg-card p-g13">
+                    <CollapsibleTrigger className="h-g42 w-full justify-between gap-g13 rounded-md border border-border bg-card px-g13">
+                      <span className="flex min-w-0 items-center gap-g8 text-sm font-semibold">
+                        <Building2 className="size-g16 shrink-0 text-muted-foreground" aria-hidden="true" />
                         {t('contract_creator.parties.second_party', 'Second Party')}
                       </span>
                       <CollapsibleIndicator />
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                    <div className="mt-4 grid gap-4 border-t border-border pt-4">
+                    <div className="mt-g13 grid gap-g13 border-t border-border pt-g13">
                       <Field>
-                        <FieldLabel
-                          htmlFor={`${panelIdPrefix}-partner`}
-                          title={t('contract_creator.partners.select_label_title', 'Mengisi otomatis nama badan hukum, domisili kantor, direktur penandatangan, dan email resmi ke seluruh pasal perjanjian')}
+                        <Tooltip><TooltipTrigger asChild><FieldLabel
+                          htmlFor={`${panelIdPrefix}-partner`} className="font-semibold"
                         >
                           {t('contract_creator.partners.select_label', 'Select Existing Partner')}
-                        </FieldLabel>
+                        </FieldLabel></TooltipTrigger><TooltipBody>{t('contract_creator.partners.select_label_title', 'Mengisi otomatis nama badan hukum, domisili kantor, direktur penandatangan, dan email resmi ke seluruh pasal perjanjian')}</TooltipBody></Tooltip>
                         <AlphabeticalSelect
                           id={`${panelIdPrefix}-partner`}
                           value={selectedPartnerId}
@@ -1958,9 +1931,9 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                         </AlphabeticalSelect>
 
                         {selectedPartner && (
-                          <Card size="sm" className="border-status-success-border bg-status-success-soft p-3">
+                          <Card size="sm" className="border-status-success-border bg-status-success-soft p-g13">
                             <Text weight="semibold">{selectedPartner.nama_partner}</Text>
-                            <div className="mt-2 flex flex-wrap gap-1.5" aria-label={t('contract_creator.parties.registered_record', 'Registered partner record')}>
+                            <div className="mt-g8 flex flex-wrap gap-g5" aria-label={t('contract_creator.parties.registered_record', 'Registered partner record')}>
                               <Badge>{selectedPartner.partner_id}</Badge>
                               {selectedPartner.entity_type && (
                                 <Badge>{selectedPartner.entity_type}</Badge>
@@ -1972,7 +1945,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                             <Button variant="outline"
                               type="button"
                               onClick={() => handleApplyPartner(selectedPartner)}
-                              className="mt-3 w-full"
+                              className="mt-g13 w-full"
                             >
                               {t('contract_creator.partners.resync_button', 'Sinkronkan Ulang ke Dokumen')}
                             </Button>
@@ -1984,16 +1957,16 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                     </CollapsibleContent>
                   </Collapsible>
 
-                  <Collapsible defaultOpen className="rounded-lg border border-border bg-card p-4">
-                    <CollapsibleTrigger className="w-full justify-between gap-3">
-                      <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-                        <Building2 className="size-4 shrink-0 text-accent-foreground" aria-hidden="true" />
+                  <Collapsible defaultOpen className="rounded-lg border border-border bg-card p-g13">
+                    <CollapsibleTrigger className="h-g42 w-full justify-between gap-g13 rounded-md border border-border bg-card px-g13">
+                      <span className="flex min-w-0 items-center gap-g8 text-sm font-semibold">
+                        <Building2 className="size-g16 shrink-0 text-muted-foreground" aria-hidden="true" />
                         {t('contract_creator.parties.first_party', 'First Party')}
                       </span>
                       <CollapsibleIndicator />
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                    <div className="mt-4 border-t border-border pt-4">
+                    <div className="mt-g13 border-t border-border pt-g13">
                       {renderPartyFields(FIRST_PARTY_FIELD_KEYS)}
                     </div>
                     </CollapsibleContent>
@@ -2003,21 +1976,17 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
               {/* TAB 3: CUSTOM TEMPLATE LIBRARY & DRAG-AND-DROP BUILDER */}
               {sidebarTab === 'contents' && (
-                <div className="space-y-4">
+                <div className="space-y-g13">
                   {/* Custom field builder */}
-                  <Collapsible open={showAddCustomField} onOpenChange={details => setShowAddCustomField(details.open)} className="rounded-lg border border-dashed border-status-success-border bg-card p-4">
-                    <CollapsibleTrigger className="w-full justify-between gap-3 text-sm font-semibold">
-                      <span className="flex items-center gap-1.5">
-                        <PlusCircle className="size-4 text-accent-foreground" aria-hidden="true" />
-                        {t('contract_creator.custom_field_builder.create_button', 'Buat Kolom Isian Kustom Baru')}
-                      </span>
-                      <CollapsibleIndicator />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
+                  <Card className="gap-g13 p-g13">
+                    <Heading as="h3" size="sm" weight="semibold" className="flex items-center gap-g8">
+                      <PlusCircle className="size-g16 text-muted-foreground" aria-hidden="true" />
+                      {t('contract_creator.custom_field_builder.title', 'Create New Field')}
+                    </Heading>
                     {(
-                      <div className="mt-3 grid gap-3 border-t border-border pt-3">
+                      <div className="grid gap-g13">
                         <Field>
-                          <FieldLabel htmlFor={`${panelIdPrefix}-custom-name`}>{t('contract_creator.custom_field_builder.name_label', 'Nama Kolom Isian')}</FieldLabel>
+                          <FieldLabel htmlFor={`${panelIdPrefix}-custom-name`} className="font-semibold">{t('contract_creator.custom_field_builder.field_name', 'Field Name')}</FieldLabel>
                           <Input
                             type="text"
                             id={`${panelIdPrefix}-custom-name`}
@@ -2029,7 +1998,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                         </Field>
 
                         <Field>
-                          <FieldLabel htmlFor={`${panelIdPrefix}-custom-type`}>{t('contract_creator.custom_field_builder.type_label', 'Tipe Isian')}</FieldLabel>
+                          <FieldLabel htmlFor={`${panelIdPrefix}-custom-type`} className="font-semibold">{t('contract_creator.custom_field_builder.field_type', 'Field Type')}</FieldLabel>
                           <AlphabeticalSelect
                             id={`${panelIdPrefix}-custom-type`}
                             value={newFieldType}
@@ -2048,7 +2017,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
                         {newFieldType === 'select' && (
                           <Field>
-                            <FieldLabel htmlFor={`${panelIdPrefix}-custom-options`}>{t('contract_creator.custom_field_builder.options_label', 'Daftar Opsi (pisahkan dengan koma)')}</FieldLabel>
+                            <FieldLabel htmlFor={`${panelIdPrefix}-custom-options`} className="font-semibold">{t('contract_creator.custom_field_builder.options_label', 'Daftar Opsi (pisahkan dengan koma)')}</FieldLabel>
                             <Input
                               type="text"
                               id={`${panelIdPrefix}-custom-options`}
@@ -2061,7 +2030,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                         )}
 
                         <Field>
-                          <FieldLabel htmlFor={`${panelIdPrefix}-custom-placeholder`}>{t('contract_creator.custom_field_builder.placeholder_label', 'Placeholder Default')}</FieldLabel>
+                          <FieldLabel htmlFor={`${panelIdPrefix}-custom-placeholder`} className="font-semibold">{t('contract_creator.custom_field_builder.default_placeholder', 'Default Placeholder')}</FieldLabel>
                           <Input
                             type="text"
                             id={`${panelIdPrefix}-custom-placeholder`}
@@ -2073,7 +2042,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                         </Field>
 
                         <Field>
-                          <FieldLabel htmlFor={`${panelIdPrefix}-custom-description`}>{t('contract_creator.custom_field_builder.description_label', 'Keterangan / Deskripsi')}</FieldLabel>
+                          <FieldLabel htmlFor={`${panelIdPrefix}-custom-description`} className="font-semibold">{t('contract_creator.ai_template.notes_label', 'Notes / Description')}</FieldLabel>
                           <Input
                             type="text"
                             id={`${panelIdPrefix}-custom-description`}
@@ -2084,42 +2053,37 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                           />
                         </Field>
 
-                        <Button variant="ghost" size="sm"
+                        <Button variant="outline"
                           type="button"
                           onClick={handleCreateCustomField}
                           className="w-full"
                         >
-                          <PlusCircle className="w-3.5 h-3.5" />
-                          <span>{t('contract_creator.custom_field_builder.submit_button', 'Buat Kolom Isian Baru')}</span>
+                          <PlusCircle className="size-g16" aria-hidden="true" />
+                          <span>{t('contract_creator.custom_field_builder.create_field', 'Create Field')}</span>
                         </Button>
                       </div>
                     )}
-                    </CollapsibleContent>
-                  </Collapsible>
+                  </Card>
 
-                  {/* Drag & drop field palette */}
-                  <div className="space-y-2.5">
-                    <Heading as="h3" size="xs" weight="semibold"
-                      className="flex items-center gap-1.5"
-                      title={t('contract_creator.dragdrop.section_title_attr', 'Seret elemen ke posisi kursor di dokumen untuk menempatkan kolom isian dinamis')}
+                  {/* Drag & drop field palette: title 8 → filter (they belong together), filter 13 → list */}
+                  <div className="flex flex-col gap-g8">
+                    <Tooltip><TooltipTrigger asChild><Heading as="h3" size="sm" weight="semibold"
+                      className="flex items-center gap-g8"
                     >
-                      <GridDotsIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                      <GridDotsIcon className="size-g16 text-muted-foreground" aria-hidden="true" />
                       <span>{t('contract_creator.dragdrop.section_title', 'Kolom Isian Drag & Drop')}</span>
-                    </Heading>
+                    </Heading></TooltipTrigger><TooltipBody>{t('contract_creator.dragdrop.section_title_attr', 'Seret elemen ke posisi kursor di dokumen untuk menempatkan kolom isian dinamis')}</TooltipBody></Tooltip>
 
-                    {/* Category switcher */}
-                    <SegmentGroup aria-label={t('contract_creator.dragdrop.section_title', 'Kolom Isian Drag & Drop')} value={activeDragCategory} onValueChange={details => details.value && setActiveDragCategory(details.value as typeof activeDragCategory)} className="w-full flex-wrap">
-                      <SegmentGroupIndicator />
-                      <SegmentGroupItems items={[
-                        { value: 'all', label: t('contract_creator.dragdrop.cat_all', 'Semua') },
-                        { value: 'firstParty', label: t('contract_creator.dragdrop.cat_first_party', 'Pihak I') },
-                        { value: 'partner', label: t('contract_creator.dragdrop.cat_partner', 'Pihak II') },
-                        { value: 'operational', label: t('contract_creator.dragdrop.cat_operational', 'Ketentuan') },
-                        { value: 'custom', label: t('contract_creator.custom_badge', 'Kustom') },
-                      ]} />
-                    </SegmentGroup>
+                    {/* Category filter */}
+                    <AlphabeticalSelect aria-label={t('contract_creator.dragdrop.category_label', 'Field category')} value={activeDragCategory} onChange={(e: any) => setActiveDragCategory(e.target.value as typeof activeDragCategory)} className="w-full" controlProps={{ className: 'w-full' }}>
+                      <option value="all">{t('contract_creator.dragdrop.cat_all', 'Semua')}</option>
+                      <option value="firstParty">{t('contract_creator.dragdrop.cat_first_party', 'Pihak I')}</option>
+                      <option value="partner">{t('contract_creator.dragdrop.cat_partner', 'Pihak II')}</option>
+                      <option value="operational">{t('contract_creator.dragdrop.cat_operational', 'Ketentuan')}</option>
+                      <option value="custom">{t('contract_creator.custom_badge', 'Kustom')}</option>
+                    </AlphabeticalSelect>
 
-                    <div className="grid grid-cols-1 gap-2">
+                    <div className="mt-g5 grid grid-cols-1 gap-g5">
                       {(() => {
                         const filteredDragFields = [
                           ...COOPERATION_AGREEMENT_FIELDS.map(f => ({ ...f, isCustom: false })),
@@ -2142,8 +2106,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                         return filteredDragFields.map((item) => {
                           const itemLabel = item.isCustom ? item.label : t(`contract_creator.field.${item.key}.label`, item.label);
                           return (
-                          <Card
-                            key={item.key}
+                          <Tooltip key={item.key}><TooltipTrigger asChild><Card
                             draggable={true}
                             onDragStart={(e) => {
                               e.dataTransfer.setData(
@@ -2157,20 +2120,15 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                               );
                               e.dataTransfer.effectAllowed = 'copy';
                             }}
-                            className={` flex items-center justify-between p-2 cursor-grab active:cursor-grabbing transition-all group ${
- item.isCustom
- ? 'hover:bg-status-success-soft/20 '
- : 'hover:bg-status-success-soft/30 '
- }`}
-                            title={t('contract_creator.dragdrop.item_title_attr', 'Seret elemen ini ke editor')}
+                            className="flex min-h-g55 flex-row items-center justify-between gap-g8 px-g13 py-g8 cursor-grab transition-colors hover:bg-muted active:cursor-grabbing"
                           >
-                            <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 min-w-0 flex-1">
-                              <span>{itemLabel}</span>
+                            <span className="flex min-w-0 flex-1 flex-col items-start gap-g3">
+                              <Text as="span" size="sm" weight="semibold" className="break-words">{itemLabel}</Text>
                               {item.isCustom && (
                                 <Badge tone="success">{t('contract_creator.custom_badge', 'Kustom')}</Badge>
                               )}
                             </span>
-                            <Button variant="outline" size="icon-sm" type="button"
+                            <Button variant="ghost" size="icon-sm" type="button"
                               aria-label={t('contract_creator.insert_field', 'Masukkan kolom: {name}', { name: itemLabel })}
                               onClick={() => {
                                 if (!editor || !canEdit) return;
@@ -2183,9 +2141,9 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                               }}
                               disabled={!canEdit}
                               className="shrink-0">
-                              <PlusCircle className="w-3.5 h-3.5" aria-hidden />
+                              <GridDotsIcon className="size-g16" aria-hidden="true" />
                             </Button>
-                          </Card>
+                          </Card></TooltipTrigger><TooltipBody>{t('contract_creator.dragdrop.item_title_attr', 'Seret elemen ini ke editor')}</TooltipBody></Tooltip>
                           );
                         });
                       })()}
@@ -2195,21 +2153,20 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
               )}
 
               {sidebarTab === 'templates' && (
-                <div className="space-y-4">
+                <div className="space-y-g13">
 
                   {/* 0. GENERATE TEMPLATE WITH AI (Superuser/Admin/Manager only) */}
                   {canManageFields && (
-                    <Card
-                      className="gap-3 border-status-success-border bg-status-success-soft p-4"
-                      title={t('contract_creator.ai_template.section_title_attr', 'Buat draf template baru dari deskripsi singkat')}
+                    <Tooltip><TooltipTrigger asChild><Card
+                      className="gap-g13 p-g13"
                     >
-                      <Heading as="h3" size="xs" weight="semibold" className="flex items-center gap-1.5">
-                        <AiIcon className="w-3.5 h-3.5 text-status-success" />
+                      <Heading as="h3" size="sm" weight="semibold" className="flex items-center gap-g8">
+                        <AiIcon className="size-g16 text-muted-foreground" aria-hidden="true" />
                         <span>{t('contract_creator.ai_template.section_title', 'Buat Template dengan AI')}</span>
                       </Heading>
-                      <div className="grid gap-3">
+                      <div className="grid gap-g13">
                         <Field>
-                        <FieldLabel htmlFor={`${panelIdPrefix}-template-type`}>{t('documents.field.type', 'Tipe Dokumen')}</FieldLabel>
+                        <FieldLabel htmlFor={`${panelIdPrefix}-template-type`} className="font-semibold">{t('contract_creator.ai_template.type_label', 'Type')}</FieldLabel>
                         <AlphabeticalSelect
                           id={`${panelIdPrefix}-template-type`}
                           value={aiTemplateDocType}
@@ -2222,7 +2179,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                         </AlphabeticalSelect>
                         </Field>
                         <Field>
-                        <FieldLabel htmlFor={`${panelIdPrefix}-template-prompt`}>{t('contract_creator.custom_field_builder.description_label', 'Keterangan / Deskripsi')}</FieldLabel>
+                        <FieldLabel htmlFor={`${panelIdPrefix}-template-prompt`} className="font-semibold">{t('contract_creator.ai_template.notes_label', 'Notes / Description')}</FieldLabel>
                         <Textarea
                           id={`${panelIdPrefix}-template-prompt`}
                           value={aiTemplatePrompt}
@@ -2232,7 +2189,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                           className="w-full resize-none"
                         />
                         </Field>
-                        <Button variant="ghost" size="sm"
+                        <Button variant="outline"
                           type="button"
                           onClick={handleGenerateAiTemplate}
                           disabled={isGeneratingAiTemplate}
@@ -2240,32 +2197,31 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                         >
                           {isGeneratingAiTemplate ? (
                             <>
-                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              <Spinner size="sm" decorative />
                               <span>{t('contract_creator.ai_template.generating', 'Membuat draf...')}</span>
                             </>
                           ) : (
                             <>
-                              <AiIcon className="w-3.5 h-3.5" />
+                              <AiIcon className="size-g16" aria-hidden="true" />
                               <span>{t('contract_creator.ai_template.generate_button', 'Buatkan Template')}</span>
                             </>
                           )}
                         </Button>
                       </div>
-                    </Card>
+                    </Card></TooltipTrigger><TooltipBody>{t('contract_creator.ai_template.section_title_attr', 'Buat draf template baru dari deskripsi singkat')}</TooltipBody></Tooltip>
                   )}
 
                   {/* 1. SAVE DRAFT AS TEMPLATE */}
-                  <Card
-                    className="gap-3 p-4"
-                    title={t('contract_creator.templates.save_section_title_attr', 'Simpan seluruh teks kontrak kustom saat ini sebagai master template yang siap dipakai ulang')}
+                  <Tooltip><TooltipTrigger asChild><Card
+                    className="gap-g13 p-g13"
                   >
-                    <Heading as="h3" size="xs" weight="semibold" className="flex items-center gap-1.5">
-                      <Save className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Heading as="h3" size="sm" weight="semibold" className="flex items-center gap-g8">
+                      <Save className="size-g16 text-muted-foreground" aria-hidden="true" />
                       <span>{t('contract_creator.templates.save_section_title', 'Simpan Draf Sebagai Template')}</span>
                     </Heading>
-                    <div className="grid gap-3">
+                    <div className="grid gap-g13">
                       <Field>
-                      <FieldLabel htmlFor={`${panelIdPrefix}-template-name`}>{t('contract_creator.templates.name_label', 'Nama Template')}</FieldLabel>
+                      <FieldLabel htmlFor={`${panelIdPrefix}-template-name`} className="font-semibold">{t('contract_creator.templates.name_label', 'Nama Template')}</FieldLabel>
                       <Input
                         type="text"
                         id={`${panelIdPrefix}-template-name`}
@@ -2275,7 +2231,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                         className="w-full"
                       />
                       </Field>
-                      <Button variant="ghost" size="sm"
+                      <Button variant="outline"
                         type="button"
                         onClick={handleSaveTemplate}
                         disabled={isSavingTemplate}
@@ -2283,61 +2239,60 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                       >
                         {isSavingTemplate ? (
                           <>
-                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            <Spinner size="sm" decorative />
                             <span>{t('contract_creator.templates.saving', 'Menyimpan...')}</span>
                           </>
                         ) : (
                           <>
-                            <Save className="w-3.5 h-3.5" />
+                            <Save className="size-g16" aria-hidden="true" />
                             <span>{t('contract_creator.templates.save_button', 'Simpan Template')}</span>
                           </>
                         )}
                       </Button>
                     </div>
-                  </Card>
+                  </Card></TooltipTrigger><TooltipBody>{t('contract_creator.templates.save_section_title_attr', 'Simpan seluruh teks kontrak kustom saat ini sebagai master template yang siap dipakai ulang')}</TooltipBody></Tooltip>
 
                   {/* Saved templates library */}
-                  <div className="space-y-2.5 pt-3 border-t border-border">
-                    <Heading as="h3" size="xs" weight="semibold" className="flex items-center gap-1.5">
-                      <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                  <div className="space-y-g8 pt-g13 border-t border-border">
+                    <Heading as="h3" size="sm" weight="semibold" className="flex items-center gap-g8">
+                      <FolderOpen className="size-g16 text-muted-foreground" aria-hidden="true" />
                       <span>{t('contract_creator.templates.library_title', 'Pustaka Template Terdaftar')}</span>
                     </Heading>
 
                     {isLoadingTemplates ? (
-                      <Text size="xs" tone="muted" className="flex items-center justify-center gap-1.5 py-4" role="status"><Spinner size="sm" decorative />{t('contract_creator.templates.loading', 'Memuat pustaka...')}</Text>
+                      <Text size="xs" tone="muted" className="flex items-center justify-center gap-g5 py-g13" role="status"><Spinner size="sm" decorative />{t('contract_creator.templates.loading', 'Memuat pustaka...')}</Text>
                     ) : savedTemplates.length === 0 ? (
                       <Empty><EmptyContent><EmptyDescription>{t('contract_creator.templates.empty', 'Belum ada template yang disimpan.')}</EmptyDescription></EmptyContent></Empty>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-g8">
                         {savedTemplates.map((tpl) => (
                           <Card
                             key={tpl.id}
-                            className="p-3 flex items-center justify-between gap-2 transition-all"
+                            className="p-g13 flex items-center justify-between gap-g8 transition-all"
                           >
                             <div className="min-w-0 flex-1">
                               <div className="text-xs font-bold text-foreground truncate">
                                 {tpl.name}
                               </div>
-                              <div className="text-xs text-muted-foreground mt-0.5 font-mono">
+                              <div className="text-xs text-muted-foreground mt-g2 font-mono">
                                 {t('contract_creator.id', 'ID: {value}', { value: tpl.id.substring(0, 8) })}
                               </div>
                             </div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-g5">
                               <Button variant="ghost" size="sm"
                                 type="button"
                                 onClick={() => handleLoadTemplate(tpl)}
                               >
                                 {t('contract_creator.templates.use_button', 'Gunakan')}
                               </Button>
-                              <Button variant="ghost" size="icon-sm"
+                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm"
                                 type="button"
                                 onClick={() => handleDeleteTemplate(tpl.id)}
                                 className="text-destructive"
                                 aria-label={t('contract_creator.templates.delete_title', 'Hapus Template')}
-                                title={t('contract_creator.templates.delete_title', 'Hapus Template')}
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
+                                <Trash2 className="w-g13 h-g13" />
+                              </Button></TooltipTrigger><TooltipBody>{t('contract_creator.templates.delete_title', 'Hapus Template')}</TooltipBody></Tooltip>
                             </div>
                           </Card>
                         ))}
@@ -2347,7 +2302,9 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
                 </div>
               )}
+            </>)}
             </TabsContent>
+            ))}
             </div>
             </Tabs>
           </EditorSidePanel>
@@ -2356,8 +2313,8 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
       {/* 5. BOTTOM STATUS BAR */}
       {/* Same flex-item z-index gotcha as the top header above: no z-index needed here. */}
-      <footer className="bg-card border-t border-border px-4 py-2 flex items-center justify-between text-xs text-muted-foreground shrink-0">
-        <div className="flex items-center gap-4">
+      <footer className="bg-card border-t border-border px-g13 py-g8 flex items-center justify-between text-xs text-muted-foreground shrink-0">
+        <div className="flex items-center gap-g13">
           <span>{wordCount} {t('contract_creator.footer.words', 'kata')}</span>
           <span className="hidden sm:inline">{t('contract_creator.text_2', '•')}</span>
           <span className="hidden sm:inline">{charCount} {t('contract_creator.footer.chars', 'karakter')}</span>
@@ -2366,30 +2323,27 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
         </div>
 
         {/* Zoom Controls */}
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="icon-sm"
+        <div className="flex items-center gap-g8">
+          <Tooltip><TooltipTrigger asChild><Button variant="secondary" size="icon-sm"
             type="button"
-            onClick={() => setZoomLevel(Math.max(70, zoomLevel - 10))}
-            title={t('contract_creator.footer.zoom_out', 'Zoom Out')}
+            onClick={() => setZoomLevel(Math.max(70, zoomLevel - 10))} aria-label={t('contract_creator.footer.zoom_out', 'Zoom Out')}
           >
-            <ZoomOut className="w-3.5 h-3.5" />
-          </Button>
-          <span className="text-xs font-mono w-10 text-center">{zoomLevel}%</span>
-          <Button variant="secondary" size="icon-sm"
+            <ZoomOut className="w-g13 h-g13" />
+          </Button></TooltipTrigger><TooltipBody>{t('contract_creator.footer.zoom_out', 'Zoom Out')}</TooltipBody></Tooltip>
+          <span className="text-xs font-mono w-g42 text-center">{zoomLevel}%</span>
+          <Tooltip><TooltipTrigger asChild><Button variant="secondary" size="icon-sm"
             type="button"
-            onClick={() => setZoomLevel(Math.min(150, zoomLevel + 10))}
-            title={t('contract_creator.footer.zoom_in', 'Zoom In')}
+            onClick={() => setZoomLevel(Math.min(150, zoomLevel + 10))} aria-label={t('contract_creator.footer.zoom_in', 'Zoom In')}
           >
-            <ZoomIn className="w-3.5 h-3.5" />
-          </Button>
-          <Button variant="ghost" size="sm"
+            <ZoomIn className="w-g13 h-g13" />
+          </Button></TooltipTrigger><TooltipBody>{t('contract_creator.footer.zoom_in', 'Zoom In')}</TooltipBody></Tooltip>
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm"
             type="button"
             onClick={() => setZoomLevel(100)}
-            className="ml-1"
-            title={t('contract_creator.footer.zoom_reset', 'Reset Zoom 100%')}
+            className="ml-g3"
           >
             100%
-          </Button>
+          </Button></TooltipTrigger><TooltipBody>{t('contract_creator.footer.zoom_reset', 'Reset Zoom 100%')}</TooltipBody></Tooltip>
         </div>
       </footer>
       </div>

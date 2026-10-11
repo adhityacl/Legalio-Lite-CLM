@@ -6,6 +6,7 @@ import { Card } from '@legalio/ui-components/card';
 import { Badge } from '@legalio/ui-components/badge';
 import { Marquee, MarqueeContent, MarqueeItem, MarqueeViewport } from '@legalio/ui-components/marquee';
 
+import { List, ListItem } from '@legalio/ui-components/list';
 type TickerStatus = 'loading' | 'ready' | 'empty' | 'error';
 
 
@@ -57,10 +58,10 @@ export const NewsTicker: React.FC = () => {
 
   return (
     <Card role="region" aria-label={label} className="flex-row flex-wrap items-stretch overflow-hidden sm:flex-nowrap">
-      <Badge tone="success" className="m-3 shrink-0 self-center"><Megaphone aria-hidden="true" />{label}</Badge>
+      <Badge tone="success" className="m-g13 shrink-0 self-center"><Megaphone aria-hidden="true" />{label}</Badge>
       {/* Screen readers get the plain list; the moving copy is decorative. */}
-      <ul className="sr-only">{items.map(item => <li key={item}>{item}</li>)}</ul>
-      <Marquee aria-hidden="true" pauseOnInteraction autoFill spacing="2.5rem" speed={40} className="min-w-0 flex-1 self-center py-3">
+      <List marker="none" className="sr-only">{items.map(item => <ListItem key={item}>{item}</ListItem>)}</List>
+      <Marquee aria-hidden="true" pauseOnInteraction autoFill spacing="var(--spacing-g42)" speed={40} className="min-w-0 flex-1 self-center py-g13">
         <MarqueeViewport>
           <MarqueeContent>
             {items.map(item => <MarqueeItem key={item} className="text-sm whitespace-nowrap text-foreground">{item}</MarqueeItem>)}

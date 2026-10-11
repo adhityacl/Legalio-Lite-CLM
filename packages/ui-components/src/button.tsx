@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/button';
+export * from './moduix/ui/button';

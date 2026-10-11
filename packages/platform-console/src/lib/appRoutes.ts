@@ -10,7 +10,7 @@ export const OPERATIONAL_TABS = [
   'partner-evaluation', 'partner-spending', 'notifikasi', 'bulk-import', 'privacy', 'terms',
 ] as const;
 
-export const SETTINGS_TABS = ['settings-organization', 'settings-access', 'settings-integrations'] as const;
+export const SETTINGS_TABS = ['settings-organization', 'settings-access'] as const;
 export type SettingsTabId = (typeof SETTINGS_TABS)[number];
 
 import { SYSTEM_SUBMENUS, SYSTEM_TABS } from '@legalio/shared/systemConsole';
@@ -42,7 +42,6 @@ export function defaultSettingsTab(ctx: RouteContext): SettingsTabId | null {
 const SETTINGS_PERMISSION: Record<SettingsTabId, string> = {
   'settings-organization': 'tenant.settings.read',
   'settings-access': 'tenant.member.read',
-  'settings-integrations': 'tenant.integration.read',
 };
 
 /**
@@ -73,14 +72,21 @@ export function resolveRoute(tab: string, ctx: RouteContext): RouteDecision {
       if (tab === 'settings' && target) return { kind: 'redirect', tab: target };
       return ctx.can('tenant.settings.read') ? { kind: 'redirect', tab: 'settings-organization' } : { kind: 'denied' };
     }
-    case 'settings-google':
-      return ctx.can('tenant.integration.read') ? { kind: 'redirect', tab: 'settings-integrations' } : { kind: 'denied' };
+    // The Integrations tab was removed from Settings; old links land on the Settings default.
+    case 'settings-integrations':
+    case 'settings-google': {
+      const target = defaultSettingsTab(ctx);
+      return target ? { kind: 'redirect', tab: target } : { kind: 'denied' };
+    }
     case 'settings-ai':
       return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-ai' } : { kind: 'denied' };
     case 'settings-security':
       return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-database' } : { kind: 'denied' };
     case 'settings-language':
       return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-ui-texts' } : { kind: 'denied' };
+    // The Design System catalog page was removed; old links land on the System Console dashboard.
+    case 'admin-system-design-system':
+      return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-dashboard' } : { kind: 'denied' };
     case 'admin-system-settings':
       return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-google' } : { kind: 'denied' };
     case 'admin-organization-dashboard':

@@ -50,6 +50,8 @@ import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Text } from '@legalio/ui-components/text';
 interface IOViewProps {
   ios: InsertionOrder[];
   contracts: Contract[];
@@ -236,24 +238,22 @@ export const IOView: React.FC<IOViewProps> = ({
       <TableColumnHeader
         scope="col"
         aria-sort={isSorted ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className="text-left align-middle"
        data-numeric={field === 'value'}>
-        <Button variant="ghost" size="sm"
+        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="-ms-g13 font-semibold text-muted-foreground"
           type="button"
           onClick={() => handleSort(field)}
-          title={t('io.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}
         >
           <span>{label}</span>
           {isSorted ? (
             sortOrder === 'asc' ? (
-              <ArrowUp className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
+              <ArrowUp className="w-g13 h-g13 text-accent-foreground shrink-0" />
             ) : (
-              <ArrowDown className="w-3.5 h-3.5 text-accent-foreground shrink-0" />
+              <ArrowDown className="w-g13 h-g13 text-accent-foreground shrink-0" />
             )
           ) : (
-            <ArrowUpDown className="w-3 h-3 text-muted-foreground shrink-0" />
+            <ArrowUpDown className="w-g13 h-g13 text-muted-foreground shrink-0" />
           )}
-        </Button>
+        </Button></TooltipTrigger><TooltipBody>{t('io.urutkan_berdasarkan', 'Urutkan berdasarkan {label}', { label })}</TooltipBody></Tooltip>
       </TableColumnHeader>
     );
   };
@@ -354,44 +354,43 @@ export const IOView: React.FC<IOViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in-50 duration-200">
+    <div className="flex flex-col gap-g21 animate-in fade-in-50 duration-200">
       {/* Page Header */}
-      <Card className="flex-row flex-wrap items-center justify-between gap-4 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-g13">
         <div>
-          <Heading as="h2" size="lg" weight="semibold">
+          <Heading as="h2" size="md" weight="semibold">
             <span>{t('io.title', 'Insertion Order Management')}</span>
           </Heading>
         </div>
 
-        <div className="mobile-page-actions flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-g8 shrink-0">
           {hasPermission('export.csv') && (
-            <Button variant="outline"
+            <Tooltip><TooltipTrigger asChild><Button variant="outline"
               onClick={handleExportCSV}
-              disabled={filteredIOs.length === 0}
-              title={t('io.export_csv', 'Ekspor CSV')}
+              disabled={filteredIOs.length === 0} aria-label={t('io.export_csv', 'Ekspor CSV')}
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-g16 h-g16" />
               <span>{t('io.export_csv', 'Ekspor CSV')}</span>
-            </Button>
+            </Button></TooltipTrigger><TooltipBody>{t('io.export_csv', 'Ekspor CSV')}</TooltipBody></Tooltip>
           )}
 
           {canCreateIO(user) && (
             <Button
               onClick={onAddIO}
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-g16 h-g16" />
               <span>{t('ui.add_io')}</span>
             </Button>
           )}
         </div>
-      </Card>
+      </div>
 
       {/* DataTable Toolbar - Justified Responsive Grid/Flex */}
-      <Card className="p-4 sm:p-5">
-        <div className="mobile-filter-grid flex flex-wrap items-center gap-2.5 w-full">
+      <Card className="p-g13">
+        <div className="flex w-full flex-wrap items-center gap-g13">
           {/* Search Input */}
-          <InputGroup className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
-            <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+          <InputGroup className="relative flex-1 min-w-g233 sm:min-w-g233">
+            <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
             <InputGroupInput
               type="text"
               placeholder={t('io.search_ph', 'Cari insertion orders...')}
@@ -409,7 +408,7 @@ export const IOView: React.FC<IOViewProps> = ({
             aria-label={t('ui.filter_status')}
               value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('io.all_status', 'Semua Status')}</option>
             <option value="Berjalan">{t('io.status_berjalan', 'Berjalan')}</option>
@@ -423,7 +422,7 @@ export const IOView: React.FC<IOViewProps> = ({
             aria-label={t('ui.filter_pricing')}
               value={selectedPricingModel}
             onChange={(e) => setSelectedPricingModel(e.target.value)}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('io.all_pricing_models', 'Semua Model Pricing')}</option>
             {pricingFilterOptions.map((model) => <option key={model} value={model}>{model}</option>)}
@@ -434,7 +433,7 @@ export const IOView: React.FC<IOViewProps> = ({
             aria-label={t('ui.filter_charging')}
               value={selectedChargingType}
             onChange={(e) => setSelectedChargingType(e.target.value)}
-            className="w-full" controlProps={{ className: "flex-1 min-w-[130px]" }}
+            className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('io.all_charging_types', 'Semua Skema Pembayaran')}</option>
             <option value="Prepaid">{t('io.prepaid', 'Prepaid')}</option>
@@ -449,15 +448,12 @@ export const IOView: React.FC<IOViewProps> = ({
               onClick={resetFilters}
             >
               {t('common.reset', 'Reset')}
-              <X className="ml-1.5 h-3.5 w-3.5" />
+              <X className="ml-g5 h-g13 w-g13" />
             </Button>
           )}
 
           {/* Column Toggle */}
           <TableViewMenu title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
-            <div className="px-3.5 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 border-b border-border">
-              {t('io.toggle_columns', 'Toggle Kolom')}
-            </div>
             {Object.keys(visibleColumns)
               .filter((col) => col !== 'detail_pembayaran')
               .map((col) => {
@@ -485,12 +481,12 @@ export const IOView: React.FC<IOViewProps> = ({
       {/* DataTable Container */}
       <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_status'), value: selectedStatus, active: selectedStatus !== 'ALL' }, { label: t('ui.filter_pricing'), value: selectedPricingModel, active: selectedPricingModel !== 'ALL' }, { label: t('ui.filter_charging'), value: selectedChargingType, active: selectedChargingType !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedStatus('ALL'); setSelectedPricingModel('ALL'); setSelectedChargingType('ALL'); }} />
-        <p className="mobile-table-hint px-4 py-2 text-xs text-muted-foreground md:hidden">{t('ui.scroll_table')}</p>
-        <TableScrollArea className="data-table-scroll rounded-none border-0" tabIndex={0} role="region" aria-label={t('ui.scroll_table')}>
-          <Table className="app-data-table w-full text-left">
+        <Text size="xs" tone="muted" className="px-g13 py-g8 md:hidden">{t('ui.scroll_table')}</Text>
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
+          <Table>
             <TableHeader>
               <TableRow>
-                <TableColumnHeader scope="col" className="w-12 text-left align-middle">
+                <TableColumnHeader scope="col" className="w-g42">
                   <div className="flex items-center justify-start">
                     <Checkbox checked={isAllSelected} aria-label={t('io.select_all', 'Pilih semua IO')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
@@ -499,38 +495,38 @@ export const IOView: React.FC<IOViewProps> = ({
                 {visibleColumns.judul && renderSortHeader(t('io.col_title', 'Judul IO'), 'judul')}
                 {visibleColumns.partner && renderSortHeader(t('io.col_partner', 'Partner'), 'partner')}
                 {visibleColumns.kanal && (
-                  <TableColumnHeader scope="col" className="text-left align-middle">
+                  <TableColumnHeader scope="col">
                     <span>{t('io.col_channel', 'Kanal Media')}</span>
                   </TableColumnHeader>
                 )}
                 {visibleColumns.model_pembayaran && (
-                  <TableColumnHeader scope="col" className="text-left align-middle">
+                  <TableColumnHeader scope="col">
                     <span>{t('io.col_pricing_model', 'Model')}</span>
                   </TableColumnHeader>
                 )}
                 {visibleColumns.skema_pembayaran && (
-                  <TableColumnHeader scope="col" className="text-left align-middle">
+                  <TableColumnHeader scope="col">
                     <span>{t('io.col_charging_type', 'Skema')}</span>
                   </TableColumnHeader>
                 )}
                 {visibleColumns.tanggal_mulai && (
-                  <TableColumnHeader scope="col" className="text-left align-middle">
+                  <TableColumnHeader scope="col">
                     <span>{t('io.col_start_date', 'Tgl Mulai')}</span>
                   </TableColumnHeader>
                 )}
                 {visibleColumns.tanggal_selesai && (
-                  <TableColumnHeader scope="col" className="text-left align-middle">
+                  <TableColumnHeader scope="col">
                     <span>{t('io.col_end_date', 'Tgl Selesai')}</span>
                   </TableColumnHeader>
                 )}
                 {visibleColumns.nilai && renderSortHeader(t('io.col_value', 'Nilai Order'), 'value')}
                 {visibleColumns.status && renderSortHeader(t('io.col_status', 'Status'), 'status')}
                 {visibleColumns.file && (
-                  <TableColumnHeader scope="col" className="text-left align-middle">
+                  <TableColumnHeader scope="col">
                     <span>{t('io.col_document', 'File')}</span>
                   </TableColumnHeader>
                 )}
-                <TableColumnHeader data-actions="true" scope="col" className="text-right w-20 align-middle">
+                <TableColumnHeader data-actions="true" scope="col" className="text-right w-g89">
                   <div className="flex items-center justify-end">{t('io.col_action', 'Aksi')}</div>
                 </TableColumnHeader>
               </TableRow>
@@ -550,61 +546,61 @@ export const IOView: React.FC<IOViewProps> = ({
  )}
  >
  {/* Checkbox */}
- <TableCell className="text-left align-middle">
+ <TableCell>
                         <div className="flex items-center justify-start">
                           <Checkbox checked={isSelected} aria-label={t('io.pilih_io', 'Pilih IO {nomor_io}', { nomor_io: io.nomor_io })} onCheckedChange={() => handleSelectRow(io.io_id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                         </div>
                       </TableCell>
                       {/* Nomor IO */}
                       {visibleColumns.nomor && (
-                        <TableCell className="text-left whitespace-nowrap">
+                        <TableCell className="whitespace-nowrap">
                           {io.nomor_io}
                         </TableCell>
                       )}
                       {/* Judul IO */}
                       {visibleColumns.judul && (
-                        <TableCell className="text-left">
-                          <span
+                        <TableCell className="max-w-g233">
+                          <Tooltip><TooltipTrigger asChild><span
                             onClick={() => setDetailIO(io)}
-                            className="hover:text-accent-foreground cursor-pointer"
+                            className="block cursor-pointer truncate hover:text-accent-foreground"
                           >
                             {io.judul_io}
-                          </span>
+                          </span></TooltipTrigger><TooltipBody>{io.judul_io}</TooltipBody></Tooltip>
                         </TableCell>
                       )}
                       {/* Partner */}
                       {visibleColumns.partner && (
-                        <TableCell className="text-left">
+                        <TableCell>
                           {io.partner_nama || '-'}
                         </TableCell>
                       )}
                       {/* Kanal */}
                       {visibleColumns.kanal && (
-                        <TableCell className="text-left">
+                        <TableCell>
                           {io.kanal_media || '-'}
                         </TableCell>
                       )}
                       {/* Model Pembayaran */}
                       {visibleColumns.model_pembayaran && (
-                        <TableCell className="text-left whitespace-nowrap">
+                        <TableCell className="whitespace-nowrap">
                           {io.pricing_model || io.model_pembayaran || '-'}
                         </TableCell>
                       )}
                       {/* Skema */}
                       {visibleColumns.skema_pembayaran && (
-                        <TableCell className="text-left">
+                        <TableCell>
                           {io.skema_pembayaran || io.charging_type || '-'}
                         </TableCell>
                       )}
                       {/* Tanggal Mulai */}
                       {visibleColumns.tanggal_mulai && (
-                        <TableCell className="text-left whitespace-nowrap">
+                        <TableCell className="whitespace-nowrap">
                           {formatBusinessDate(io.tanggal_mulai)}
                         </TableCell>
                       )}
                       {/* Tanggal Selesai */}
                       {visibleColumns.tanggal_selesai && (
-                        <TableCell className="text-left whitespace-nowrap">
+                        <TableCell className="whitespace-nowrap">
                           {formatBusinessDate(io.tanggal_berakhir || io.tanggal_selesai)}
                         </TableCell>
                       )}
@@ -616,50 +612,49 @@ export const IOView: React.FC<IOViewProps> = ({
                       )}
                       {/* Status */}
                       {visibleColumns.status && (
-                        <TableCell className="text-left whitespace-nowrap">
+                        <TableCell className="whitespace-nowrap">
                           <Badge
                             tone={statusTone(
  io.status
  )}
                           >
-                            {io.status === 'Active' && <CheckCircle2 className="w-3.5 h-3.5" />}
-                            {io.status === 'Expired' && <Clock className="w-3.5 h-3.5" />}
+                            {io.status === 'Active' && <CheckCircle2 className="w-g13 h-g13" />}
+                            {io.status === 'Expired' && <Clock className="w-g13 h-g13" />}
                             <span>{t(CONTRACT_STATUS_LABEL_KEY[io.status] || 'status.active', io.status)}</span>
                           </Badge>
                         </TableCell>
                       )}
                       {/* File */}
                       {visibleColumns.file && (
-                        <TableCell className="text-left">
+                        <TableCell>
                           {io.link_file_io ? (
-                            <a
-                              href={io.link_file_io}
+                            <Button asChild variant="link"><a href={io.link_file_io}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-accent-foreground hover:text-accent-foreground font-normal hover:underline"
+                              
                             >
-                              <FileDown className="w-3.5 h-3.5" /> {t('io.pdf', 'PDF')}
-                            </a>
+                              <FileDown className="w-g13 h-g13" /> {t('io.pdf', 'PDF')}
+                            </a></Button>
                           ) : (
                             <span className="text-primary-foreground">-</span>
                           )}
                         </TableCell>
                       )}
                       {/* Actions Menu */}
-                      <TableCell data-actions="true" className="text-right align-middle w-20">
+                      <TableCell data-actions="true" className="text-right w-g89">
                         <div className="flex items-center justify-end">
                           <ActionMenu
                             items={[
                               {
                                 label: t('io.action_detail', 'Detail'),
-                                icon: <ExternalLink className="w-3.5 h-3.5" />,
+                                icon: <ExternalLink className="w-g13 h-g13" />,
                                 onClick: () => setDetailIO(io),
                               },
                               ...(canEditIO(io, partners, user)
                                 ? [
                                     {
                                       label: t('io.action_edit', 'Edit'),
-                                      icon: <Edit2 className="w-3.5 h-3.5" />,
+                                      icon: <Edit2 className="w-g13 h-g13" />,
                                       onClick: () => onEditIO(io),
                                     },
                                   ]
@@ -668,7 +663,7 @@ export const IOView: React.FC<IOViewProps> = ({
                                 ? [
                                     {
                                       label: t('io.action_delete', 'Hapus'),
-                                      icon: <Trash2 className="w-3.5 h-3.5" />,
+                                      icon: <Trash2 className="w-g13 h-g13" />,
                                       onClick: () => onDeleteIO(io.io_id),
                                       variant: 'danger' as const,
                                       dividerBefore: true,
@@ -702,72 +697,70 @@ export const IOView: React.FC<IOViewProps> = ({
 
       {/* Detail IO Modal Dialog */}
       {detailIO && (
-        <ModalFrame onClose={() => setDetailIO(null)} className="max-w-4xl w-full max-h-[92dvh] flex flex-col overflow-hidden">
+        <ModalFrame onClose={() => setDetailIO(null)} className="max-w-g987 w-full flex flex-col overflow-hidden">
 
-            <DialogHeader className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
+            <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
               <div>
-                <DialogTitle className="flex items-center gap-2">
-                  <FileSpreadsheet className="w-5 h-5 text-accent-foreground" />
+                <DialogTitle className="flex items-center gap-g8">
+                  <FileSpreadsheet className="w-g21 h-g21 text-accent-foreground" />
                   <span>{detailIO.nomor_io}</span>
                 </DialogTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">{detailIO.judul_io}</p>
+                <Text size="xs" tone="muted" className="mt-g2">{detailIO.judul_io}</Text>
               </div>
               <Button variant="secondary" size="icon-sm" aria-label={t('common.close', 'Tutup')}
                 type="button"
                 onClick={() => setDetailIO(null)}
               >
-                <X className="w-5 h-5" />
+                <X className="w-g21 h-g21" />
               </Button>
             </DialogHeader>
 
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1">
-              <Card className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-background">
+            <div className="p-g21 sm:p-g21 overflow-y-auto space-y-g13 text-xs flex-1">
+              <Card className="grid grid-cols-1 sm:grid-cols-2 gap-g13 p-g13 bg-background">
                 <div>
-                  <span className="text-muted-foreground block text-xs font-medium">{t('io.detail_partner_label', 'Partner / Vendor:')}</span>
-                  <span className="font-bold text-foreground text-xs">{detailIO.partner_nama || '-'}</span>
+                  <Text as="span" size="xs" weight="medium" tone="muted" className="block">{t('io.detail_partner_label', 'Partner / Vendor:')}</Text>
+                  <Text as="span" size="xs" weight="bold">{detailIO.partner_nama || '-'}</Text>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-xs font-medium">{t('io.detail_channel_label', 'Kanal Media Placement:')}</span>
-                  <span className="font-bold text-foreground text-xs">{detailIO.kanal_media || '-'}</span>
+                  <Text as="span" size="xs" weight="medium" tone="muted" className="block">{t('io.detail_channel_label', 'Kanal Media Placement:')}</Text>
+                  <Text as="span" size="xs" weight="bold">{detailIO.kanal_media || '-'}</Text>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-xs font-medium">{t('io.detail_total_value_label', 'Nilai Total IO:')}</span>
-                  <span className="font-bold text-accent-foreground font-mono text-xs">
+                  <Text as="span" size="xs" weight="medium" tone="muted" className="block">{t('io.detail_total_value_label', 'Nilai Total IO:')}</Text>
+                  <Text as="span" size="xs" weight="bold" tone="primary" className="font-mono">
                     {formatMoney(detailIO.nilai_io, detailIO.mata_uang)}
-                  </span>
+                  </Text>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-xs font-medium">{t('io.detail_pricing_scheme_label', 'Model Pembayaran & Skema:')}</span>
-                  <span className="font-bold text-foreground text-xs">
+                  <Text as="span" size="xs" weight="medium" tone="muted" className="block">{t('io.detail_pricing_scheme_label', 'Model Pembayaran & Skema:')}</Text>
+                  <Text as="span" size="xs" weight="bold">
                     {detailIO.pricing_model || detailIO.model_pembayaran || '-'} • {detailIO.charging_type || detailIO.skema_pembayaran || '-'}
-                  </span>
+                  </Text>
                 </div>
               </Card>
 
-              <div>
-                <label className="block font-bold text-foreground mb-1.5 text-xs">
-                  {t('io.detail_deliverables_label', 'Deliverables & Lingkup Pekerjaan')}
-                </label>
-                <p className="text-foreground bg-background p-3.5 rounded-xl border border-border leading-relaxed font-mono text-xs whitespace-pre-line">
+              <section className="grid gap-g5">
+                <Heading as="h3" size="xs" weight="semibold">{t('io.detail_deliverables_label', 'Deliverables & Lingkup Pekerjaan')}</Heading>
+                <Card variant="subtle" size="sm" className="p-g13 font-mono text-xs whitespace-pre-line">
                   {detailIO.deliverables || t('io.detail_no_deliverables', 'Tidak ada catatan deliverables khusus.')}
-                </p>
-              </div>
+                </Card>
+              </section>
 
               {detailIO.link_file_io && (
-                <div className="pt-3 border-t border-border">
+                <div className="pt-g13 border-t border-border">
                   <Button variant="outline" size="sm"
                     type="button"
                     onClick={() => window.open(detailIO.link_file_io, '_blank')}
                     className="w-full"
                   >
-                    <ExternalLink className="w-4 h-4" />
+                    <ExternalLink className="w-g16 h-g16" />
                     <span>{t('io.detail_open_drive', 'Buka Berkas IO di Google Drive')}</span>
                   </Button>
                 </div>
               )}
             </div>
 
-            <div className="p-4 sm:p-5 bg-background border-t border-border flex justify-end shrink-0">
+            <div className="p-g13 sm:p-g21 bg-background border-t border-border flex justify-end shrink-0">
               <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => setDetailIO(null)}

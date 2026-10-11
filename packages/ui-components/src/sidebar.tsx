@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/sidebar';
+export * from './moduix/ui/sidebar';

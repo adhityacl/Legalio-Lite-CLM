@@ -11,10 +11,7 @@ Indeks semua hasil kerja. Sumber kebenaran RBAC: `Engineering PRD — RBAC Struc
 | [HANDOVER.md](HANDOVER.md) | Changelog, aktivasi, migrasi role, deploy & rollback, status kriteria, risiko |
 | [RBAC-Audit-Report.md](RBAC-Audit-Report.md) | Audit baris-per-baris PRD ↔ kode + 12 temuan (4 kritis) |
 | [RBAC-Impersonation-QC-Report.md](RBAC-Impersonation-QC-Report.md) | Metode & hasil QC impersonasi (unit + runtime) |
-| [ObsidianUI-Integration-Plan.md](ObsidianUI-Integration-Plan.md) | Cara pasang Obsidian UI, pemetaan komponen, design token, hasil uji kontras |
 | [RBAC-Role-Permission-Matrix.md](RBAC-Role-Permission-Matrix.md) / [.csv](RBAC-Role-Permission-Matrix.csv) | Matriks 32 permission × 5 peran (dihasilkan dari kode) |
-| [design-preview.html](design-preview.html) | Pratinjau desain mandiri (token Takram + pola Obsidian UI) |
-| [Laporan-RBAC-ObsidianUI.docx](Laporan-RBAC-ObsidianUI.docx) | **Laporan serah terima final (DOCX)** — 11 tabel, data dibaca langsung dari hasil pengukuran. *Hanya di folder DELIVERY lokal* (format biner tidak dapat dikirim lewat konektor GitHub). |
 | [RUNBOOK-perbaikan-Codespaces.docx](RUNBOOK-perbaikan-Codespaces.docx) | **Runbook 1 halaman**: cara menutup kebocoran, perintah perbaikan, cara restart app, verifikasi, dan troubleshooting. *Hanya di DELIVERY lokal.* |
 
 ## Bukti eksekusi (qc/)
@@ -28,7 +25,6 @@ Indeks semua hasil kerja. Sumber kebenaran RBAC: `Engineering PRD — RBAC Struc
 | [qc/migration-verification.json](qc/migration-verification.json) | Migrasi idempoten: 6 tabel, 0 FK error, 77 pemetaan |
 | [qc/patch-verification.json](qc/patch-verification.json) · [patch](qc/server.ts.secure.patch) | Patcher integrasi: idempoten + lolos syntax check |
 | [qc/contrast-report.json](qc/contrast-report.json) | Kontras WCAG 2.1 AA: **28/28** (light + dark) |
-| [qc/design-preview-render.json](qc/design-preview-render.json) | Render halaman pratinjau: 5 kartu · 15 baris · 90 sel · LULUS |
 
 ## Kode (branch `feat/rbac-alignment`, PR #1)
 

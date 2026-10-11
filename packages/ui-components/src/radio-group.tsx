@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/radio-group';
+export * from './moduix/ui/radio-group';

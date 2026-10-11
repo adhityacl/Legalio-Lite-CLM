@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/drawer';
+export * from './moduix/ui/drawer';

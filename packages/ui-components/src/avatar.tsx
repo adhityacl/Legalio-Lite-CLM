@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/avatar';
+export * from './moduix/ui/avatar';

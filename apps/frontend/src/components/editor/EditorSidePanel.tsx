@@ -7,13 +7,13 @@ import { Drawer, DrawerBackdrop, DrawerCloseIcon, DrawerContent, DrawerHeader, D
 export function EditorSidePanel({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   const desktop = useMediaQuery('(min-width: 1024px)');
   const { t } = useLanguage();
-  if (desktop) return <aside className="editor-side-panel z-10 flex min-h-0 w-100 shrink-0 overflow-hidden border-s border-border bg-card xl:w-108">{children}</aside>;
+  if (desktop) return <aside className="z-10 flex min-h-0 w-g377 shrink-0 overflow-hidden border-s border-border bg-card xl:w-g377">{children}</aside>;
   return (
     <Drawer open swipeDirection="end" onOpenChange={details => { if (!details.open) onClose(); }}>
       <DrawerBackdrop />
       <DrawerPositioner>
-        <DrawerContent className="editor-side-panel flex w-[min(27rem,100vw)] flex-col p-0">
-          <DrawerHeader className="border-b border-border px-4 py-3">
+        <DrawerContent className="flex w-full max-w-g377 flex-col p-0">
+          <DrawerHeader className="border-b border-border px-g13 py-g13">
             <DrawerTitle>{t('contract_creator.panel_title', 'Panel Asisten Kontrak')}</DrawerTitle>
             <DrawerCloseIcon aria-label={t('common.close', 'Close')} />
           </DrawerHeader>

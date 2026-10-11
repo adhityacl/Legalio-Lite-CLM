@@ -88,21 +88,21 @@ export const ResetWorkspaceDialog: React.FC<ResetWorkspaceDialogProps> = ({ open
     <Dialog role="alertdialog" open={open} onOpenChange={(details) => status.kind !== 'running' && onOpenChange(details.open)}>
       <DialogBackdrop />
       <DialogPositioner>
-        <DialogContent className="flex max-h-[90vh] w-[min(32rem,calc(100vw-2rem))] flex-col overflow-hidden p-0">
-          <DialogHeader className="border-b border-status-danger-border bg-status-danger-soft px-6 py-4">
-            <DialogTitle className="flex items-center gap-2"><ShieldAlert className="size-5 text-status-danger" aria-hidden="true" />{t('settings.reset_modal_title', 'Reset workspace')}</DialogTitle>
+        <DialogContent className="flex w-full max-w-g610 flex-col overflow-hidden p-0">
+          <DialogHeader className="border-b border-status-danger-border bg-status-danger-soft px-g21 py-g13">
+            <DialogTitle className="flex items-center gap-g8"><ShieldAlert className="size-g21 text-status-danger" aria-hidden="true" />{t('settings.reset_modal_title', 'Reset workspace')}</DialogTitle>
             <DialogCloseIcon aria-label={t('common.close', 'Close')} />
             <DialogDescription className="text-status-danger">{t('settings.reset_modal_warning', 'This action is permanent and cannot be undone.')}</DialogDescription>
           </DialogHeader>
 
           <form onSubmit={submit} noValidate aria-busy={status.kind === 'running'} className="flex min-h-0 flex-1 flex-col">
-            <DialogBody className="mt-0 grid gap-4 overflow-y-auto px-6 py-5 text-foreground">
+            <DialogBody className="mt-0 grid gap-g13 overflow-y-auto px-g21 py-g21 text-foreground">
               <RadioGroup value={mode} onValueChange={(details) => details.value && setMode(details.value as ResetMode)}>
                 <RadioGroupLabel>{t('settings.reset.mode_label', 'After the reset')}</RadioGroupLabel>
                 {modes.map((option) => (
-                  <RadioGroupItem key={option.value} value={option.value} className="items-start gap-3 rounded-lg border border-border p-3 data-[state=checked]:border-status-danger-border data-[state=checked]:bg-status-danger-soft">
-                    <RadioGroupItemControl className="mt-0.5" />
-                    <span className="grid gap-0.5">
+                  <RadioGroupItem key={option.value} value={option.value} className="items-start gap-g13 rounded-lg border border-border p-g13 data-[state=checked]:border-status-danger-border data-[state=checked]:bg-status-danger-soft">
+                    <RadioGroupItemControl className="mt-g2" />
+                    <span className="grid gap-g2">
                       <RadioGroupItemText className="font-semibold">{option.title}</RadioGroupItemText>
                       <Text as="span" size="sm" tone="muted">{option.description}</Text>
                     </span>
@@ -112,7 +112,7 @@ export const ResetWorkspaceDialog: React.FC<ResetWorkspaceDialogProps> = ({ open
               </RadioGroup>
 
               {mode === 'empty' && (
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-g13 sm:grid-cols-2">
                   <Field className="sm:col-span-2" required invalid={status.kind === 'error' && nameMissing}>
                     <FieldLabel htmlFor={ids.name}>{t('settings.reset.org_name', 'Organization name')}</FieldLabel>
                     <Input id={ids.name} value={name} onChange={(e) => setName(e.target.value)} aria-describedby={status.kind === 'error' ? ids.error : undefined} />
@@ -143,7 +143,7 @@ export const ResetWorkspaceDialog: React.FC<ResetWorkspaceDialogProps> = ({ open
                 <Alert status="error" id={ids.error} role="alert"><AlertIndicator /><AlertContent><AlertDescription>{status.message}</AlertDescription></AlertContent></Alert>
               )}
             </DialogBody>
-            <DialogFooter className="mt-0 border-t border-border px-6 py-4">
+            <DialogFooter className="mt-0 border-t border-border px-g21 py-g13">
               <Button variant="outline" disabled={status.kind === 'running'} onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
               <Button type="submit" variant="destructive" loading={status.kind === 'running'} disabled={!canSubmit}>
                 <Trash2 aria-hidden="true" />

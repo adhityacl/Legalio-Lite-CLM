@@ -1,0 +1,11 @@
+/*
+ * Control sizes (Input, Button, Select, etc.)
+ * Keeps elements in the same row at a consistent height.
+ */
+:root {
+  --moduix-size-xs: 21px;
+  --moduix-size-sm: 26px;
+  --moduix-size-md: 34px;
+  --moduix-size-lg: 42px;
+  --moduix-size-xl: 55px;
+}

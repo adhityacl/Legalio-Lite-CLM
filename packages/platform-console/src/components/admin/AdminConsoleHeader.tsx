@@ -17,6 +17,8 @@ import { Button } from '@legalio/ui-components/button';
 import { Badge, type StatusTone } from '@legalio/ui-components/badge';
 import { ContextHeader } from '@legalio/ui-components/blocks';
 import { Tabs, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Spinner } from '@legalio/ui-components/spinner';
 interface AdminConsoleHeaderProps {
   area: 'system' | 'organization';
   activeTab: ConsoleDashboardTab;
@@ -78,20 +80,19 @@ export const AdminConsoleHeader: React.FC<AdminConsoleHeaderProps> = ({
       title={label}
       description={isSystemArea ? undefined : t('admin.active_organization_controls', 'Active organization controls')}
       actions={
-        <Button variant="ghost" size="icon-md" onClick={onRefresh} disabled={isRefreshing}
-          aria-label={t('admin.refresh_btn', 'Segarkan Data')} title={t('admin.refresh_btn', 'Segarkan Data')}>
-          <RefreshCw aria-hidden="true" className={isRefreshing ? 'animate-spin' : undefined} />
-        </Button>
+        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" onClick={onRefresh} disabled={isRefreshing}
+          aria-label={t('admin.refresh_btn', 'Segarkan Data')}>
+          {isRefreshing ? <Spinner size="sm" decorative /> : <RefreshCw aria-hidden="true" />}
+        </Button></TooltipTrigger><TooltipBody>{t('admin.refresh_btn', 'Segarkan Data')}</TooltipBody></Tooltip>
       }
     >
       {/* Panels render in the console view; ids keep the tab/panel relationship (WAI-ARIA tabs). */}
       <Tabs
-        variant="line"
         value={activeTab}
         onValueChange={details => onTabChange(details.value as ConsoleDashboardTab)}
         ids={{ trigger: value => `admin-${area}-${value}-tab`, content: value => `admin-${area}-${value}-panel` }}
       >
-        <TabsList aria-label={label} className="admin-tab-list overflow-x-auto border-t border-border px-4">
+        <TabsList aria-label={label} className="mx-g21 mb-g21 w-fit max-w-full overflow-x-auto">
           {visibleNavItems.map(item => {
             const Icon = item.icon;
             return (

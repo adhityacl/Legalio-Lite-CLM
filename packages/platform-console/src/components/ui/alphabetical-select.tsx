@@ -50,9 +50,3 @@ export const AlphabeticalSelect = React.forwardRef<HTMLSelectElement, React.Comp
   },
 );
 AlphabeticalSelect.displayName = 'AlphabeticalSelect';
-
-export function AlphabeticalDatalist({ children, ...props }: React.HTMLAttributes<HTMLDataListElement>) {
-  const { language } = useLanguage();
-  const locale = language === 'ZH' ? 'zh-CN' : language === 'ID' ? 'id' : 'en';
-  return <datalist {...props}>{alphabeticalOptions(children, locale)}</datalist>;
-}

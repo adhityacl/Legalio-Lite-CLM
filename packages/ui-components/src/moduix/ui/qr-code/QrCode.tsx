@@ -1,0 +1,116 @@
+'use client';
+
+import { QrCode as QrCodePrimitive, useQrCode, useQrCodeContext } from '@ark-ui/react/qr-code';
+import type { ComponentProps, ComponentRef } from 'react';
+import { forwardRef } from 'react';
+import { cn } from '../../lib/cn';
+
+const QrCode = forwardRef<
+  ComponentRef<typeof QrCodePrimitive.Root>,
+  ComponentProps<typeof QrCodePrimitive.Root>
+>(function QrCode({ className, ...props }, ref) {
+  return (
+    <QrCodePrimitive.Root
+      ref={ref}
+      className={cn(
+        'relative box-border inline-flex w-g144 max-w-full flex-col items-center gap-g13 text-foreground',
+        className,
+      )}
+      {...props}
+      data-slot="qr-code-root"
+    />
+  );
+});
+
+const QrCodeRootProvider = forwardRef<
+  ComponentRef<typeof QrCodePrimitive.RootProvider>,
+  ComponentProps<typeof QrCodePrimitive.RootProvider>
+>(function QrCodeRootProvider({ className, ...props }, ref) {
+  return (
+    <QrCodePrimitive.RootProvider
+      ref={ref}
+      className={cn(
+        'relative box-border inline-flex w-g144 max-w-full flex-col items-center gap-g13 text-foreground',
+        className,
+      )}
+      {...props}
+      data-slot="qr-code-root-provider"
+    />
+  );
+});
+
+const QrCodeFrame = forwardRef<
+  ComponentRef<typeof QrCodePrimitive.Frame>,
+  ComponentProps<typeof QrCodePrimitive.Frame>
+>(function QrCodeFrame({ className, ...props }, ref) {
+  return (
+    <QrCodePrimitive.Frame
+      ref={ref}
+      className={cn('box-border aspect-square h-auto w-full fill-current text-inherit', className)}
+      {...props}
+      data-slot="qr-code-frame"
+    />
+  );
+});
+
+const QrCodePattern = forwardRef<
+  ComponentRef<typeof QrCodePrimitive.Pattern>,
+  ComponentProps<typeof QrCodePrimitive.Pattern>
+>(function QrCodePattern({ className, ...props }, ref) {
+  return (
+    <QrCodePrimitive.Pattern
+      ref={ref}
+      className={cn('fill-inherit', className)}
+      {...props}
+      data-slot="qr-code-pattern"
+    />
+  );
+});
+
+const QrCodeOverlay = forwardRef<
+  ComponentRef<typeof QrCodePrimitive.Overlay>,
+  ComponentProps<typeof QrCodePrimitive.Overlay>
+>(function QrCodeOverlay({ className, ...props }, ref) {
+  return (
+    <QrCodePrimitive.Overlay
+      ref={ref}
+      className={cn(
+        'box-border inline-flex size-control-lg items-center justify-center rounded-sm bg-background p-g5 text-foreground [&_img]:size-full [&_img]:object-contain [&_svg]:size-full [&_svg]:object-contain',
+        className,
+      )}
+      {...props}
+      data-slot="qr-code-overlay"
+    />
+  );
+});
+
+const QrCodeDownloadTrigger = forwardRef<
+  ComponentRef<typeof QrCodePrimitive.DownloadTrigger>,
+  ComponentProps<typeof QrCodePrimitive.DownloadTrigger>
+>(function QrCodeDownloadTrigger({ className, ...props }, ref) {
+  return (
+    <QrCodePrimitive.DownloadTrigger
+      ref={ref}
+      className={cn(
+        'box-border inline-flex min-h-control-md cursor-pointer appearance-none items-center justify-center gap-g8 rounded-md border border-border bg-background px-g16 text-sm font-medium whitespace-nowrap text-foreground transition-[border-color,background-color,color,opacity,box-shadow] duration-200 ease-in-out select-none focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 data-disabled:pointer-events-none data-disabled:opacity-50 motion-reduce:transition-none [&_svg]:size-g16 [&_svg]:shrink-0 [&:active:not(:disabled):not([data-disabled])]:opacity-[0.94] [@media(hover:hover)]:[&:not(:disabled):not([data-disabled]):hover]:bg-accent',
+        className,
+      )}
+      {...props}
+      data-slot="qr-code-download-trigger"
+    />
+  );
+});
+
+const QrCodeContext = QrCodePrimitive.Context;
+
+export {
+  QrCode,
+  QrCodeContext,
+  QrCodeDownloadTrigger,
+  QrCodeFrame,
+  QrCodeOverlay,
+  QrCodePattern,
+  QrCodeRootProvider,
+  useQrCode,
+  useQrCodeContext,
+};

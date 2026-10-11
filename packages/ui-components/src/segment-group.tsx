@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/segment-group';
+export * from './moduix/ui/segment-group';

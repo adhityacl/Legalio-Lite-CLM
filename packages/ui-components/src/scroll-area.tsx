@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/scroll-area';
+export * from './moduix/ui/scroll-area';

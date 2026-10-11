@@ -1,4 +1,4 @@
-/* moduix Tailwind package setup (https://moduix.dev/docs/quick-start). Imported before tailwindcss. */
-@import "@moduix/react-tailwind/style.css";
+/* Legalio UI foundation: the in-tree moduix foundation (copied from the official moduix registry), then Legalio theme tokens. */
+@import "../moduix/lib/styles/style.css";
 @import "./theme.css";
-@source "../../node_modules/@moduix/react-tailwind/dist/components";
+@source "..";

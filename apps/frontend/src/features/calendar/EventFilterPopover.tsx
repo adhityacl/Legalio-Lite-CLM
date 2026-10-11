@@ -9,6 +9,7 @@ import { Popover, PopoverBody, PopoverContent, PopoverFooter, PopoverHeader, Pop
 import { EVENT_TYPES, EVENT_TYPE_CONFIG, type EventType } from './eventTypes';
 import { EventIndicator } from './EventItem';
 
+import { BadgeDot } from '@legalio/ui-components/badge';
 export interface EventFilters {
   enabled: ReadonlySet<EventType>;
   onToggle: (type: EventType) => void;
@@ -24,13 +25,13 @@ export function EventFilterPopover({ enabled, onToggle, search, onSearch, onRese
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon-md" className="relative" aria-label={t('calendar.filter_events')}>
           <CalendarSearch aria-hidden="true" />
-          {filtered && <span className="absolute end-2 top-2 size-2 rounded-full bg-primary" aria-hidden="true" />}
+          {filtered && <BadgeDot className="size-g8 absolute end-g8 top-g8 text-primary" aria-hidden="true" />}
         </Button>
       </PopoverTrigger>
       <PopoverPositioner>
-        <PopoverContent className="w-80 max-w-[calc(100vw-2rem)]" aria-label={t('calendar.filter_events')}>
+        <PopoverContent className="w-g377 max-w-full" aria-label={t('calendar.filter_events')}>
           <PopoverHeader><PopoverTitle>{t('calendar.filter_events')}</PopoverTitle></PopoverHeader>
-          <PopoverBody className="grid gap-4">
+          <PopoverBody className="grid gap-g13">
             <Field>
               <FieldLabel>{t('calendar.search_documents')}</FieldLabel>
               <Input type="search" value={search} onChange={event => onSearch(event.target.value)} placeholder={t('calendar.search_placeholder')} />
@@ -41,7 +42,7 @@ export function EventFilterPopover({ enabled, onToggle, search, onSearch, onRese
                 {EVENT_TYPES.map(type => (
                   <Checkbox key={type} checked={enabled.has(type)} onCheckedChange={() => onToggle(type)}>
                     <CheckboxControl />
-                    <CheckboxLabel className="gap-2"><EventIndicator type={type} />{t(EVENT_TYPE_CONFIG[type].labelKey)}</CheckboxLabel>
+                    <CheckboxLabel className="gap-g8"><EventIndicator type={type} />{t(EVENT_TYPE_CONFIG[type].labelKey)}</CheckboxLabel>
                     <CheckboxHiddenInput />
                   </Checkbox>
                 ))}

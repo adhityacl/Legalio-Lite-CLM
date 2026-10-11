@@ -7,6 +7,9 @@ import { Button } from '@legalio/ui-components/button';
 import { Input } from '@legalio/ui-components/input';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
+import { Badge } from '@legalio/ui-components/badge';
+import { Text } from '@legalio/ui-components/text';
+import { List, ListItem } from '@legalio/ui-components/list';
 export interface DueDiligenceChecklistEditorProps {
   /** Pack-provided items (core + country + industry), as returned by the server. */
   packItems: Array<DueDiligenceRequirement & { disabled?: boolean }>;
@@ -66,38 +69,34 @@ export const DueDiligenceChecklistEditor: React.FC<DueDiligenceChecklistEditorPr
     onChange({ overrides, customItems: customItems.filter((item) => item.key !== key) });
   };
 
-  const rowClass = 'flex flex-col gap-2 border-b border-border py-3 last:border-b-0  sm:flex-row sm:items-center';
-  const toggleClass = 'inline-flex min-h-10 items-center gap-2 text-sm text-foreground ';
+  const rowClass = 'flex flex-col gap-g8 border-b border-border py-g13 last:border-b-0  sm:flex-row sm:items-center';
+  const toggleClass = 'inline-flex items-center gap-g8 text-sm text-foreground ';
 
   return (
     <div>
-      <ul className="divide-y-0">
+      <List marker="none" className="divide-y-0">
         {packOnly.map((item) => {
           const override = overrides[item.key] || {};
           const required = typeof override.required === 'boolean' ? override.required : item.required;
           const hidden = Boolean(override.disabled);
           return (
-            <li key={item.key} className={rowClass}>
+            <ListItem key={item.key} className={rowClass}>
               <div className="min-w-0 flex-1">
                 <span className={`wrap-break-word text-sm font-medium ${hidden ? 'text-muted-foreground line-through' : 'text-foreground '}`}>
                   {localize(item.label, language)}
                 </span>
-                <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
-                  {t(SOURCE_KEY[item.source || 'core'] || SOURCE_KEY.core, item.source || 'core')}
-                </span>
+                <Badge className="ms-g8">{t(SOURCE_KEY[item.source || 'core'] || SOURCE_KEY.core, item.source || 'core')}</Badge>
               </div>
               <Checkbox checked={required} disabled={disabled || hidden} onCheckedChange={(details) => setOverride(item.key, { required: details.checked === true })}><CheckboxControl /><CheckboxLabel>{t('settings.region.dd_required', 'Required')}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
               <Checkbox checked={hidden} disabled={disabled} onCheckedChange={(details) => setOverride(item.key, { disabled: details.checked === true })}><CheckboxControl /><CheckboxLabel>{t('settings.region.dd_hidden', 'Hidden')}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
-            </li>
+            </ListItem>
           );
         })}
         {customItems.map((item) => (
-          <li key={item.key} className={rowClass}>
+          <ListItem key={item.key} className={rowClass}>
             <div className="min-w-0 flex-1">
-              <span className="wrap-break-word text-sm font-medium text-foreground">{localize(item.label, language)}</span>
-              <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
-                {t('settings.region.dd_source_tenant', 'Custom')}
-              </span>
+              <Text as="span" size="sm" weight="medium" className="wrap-break-word">{localize(item.label, language)}</Text>
+              <Badge className="ms-g8">{t('settings.region.dd_source_tenant', 'Custom')}</Badge>
             </div>
             <Checkbox checked={item.required} disabled={disabled} onCheckedChange={(details) => updateCustom(item.key, { required: details.checked === true })}><CheckboxControl /><CheckboxLabel>{t('settings.region.dd_required', 'Required')}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
             <Button variant="ghost" size="icon-md"
@@ -107,12 +106,12 @@ export const DueDiligenceChecklistEditor: React.FC<DueDiligenceChecklistEditorPr
               className="text-destructive"
               aria-label={`${t('settings.region.dd_remove', 'Remove item')}: ${localize(item.label, language)}`}
             >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              <Trash2 className="h-g16 w-g16" aria-hidden="true" />
             </Button>
-          </li>
+          </ListItem>
         ))}
-      </ul>
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+      </List>
+      <div className="mt-g13 flex flex-col gap-g8 sm:flex-row sm:items-end">
         <Field className="flex-1">
           <FieldLabel htmlFor={newLabelId}>
             {t('settings.region.dd_new_label', 'New item name')}
@@ -137,7 +136,7 @@ export const DueDiligenceChecklistEditor: React.FC<DueDiligenceChecklistEditorPr
           onClick={addCustom}
           disabled={disabled || !newLabel.trim()}
         >
-          <Plus className="h-4 w-4" aria-hidden="true" />
+          <Plus className="h-g16 w-g16" aria-hidden="true" />
           {t('settings.region.dd_add', 'Add checklist item')}
         </Button>
       </div>

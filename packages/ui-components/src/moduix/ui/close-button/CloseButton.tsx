@@ -1,0 +1,87 @@
+'use client';
+
+import type { HTMLArkProps } from '@ark-ui/react/factory';
+import { ark } from '@ark-ui/react/factory';
+import { forwardRef, type ComponentRef } from 'react';
+import { cn } from '../../lib/cn';
+import { CloseIcon } from '../../lib/icons/ui';
+
+type CloseButtonProps = HTMLArkProps<'button'> & {
+  'data-disabled'?: string;
+  'data-part'?: string;
+  'data-scope'?: string;
+  'data-slot'?: string;
+};
+
+const CloseButton = forwardRef<ComponentRef<typeof ark.button>, CloseButtonProps>(
+  function CloseButton(
+    {
+      asChild,
+      className,
+      children,
+      disabled,
+      onClick,
+      onClickCapture,
+      type,
+      'aria-disabled': ariaDisabled,
+      'aria-label': ariaLabel,
+      'aria-labelledby': ariaLabelledBy,
+      'data-disabled': dataDisabled,
+      'data-part': dataPart,
+      'data-scope': dataScope,
+      'data-slot': dataSlot,
+      ...props
+    },
+    ref,
+  ) {
+    const isDisabled =
+      disabled || ariaDisabled === true || ariaDisabled === 'true' || dataDisabled !== undefined;
+    const nativeDisabled = asChild ? undefined : disabled;
+    const resolvedAriaDisabled = asChild && disabled ? true : ariaDisabled;
+    const handleClickCapture: CloseButtonProps['onClickCapture'] = (event) => {
+      if (isDisabled) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      onClickCapture?.(event);
+    };
+    const handleClick: CloseButtonProps['onClick'] = (event) => {
+      if (isDisabled) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      onClick?.(event);
+    };
+
+    return (
+      <ark.button
+        ref={ref}
+        asChild={asChild}
+        {...props}
+        type={asChild ? type : (type ?? 'button')}
+        disabled={nativeDisabled}
+        data-scope={dataScope ?? 'close-button'}
+        data-part={dataPart ?? 'root'}
+        data-slot={dataSlot ?? 'close-button-root'}
+        data-disabled={dataDisabled ?? (isDisabled ? '' : undefined)}
+        className={cn(
+          "m-0 box-border inline-flex size-g26 shrink-0 cursor-pointer appearance-none items-center justify-center rounded-sm border-0 bg-transparent p-0 text-muted-foreground transition-[background-color,color,opacity] duration-200 ease-in-out select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-disabled:pointer-events-none data-disabled:cursor-default data-disabled:opacity-50 [&:active:not([data-disabled])]:opacity-[0.94] [&>svg]:shrink-0 [&>svg:not([class*='size-'])]:size-g16 [@media(hover:hover)]:[&:not([data-disabled]):hover]:bg-muted [@media(hover:hover)]:[&:not([data-disabled]):hover]:text-foreground",
+          className,
+        )}
+        aria-disabled={resolvedAriaDisabled}
+        aria-label={ariaLabel ?? (ariaLabelledBy == null ? 'Close' : undefined)}
+        aria-labelledby={ariaLabelledBy}
+        onClickCapture={handleClickCapture}
+        onClick={handleClick}
+      >
+        {children || <CloseIcon className="size-g16 shrink-0" />}
+      </ark.button>
+    );
+  },
+);
+
+export { CloseButton };

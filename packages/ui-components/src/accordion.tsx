@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/accordion';
+export * from './moduix/ui/accordion';

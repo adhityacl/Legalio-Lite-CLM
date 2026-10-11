@@ -94,6 +94,32 @@ test('Add saves title, description, vendor ID, rounded months and the same invoi
   await expect(dialog).toBeHidden();
 });
 
+test('upload triggers open the native file chooser, label the input and accept the same file again', async ({ page }) => {
+  await setup(page);
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  const dialog = await openAdd(page);
+  const invoiceDrop = dialog.getByRole('button', { name: 'Invoice drop zone', exact: true });
+  await expect(invoiceDrop).toBeVisible();
+  await expect(invoiceDrop.getByRole('button')).toHaveCount(1); // only the zag-managed trigger is nested
+  const chooser = page.waitForEvent('filechooser');
+  await invoiceDrop.getByRole('button', { name: 'Choose file', exact: true }).click();
+  await (await chooser).setFiles(invoice);
+  await expect(dialog.getByText('invoice.png', { exact: true })).toBeVisible();
+  const billingChooser = page.waitForEvent('filechooser');
+  await dialog.getByRole('button', { name: 'Billing drop zone', exact: true }).getByRole('button', { name: 'Choose file', exact: true }).click();
+  await (await billingChooser).setFiles({ name: 'billing.pdf', mimeType: 'application/pdf', buffer: Buffer.from('billing') });
+  await expect(dialog.getByText('billing.pdf', { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel('Upload Invoice', { exact: true })).toHaveAttribute('type', 'file');
+  // Re-picking the identical file (zag would report FILE_EXISTS) still replaces the selection.
+  await dialog.getByLabel('Upload Invoice', { exact: true }).setInputFiles({ ...invoice, name: 'other.png' });
+  await expect(dialog.getByText('other.png', { exact: true })).toBeVisible();
+  await dialog.getByLabel('Upload Invoice', { exact: true }).setInputFiles(invoice);
+  await expect(dialog.getByText('invoice.png', { exact: true })).toBeVisible();
+  await dialog.getByLabel('Upload Invoice', { exact: true }).setInputFiles(invoice);
+  await expect(dialog.getByText('invoice.png', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Parse File' })).toBeVisible();
+});
+
 test('saved unequal June and July allocations appear in the dashboard with year filtering', async ({ page }) => {
   await setup(page, true);
   await page.setViewportSize({ width: 1440, height: 1100 });

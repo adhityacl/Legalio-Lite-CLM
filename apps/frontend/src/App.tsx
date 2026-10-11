@@ -1,7 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SignInForm } from './components/SignInForm';
-import InteractiveGridBackground from './components/lightswind/interactive-grid-background';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { ConfirmDialogProvider, useConfirm } from './context/ConfirmDialogContext';
@@ -15,7 +14,6 @@ import { Header } from './components/Header';
 import { AppShell } from './components/Sidebar';
 
 import { ConsoleSubmenu } from './components/admin/types';
-import { AlertTriangle, CheckCircle2, X, ExternalLink } from 'lucide-react';
 
 const LazyDashboardView = lazy(() => import('./components/DashboardView').then((m) => ({ default: m.DashboardView })));
 const LazyHierarchyTreemapView = lazy(() => import('./components/HierarchyTreemapView').then((m) => ({ default: m.HierarchyTreemapView })));
@@ -52,19 +50,20 @@ import { PermissionProvider, usePermissions } from './lib/permissions';
 import { OrganizationOnboarding } from './components/account/OrganizationOnboarding';
 import { InvitationPrompt } from './components/account/InvitationPrompt';
 import { SETTINGS_TABS, SYSTEM_TABS, needsOrganization, resolveRoute, type SettingsTabId } from './lib/appRoutes';
-import { tableDesignForTab } from './lib/tableDesign';
 
 import { Button } from '@legalio/ui-components/button';
+import { Text } from '@legalio/ui-components/text';
+import { List, ListItem } from '@legalio/ui-components/list';
 /** Full-page state shown instead of any privileged view (PRD §4.5.4, §6.2, §11.3). */
 /** `standalone` screens have no app header, so they carry the page's only h1. */
 const StateScreen: React.FC<{ title: string; message?: string; children?: React.ReactNode; busy?: boolean; standalone?: boolean }> = ({ title, message, children, busy, standalone }) => {
   const Heading = standalone ? 'h1' : 'h2';
   return (
-  <div className="flex min-h-[60vh] items-center justify-center p-6" aria-busy={busy || undefined}>
-    <div className="max-w-md space-y-4 text-center" role={busy ? 'status' : undefined}>
+  <div className="flex min-h-g377 items-center justify-center p-g21" aria-busy={busy || undefined}>
+    <div className="max-w-g377 space-y-g13 text-center" role={busy ? 'status' : undefined}>
       <Heading className="text-xl font-semibold text-foreground ">{title}</Heading>
-      {message && <p className="text-sm text-muted-foreground">{message}</p>}
-      {children && <div className="flex flex-wrap justify-center gap-2">{children}</div>}
+      {message && <Text size="sm" tone="muted">{message}</Text>}
+      {children && <div className="flex flex-wrap justify-center gap-g8">{children}</div>}
     </div>
   </div>
   );
@@ -73,6 +72,7 @@ const StateScreen: React.FC<{ title: string; message?: string; children?: React.
 const MainApp: React.FC = () => {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
+  const showAlert = useAlertToast();
 
   if (!user) {
     return null;
@@ -150,28 +150,10 @@ const MainApp: React.FC = () => {
   const [showAmendmentModal, setShowAmendmentModal] = useState(false);
   const [amendmentParent, setAmendmentParent] = useState<Contract | InsertionOrder | undefined>(undefined);
 
-  // Toast Notification System
-  const [toasts, setToasts] = useState<Array<{
-    id: string;
-    type: 'success' | 'warning' | 'error' | 'info';
-    title: string;
-    message: string;
-    actionText?: string;
-    onAction?: () => void;
-  }>>([]);
-
-  const showToast = (toast: {
-    type: 'success' | 'warning' | 'error' | 'info';
-    title: string;
-    message: string;
-    actionText?: string;
-    onAction?: () => void;
-  }) => {
-    const id = 'toast-' + Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { ...toast, id }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4500);
+  // Notifications go through the shared moduix toaster (AlertToastProvider).
+  const showToast = (toast: { type: 'success' | 'warning' | 'error' | 'info'; title: string; message: string }) => {
+    const variant = ({ success: 'success', warning: 'warning', error: 'destructive', info: 'default' } as const)[toast.type];
+    showAlert({ title: toast.title, description: toast.message, variant });
   };
 
   // Contract CRUD Handlers (Optimistic UI)
@@ -544,16 +526,15 @@ const MainApp: React.FC = () => {
       <div className="flex min-h-dvh items-center justify-center bg-(--moduix-color-background) text-(--moduix-color-foreground)">
         {selectionStatus === 'choose' ? (
           <StateScreen standalone title={t('tb.choose_organization', 'Choose an organization')} message={t('tb.choose_organization_desc', 'You belong to several organizations. Choose the one to work in for this tab.')}>
-            <ul className="w-full space-y-2">
+            <List marker="none" className="grid w-full gap-g8">
               {organizations.map((org) => (
-                <li key={org.organizationId}>
-                  <button type="button" onClick={() => void switchTenant(org.organizationId)}
-                    className="flex min-h-10 w-full cursor-pointer items-center justify-between rounded-lg border border-border bg-card px-4 text-left text-sm font-semibold hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--moduix-color-ring)/40 ">
+                <ListItem key={org.organizationId}>
+                  <Button variant="outline" className="w-full justify-start" onClick={() => void switchTenant(org.organizationId)}>
                     {org.organizationName}
-                  </button>
-                </li>
+                  </Button>
+                </ListItem>
               ))}
-            </ul>
+            </List>
             <Button variant="link" type="button" onClick={() => void logout()}>{t('app.kembali_ke_login', 'Kembali ke login')}</Button>
           </StateScreen>
         ) : (
@@ -578,7 +559,7 @@ const MainApp: React.FC = () => {
     ) : null;
 
   return (
-    <div data-table-design={tableDesignForTab(activeTab)} className="h-screen w-full bg-background font-sans text-foreground">
+    <div className="h-screen w-full bg-background font-sans text-foreground">
       <a href="#main-content" className="skip-link">
         {t('app.skip_to_content', 'Lewati ke konten utama')}
       </a>
@@ -607,7 +588,7 @@ const MainApp: React.FC = () => {
           id="main-content"
           tabIndex={-1}
           // The AI chat launcher is fixed bottom-right; reserve room so it never covers the last row's actions.
-          className={`flex-1 min-h-0 p-3.5 sm:p-5 md:p-7 ${modules.aiAssistant ? 'pb-24 sm:pb-28 md:pb-28' : ''} overflow-y-auto overflow-x-hidden bg-background overscroll-contain focus:outline-none`}
+          className={`flex-1 min-h-0 p-g13 sm:p-g21 md:p-g34 ${modules.aiAssistant ? 'pb-g89 sm:pb-g89 md:pb-g89' : ''} overflow-y-auto overflow-x-hidden bg-background overscroll-contain focus:outline-none`}
         >
           {isPlatformAdmin && (
             <DefaultPasswordBanner
@@ -621,9 +602,9 @@ const MainApp: React.FC = () => {
               ].includes(activeTab)}
             />
           )}
-          <Suspense fallback={<div className="flex h-full min-h-70 items-center justify-center text-sm text-muted-foreground">{t('app.memuat_halaman', 'Memuat halaman...')}</div>}>
+          <Suspense fallback={<div className="flex h-full min-h-g233 items-center justify-center text-sm text-muted-foreground">{t('app.memuat_halaman', 'Memuat halaman...')}</div>}>
             {gateScreen ?? (
-            <section className="w-full space-y-6">
+            <section className="w-full space-y-g21">
               {activeTab === 'dashboard' && (
                 <LazyDashboardView
                   contracts={contracts}
@@ -860,55 +841,6 @@ const MainApp: React.FC = () => {
 
       </Suspense>
 
-      {/* Floating Toast Notification Stack */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`pointer-events-auto p-4 rounded-xl border shadow-lg flex items-start gap-3 animate-in slide-in-from-bottom-5 fade-in duration-200 ${
- toast.type === 'error'
- ? 'bg-status-danger-soft border-status-danger-border text-status-danger '
- : toast.type === 'warning'
- ? 'bg-status-warning-soft border-status-warning-border text-status-warning '
- : 'bg-status-success-soft border-status-success-border text-status-success '
- }`}
-          >
-            <div className="shrink-0 mt-0.5">
-              {toast.type === 'error' ? (
-                <AlertTriangle className="w-5 h-5 text-status-danger" />
-              ) : toast.type === 'warning' ? (
-                <AlertTriangle className="w-5 h-5 text-status-warning" />
-              ) : (
-                <CheckCircle2 className="w-5 h-5 text-status-success" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold leading-tight">{toast.title}</p>
-              <p className="text-xs mt-1 leading-snug opacity-90">{toast.message}</p>
-              {toast.actionText && toast.onAction && (
-                <Button variant="link" size="sm"
-                  onClick={() => {
-                    toast.onAction?.();
-                    setToasts((prev) => prev.filter((t) => t.id !== toast.id));
-                  }}
-                  className="mt-2"
-                >
-                  <span>{toast.actionText}</span>
-                  <ExternalLink className="w-3 h-3" />
-                </Button>
-              )}
-            </div>
-            <Button variant="ghost" size="icon-md"
-              type="button"
-              onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
-              className="-mr-2 -mt-2 shrink-0"
-              aria-label={t('app.tutup_notifikasi', 'Tutup notifikasi')}
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        ))}
-      </div>
       {modules.aiAssistant && (
         <AIChatLauncher />
       )}
@@ -1011,7 +943,7 @@ const AppContent = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground ">
-        <p className="text-lg">{t('app.memuat', 'Memuat...')}</p>
+        <Text size="lg">{t('app.memuat', 'Memuat...')}</Text>
       </div>
     );
   }
@@ -1034,35 +966,17 @@ const AppContent = () => {
 
   if (!user) {
     return (
-      <InteractiveGridBackground
-        staticOnly
-        gridSize={40}
-        gridColor="#d1d5db"
-        darkGridColor="#1f2937"
-        effectColor="rgba(38, 83, 246, 0.45)"
-        darkEffectColor="rgba(38, 83, 246, 0.55)"
-        trailLength={5}
-        glow
-        glowRadius={28}
-        showFade
-        fadeIntensity={25}
-        className="w-full bg-card"
-        style={{ height: '100dvh' }}
-      >
-        <main className="flex h-full w-full flex-col items-center overflow-y-auto px-4 py-6 sm:px-6 sm:py-10">
-          <SignInForm
-            onOpenPrivacyPolicy={handleOpenPrivacy}
-            onOpenTermsOfService={handleOpenTerms}
-          />
-        </main>
-      </InteractiveGridBackground>
+        <SignInForm
+          onOpenPrivacyPolicy={handleOpenPrivacy}
+          onOpenTermsOfService={handleOpenTerms}
+        />
     );
   }
 
   if (activeTab === 'login') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground ">
-        <p className="text-lg">{t('app.memuat', 'Memuat...')}</p>
+        <Text size="lg">{t('app.memuat', 'Memuat...')}</Text>
       </div>
     );
   }

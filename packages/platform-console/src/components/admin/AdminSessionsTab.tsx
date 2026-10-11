@@ -17,7 +17,10 @@ import { TableEmptyState } from '../ui/table-empty-state';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
 import { Card } from '@legalio/ui-components/card';
-import { Alert, AlertContent } from '@legalio/ui-components/alert';
+import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Text } from '@legalio/ui-components/text';
+import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
 interface AdminSessionsTabProps {
   sessions: ConsoleSession[];
   onRevokeSession: (sessionId: string) => void;
@@ -59,11 +62,11 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-g13">
       {/* Controls Bar */}
-      <Card className="mobile-controls-bar flex flex-col items-stretch justify-between gap-3 p-4 sm:flex-row sm:items-center">
-        <InputGroup className="relative min-w-[220px] max-w-md flex-1">
-          <InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon>
+      <Card className="flex flex-col items-stretch justify-between gap-g13 p-g13 sm:flex-row sm:items-center">
+        <InputGroup className="relative min-w-g233 max-w-g377 flex-1">
+          <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
           <InputGroupInput
             type="text"
             aria-label={t('admin.sess_search_ph', 'Cari sesi berdasarkan email, IP, browser, token...')}
@@ -73,37 +76,37 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
           />
         </InputGroup>
 
-        <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-          <Radio className="h-4 w-4 animate-pulse text-status-success" aria-hidden="true" />
+        <div className="flex shrink-0 items-center gap-g8 text-xs text-muted-foreground">
+          <Radio className="h-g16 w-g16 animate-pulse text-status-success" aria-hidden="true" />
           <span>
             <strong className="text-foreground">{activeSessionCount}</strong> {t('admin.active_sessions_in_database', 'Sesi aktif di database')}
           </span>
         </div>
       </Card>
-      {copyError && <Alert status="error" role="alert"><AlertContent>{copyError}</AlertContent></Alert>}
+      {copyError && <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{copyError}</AlertDescription></AlertContent></Alert>}
 
       {/* Sessions Table */}
       <Card className="overflow-hidden">
-        <TableScrollArea className="rounded-none border-0">
-          <Table className="w-full text-left">
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
+          <Table>
             <TableHeader>
               <TableRow>
-                <TableColumnHeader scope="col" className="text-left align-middle">
+                <TableColumnHeader scope="col">
                   {t('admin.col_identifier', 'Pengguna')}
                 </TableColumnHeader>
-                <TableColumnHeader scope="col" className="text-left align-middle">
+                <TableColumnHeader scope="col">
                   {t('admin.col_token', 'Session Token')}
                 </TableColumnHeader>
-                <TableColumnHeader scope="col" className="text-left align-middle">
+                <TableColumnHeader scope="col">
                   {t('admin.col_ip_agent', 'IP Address & Device')}
                 </TableColumnHeader>
-                <TableColumnHeader scope="col" className="text-left align-middle">
+                <TableColumnHeader scope="col">
                   {t('admin.col_started', 'Mulai Login')}
                 </TableColumnHeader>
-                <TableColumnHeader scope="col" className="text-left align-middle">
+                <TableColumnHeader scope="col">
                   {t('admin.col_expires', 'Kadaluarsa')}
                 </TableColumnHeader>
-                <TableColumnHeader scope="col" className="text-right w-20 align-middle">
+                <TableColumnHeader scope="col" className="text-right w-g89">
                   <div className="flex items-center justify-end">{t('admin.col_action', 'Aksi')}</div>
                 </TableColumnHeader>
               </TableRow>
@@ -120,51 +123,38 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
                   return (
                     <TableRow key={s.id}>
                       {/* User */}
-                      <TableCell className="text-left align-middle">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-semibold shrink-0">
-                            {displayName.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-semibold text-foreground truncate">
-                              {displayName}
-                            </div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {s.userEmail}
-                            </div>
-                          </div>
+                      <TableCell>
+                        <div className="flex min-w-0 items-center gap-g8">
+                          <Avatar size="sm" className="bg-muted text-foreground shrink-0"><AvatarFallback className="bg-transparent text-inherit">{displayName.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
+                          <span className="truncate text-foreground">{displayName}</span>
+                          <Text as="span" size="xs" tone="muted" className="truncate">{s.userEmail}</Text>
                         </div>
                       </TableCell>
 
                       {/* Token Preview */}
-                      <TableCell className="text-left align-middle font-mono">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-sm">
-                            {s.token ? `${s.token.slice(0, 12)}...` : `${(s.id || '').slice(0, 12)}...`}
-                          </span>
-                          <Button variant="ghost" size="icon-sm"
+                      <TableCell className="font-mono">
+                        <div className="flex items-center gap-g5">
+                          <Badge tone="neutral">{s.token ? `${s.token.slice(0, 12)}...` : `${(s.id || '').slice(0, 12)}...`}</Badge>
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm"
                             type="button"
                             onClick={() => handleCopy(s.token || s.id, s.id)}
-                            title={t('admin.copy_token', 'Copy Token')}
                             aria-label={t('admin.copy_token', 'Salin token sesi')}
                           >
-                            {isCopied ? <Check className="w-3 h-3 text-status-success" /> : <Copy className="w-3 h-3" />}
-                          </Button>
+                            {isCopied ? <Check className="w-g13 h-g13 text-status-success" /> : <Copy className="w-g13 h-g13" />}
+                          </Button></TooltipTrigger><TooltipBody>{t('admin.copy_token', 'Copy Token')}</TooltipBody></Tooltip>
                         </div>
                       </TableCell>
 
                       {/* IP & User Agent */}
-                      <TableCell className="text-left align-middle">
-                        <div className="font-mono text-xs text-foreground">
-                          {s.ipAddress || t('admin.not_available', 'Tidak tersedia')}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={s.userAgent}>
-                          {s.userAgent || t('admin.standard_browser', 'Standard Browser')}
+                      <TableCell>
+                        <div className="flex min-w-0 items-center gap-g8">
+                          <Text as="span" size="xs" className="shrink-0 font-mono">{s.ipAddress || t('admin.not_available', 'Tidak tersedia')}</Text>
+                          <Tooltip><TooltipTrigger asChild><Text as="span" size="xs" tone="muted" className="max-w-g233 truncate">{s.userAgent || t('admin.standard_browser', 'Standard Browser')}</Text></TooltipTrigger><TooltipBody>{s.userAgent}</TooltipBody></Tooltip>
                         </div>
                       </TableCell>
 
                       {/* Created At */}
-                      <TableCell className="text-left align-middle">
+                      <TableCell>
                         {new Date(s.createdAt).toLocaleString(getActiveFormattingLocale(), {
                           day: 'numeric',
                           month: 'short',
@@ -174,47 +164,45 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
                       </TableCell>
 
                       {/* Expires At */}
-                      <TableCell className="text-left align-middle">
+                      <TableCell>
                         {isExpired ? (
-                          <Badge tone="danger" className="gap-1">
+                          <Badge tone="danger" className="gap-g3">
                             {t('status.expired', 'Expired')}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground text-xs">
+                          <Text as="span" size="xs" tone="muted">
                             {new Date(s.expiresAt).toLocaleDateString(getActiveFormattingLocale(), {
                               day: 'numeric',
                               month: 'short',
                               year: 'numeric',
                             })}
-                          </span>
+                          </Text>
                         )}
                       </TableCell>
 
                       {/* Actions */}
-                      <TableCell className="text-right align-middle w-20">
-                        <div className="flex items-center justify-end gap-1">
+                      <TableCell className="text-right w-g89">
+                        <div className="flex items-center justify-end gap-g3">
                           {s.userId && (
-                            <Button
+                            <Tooltip><TooltipTrigger asChild><Button
                               type="button"
                               variant="ghost"
-                              size="icon-md"
+                              size="icon-sm"
                               onClick={() => onRevokeAllUserSessions(s.userId)}
                               aria-label={t('admin.revoke_all_user_sessions', 'Cabut Semua Sesi User')}
-                              title={t('admin.revoke_all_user_sessions', 'Cabut Semua Sesi User')}
                             >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                            </Button>
+                              <RotateCcw className="w-g13 h-g13" />
+                            </Button></TooltipTrigger><TooltipBody>{t('admin.revoke_all_user_sessions', 'Cabut Semua Sesi User')}</TooltipBody></Tooltip>
                           )}
-                          <Button
+                          <Tooltip><TooltipTrigger asChild><Button
                             type="button"
                             variant="ghost"
-                            size="icon-md"
+                            size="icon-sm"
                             onClick={() => onRevokeSession(s.id)}
                             aria-label={t('admin.revoke_session', 'Cabut Sesi')}
-                            title={t('admin.revoke_session', 'Cabut Sesi')}
                           >
-                            <X className="w-3.5 h-3.5" />
-                          </Button>
+                            <X className="w-g13 h-g13" />
+                          </Button></TooltipTrigger><TooltipBody>{t('admin.revoke_session', 'Cabut Sesi')}</TooltipBody></Tooltip>
                         </div>
                       </TableCell>
                     </TableRow>

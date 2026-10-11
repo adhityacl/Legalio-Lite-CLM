@@ -1,1 +1,1 @@
-export * from '@moduix/react-tailwind/toast';
+export * from './moduix/ui/toast';

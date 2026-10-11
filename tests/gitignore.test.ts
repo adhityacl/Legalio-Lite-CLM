@@ -20,7 +20,7 @@ test('Git excludes local AI rules, secrets, waste and dumps while retaining sour
     'apps/backend/.env.example', 'apps/frontend/.env.example', 'package.json', 'package-lock.json',
     'apps/backend/src/migrations/001_rbac_alignment.sql', 'packages/types/src/index.ts',
     '.github/workflows/ci.yml', 'docs/rbac/RBAC-Role-Permission-Matrix.csv',
-    'docs/table-design/design-tokens.json', 'scripts/get-superuser-token.mjs',
+    'scripts/get-superuser-token.mjs',
   ];
   const result = spawnSync('git', ['check-ignore', '--no-index', '--stdin'], {
     cwd: fileURLToPath(new URL('..', import.meta.url)),
