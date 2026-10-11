@@ -36,6 +36,7 @@ export default defineConfig(() => {
     },
 
     server: {
+      allowedHosts: true as true,
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {
         // Containers and WSL bind mounts often drop file-change events, which leaves
