@@ -25,7 +25,6 @@
 - [Design system](#design-system)
 - [Configuration](#configuration)
 - [Google integration](#google-integration)
-- [Testing](#testing)
 - [Deployment](#deployment)
 - [Backups and updates](#backups-and-updates)
 - [Troubleshooting](#troubleshooting)
@@ -58,7 +57,7 @@
 
 ### System console (`/sys`)
 
-A standalone superuser console for accounts, sessions, organizations, API keys, Google credentials, AI model and parser, SMTP relay, shared UI texts, the database browser, and backup and restore. Express serves the built console even when the workspace frontend is stopped. See [docs/architecture/system-console.md](docs/architecture/system-console.md).
+A standalone superuser console for accounts, sessions, organizations, API keys, Google credentials, AI model and parser, SMTP relay, shared UI texts, the database browser, and backup and restore. Express serves the built console even when the workspace frontend is stopped.
 
 ### Access control
 
@@ -87,7 +86,6 @@ A standalone superuser console for accounts, sessions, organizations, API keys, 
 | Data | SQLite through `better-sqlite3`, in a single `auth.db` file |
 | Integrations | `@google/genai`, `googleapis`, Google Identity Services, `nodemailer`, `docx`, `pdf-lib`, `pdf-parse` |
 | Monorepo | npm workspaces and Turborepo 2 |
-| Tests | Node's built-in test runner (`node:test`) and Playwright |
 
 ---
 
@@ -104,11 +102,8 @@ NEW-CLM/
 │   ├── shared/              # Policy, currency, lifecycle, templates and demo data
 │   ├── types/               # Domain and API contracts
 │   └── ts-config/           # Shared TypeScript configuration
-├── docs/                    # Architecture notes and the design system standard
-├── tests/                   # node:test suites and Playwright specs (tests/e2e)
-├── scripts/  tools/         # Setup, build and test helpers
-├── compose.yaml  turbo.json  package.json
-└── .github/workflows/ci.yml
+├── scripts/                 # setup-env (runs on npm install) and clean-build
+└── compose.yaml  turbo.json  package.json
 ```
 
 Backend environment variables live in `apps/backend/.env`, and frontend public variables in `apps/frontend/.env`. Neither file is committed. Runtime data (`auth.db`, `uploads/`, `backups/`) stays at the repository root unless `AUTH_DB_PATH` and `APP_DATA_DIR` point elsewhere.
@@ -151,7 +146,6 @@ After changing anything under `packages/` that the console uses, rebuild it with
 | `npm run build:frontend` / `build:backend` / `build:sys` | Build one app or the console |
 | `npm start` | Run the built backend |
 | `npm run lint` | Workspace type checks plus a root TypeScript check |
-| `npm test` | All `tests/*.test.ts` suites |
 | `npm run setup` | Recreate `apps/backend/.env` without touching an existing secret |
 | `npm run clean` | Remove build output |
 
@@ -159,7 +153,7 @@ After changing anything under `packages/` that the console uses, rebuild it with
 
 ## Design system
 
-All UI follows [docs/design-system/STANDARD.md](docs/design-system/STANDARD.md). It is the single source of truth and overrides every other design document. AI agents should also read [docs/design-system/ai-rules.md](docs/design-system/ai-rules.md).
+All UI follows one standard: the golden-ratio design system in `packages/ui-components`.
 
 - **Components**: import them from `@legalio/ui-components/<component>`, for example `import { Button } from '@legalio/ui-components/button'`. Do not import third-party UI libraries in application code.
 - **Golden ratio sizes**: every size comes from the golden ratio scale.
@@ -168,7 +162,6 @@ All UI follows [docs/design-system/STANDARD.md](docs/design-system/STANDARD.md).
   - Type scale: 13, 16, 21, 26, 34 and 42 px. 13 px is the minimum.
 - **Colours**: only semantic tokens (`text-foreground`, `bg-card`, `border-border`, `text-status-*`, …). Raw hex values and palette classes are not allowed.
 - **Dialogs**: forms use the 720 px `form` width and are built from numbered `FormSection` cards.
-- **Automated guard**: `npx tsx --test tests/designTokens.test.ts` fails on forbidden sizes, colours and patterns.
 
 ---
 
@@ -200,25 +193,6 @@ Two JSON files from [Google Cloud Console](https://console.cloud.google.com/) co
 2. **OAuth client**: APIs & Services → Credentials → OAuth 2.0 Client IDs → Download JSON. Its **Authorized JavaScript origins** must contain the exact app URL, including scheme and port.
 
 Upload both files from the **Connect Google** banner or **System Console → Google & storage**. The files are validated and stored in `auth.db` (`integration_credentials`). They apply immediately and take priority over `.env` values. Secrets are never sent back to the browser. Google accounts must be invited unless `ALLOW_GOOGLE_SELF_SIGNUP=true`.
-
----
-
-## Testing
-
-```bash
-npm run lint                     # type checks
-npm test                         # all node:test suites
-npm run test:frontend            # frontend unit suites (CI selection)
-npm run test:backend             # backend unit suites (CI selection)
-npm run test:rbac                # RBAC permission matrix
-npm run test:tenant-boundaries   # isolated API, migration and settings checks
-npx playwright install chromium  # one-time browser install
-npm run test:e2e:fixtures        # mocked-API browser regressions (settings, calendar, forms, UI)
-npm run test:e2e:sys             # /sys console against an API-only backend
-npm run test:e2e                 # isolated live browser suite
-```
-
-GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) picks the frontend and backend jobs from the changed paths ([scripts/affected-apps.mjs](scripts/affected-apps.mjs)). Live browser suites use temporary databases and never touch the workspace database.
 
 ---
 

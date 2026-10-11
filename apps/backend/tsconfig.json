@@ -2,8 +2,7 @@
   "extends": "@legalio/ts-config/backend.json",
   "include": [
     "src",
-    "*.ts",
-    "../../tests/organizationSettingsContract.test.ts"
+    "*.ts"
   ],
   "exclude": [
     "dist",

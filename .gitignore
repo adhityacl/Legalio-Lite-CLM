@@ -137,3 +137,18 @@ GEMINI.md
 .migration/
 .dockerignore
 .agents/skills/moduix
+
+# 10. Development-only files: the public repository ships only what is needed
+#     to install, build and run the app. These stay local.
+tests/
+tools/
+docs/
+playwright*.config.ts
+.github/
+.devcontainer/
+handover.md
+skills-lock.json
+scripts/*
+!scripts/setup-env.mjs
+!scripts/clean-build.mjs
+apps/frontend/src/features/calendar/DocumentCalendar.example.tsx
