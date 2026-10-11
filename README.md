@@ -7,8 +7,6 @@
 [![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3-003B57?logo=sqlite&logoColor=white)](https://github.com/WiseLibs/better-sqlite3)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#-feedback-and-contributing)
 
-> *Your documentation is a direct reflection of your software, so hold it to the same standards.*
-
 ![Legalio dashboard](assets/screenshots/dashboard.png)
 
 
