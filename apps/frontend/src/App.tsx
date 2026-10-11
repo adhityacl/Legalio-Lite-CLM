@@ -53,11 +53,14 @@ import { SETTINGS_TABS, SYSTEM_TABS, needsOrganization, resolveRoute, type Setti
 
 import { Button } from '@legalio/ui-components/button';
 import { Text } from '@legalio/ui-components/text';
+import { Spinner } from '@legalio/ui-components/spinner';
 import { List, ListItem } from '@legalio/ui-components/list';
 /** Full-page state shown instead of any privileged view (PRD §4.5.4, §6.2, §11.3). */
 /** `standalone` screens have no app header, so they carry the page's only h1. */
 const StateScreen: React.FC<{ title: string; message?: string; children?: React.ReactNode; busy?: boolean; standalone?: boolean }> = ({ title, message, children, busy, standalone }) => {
   const Heading = standalone ? 'h1' : 'h2';
+  // A transient load is a quiet status line, not a headline.
+  if (busy) return <LoadingState label={title} />;
   return (
   <div className="flex min-h-g377 items-center justify-center p-g21" aria-busy={busy || undefined}>
     <div className="max-w-g377 space-y-g13 text-center" role={busy ? 'status' : undefined}>
@@ -66,6 +69,25 @@ const StateScreen: React.FC<{ title: string; message?: string; children?: React.
       {children && <div className="flex flex-wrap justify-center gap-g8">{children}</div>}
     </div>
   </div>
+  );
+};
+
+/**
+ * Page-level loading: small spinner and a 13px muted label, centred.
+ * `delayed` hides it for the first 800 ms so a fast session check does not
+ * flash a second loader before the in-shell one.
+ */
+const LoadingState: React.FC<{ label: string; delayed?: boolean }> = ({ label, delayed = false }) => {
+  const [visible, setVisible] = useState(!delayed);
+  useEffect(() => {
+    if (!delayed) return;
+    const timer = setTimeout(() => setVisible(true), 800);
+    return () => clearTimeout(timer);
+  }, [delayed]);
+  return (
+    <div role="status" aria-label={label} className="flex min-h-g233 flex-1 items-center justify-center gap-g8 p-g21 text-sm text-muted-foreground">
+      {visible && <><Spinner size="sm" decorative />{label}</>}
+    </div>
   );
 };
 
@@ -602,7 +624,7 @@ const MainApp: React.FC = () => {
               ].includes(activeTab)}
             />
           )}
-          <Suspense fallback={<div className="flex h-full min-h-g233 items-center justify-center text-sm text-muted-foreground">{t('app.memuat_halaman', 'Memuat halaman...')}</div>}>
+          <Suspense fallback={<LoadingState label={t('app.memuat_halaman', 'Memuat halaman...')} />}>
             {gateScreen ?? (
             <section className="w-full space-y-g21">
               {activeTab === 'dashboard' && (
@@ -943,7 +965,7 @@ const AppContent = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground ">
-        <Text size="lg">{t('app.memuat', 'Memuat...')}</Text>
+        <LoadingState delayed label={t('app.memuat', 'Memuat...')} />
       </div>
     );
   }
@@ -976,7 +998,7 @@ const AppContent = () => {
   if (activeTab === 'login') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground ">
-        <Text size="lg">{t('app.memuat', 'Memuat...')}</Text>
+        <LoadingState delayed label={t('app.memuat', 'Memuat...')} />
       </div>
     );
   }

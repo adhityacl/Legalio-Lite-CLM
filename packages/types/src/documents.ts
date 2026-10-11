@@ -12,7 +12,7 @@ export type MetadataFieldType = (typeof METADATA_FIELD_TYPES)[number];
 export const DOCUMENT_SORT_KEYS = ['name', 'type', 'status', 'created_at', 'modified_at', 'created_by', 'file_size'] as const;
 export type DocumentSortKey = (typeof DOCUMENT_SORT_KEYS)[number];
 
-export const PAGE_SIZES = [25, 50, 100] as const;
+export const PAGE_SIZES = [5, 10, 20, 50] as const;
 
 export type SaveKind = 'auto' | 'manual' | 'restore';
 export type CommentType = 'comment' | 'suggestion';

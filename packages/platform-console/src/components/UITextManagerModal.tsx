@@ -36,7 +36,7 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
   const [selectedModule, setSelectedModule] = useState<string>('ALL');
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
   // FileUpload keeps accepted files; remount after each import so the same CSV can be chosen again.
   const [importKey, setImportKey] = useState(0);
 

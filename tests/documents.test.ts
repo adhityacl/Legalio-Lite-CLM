@@ -89,7 +89,7 @@ test('explorer: tenant isolation, search incl. metadata, filters, sorting, pagin
   assert.equal((await call('ana', 'DELETE', `/documents/${foreign.body.id}`)).status, 404);
   assert.equal((await call('citra', 'GET', '/documents')).body.total, 1);
 
-  const sorted = await call('ana', 'GET', '/documents?sort_by=name&sort_dir=asc&limit=25');
+  const sorted = await call('ana', 'GET', '/documents?sort_by=name&sort_dir=asc&limit=50');
   assert.deepEqual(
     sorted.body.documents.map((d: any) => d.name),
     ['Alpha Lease', 'Beta Supply', 'Gamma Service', 'NDA Acme (rev)'],
@@ -99,7 +99,7 @@ test('explorer: tenant isolation, search incl. metadata, filters, sorting, pagin
   assert.equal((await call('ana', 'GET', '/documents?created_by=u2')).body.total, 3);
 
   const paged = await call('ana', 'GET', '/documents?sort_by=name&sort_dir=asc&limit=999&page=1');
-  assert.equal(paged.body.limit, 25, 'unsupported page sizes fall back to 25');
+  assert.equal(paged.body.limit, 5, 'unsupported page sizes fall back to 5');
 
   const gamma = sorted.body.documents[2];
   await call('ana', 'PATCH', `/documents/${gamma.id}`, { status: 'archived' });

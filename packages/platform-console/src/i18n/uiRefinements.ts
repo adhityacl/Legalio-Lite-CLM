@@ -154,7 +154,11 @@ export const UI_REFINEMENTS = {
     "documents.comments.suggest_button": "Usulkan",
     "calendar.event_count": "{count} event",
     "calendar.year": "Tahun",
-    "calendar.event_count_one": "1 event"
+    "calendar.event_count_one": "1 event",
+    "admin.org_logo_title": "Logo Organisasi",
+    "admin.org_logo_subtitle": "Unggah logo yang jelas untuk workspace organisasi Anda.",
+    "admin.logo_choose_drag": "Pilih atau tarik logo",
+    "admin.logo_dropzone_hint": "PNG, JPG, atau WebP hingga 2 MB"
   },
   "EN": {
     "ui.recent_documents": "Latest Documents",
@@ -311,7 +315,11 @@ export const UI_REFINEMENTS = {
     "documents.comments.suggest_button": "Suggest",
     "calendar.event_count": "{count} events",
     "calendar.year": "Year",
-    "calendar.event_count_one": "1 event"
+    "calendar.event_count_one": "1 event",
+    "admin.org_logo_title": "Organization Logo",
+    "admin.org_logo_subtitle": "Upload a clear logo for your organization workspace.",
+    "admin.logo_choose_drag": "Choose or drag a logo",
+    "admin.logo_dropzone_hint": "PNG, JPG, or WebP up to 2 MB"
   },
   "ZH": {
     "ui.recent_documents": "最新文档",
@@ -468,6 +476,10 @@ export const UI_REFINEMENTS = {
     "documents.comments.suggest_button": "建议",
     "calendar.event_count": "{count} 个事件",
     "calendar.year": "年份",
-    "calendar.event_count_one": "1 个事件"
+    "calendar.event_count_one": "1 个事件",
+    "admin.org_logo_title": "组织标志",
+    "admin.org_logo_subtitle": "为您的组织工作区上传清晰的标志。",
+    "admin.logo_choose_drag": "选择或拖放标志",
+    "admin.logo_dropzone_hint": "PNG、JPG 或 WebP，最大 2 MB"
   }
 };

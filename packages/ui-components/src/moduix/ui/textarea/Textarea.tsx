@@ -2,15 +2,18 @@ import { Field as FieldPrimitive } from '@ark-ui/react/field';
 import type { ComponentProps, ComponentRef } from 'react';
 import { forwardRef } from 'react';
 import { cn } from '../../lib/cn';
+import { useStandaloneFieldId } from '../../lib/use-standalone-field-id';
 
 const Textarea = forwardRef<
   ComponentRef<typeof FieldPrimitive.Textarea>,
   ComponentProps<typeof FieldPrimitive.Textarea>
 >(function Textarea({ autoresize, className, ...props }, ref) {
+  const id = useStandaloneFieldId(props.id, props.name);
   return (
     <FieldPrimitive.Textarea
       ref={ref}
       {...props}
+      {...(id ? { id } : {})}
       data-scope="field"
       data-part="textarea"
       data-slot="textarea-root"

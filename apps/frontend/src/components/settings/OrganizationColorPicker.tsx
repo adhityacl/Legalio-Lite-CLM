@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import { Check, Palette, X } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
-import { accentPalettes, findAccentPalette, organizationThemeTokens } from '../../lib/organizationColors';
+import { accentPalettes, findAccentPalette } from '../../lib/organizationColors';
 import { Button } from '@legalio/ui-components/button';
 import { ModalFrame } from '../ui/modal-frame';
 
 import { DialogTitle } from '@legalio/ui-components/dialog';
-import { Text } from '@legalio/ui-components/text';
 import { Toggle } from '@legalio/ui-components/toggle';
 export function OrganizationColorPicker({ id, value, onChange, disabled }: {
   id: string;
@@ -21,7 +20,6 @@ export function OrganizationColorPicker({ id, value, onChange, disabled }: {
   const [draft, setDraft] = useState(value);
   const palette = findAccentPalette(value);
   const chosen = findAccentPalette(draft);
-  const preview = organizationThemeTokens(draft, theme === 'dark');
   const title = t('tb.choose_palette', 'Choose color palette');
   return (
     <>
@@ -33,10 +31,7 @@ export function OrganizationColorPicker({ id, value, onChange, disabled }: {
       {open && (
         <ModalFrame onClose={() => setOpen(false)} className="flex w-full max-w-g610 flex-col overflow-hidden">
           <div className="flex items-center justify-between gap-g13 border-b border-border p-g21">
-            <div>
-              <DialogTitle className="flex items-center gap-g8">{title}</DialogTitle>
-              <Text size="xs" tone="muted" className="mt-g3">{t('tb.radix_palette_hint', 'Radix Colors · 12 shades · Light and dark themes')}</Text>
-            </div>
+            <DialogTitle>{title}</DialogTitle>
             <Button type="button" variant="ghost" size="icon-md" aria-label={t('common.close', 'Close')} onClick={() => setOpen(false)}><X className="h-g16 w-g16" aria-hidden="true" /></Button>
           </div>
           <div className="min-h-0 overflow-y-auto p-g21">
@@ -53,10 +48,9 @@ export function OrganizationColorPicker({ id, value, onChange, disabled }: {
               })}
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-g13 border-t border-border p-g21">
-            <span className="rounded-lg px-g13 py-g8 text-sm font-semibold" style={{ backgroundColor: preview['--primary'], color: preview['--primary-foreground'] }}>{chosen?.label || draft.toUpperCase()}</span>
+          <div className="flex items-center justify-end gap-g13 border-t border-border p-g21">
             <div className="flex gap-g8">
-              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t('admin.btn_cancel', 'Cancel')}</Button>
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>{t('admin.btn_cancel', 'Cancel')}</Button>
               <Button type="button" disabled={disabled} onClick={() => { onChange(draft); setOpen(false); }}>{t('admin.btn_apply', 'Apply')}</Button>
             </div>
           </div>

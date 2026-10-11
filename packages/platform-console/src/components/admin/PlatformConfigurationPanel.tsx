@@ -90,7 +90,7 @@ import { NumberInput, NumberInputControl, NumberInputDecrementTrigger, NumberInp
 import { CloseButton } from '@legalio/ui-components/close-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
-export type PlatformConfigurationSection = 'google' | 'ai' | 'notifications' | 'language' | 'security';
+export type PlatformConfigurationSection = 'google' | 'google-drive' | 'google-credentials' | 'database' | 'ai' | 'notifications' | 'language' | 'security';
 
 const EMPTY_CONFIG: GoogleSheetsConfig = { driveFolderId: '', spreadsheetId: '', isConnected: false, autoSync: false };
 
@@ -860,11 +860,14 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
   );
 
   const sections: Array<{ id: PlatformConfigurationSection; label: string }> = [
-    { id: 'google', label: t('tb.config_google', 'Google & storage') },
-    { id: 'ai', label: t('settings.nav_ai', 'AI Model & Parser') },
+    { id: 'google', label: t('settings.google_auth_title', 'Google Workspace Account Authentication') },
+    { id: 'google-drive', label: t('settings.penyimpanan_file_dokumen_google_drive', 'Document File Storage (Google Drive)') },
+    { id: 'google-credentials', label: t('google_setup.settings_title', 'Google Cloud Credentials') },
+    { id: 'database', label: t('sqlite.sqlite_database', 'SQLite Database') },
+    { id: 'ai', label: t('sys.nav_ai', 'AI Model') },
     { id: 'notifications', label: t('tb.config_smtp', 'SMTP relay') },
     { id: 'language', label: t('tb.config_texts_short', 'UI texts') },
-    { id: 'security', label: t('tb.config_maintenance', 'Database & reset') },
+    { id: 'security', label: t('sys.nav_reset', 'System reset') },
   ];
   const activeSectionLabel = sections.find((section) => section.id === activeSection)?.label || sections[0].label;
 
@@ -873,7 +876,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-g13">
         <div>
-          <Heading as="h2" size="lg" weight="semibold">
+          <Heading as="h2" size="md" weight="semibold">
             <span>{activeSectionLabel}</span>
           </Heading>
         </div>
@@ -892,19 +895,19 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
       <div className="w-full space-y-g21">
         {/* GROUP 1: GOOGLE INTEGRATION & DATABASE */}
 
-          {activeSection === 'google' && (
+          {(['google', 'google-drive', 'google-credentials'] as PlatformConfigurationSection[]).includes(activeSection) && (
             <div className="space-y-g21">
               {/* Google OAuth Account Card */}
-              <Card className="overflow-hidden">
+              {activeSection === 'google' && <Card className="overflow-hidden">
                 <CardHeader >
-                  <CardTitle className="flex items-center justify-between">
+                  <CardTitle className="flex flex-wrap items-center justify-between gap-g8">
                     <span>{t('settings.google_auth_title', 'Autentikasi Akun Google Workspace')}</span>
                     {isTokenActive ? (
-                      <Badge>
+                      <Badge className="shrink-0">
                         {t('settings.oauth_active', 'OAuth Aktif')}
                       </Badge>
                     ) : (
-                      <Badge>
+                      <Badge className="shrink-0">
                         {t('settings.oauth_inactive', 'Belum Terhubung')}
                       </Badge>
                     )}
@@ -957,12 +960,10 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                     </div>
                   </Card>
                 </CardBody>
-              </Card>
-
-
+              </Card>}
 
               {/* Master Google Drive Storage Card (File Attachment Storage) */}
-              {isAdmin && (
+              {activeSection === 'google-drive' && isAdmin && (
                 <Card id="card-master-drive-org-database" className="overflow-hidden">
                   <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-g13">
                     <div className="space-y-g3">
@@ -1154,11 +1155,8 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                 </Card>
               )}
 
-              {/* SQLite Database Status & Browser Card */}
-              {isAdmin && <SQLiteDatabaseCard />}
-
               {/* Google Cloud Credentials */}
-              {isSuperuser && (
+              {activeSection === 'google-credentials' && isSuperuser && (
                 <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-g13 p-g13">
                   <div>
                     <Heading as="h4" size="xs" weight="bold">
@@ -1182,6 +1180,8 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
               )}
             </div>
           )}
+
+          {activeSection === 'database' && isAdmin && <SQLiteDatabaseCard />}
 
           {/* GROUP 2: AI & SMART AUTOMATION */}
           {activeSection === 'ai' && (

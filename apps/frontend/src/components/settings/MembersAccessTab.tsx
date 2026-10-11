@@ -38,7 +38,7 @@ interface Invitation { id: string; organizationId: string; email: string; tenant
 interface AuditEvent { id: string; createdAt: string; actorId: string; actorName: string; action: string; targetType: string; targetId: string; outcome: string; changedFields: string[]; accessMode: string }
 
 type Filter = 'active' | 'suspended' | 'pending';
-const PAGE_SIZE = 25;
+const PAGE_SIZES = [5, 10, 20, 50];
 const RANK: Record<TenantRole, number> = { admin: 4, manager: 3, editor: 2, viewer: 1 };
 
 
@@ -78,6 +78,7 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [dialog, setDialog] = useState<null | { kind: 'invite'; codeOnly?: boolean } | { kind: 'departments' } | { kind: 'history' } | { kind: 'edit'; member: Member } | { kind: 'link'; url: string; code?: string; expiresAt?: string }>(
     intent === 'departments' ? { kind: 'departments' } : intent === 'history' ? { kind: 'history' } : null,
   );
@@ -106,9 +107,9 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
   const departmentName = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments]);
   const names = (ids: string[]) => ids.map((id) => departmentName.get(id) || t('tb.other_department', 'Other department')).join(', ') || '—';
 
-  const query = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE), ...(debounced ? { search: debounced } : {}) });
+  const query = new URLSearchParams({ limit: String(pageSize), offset: String(page * pageSize), ...(debounced ? { search: debounced } : {}) });
   const membersQuery = useQuery<{ members: Member[]; total: number }>({
-    queryKey: key('members', filter, debounced, page),
+    queryKey: key('members', filter, debounced, page, pageSize),
     queryFn: ({ signal }) => orgApi(orgPath(organizationId, `/members?status=${filter}&${query}`), { signal }),
     enabled: filter !== 'pending',
   });
@@ -176,7 +177,7 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
   const loading = filter === 'pending' ? invitationsQuery.isLoading : membersQuery.isLoading;
   const failed = filter === 'pending' ? invitationsQuery.isError : membersQuery.isError;
   const total = filter === 'pending' ? invitationsQuery.data?.total || 0 : membersQuery.data?.total || 0;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <div className="flex min-w-0 flex-col gap-g13">
@@ -284,7 +285,7 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
             </Table>
           </TableScrollArea>
         )}
-        {pages > 1 && <TablePagination currentPage={page + 1} totalPages={pages} rowsPerPage={PAGE_SIZE} rowsPerPageOptions={[PAGE_SIZE]} onPageChange={next => setPage(next - 1)} onRowsPerPageChange={() => undefined} />}
+        {total > PAGE_SIZES[0] && <TablePagination currentPage={page + 1} totalPages={pages} rowsPerPage={pageSize} rowsPerPageOptions={PAGE_SIZES} onPageChange={next => setPage(next - 1)} onRowsPerPageChange={size => { setPageSize(size); setPage(0); }} />}
       </Card>
 
       {dialog?.kind === 'invite' && (
@@ -545,12 +546,13 @@ const HistoryDialog: React.FC<{ organizationId: string; onClose: () => void }> =
   const { identity } = useIdentity();
   const [dataset, setDataset] = useState<'admin' | 'activity'>('admin');
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const audit = useQuery<{ events: AuditEvent[]; total: number }>({
-    queryKey: ['org-audit', identity?.id, organizationId, page],
-    queryFn: ({ signal }) => orgApi(orgPath(organizationId, `/audit?limit=25&offset=${page * 25}`), { signal }),
+    queryKey: ['org-audit', identity?.id, organizationId, page, pageSize],
+    queryFn: ({ signal }) => orgApi(orgPath(organizationId, `/audit?limit=${pageSize}&offset=${page * pageSize}`), { signal }),
     enabled: dataset === 'admin',
   });
-  const pages = Math.max(1, Math.ceil((audit.data?.total || 0) / 25));
+  const pages = Math.max(1, Math.ceil((audit.data?.total || 0) / pageSize));
   return (
     <ModalFrame size="xl" onClose={onClose} >
       <DialogHeader title={t('tb.history', 'History')} onClose={onClose} />
@@ -584,7 +586,7 @@ const HistoryDialog: React.FC<{ organizationId: string; onClose: () => void }> =
                   </TableBody>
                 </Table>
                 </TableScrollArea>
-                {pages > 1 && <TablePagination currentPage={page + 1} totalPages={pages} rowsPerPage={25} rowsPerPageOptions={[25]} onPageChange={next => setPage(next - 1)} onRowsPerPageChange={() => undefined} />}
+                {(audit.data?.total || 0) > PAGE_SIZES[0] && <TablePagination currentPage={page + 1} totalPages={pages} rowsPerPage={pageSize} rowsPerPageOptions={PAGE_SIZES} onPageChange={next => setPage(next - 1)} onRowsPerPageChange={size => { setPageSize(size); setPage(0); }} />}
                 </Card>
             )}
           </TabsContent>

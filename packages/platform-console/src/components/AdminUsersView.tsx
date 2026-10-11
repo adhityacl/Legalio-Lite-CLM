@@ -5,7 +5,7 @@ import { useConfirm } from '../context/ConfirmDialogContext';
 import { useAlertToast } from '../context/AlertToastContext';
 import { useNavigation } from '../context/NavigationContext';
 import type { SystemSubmenu } from '../lib/appRoutes';
-import type { ConsoleAccount, ConsoleApiKey, ConsoleConfigurationSection, ConsoleDashboardTab, ConsoleMetrics, ConsoleOrganization, ConsoleSession, ConsoleUser } from './admin/types';
+import type { ConsoleAccount, ConsoleApiKey, ConsoleConfigurationSection, ConsoleMetrics, ConsoleOrganization, ConsoleSession, ConsoleUser } from './admin/types';
 import type { PlatformConfigurationSection } from './admin/PlatformConfigurationPanel';
 import { AdminDashboardTab } from './admin/AdminDashboardTab';
 import { AdminConsoleHeader } from './admin/AdminConsoleHeader';
@@ -25,10 +25,13 @@ const LazyPlatformConfigurationPanel = lazy(() => import('./admin/PlatformConfig
 
 const CONFIGURATION_SECTIONS: Record<ConsoleConfigurationSection, PlatformConfigurationSection> = {
   google: 'google',
+  'google-drive': 'google-drive',
+  'google-credentials': 'google-credentials',
   ai: 'ai',
   smtp: 'notifications',
   'ui-texts': 'language',
-  database: 'security',
+  database: 'database',
+  reset: 'security',
 };
 
 async function consoleApi<T = any>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
@@ -134,17 +137,13 @@ export const AdminUsersView: React.FC<{ initialTab?: SystemSubmenu; onManageOrga
 
       {!configurationSection && activeTab !== 'backups' && (
         <AdminConsoleHeader
-          area="system"
-          activeTab={activeTab as ConsoleDashboardTab}
-          onTabChange={navigateToTab}
-          onCreateOrgClick={() => setIsCreateOrgOpen(true)}
+          activeTab={activeTab}
           onRefresh={() => loadConsoleData(true)}
           isRefreshing={isRefreshing}
-          userCounts={{ users: users.length, sessions: sessions.length, orgs: organizations.length, teams: 0, invites: 0, apiKeys: apiKeys.length }}
         />
       )}
 
-      <div id={`admin-system-${activeTab}-panel`} role="tabpanel" aria-labelledby={`admin-system-${activeTab}-tab`} className="w-full">
+      <div id={`admin-system-${activeTab}-panel`} role="region" aria-label={activeTab} className="w-full">
         {activeTab === 'backups' ? (
           <Suspense fallback={<p role="status">{t('sys.loading', 'Loading…')}</p>}><LazySQLiteBackups /></Suspense>
         ) : configurationSection ? (

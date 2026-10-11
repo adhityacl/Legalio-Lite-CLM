@@ -55,7 +55,7 @@ const PaginationItem = forwardRef<
         'inline-flex h-control-md min-w-control-md items-center justify-center rounded-md text-sm font-medium tabular-nums',
         'cursor-pointer gap-g8 border border-border bg-background px-g8 whitespace-nowrap text-foreground no-underline select-none',
         'focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 data-disabled:pointer-events-none data-disabled:opacity-50',
-        'data-selected:border-foreground data-selected:bg-foreground data-selected:text-background [@media(hover:hover)]:hover:bg-accent [@media(hover:hover)]:data-selected:hover:bg-foreground',
+        'data-selected:border-primary data-selected:bg-primary data-selected:text-primary-foreground [@media(hover:hover)]:hover:bg-accent [@media(hover:hover)]:data-selected:hover:bg-primary',
         '[&_svg]:size-g16 [&_svg]:shrink-0',
         className,
       )}

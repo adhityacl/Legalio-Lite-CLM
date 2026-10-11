@@ -43,6 +43,19 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
 
   const tabLabel = (() => {
     switch (activeTab) {
+      case 'admin-system-dashboard': return t('admin.tab_dashboard', 'Dashboard');
+      case 'admin-system-users': return t('admin.tab_users', 'Users');
+      case 'admin-system-sessions': return t('admin.tab_sessions', 'Sessions');
+      case 'admin-system-organizations': return t('admin.tab_organizations', 'Organizations');
+      case 'admin-system-google': return t('settings.google_auth_title', 'Google Workspace Account Authentication');
+      case 'admin-system-google-drive': return t('settings.penyimpanan_file_dokumen_google_drive', 'Document File Storage (Google Drive)');
+      case 'admin-system-google-credentials': return t('google_setup.settings_title', 'Google Cloud Credentials');
+      case 'admin-system-database': return t('sqlite.sqlite_database', 'SQLite Database');
+      case 'admin-system-backups': return t('backup.title', 'Backup & Restore');
+      case 'admin-system-ai': return t('sys.nav_ai', 'AI Model');
+      case 'admin-system-smtp': return t('tb.config_smtp', 'SMTP relay');
+      case 'admin-system-ui-texts': return t('tb.config_texts_short', 'UI texts');
+      case 'admin-system-reset': return t('sys.nav_reset', 'System reset');
       case 'hierarchy': return t('nav.hierarchy', 'Struktur Dokumen');
       case 'partners': case 'partners-list': return t('nav.partners', 'Mitra Kerja');
       case 'partner-evaluation': return t('nav.partner_eval', 'Evaluasi Mitra');
@@ -63,11 +76,11 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
 
   return (
     <header className="sticky top-0 z-20 flex h-g42 shrink-0 items-center justify-between gap-g13 border-b border-border bg-muted px-g13 md:px-g34">
-      <div className="flex min-w-0 items-center gap-g8">
+      <div className="flex min-w-0 flex-1 items-center gap-g8">
         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" onClick={onOpenMobileMenu} className="md:hidden" aria-label={t('header.buka_menu_navigasi', 'Buka Menu Navigasi')}>
           <MenuIcon aria-hidden="true" />
         </Button></TooltipTrigger><TooltipBody>{t('header.buka_navigasi', 'Buka Navigasi')}</TooltipBody></Tooltip>
-        <Breadcrumbs>
+        <Breadcrumbs className="min-w-0 flex-1">
           <BreadcrumbsList>
             <BreadcrumbsItem className="hidden sm:inline-flex">{organization}</BreadcrumbsItem>
             <BreadcrumbsSeparator className="hidden sm:inline-flex" />

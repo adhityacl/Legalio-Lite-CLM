@@ -20,20 +20,20 @@ test.afterEach(async ({ page }, testInfo) => {
 async function login(page: import('@playwright/test').Page, email: string) {
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill('console-password-9');
-  await page.getByRole('button', { name: /^Sign in$/i }).click();
+  await page.getByRole('button', { name: /^Sign in(?: securely)?$/i }).click();
 }
 
 test('fresh browser logs in at /sys with no workspace frontend and preserves the requested tab', async ({ page }) => {
   await page.goto('/sys?tab=admin-system-users');
   await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Switch Language', exact: true })).toBeVisible();
+  await expect(page.getByRole('radiogroup', { name: 'Switch Language', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Register/ })).toHaveCount(0);
   await page.getByLabel('Email', { exact: true }).fill('super@example.test');
   await page.getByLabel('Password', { exact: true }).fill('wrong-password');
-  await page.getByRole('button', { name: /^Sign in$/i }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await page.getByRole('button', { name: /^Sign in(?: securely)?$/i }).click();
+  await expect(page.getByText('Incorrect email or password. Please try again.', { exact: true })).toBeVisible();
   await login(page, 'super@example.test');
-  await expect(page.getByRole('navigation', { name: 'ADMIN NAVIGATION' })).toBeVisible();
+  await expect(page.locator('[data-slot="sidebar-panel"]')).toBeVisible();
   await expect(page.getByRole('row').filter({ hasText: 'super@example.test' })).toBeVisible();
   await expect(page).toHaveURL(/\/sys\?tab=admin-system-users$/);
   await page.reload();
@@ -41,7 +41,7 @@ test('fresh browser logs in at /sys with no workspace frontend and preserves the
   await page.getByRole('button', { name: 'User Menu', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Sign Out', exact: true }).click();
   await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Sign in$/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Sign in(?: securely)?$/i })).toBeVisible();
   const workspace = await page.request.get('/app?tab=contracts');
   expect(workspace.status()).toBe(404); // backend is running API_ONLY=true, no Vite/preview
 });
@@ -50,11 +50,11 @@ test('ordinary account is denied by both the console and its APIs', async ({ pag
   await page.goto('/sys');
   await login(page, 'nomember@example.test');
   await expect(page.getByRole('heading', { name: 'System Console access denied' })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'ADMIN NAVIGATION' })).toHaveCount(0);
+  await expect(page.locator('[data-slot="sidebar-panel"]')).toHaveCount(0);
   const token = await page.evaluate(() => localStorage.getItem('auth_session_token'));
   expect((await api(token!, '/api/auth-console/users')).status).toBe(403);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-  await expect(page.getByRole('button', { name: /^Sign in$/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Sign in(?: securely)?$/i })).toBeVisible();
 });
 
 test('superuser without membership navigates all tabs, supports history, mobile, theme and language', async ({ page }, testInfo) => {
@@ -65,19 +65,19 @@ test('superuser without membership navigates all tabs, supports history, mobile,
   page.on('request', (request) => requests.push(request.url()));
   await page.goto('/sys?tab=unknown');
   await expect(page).toHaveURL(/tab=admin-system-dashboard$/);
-  const nav = page.getByRole('navigation', { name: 'ADMIN NAVIGATION' });
+  const nav = page.locator('[data-slot="sidebar-panel"]');
   await expect(nav).toBeVisible();
-  // Reuse the approved grouped sidebar entries and the existing content tabs.
-  for (const name of ['Dashboard', 'Google & storage', 'AI Model & Parser', 'SMTP relay', 'UI texts', 'Backup & Restore', 'Database & reset']) {
+  // Each sidebar destination opens its own page.
+  for (const name of ['Dashboard', 'Tenant', 'Google', 'Database', 'AI Model', 'SMTP relay', 'UI texts', 'System reset']) {
     await nav.getByRole('button', { name, exact: true }).click();
     await expect(page.locator('#sys-content')).not.toBeEmpty();
     await expect(page.locator('#sys-content')).not.toContainText('Select an organization');
     await expect(page.locator('#sys-content [role="status"]').filter({ hasText: 'Loading…' })).toHaveCount(0);
   }
   await nav.getByRole('button', { name: 'Dashboard', exact: true }).click();
-  await page.getByRole('tab', { name: /^Users/ }).click();
+  await nav.getByRole('button', { name: 'Tenant', exact: true }).click();
   await expect(page.getByRole('row').filter({ hasText: 'super@example.test' })).toBeVisible();
-  await page.getByRole('tab', { name: /^Sessions/ }).click();
+  await nav.getByRole('button', { name: 'Sessions', exact: true }).click();
   await page.goBack();
   await expect(page).toHaveURL(/tab=admin-system-users$/);
   await page.goForward();
@@ -87,10 +87,10 @@ test('superuser without membership navigates all tabs, supports history, mobile,
   await page.getByRole('button', { name: 'Switch to Dark Mode', exact: true }).click();
   await expect(page.locator('html')).toHaveClass(/dark/);
   await page.getByRole('button', { name: 'Switch Language', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: /Bahasa Indonesia/ }).click();
-  await expect(page.getByRole('navigation', { name: 'NAVIGASI ADMIN' })).toContainText('Admin Sistem');
+  await page.getByRole('menuitemradio', { name: /Bahasa Indonesia/ }).click();
+  await expect(page.locator('[data-slot="sidebar-panel"]')).toContainText('Admin Sistem');
   await page.getByRole('button', { name: 'Ganti Bahasa', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: /English/ }).click();
+  await page.getByRole('menuitemradio', { name: /English/ }).click();
   await page.setViewportSize({ width: 375, height: 812 });
   const menu = page.getByRole('button', { name: 'Open Navigation Menu', exact: true });
   await menu.click();
@@ -151,7 +151,7 @@ test('first superuser can be created through /sys on a fresh installation', asyn
     await page.getByLabel('Email', { exact: true }).fill('first@example.test');
     await page.getByLabel('Password', { exact: true }).fill('console-password-9');
     await page.getByRole('button', { name: 'Create admin account', exact: true }).click();
-    await expect(page.getByRole('navigation', { name: 'ADMIN NAVIGATION' })).toBeVisible();
+    await expect(page.locator('[data-slot="sidebar-panel"]')).toBeVisible();
     await expect(page.getByRole('row').filter({ hasText: 'first@example.test' })).toBeVisible();
   } finally { await fresh.stop(); }
 });
@@ -160,11 +160,11 @@ test('first superuser can be created through /sys on a fresh installation', asyn
 test('console reuses the approved frontend header and grouped sidebar', async ({ page }, testInfo) => {
   await signIn(page, 'super');
   await page.goto('/sys?tab=admin-system-organizations');
-  await expect(page.locator('header')).toBeVisible();
-  const sidebar = page.locator('aside');
-  await expect(sidebar.getByRole('button', { name: 'System Admin', exact: true })).toBeVisible();
-  await expect(sidebar.getByRole('button', { name: 'Google & storage', exact: true })).toBeVisible();
-  await expect(page.locator('header [data-slot="button-root"]:visible')).toHaveCount(4);
+  await expect(page.locator('header:not([data-slot="sidebar-header"])')).toBeVisible();
+  const sidebar = page.locator('[data-slot="sidebar-panel"]');
+  await expect(sidebar.getByRole('button', { name: 'Tenant', exact: true })).toBeVisible();
+  await expect(sidebar.getByRole('button', { name: 'Google', exact: true })).toBeVisible();
+  await expect(page.locator('header:not([data-slot="sidebar-header"]) button:visible')).toHaveCount(5);
   await expect(page.locator('header select')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create Organization', exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('sys-approved-shell.png'), fullPage: true });
@@ -308,4 +308,72 @@ test('system UI text editor traps focus and restores its trigger', async ({ page
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
+});
+
+test('separate system pages follow the requested sidebar hierarchy and isolate configuration panels', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await signIn(page, 'super');
+  await page.goto('/sys?tab=admin-system-dashboard');
+  const nav = page.locator('[data-slot="sidebar-panel"]');
+  await expect(nav.getByRole('button', { name: 'Tenant', exact: true })).toBeVisible();
+  await expect(nav.locator('[data-slot="sidebar-navigation-list"]').first().locator(':scope > [data-slot="sidebar-navigation-item"]')).toHaveCount(8);
+  for (const label of ['Dashboard', 'Tenant', 'Google', 'Database', 'AI Model', 'SMTP relay', 'UI texts', 'System reset']) {
+    await expect(nav.getByRole('button', { name: label, exact: true })).toBeVisible();
+  }
+  await expect(page.locator('#sys-content [role="tablist"]')).toHaveCount(0);
+  await nav.getByRole('button', { name: 'Tenant', exact: true }).click();
+  await expect(page).toHaveURL(/tab=admin-system-users$/);
+  await nav.getByRole('button', { name: 'Sessions', exact: true }).click();
+  await expect(page).toHaveURL(/tab=admin-system-sessions$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/tab=admin-system-users$/);
+  await page.goForward();
+  await expect(page).toHaveURL(/tab=admin-system-sessions$/);
+  await nav.getByRole('button', { name: 'Organizations', exact: true }).click();
+  await expect(page).toHaveURL(/tab=admin-system-organizations$/);
+  await nav.getByRole('button', { name: 'Google', exact: true }).click();
+  await expect(page).toHaveURL(/tab=admin-system-google$/);
+  const main = page.locator('#sys-content');
+  await expect(main.getByRole('heading', { name: 'Google Workspace Account Authentication', exact: true }).first()).toBeVisible();
+  await expect(main.getByRole('heading', { name: 'SQLite Database', exact: true })).toHaveCount(0);
+  await expect(main.locator('#card-master-drive-org-database')).toHaveCount(0);
+  await nav.getByRole('button', { name: 'Document File Storage (Google Drive)', exact: true }).click();
+  await expect(page).toHaveURL(/tab=admin-system-google-drive$/);
+  await expect(main.locator('#card-master-drive-org-database')).toBeVisible();
+  await expect(main.getByRole('button', { name: 'Connect Google Account', exact: true })).toHaveCount(0);
+  await nav.getByRole('button', { name: 'Google Cloud Credentials', exact: true }).click();
+  await expect(page).toHaveURL(/tab=admin-system-google-credentials$/);
+  await expect(main.getByRole('button', { name: 'Manage credential files', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(main.getByRole('button', { name: 'Manage credential files', exact: true })).toBeVisible();
+  await nav.getByRole('button', { name: 'Database', exact: true }).click();
+  await expect(page).toHaveURL(/tab=admin-system-database$/);
+  await expect(main.getByRole('heading', { name: 'SQLite Database', exact: true }).first()).toBeVisible();
+  await expect(main.getByRole('button', { name: 'Reset System Database', exact: true })).toHaveCount(0);
+  await nav.getByRole('button', { name: 'Backup & Restore', exact: true }).click();
+  await expect(page).toHaveURL(/tab=admin-system-backups$/);
+  await expect(main.getByRole('heading', { name: 'Backup & Restore', exact: true })).toBeVisible();
+  for (const [label, tab] of [['AI Model', 'ai'], ['SMTP relay', 'smtp'], ['UI texts', 'ui-texts'], ['System reset', 'reset']]) {
+    await nav.getByRole('button', { name: label, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`tab=admin-system-${tab}$`));
+    await expect(main.getByRole('heading', { name: label, exact: true })).toBeVisible();
+  }
+  await expect(main.getByRole('button', { name: 'Reset System Database', exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('system-pages-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.getByRole('button', { name: 'Open Navigation Menu', exact: true }).click();
+  const drawer = page.getByRole('dialog');
+  await drawer.getByRole('button', { name: 'Google', exact: true }).click();
+  await expect(drawer).toBeHidden();
+  await expect(page).toHaveURL(/tab=admin-system-google$/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const badge = main.locator('[data-slot="badge-root"]').first();
+  await expect(badge).toBeVisible();
+  expect(await badge.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  const breadcrumb = page.locator('header [data-slot="breadcrumbs-root"]');
+  const search = page.getByRole('button', { name: 'Search menu', exact: true });
+  const breadcrumbBox = await breadcrumb.boundingBox();
+  const searchBox = await search.boundingBox();
+  expect(breadcrumbBox!.x + breadcrumbBox!.width).toBeLessThanOrEqual(searchBox!.x);
+  await page.screenshot({ path: testInfo.outputPath('system-pages-mobile.png'), fullPage: true });
 });

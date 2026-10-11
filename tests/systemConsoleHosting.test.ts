@@ -51,3 +51,12 @@ test('legacy platform configuration and removed system tabs resolve without sele
   assert.equal(needsOrganization('admin-system-rbac', true), false);
   assert.deepEqual(resolveRoute('admin-system-rbac', context), { kind: 'denied' });
 });
+
+
+test('separate console pages are platform-only and require no organization selection', () => {
+  for (const tab of ['admin-system-google-drive', 'admin-system-google-credentials', 'admin-system-database', 'admin-system-backups', 'admin-system-reset']) {
+    assert.equal(needsOrganization(tab, true), false);
+    assert.deepEqual(resolveRoute(tab, { isPlatformAdmin: true, organizationReady: false, can: () => false }), { kind: 'allow', tab });
+    assert.deepEqual(resolveRoute(tab, { isPlatformAdmin: false, organizationReady: false, can: () => false }), { kind: 'denied' });
+  }
+});

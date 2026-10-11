@@ -4,6 +4,7 @@ import { Field as FieldPrimitive } from '@ark-ui/react/field';
 import type { ComponentProps, ComponentRef } from 'react';
 import { forwardRef } from 'react';
 import { cn } from '../../lib/cn';
+import { useStandaloneFieldId } from '../../lib/use-standalone-field-id';
 import { ChevronDownIcon } from '../../lib/icons/ui';
 
 type NativeSelectProps = ComponentProps<typeof FieldPrimitive.Select> & {
@@ -13,6 +14,7 @@ type NativeSelectProps = ComponentProps<typeof FieldPrimitive.Select> & {
 const NativeSelect = forwardRef<ComponentRef<typeof FieldPrimitive.Select>, NativeSelectProps>(
   function NativeSelect({ className, controlProps, multiple, size, ...props }, ref) {
     const isList = multiple || (size !== undefined && size > 1);
+    const id = useStandaloneFieldId(props.id, props.name);
 
     return (
       <span
@@ -24,6 +26,7 @@ const NativeSelect = forwardRef<ComponentRef<typeof FieldPrimitive.Select>, Nati
       >
         <FieldPrimitive.Select
           {...props}
+          {...(id ? { id } : {})}
           ref={ref}
           data-scope="field"
           data-part="select"

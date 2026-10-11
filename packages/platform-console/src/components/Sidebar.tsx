@@ -17,6 +17,8 @@ import {
   Mail,
   Database,
   Languages,
+  ShieldAlert,
+  Radio,
 } from 'lucide-react';
 import { AiIcon } from './icons/AiIcon';
 import { useLanguage } from '../context/LanguageContext';
@@ -107,16 +109,32 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
     ...(modules.evaluation ? [{ id: 'partner-evaluation', label: t('nav.partner_eval', 'Evaluasi Kinerja'), icon: ClipboardCheck, active: activeTab === 'partner-evaluation' }] : []),
     ...(modules.spending ? [{ id: 'partner-spending', label: t('nav.partner_spending', 'Pengeluaran Mitra'), icon: CreditCard, active: activeTab === 'partner-spending' }] : []),
   ];
-  const systemDashboardTabs = ['admin-system-dashboard', 'admin-system-users', 'admin-system-accounts', 'admin-system-sessions', 'admin-system-organizations', 'admin-system-apikeys'];
-  const systemChildren: NavLeaf[] = [
-    { id: 'admin-system-dashboard', label: t('admin.tab_dashboard', 'Dashboard'), icon: Sliders },
-    { id: 'admin-system-google', label: t('tb.config_google', 'Google & storage'), icon: Globe2 },
-    { id: 'admin-system-ai', label: t('settings.nav_ai', 'AI Model & Parser'), icon: AiIcon },
-    { id: 'admin-system-smtp', label: t('tb.config_smtp', 'SMTP relay'), icon: Mail },
-    { id: 'admin-system-ui-texts', label: t('tb.config_texts_short', 'UI texts'), icon: Languages },
-    { id: 'admin-system-backups', label: t('backup.title', 'Backup & Restore'), icon: Database },
-    { id: 'admin-system-database', label: t('tb.config_maintenance', 'Database & reset'), icon: Database },
-  ].map(item => ({ ...item, active: item.id === 'admin-system-dashboard' ? systemDashboardTabs.includes(activeTab) : activeTab === item.id }));
+  const systemLeaf = (id: string, label: string, icon: Icon): NavLeaf => ({ id: `admin-system-${id}`, label, icon, active: activeTab === `admin-system-${id}` });
+  const systemGroup = (id: string, label: string, icon: Icon, children: NavLeaf[]): NavEntry => ({ id, label, icon, children, active: children.some(child => child.active) });
+  const systemItems: NavEntry[] = [
+    systemLeaf('dashboard', t('admin.tab_dashboard', 'Dashboard'), LayoutDashboard),
+    systemGroup('system-tenant', t('sys.nav_tenant', 'Tenant'), Users, [
+      systemLeaf('users', t('admin.tab_users', 'Users'), Users),
+      systemLeaf('sessions', t('admin.tab_sessions', 'Sessions'), Radio),
+      systemLeaf('organizations', t('admin.tab_organizations', 'Organizations'), Building2),
+    ]),
+    systemGroup('system-google', t('sys.nav_google', 'Google'), Globe2, [
+      systemLeaf('google', t('settings.google_auth_title', 'Google Workspace Account Authentication'), Globe2),
+      systemLeaf('google-drive', t('settings.penyimpanan_file_dokumen_google_drive', 'Document File Storage (Google Drive)'), FileText),
+      systemLeaf('google-credentials', t('google_setup.settings_title', 'Google Cloud Credentials'), Settings),
+    ]),
+    systemGroup('system-database', t('sys.nav_database', 'Database'), Database, [
+      systemLeaf('database', t('sqlite.sqlite_database', 'SQLite Database'), Database),
+      systemLeaf('backups', t('backup.title', 'Backup & Restore'), Database),
+    ]),
+    systemLeaf('ai', t('sys.nav_ai', 'AI Model'), AiIcon),
+    systemLeaf('smtp', t('tb.config_smtp', 'SMTP relay'), Mail),
+    systemLeaf('ui-texts', t('tb.config_texts_short', 'UI texts'), Languages),
+    systemLeaf('reset', t('sys.nav_reset', 'System reset'), ShieldAlert),
+  ];
+  if (showSystemAdmin && hasPlatformPermission('platform.access')) {
+    return [{ id: 'admin', title: t('nav.system_admin', 'System Admin'), items: systemItems }];
+  }
 
   const main: NavEntry[] = [
     can('document.view') && { id: 'dashboard', label: t('nav.dashboard', 'Dashboard'), icon: LayoutDashboard, active: activeTab === 'dashboard' },
@@ -132,7 +150,6 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
   /* Administration (PRD §6.1): System Admin only in the standalone console for platform administrators,
      Import Data for tenant admins, and exactly one Settings entry for whoever may open one of its tabs. */
   const admin: NavEntry[] = [
-    showSystemAdmin && hasPlatformPermission('platform.access') && { id: 'admin-system', label: t('nav.system_admin', 'System Admin'), icon: Users, active: activeTab.startsWith('admin-system-'), children: systemChildren, target: 'admin-system-dashboard' },
     can('tenant.data.import') && { id: 'bulk-import', label: t('nav.bulk_import', 'Import Data'), icon: Upload, active: activeTab === 'bulk-import' },
     (hasPermission('tenant.settings.read') || hasPermission('tenant.member.read')) && { id: 'settings', label: t('nav.settings', 'Pengaturan'), icon: Settings, active: activeTab.startsWith('settings') },
   ].filter(Boolean) as NavEntry[];
@@ -172,9 +189,11 @@ function NavigationGroupItem({ item, onNavigate, withTooltip }: {
           {item.children!.map(child => (
             <SidebarNavigationSubItem key={child.id}>
               {/* moduix renders an <a>; without an href it is not focusable, so use a real button. */}
-              <SidebarNavigationSubButton asChild active={child.active} aria-current={child.active ? 'page' : undefined}>
-                <button type="button" onClick={() => onNavigate(child.id)}>{child.label}</button>
-              </SidebarNavigationSubButton>
+              <Tooltip><TooltipTrigger asChild>
+                <SidebarNavigationSubButton asChild active={child.active} aria-current={child.active ? 'page' : undefined}>
+                  <button type="button" onClick={() => onNavigate(child.id)}><span className="truncate">{child.label}</span></button>
+                </SidebarNavigationSubButton>
+              </TooltipTrigger><TooltipBody>{child.label}</TooltipBody></Tooltip>
             </SidebarNavigationSubItem>
           ))}
         </SidebarNavigationSubList>

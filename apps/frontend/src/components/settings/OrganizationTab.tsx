@@ -28,10 +28,9 @@ import { Textarea } from '@legalio/ui-components/textarea';
 import { Alert, AlertActions, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 import { Badge } from '@legalio/ui-components/badge';
 import { Field, FieldLabel, FieldHelperText, FieldErrorText } from '@legalio/ui-components/field';
-import { DialogTitle } from '@legalio/ui-components/dialog';
+import { DialogCloseIcon, DialogDescription, DialogTitle } from '@legalio/ui-components/dialog';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
 import { Heading } from '@legalio/ui-components/heading';
-import { Avatar, AvatarFallback, AvatarImage } from '@legalio/ui-components/avatar';
 import { NumberInput, NumberInputControl, NumberInputDecrementTrigger, NumberInputIncrementTrigger, NumberInputInput } from '@legalio/ui-components/number-input';
 export type { OrganizationSettingsDto } from '@legalio/types/organizationSettings';
 
@@ -252,10 +251,6 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
           <Field>
             <Text id={`${ids.logo}-label`} size="sm" weight="medium">{t('admin.org_logo_label', 'Logo Organisasi / Workspace')}</Text>
             <div className="flex items-center gap-g13">
-              <Avatar className="size-g55">
-                {profile.logoUrl && <AvatarImage src={profile.logoUrl} alt={profile.name} />}
-                <AvatarFallback><Building2 className="size-g26 text-accent-foreground" aria-hidden="true" /></AvatarFallback>
-              </Avatar>
               <Button id={ids.logo} type="button" variant="outline" aria-describedby={`${ids.logo}-label`} disabled={!canEdit} onClick={() => { setDraftLogo(profile.logoUrl); setLogoDialogOpen(true); }}>{t('admin.logo_mode_upload', 'Unggah File Gambar')}</Button>
             </div>
           </Field>
@@ -410,12 +405,17 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
       }), remindersValid && emailsValid)}
       </Accordion>
       {logoDialogOpen && (
-        <ModalFrame onClose={() => setLogoDialogOpen(false)} className="w-full max-w-g377 p-g21">
-          <DialogTitle className="flex items-center gap-g8">{t('admin.org_logo_label', 'Logo Organisasi / Workspace')}</DialogTitle>
-          <LogoUploadField logo={draftLogo} name={profile.name} onChange={setDraftLogo} />
-          <p className={hintClass}>{t('admin.logo_raster_type', 'PNG, JPG, WebP. Max 2 MB.')}</p>
-          <div className="mt-g21 flex justify-end gap-g8">
-            <Button type="button" variant="ghost" onClick={() => setLogoDialogOpen(false)}>{t('admin.btn_cancel', 'Batal')}</Button>
+        <ModalFrame size="md" onClose={() => setLogoDialogOpen(false)} className="gap-g21 p-g21">
+          <div className="flex items-start justify-between gap-g13">
+            <div className="flex flex-col gap-g3">
+              <DialogTitle className="text-xl font-bold">{t('admin.org_logo_title', 'Organization Logo')}</DialogTitle>
+              <DialogDescription className="text-sm">{t('admin.org_logo_subtitle', 'Upload a clear logo for your organization workspace.')}</DialogDescription>
+            </div>
+            <DialogCloseIcon aria-label={t('common.close', 'Close')} />
+          </div>
+          <LogoUploadField logo={draftLogo} name={profile.name} onChange={setDraftLogo} hideLabel label={t('admin.org_logo_title', 'Organization Logo')} />
+          <div className="flex justify-end gap-g8">
+            <Button type="button" variant="outline" onClick={() => setLogoDialogOpen(false)}>{t('admin.btn_cancel', 'Batal')}</Button>
             <Button type="button" disabled={!canEdit} onClick={() => { setProfile({ ...profile, logoUrl: draftLogo }); setLogoDialogOpen(false); }}>{t('admin.btn_apply', 'Terapkan')}</Button>
           </div>
         </ModalFrame>

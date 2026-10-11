@@ -54,7 +54,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [runningCron, setRunningCron] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
 
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     time: true,

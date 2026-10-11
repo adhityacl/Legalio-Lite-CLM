@@ -135,3 +135,5 @@ CLAUDE.md
 AGENTS.md
 GEMINI.md
 .migration/
+.dockerignore
+.agents/skills/moduix

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Link2, Trash2, Upload } from 'lucide-react';
+import { Info, Link2, Trash2, Upload } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAlertToast } from '../../context/AlertToastContext';
 
 import { Button } from '@legalio/ui-components/button';
 import { Input } from '@legalio/ui-components/input';
-import { Card } from '@legalio/ui-components/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@legalio/ui-components/avatar';
 import { FileUpload, FileUploadDropzone, FileUploadHiddenInput } from '@legalio/ui-components/file-upload';
 import { Text } from '@legalio/ui-components/text';
@@ -17,6 +16,8 @@ interface LogoUploadFieldProps {
   name: string;
   onChange: (logo: string) => void;
   label?: string;
+  /** Hide the field label when a dialog title already names the field. */
+  hideLabel?: boolean;
 }
 
 export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
@@ -24,6 +25,7 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
   name,
   onChange,
   label,
+  hideLabel = false,
 }) => {
   const { t } = useLanguage();
   const showAlert = useAlertToast();
@@ -79,23 +81,17 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
 
   const fieldLabel = label || t('admin.org_logo_label', 'Logo Organisasi / Workspace');
   return (
-    <Field className="gap-g8">
-      <div className="flex items-center justify-between gap-g8">
-        <FieldLabel>{fieldLabel}</FieldLabel>
-        <Button variant="link" size="sm" onClick={() => setIsUrlMode(!isUrlMode)}>
-          <Link2 aria-hidden="true" />
-          {isUrlMode ? t('admin.logo_mode_upload', 'Unggah File Gambar') : t('admin.logo_mode_url', 'Gunakan URL Gambar')}
-        </Button>
-      </div>
+    <Field className="gap-g13">
+      {!hideLabel && <FieldLabel>{fieldLabel}</FieldLabel>}
 
-      <Card size="sm" className="flex-row items-center gap-g13 p-g8">
+      <div className="flex w-full items-center gap-g13 rounded-lg border border-border bg-muted p-g13">
         <div className="relative shrink-0">
-          <Avatar size="lg">
-            {logo && <AvatarImage src={logo} alt={name || t('admin.logo', 'Logo')} />}
-            <AvatarFallback className="bg-primary text-primary-foreground">{fallbackLetter}</AvatarFallback>
+          <Avatar size="xl" className="size-g68 rounded-md">
+            {logo && <AvatarImage src={logo} alt={name || t('admin.logo', 'Logo')} className="rounded-md" />}
+            <AvatarFallback className="rounded-md bg-primary text-primary-foreground">{fallbackLetter}</AvatarFallback>
           </Avatar>
           {logo && (
-            <Tooltip><TooltipTrigger asChild><Button variant="destructive" size="icon-sm" onClick={handleRemove} className="absolute -end-g8 -top-g8 size-g26 min-w-g26 rounded-full"
+            <Tooltip><TooltipTrigger asChild><Button variant="destructive" size="icon-sm" onClick={handleRemove} className="absolute -end-g8 -top-g8 rounded-full"
               aria-label={t('admin.btn_remove_logo', 'Hapus Logo')}>
               <Trash2 className="size-g13" aria-hidden="true" />
             </Button></TooltipTrigger><TooltipBody>{t('admin.btn_remove_logo', 'Hapus Logo')}</TooltipBody></Tooltip>
@@ -107,9 +103,10 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
             <FileUpload key={uploadKey} accept="image/png,image/jpeg,image/webp" maxFiles={1} maxFileSize={2 * 1024 * 1024}
               onFileAccept={details => handleFileChange(details.files[0])}
               onFileReject={details => handleFileReject(details.files[0]?.errors)}>
-              <FileUploadDropzone className="min-h-g55 flex-row gap-g5 p-g8">
-                <Upload className="size-g13 text-accent-foreground" aria-hidden="true" />
-                <Text as="span" size="xs" tone="muted">{t('admin.logo_upload_cta', 'Pilih atau Tarik Logo')}</Text>
+              <FileUploadDropzone className="min-h-0 gap-g3 border-solid bg-card p-g13">
+                <Upload className="size-g16 text-muted-foreground" aria-hidden="true" />
+                <Text as="span" size="sm" weight="semibold" className="text-foreground">{t('admin.logo_choose_drag', 'Choose or drag a logo')}</Text>
+                <Text as="span" size="xs" tone="muted">{t('admin.logo_dropzone_hint', 'PNG, JPG, or WebP up to 2 MB')}</Text>
               </FileUploadDropzone>
               <FileUploadHiddenInput aria-label={fieldLabel} />
             </FileUpload>
@@ -120,7 +117,17 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
             </div>
           )}
         </div>
-      </Card>
+      </div>
+
+      <div className="flex w-full flex-wrap items-center justify-between gap-g8">
+        <Text as="span" size="xs" tone="muted" className="flex items-center gap-g5">
+          <Info className="size-g13 shrink-0" aria-hidden="true" />{t('admin.logo_raster_type', 'PNG, JPG, WebP. Max 2 MB.')}
+        </Text>
+        <Button variant="outline" size="sm" onClick={() => setIsUrlMode(!isUrlMode)}>
+          {isUrlMode ? <Upload aria-hidden="true" /> : <Link2 aria-hidden="true" />}
+          {isUrlMode ? t('admin.logo_mode_upload', 'Unggah File Gambar') : t('admin.logo_mode_url', 'Gunakan URL Gambar')}
+        </Button>
+      </div>
     </Field>
   );
 };

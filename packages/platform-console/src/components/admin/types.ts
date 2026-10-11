@@ -9,7 +9,7 @@ export type ConsoleDashboardTab =
   | 'apikeys';
 
 /** Configuration pages exposed directly in the System Admin sidebar. */
-export type ConsoleConfigurationSection = 'google' | 'ai' | 'smtp' | 'ui-texts' | 'database';
+export type ConsoleConfigurationSection = 'google' | 'google-drive' | 'google-credentials' | 'ai' | 'smtp' | 'ui-texts' | 'database' | 'reset';
 
 /** System Admin console sections (platform-only, PRD §6.6). */
 export type ConsoleSubmenu = ConsoleDashboardTab | ConsoleConfigurationSection | 'accounts';

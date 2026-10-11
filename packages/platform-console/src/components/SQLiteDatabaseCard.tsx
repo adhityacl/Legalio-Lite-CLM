@@ -7,8 +7,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Table as TableIcon,
-  ChevronLeft,
-  ChevronRight,
   Layers,
   HardDrive,
   Activity,
@@ -30,6 +28,7 @@ import { Dialog, DialogBackdrop, DialogBody, DialogCloseIcon, DialogContent, Dia
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { Spinner } from '@legalio/ui-components/spinner';
 import { Text } from '@legalio/ui-components/text';
+import { TablePagination } from './ui/TablePagination';
 interface SQLiteStatus {
   status: string;
   journalMode: string;
@@ -75,7 +74,7 @@ export const SQLiteDatabaseCard: React.FC = () => {
   const [tableData, setTableData] = useState<TableDataResponse | null>(null);
   const [search, setSearch] = useState<string>('');
   const [offset, setOffset] = useState<number>(0);
-  const limit = 15;
+  const [limit, setLimit] = useState(5);
 
   const [loadingStatus, setLoadingStatus] = useState<boolean>(false);
   const [loadingData, setLoadingData] = useState<boolean>(false);
@@ -122,14 +121,14 @@ export const SQLiteDatabaseCard: React.FC = () => {
     }
   };
 
-  const fetchTableData = async (table: string, currentOffset = 0, currentSearch = '') => {
+  const fetchTableData = async (table: string, currentOffset = 0, currentSearch = '', pageLimit = limit) => {
     if (!table) return;
     setLoadingData(true);
     try {
       const headers = getAuthHeaders();
       const params = new URLSearchParams({
         table,
-        limit: String(limit),
+        limit: String(pageLimit),
         offset: String(currentOffset),
       });
       if (currentSearch.trim()) {
@@ -416,39 +415,14 @@ export const SQLiteDatabaseCard: React.FC = () => {
               )}
             </TableScrollArea>
 
-            {/* Pagination Controls */}
             {tableData && tableData.total > 0 && (
-              <div className="p-g8 bg-card border-t border-border flex items-center justify-between text-xs">
-                <Text as="span" size="xs" tone="muted" className="font-mono">
-                  {offset + 1} {t('sqlite.of', '- {value} of {total}', { value: Math.min(offset + limit, tableData.total), total: tableData.total })}
-                </Text>
-
-                <div className="flex items-center gap-g3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-md"
-                    onClick={() => handlePageChange(Math.max(0, offset - limit))}
-                    aria-label={t('pagination.prev_page', 'Previous Page')}
-                    disabled={offset === 0 || loadingData}
-                  >
-                    <ChevronLeft className="w-g13 h-g13" />
-                  </Button>
-                  <Text as="span" size="xs" tone="muted" className="px-g8 font-mono">
-                    {currentPage}/{totalPages}
-                  </Text>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-md"
-                    onClick={() => handlePageChange(offset + limit)}
-                    aria-label={t('pagination.next_page', 'Next Page')}
-                    disabled={offset + limit >= tableData.total || loadingData}
-                  >
-                    <ChevronRight className="w-g13 h-g13" />
-                  </Button>
-                </div>
-              </div>
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                rowsPerPage={limit}
+                onPageChange={next => handlePageChange((next - 1) * limit)}
+                onRowsPerPageChange={size => { setLimit(size); setOffset(0); fetchTableData(selectedTable, 0, search, size); }}
+              />
             )}
           </div>
         </div>

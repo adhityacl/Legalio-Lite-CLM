@@ -86,7 +86,7 @@ export const IOView: React.FC<IOViewProps> = ({
   // Row selection & Pagination State
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
   const [pageIndex, setPageIndex] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
 
   // Sorting State
   type SortField = 'no' | 'judul' | 'partner' | 'pricing' | 'value' | 'duration' | 'status';
@@ -686,7 +686,6 @@ export const IOView: React.FC<IOViewProps> = ({
           currentPage={pageIndex + 1}
           totalPages={pageCount}
           rowsPerPage={pageSize}
-          rowsPerPageOptions={[10, 20, 50, 100]}
           onPageChange={(page) => setPageIndex(page - 1)}
           onRowsPerPageChange={(size) => {
             setPageSize(size);
