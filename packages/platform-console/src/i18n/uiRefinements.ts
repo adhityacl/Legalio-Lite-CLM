@@ -158,7 +158,9 @@ export const UI_REFINEMENTS = {
     "admin.org_logo_title": "Logo Organisasi",
     "admin.org_logo_subtitle": "Unggah logo yang jelas untuk workspace organisasi Anda.",
     "admin.logo_choose_drag": "Pilih atau tarik logo",
-    "admin.logo_dropzone_hint": "PNG, JPG, atau WebP hingga 2 MB"
+    "admin.logo_dropzone_hint": "PNG, JPG, atau WebP hingga 2 MB",
+    "login.footer_privacy": "Privasi",
+    "login.footer_terms": "Ketentuan"
   },
   "EN": {
     "ui.recent_documents": "Latest Documents",
@@ -302,8 +304,8 @@ export const UI_REFINEMENTS = {
     "login.request_access": "Request access",
     "login.have_account": "Already have an account?",
     "login.sign_in_link": "Sign in",
-    "login.hero_title": "All in one workspace for partners, contracts, and spending.",
-    "login.hero_desc": "Monitor agreements, discuss with AI, upload supporting documents, evaluate vendors, and keep every operational record organized.",
+    "login.hero_title": "All in one workspace for partner, contracts, and spending tracker.",
+    "login.hero_desc": "Monitor agreements, discuss with AI, upload supporting documents, evaluate vendors, and keep every operational record organized",
     "contract_creator.ai_template.notes_label": "Notes / Description",
     "contract_creator.ai_template.type_label": "Type",
     "contract_creator.custom_field_builder.title": "Create New Field",
@@ -319,7 +321,9 @@ export const UI_REFINEMENTS = {
     "admin.org_logo_title": "Organization Logo",
     "admin.org_logo_subtitle": "Upload a clear logo for your organization workspace.",
     "admin.logo_choose_drag": "Choose or drag a logo",
-    "admin.logo_dropzone_hint": "PNG, JPG, or WebP up to 2 MB"
+    "admin.logo_dropzone_hint": "PNG, JPG, or WebP up to 2 MB",
+    "login.footer_privacy": "Privacy",
+    "login.footer_terms": "Terms"
   },
   "ZH": {
     "ui.recent_documents": "最新文档",
@@ -480,6 +484,8 @@ export const UI_REFINEMENTS = {
     "admin.org_logo_title": "组织标志",
     "admin.org_logo_subtitle": "为您的组织工作区上传清晰的标志。",
     "admin.logo_choose_drag": "选择或拖放标志",
-    "admin.logo_dropzone_hint": "PNG、JPG 或 WebP，最大 2 MB"
+    "admin.logo_dropzone_hint": "PNG、JPG 或 WebP，最大 2 MB",
+    "login.footer_privacy": "隐私",
+    "login.footer_terms": "条款"
   }
 };

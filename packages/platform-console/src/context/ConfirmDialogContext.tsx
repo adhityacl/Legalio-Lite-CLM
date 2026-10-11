@@ -70,8 +70,8 @@ export const ConfirmDialogProvider: React.FC<{ children: React.ReactNode }> = ({
             >
               <Icon className="size-g26" />
             </span>
-            <DialogTitle>{options?.title || t('confirm.default_title', 'Konfirmasi')}</DialogTitle>
-            <DialogDescription className="mt-g8 whitespace-pre-line">{options?.description}</DialogDescription>
+            <DialogTitle className="text-md">{options?.title || t('confirm.default_title', 'Konfirmasi')}</DialogTitle>
+            <DialogDescription className="mt-g8 whitespace-pre-line text-sm">{options?.description}</DialogDescription>
             {/* Cancel is first in DOM so it receives default focus on open (safe default per UX Planet). */}
             <DialogFooter className="w-full justify-center">
               <Button variant="outline" onClick={() => settle(false)}>

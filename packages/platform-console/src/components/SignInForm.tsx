@@ -11,7 +11,6 @@ import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@
 import { Input } from '@legalio/ui-components/input';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { PasswordInput, PasswordInputControl, PasswordInputIndicator, PasswordInputInput, PasswordInputLabel, PasswordInputVisibilityTrigger } from '@legalio/ui-components/password-input';
-import { SegmentGroup, SegmentGroupIndicator, SegmentGroupItems } from '@legalio/ui-components/segment-group';
 import { Separator } from '@legalio/ui-components/separator';
 import { Text } from '@legalio/ui-components/text';
 import { capturePendingInvitation, loadInvitationPreview, type InvitationPreview } from './account/InvitationPrompt';
@@ -275,23 +274,22 @@ const AuthShell: React.FC<{ children: React.ReactNode; language: Language; setLa
   <main className="auth-backdrop relative isolate flex min-h-dvh w-full overflow-x-hidden bg-auth-ink text-auth-foreground">
     <div aria-hidden="true" className="auth-glow-blue pointer-events-none absolute -start-g55 -top-g55 -z-10 size-g233 rounded-full lg:start-g68 lg:top-g89 lg:size-g610" />
     <div aria-hidden="true" className="auth-glow-violet pointer-events-none absolute end-0 top-g377 -z-10 size-g233 rounded-full lg:end-g89 lg:top-g110 lg:size-g377" />
-    <div className="absolute end-g21 top-g34 lg:hidden"><LanguageSwitcher language={language} setLanguage={setLanguage} t={t} /></div>
+    <div className="absolute end-g21 top-g34 lg:end-g42"><LanguageSwitcher language={language} setLanguage={setLanguage} t={t} /></div>
     <div className="mx-auto flex w-full max-w-g1597 flex-col gap-g21 px-g21 py-g34 lg:flex-row lg:items-center lg:justify-between lg:gap-g55 lg:px-g110 lg:py-g89">
       <section className="flex max-w-g610 flex-col gap-g21 lg:gap-g34">
         <Image src={new URL('../assets/logo-light.png', import.meta.url).href} alt="Legalio" layout="fixed" height={42} width={206} className="h-g34 w-auto self-start object-contain lg:h-g42" />
         <div className="flex flex-col gap-g13 lg:gap-g21">
-          <p className="text-2xl font-extrabold leading-snug lg:text-3xl">{t('login.hero_title', 'All in one workspace for partners, contracts, and spending.')}</p>
-          <p className="text-sm text-auth-muted lg:text-md lg:leading-relaxed">{t('login.hero_desc', 'Monitor agreements, discuss with AI, upload supporting documents, evaluate vendors, and keep every operational record organized.')}</p>
+          <p className="text-2xl font-extrabold leading-snug lg:text-3xl">{t('login.hero_title', 'All in one workspace for partner, contracts, and spending tracker.')}</p>
+          <p className="text-sm text-auth-muted lg:text-md lg:leading-relaxed">{t('login.hero_desc', 'Monitor agreements, discuss with AI, upload supporting documents, evaluate vendors, and keep every operational record organized')}</p>
         </div>
       </section>
       <div className="flex w-full flex-col items-center gap-g21 lg:w-g377 lg:shrink-0">
-        <div className="hidden self-end lg:block"><LanguageSwitcher language={language} setLanguage={setLanguage} t={t} /></div>
         {children}
         <Text size="xs" className="flex flex-wrap items-center justify-center gap-x-g5 text-auth-muted">
-          <span>© {new Date().getFullYear()} ACL •</span>
-          <Button variant="link" size="sm" className="h-auto px-0 text-auth-muted no-underline hover:underline" onClick={onOpenPrivacy}>{t('footer.privacy_policy', 'Privacy Policy')}</Button>
+          <span>{new Date().getFullYear()} ACL •</span>
+          <Button variant="link" size="sm" className="h-auto px-0 text-auth-muted no-underline hover:text-auth-foreground hover:underline" onClick={onOpenPrivacy}>{t('login.footer_privacy', 'Privacy')}</Button>
           <span>&amp;</span>
-          <Button variant="link" size="sm" className="h-auto px-0 text-auth-muted no-underline hover:underline" onClick={onOpenTerms}>{t('footer.terms_of_service', 'Terms of Service')}</Button>
+          <Button variant="link" size="sm" className="h-auto px-0 text-auth-muted no-underline hover:text-auth-foreground hover:underline" onClick={onOpenTerms}>{t('login.footer_terms', 'Terms')}</Button>
           <span>{t('login.footer_apply', 'apply')}</span>
         </Text>
       </div>
@@ -301,8 +299,15 @@ const AuthShell: React.FC<{ children: React.ReactNode; language: Language; setLa
 
 /** Language choice before sign-in; the in-app header offers the same options. */
 const LanguageSwitcher: React.FC<{ language: Language; setLanguage: (lang: Language) => void; t: (k: string, d?: string) => string }> = ({ language, setLanguage, t }) => (
-  <SegmentGroup className="rounded-full border-auth-foreground/15 bg-auth-foreground/10 [&_[data-part=item]]:rounded-full [&_[data-part=item]]:text-auth-muted [&_[data-part=item][data-state=checked]]:text-auth-ink [&_[data-part=indicator]]:rounded-full [&_[data-part=indicator]]:bg-auth-foreground" aria-label={t('header.switch_language', 'Pilih bahasa')} value={language} onValueChange={details => details.value && setLanguage(details.value as Language)}>
-    <SegmentGroupIndicator />
-    <SegmentGroupItems items={LANGUAGE_OPTIONS.map(option => ({ value: option.code, label: option.label }))} />
-  </SegmentGroup>
+  <div role="group" aria-label={t('header.switch_language', 'Pilih bahasa')} className="flex items-center gap-g5 text-xs font-semibold">
+    {LANGUAGE_OPTIONS.map((option, index) => (
+      <React.Fragment key={option.code}>
+        {index > 0 && <span aria-hidden="true" className="text-auth-muted/60">/</span>}
+        <Button type="button" variant="link" size="sm" lang={option.htmlLang} aria-pressed={language === option.code} aria-label={option.nativeName} onClick={() => setLanguage(option.code)}
+          className={`h-auto px-0 text-xs font-semibold no-underline hover:underline ${language === option.code ? 'text-auth-foreground' : 'text-auth-muted/70'} hover:text-auth-foreground`}>
+          {option.label}
+        </Button>
+      </React.Fragment>
+    ))}
+  </div>
 );
