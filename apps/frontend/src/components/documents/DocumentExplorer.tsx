@@ -427,7 +427,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                 </Table>
               </TableScrollArea>
 
-              {data.total > 0 && <TablePagination
+              <TablePagination
                 currentPage={data.page}
                 totalPages={totalPages}
                 rowsPerPage={limit}
@@ -437,7 +437,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
                   setLimit(size);
                   setPage(1);
                 }}
-              />}
+              />
             </>
           )}
         </section></Card>

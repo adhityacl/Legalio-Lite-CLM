@@ -2,6 +2,7 @@ import { SQLiteBackups } from './sqliteBackups';
 import { createSQLiteBackupRouter } from './sqliteBackupRoutes';
 import { mountSystemConsole } from './systemConsoleHosting';
 import "dotenv/config";
+import { getPublicBaseUrl, normalizePublicUrl, saveInstallationPublicUrl } from './installationSettings';
 import type { UITextOverrides } from '@legalio/types/uiTexts';
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
@@ -35,6 +36,7 @@ import {
   syncDbToSqlite,
   loadCoreDataFromSqlite,
   setVerificationMailer,
+  reloadAuthConfiguration,
 } from "./lib/auth";
 import {
   authConsoleRouter,
@@ -7368,23 +7370,33 @@ const needsFirstRunSetup = () => !sqliteDb.prepare(`SELECT 1 FROM "user" WHERE r
 
 // Unauthenticated: tells the sign-in page whether to show the first-run setup form instead.
 app.get("/api/system/public-status", (_req: express.Request, res: express.Response) => {
-  res.json({
+  res.set('Cache-Control', 'no-store').json({
     appName: db.branding?.appName || DEFAULT_BRANDING.appName,
     needsSetup: !migrationBlock && needsFirstRunSetup(),
+    publicUrl: getPublicBaseUrl(),
     migrationRequired: Boolean(migrationBlock),
   });
 });
 
 // Unauthenticated, and only usable while no Superuser exists: creates the first admin.
 app.post("/api/system/setup", async (req: express.Request, res: express.Response) => {
+  if (!needsFirstRunSetup()) {
+    return res.status(409).json({ error: "ALREADY_SET_UP", message: "An administrator already exists. Please sign in." });
+  }
+  let publicUrl: string;
+  try {
+    publicUrl = normalizePublicUrl(req.body?.publicUrl);
+    if (process.env.BETTER_AUTH_URL?.trim() && publicUrl !== getPublicBaseUrl()) {
+      throw new Error(`The deployment already specifies the website URL ${getPublicBaseUrl()}. Use that URL for setup.`);
+    }
+  } catch (err: any) {
+    return res.status(400).json({ error: "INVALID_PUBLIC_URL", message: err.message });
+  }
   const name = String(req.body?.name || "").trim().slice(0, 200);
   const email = String(req.body?.email || "").trim().toLowerCase();
   const password = String(req.body?.password || "");
   if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8) {
     return res.status(400).json({ error: "INVALID_SETUP", message: "Enter your name, a valid email, and a password of at least 8 characters." });
-  }
-  if (!needsFirstRunSetup()) {
-    return res.status(409).json({ error: "ALREADY_SET_UP", message: "An administrator already exists. Please sign in." });
   }
   const hashed = await hashPassword(password);
   const id = `usr_${crypto.randomUUID()}`;
@@ -7404,6 +7416,7 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
         INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer)
         VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')
       `).run(`acc_${id}`, id, id, hashed, now, now);
+      saveInstallationPublicUrl(sqliteDb, publicUrl);
       return true;
     }).immediate(); // write lock before the check: concurrent setups cannot both pass
     if (!created) {
@@ -7412,13 +7425,14 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
   } catch (err: any) {
     return res.status(err?.status || 500).json({ error: "SETUP_FAILED", message: err?.message || "Setup failed." });
   }
+  reloadAuthConfiguration();
   appendAudit(sqliteDb, { actorId: id, actorPlatformRole: "superuser", accessMode: "platform", requestId: String((req as any).requestId || crypto.randomUUID()) }, {
-    organizationId: null, action: "platform.setup", targetType: "installation", targetId: "installation", outcome: "success", changedFields: ["superuser"],
+    organizationId: null, action: "platform.setup", targetType: "installation", targetId: "installation", outcome: "success", changedFields: ["superuser", "publicUrl"],
   });
   // Outside production the demo-workspace logins stay usable with the same password.
   if (!IS_TEST_MODE) await ensureUserAccountsExist(password);
   console.log(`First-run setup: created superuser ${email}`);
-  res.status(201).json({ success: true });
+  res.status(201).json({ success: true, publicUrl });
 });
 
 app.get("/api/system/status", async (req: express.Request, res: express.Response) => {
@@ -7533,7 +7547,7 @@ app.use("/api", createOrganizationAdminRouter({
       row?.organizationId === organizationId && normalizeDepartmentName(row.pic_internal || row.internal_pic) === key));
   },
   inviteUrl: (req: express.Request, token: string) => {
-    const base = (process.env.BETTER_AUTH_URL || "").replace(/\/$/, "") || `${req.protocol}://${req.get("host")}`;
+    const base = getPublicBaseUrl() || `${req.protocol}://${req.get("host")}`;
     return `${base}/?accept_invite=${encodeURIComponent(token)}`;
   },
   sendInvitation: async ({ email, organizationName, tenantRole, inviteUrl, expiresAt, inviterName }) => {

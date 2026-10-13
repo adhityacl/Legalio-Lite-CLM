@@ -78,6 +78,8 @@ interface PartnersViewProps {
   evaluations?: PartnerEvaluation[];
   onRefreshData?: () => void;
   initialSubTab?: 'list' | 'evaluation';
+  openEvaluationId?: string;
+  onEvaluationOpened?: () => void;
   onAddPartner: () => void;
   onEditPartner: (partner: Partner) => void;
   onDeletePartner: (id: string, name: string) => void;
@@ -90,6 +92,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   evaluations = [],
   onRefreshData,
   initialSubTab = 'list',
+  openEvaluationId,
+  onEvaluationOpened,
   onAddPartner,
   onEditPartner,
   onDeletePartner,
@@ -401,6 +405,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
     <div className="space-y-g21">
       {subTab === 'evaluation' ? (
         <PartnerEvaluationView
+          openEvaluationId={openEvaluationId}
+          onEvaluationOpened={onEvaluationOpened}
           partners={partners}
           contracts={contracts}
           evaluations={evaluations}

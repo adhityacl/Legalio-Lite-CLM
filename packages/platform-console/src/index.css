@@ -27,6 +27,34 @@
   }
 }
 
+/* Fit the auth scene to short laptop viewports before reducing readable text. */
+@media (min-width: 48rem) and (max-width: 63.999rem) {
+  .auth-layout { flex-direction: row; align-items: center; gap: 26px; padding-inline: 26px; }
+  .auth-hero { flex: 1; }
+  .auth-form { flex-shrink: 0; }
+}
+
+@media (min-width: 48rem) and (max-height: 800px) {
+  .auth-layout { padding-block: 21px; }
+  .auth-card { padding: 21px; gap: 13px; }
+  .auth-card h1 { font-size: 26px; line-height: 34px; }
+  .auth-form { gap: 13px; }
+  .auth-hero { gap: 21px; }
+  .auth-hero p:first-child { font-size: 34px; line-height: 1.25; }
+}
+
+@media (min-width: 48rem) and (max-height: 650px) {
+  .auth-language { padding-top: 8px; }
+  .auth-layout { padding-block: 13px; }
+  .auth-card { padding: 13px 21px; gap: 8px; }
+  .auth-card form { gap: 8px; }
+  .auth-form { gap: 8px; }
+  .auth-hero p:first-child { font-size: 26px; }
+  .auth-setup-card { padding-block: 8px; }
+  .auth-setup-card h1 { font-size: 21px; line-height: 26px; }
+  .auth-setup-card form { gap: 5px; }
+}
+
 /* Keyboard users can jump past the navigation; visible only while focused. */
 .skip-link {
   position: fixed;

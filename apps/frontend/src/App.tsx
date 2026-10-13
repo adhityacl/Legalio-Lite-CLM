@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SignInForm } from './components/SignInForm';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -45,6 +45,7 @@ import {
 import { getCachedAccessToken, invalidateGoogleToken } from './lib/googleAuthService';
 import { getAuthHeaders } from './lib/apiFetch';
 import { useWorkspaceData } from './features/workspace/useWorkspaceData';
+import { buildWorkspaceSearchResults, type WorkspaceSearchResult } from '@legalio/platform-console/lib/workspaceSearch';
 import { AIChatLauncher } from './components/AIChatLauncher';
 import { PermissionProvider, usePermissions } from './lib/permissions';
 import { OrganizationOnboarding } from './components/account/OrganizationOnboarding';
@@ -154,10 +155,13 @@ const MainApp: React.FC = () => {
     return () => window.removeEventListener('organization-switched', onSwitched);
   }, [activeTab, replaceActiveTab]);
 
-  const { contracts, ios, partners, notifications, evaluations, spendings, googleConfig,
+  const { organizationId: dataOrganizationId, contracts, ios, partners, notifications, evaluations, spendings, googleConfig,
     timestamp: lastSyncTimestamp, updateData, cancelPendingLoad, loadAllData, workspaceLoading, workspaceError } = useWorkspaceData();
-  const [calendarDocument, setCalendarDocument] = useState<{ kind: 'contract' | 'io'; id: string } | null>(null);
-  useEffect(() => { setCalendarDocument(null); }, [activeTenantId]);
+  const [recordToOpen, setRecordToOpen] = useState<{ kind: WorkspaceSearchResult['kind']; id: string } | null>(null);
+  useEffect(() => { setRecordToOpen(null); }, [activeTenantId]);
+  const searchResults = useMemo(() => caps.status === 'ready' && dataOrganizationId === activeTenantId
+    ? buildWorkspaceSearchResults({ organizationId: activeTenantId, partners, contracts, ios, evaluations, spendings }, user)
+    : [], [caps.status, dataOrganizationId, activeTenantId, partners, contracts, ios, evaluations, spendings, user]);
 
   // Modal States
   const [showContractModal, setShowContractModal] = useState(false);
@@ -586,6 +590,12 @@ const MainApp: React.FC = () => {
         {t('app.skip_to_content', 'Lewati ke konten utama')}
       </a>
       <AppShell
+        searchResults={searchResults}
+        searchLoading={workspaceLoading}
+        onSelectSearchResult={result => {
+          setRecordToOpen({ kind: result.kind, id: result.recordId });
+          setActiveTab(result.tab);
+        }}
         navigation={{
           activeTab,
           setActiveTab,
@@ -650,7 +660,7 @@ const MainApp: React.FC = () => {
                   error={workspaceError}
                   onRetry={loadAllData}
                   onOpenCalendarDocument={(kind, id) => {
-                    setCalendarDocument({ kind, id });
+                    setRecordToOpen({ kind, id });
                     setActiveTab(kind === 'contract' ? 'contracts' : 'ios');
                   }}
                   partners={partners}
@@ -691,8 +701,8 @@ const MainApp: React.FC = () => {
 
               {activeTab === 'contracts' && (
                 <LazyContractsView
-                  openDocumentId={calendarDocument?.kind === 'contract' ? calendarDocument.id : undefined}
-                  onDocumentOpened={() => setCalendarDocument(null)}
+                  openDocumentId={recordToOpen?.kind === 'contract' ? recordToOpen.id : undefined}
+                  onDocumentOpened={() => setRecordToOpen(null)}
                   contracts={contracts}
                   partners={partners}
                   ios={ios}
@@ -731,8 +741,8 @@ const MainApp: React.FC = () => {
 
               {(activeTab === 'ios' || activeTab === 'io') && modules.commercialDocuments && (
                 <LazyIOView
-                  openDocumentId={calendarDocument?.kind === 'io' ? calendarDocument.id : undefined}
-                  onDocumentOpened={() => setCalendarDocument(null)}
+                  openDocumentId={recordToOpen?.kind === 'io' ? recordToOpen.id : undefined}
+                  onDocumentOpened={() => setRecordToOpen(null)}
                   ios={ios}
                   contracts={contracts}
                   partners={partners}
@@ -750,6 +760,8 @@ const MainApp: React.FC = () => {
 
               {(activeTab === 'partners' || activeTab === 'partner-evaluation') && (
                 <LazyPartnersView
+                  openEvaluationId={recordToOpen?.kind === 'evaluation' ? recordToOpen.id : undefined}
+                  onEvaluationOpened={() => setRecordToOpen(null)}
                   partners={partners}
                   contracts={contracts}
                   evaluations={evaluations}
@@ -770,6 +782,8 @@ const MainApp: React.FC = () => {
 
               {activeTab === 'partner-spending' && modules.spending && (
                 <LazyPartnerSpendingView
+                  openSpendingId={recordToOpen?.kind === 'spending' ? recordToOpen.id : undefined}
+                  onSpendingOpened={() => setRecordToOpen(null)}
                   partners={partners}
                   spendings={spendings}
                   onRefreshData={loadAllData}

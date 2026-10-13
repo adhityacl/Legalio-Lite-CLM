@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Building2, Loader2, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, Loader2, Users } from 'lucide-react';
 import { Button } from '@legalio/ui-components/button';
 import { listCountryPacks, listIndustryPacks, localize, localizeName } from '@legalio/shared/policy';
 import { useIdentity } from '../../context/AuthContext';
@@ -66,8 +66,8 @@ export function OrganizationOnboarding() {
   };
 
   return (
-    <main className="flex min-h-dvh w-full items-center justify-center bg-(--moduix-color-background) px-g13 py-g34 text-(--moduix-color-foreground)">
-      <Card asChild><section aria-labelledby="onboarding-title" className="w-full max-w-g610 p-g21 sm:p-g34">
+    <main className="flex h-dvh w-full flex-col overflow-y-auto bg-(--moduix-color-background) px-g13 py-g21 text-(--moduix-color-foreground) sm:py-g34">
+      <Card asChild><section aria-labelledby="onboarding-title" className="mx-auto my-auto w-full max-w-g610 shrink-0 p-g21 sm:p-g34">
         {(stage === 'profile' || stage === 'region') && (
           <List as="ol" size="sm" marker="none" aria-label={t('onboarding.progress', 'Organization setup progress')} className="mb-g21 grid grid-cols-2 gap-g13">
             {[['profile', t('tb.section_profile', 'Organization profile')], ['region', t('tb.section_region', 'Region and formatting')]].map(([step, label], index) => (
@@ -86,9 +86,14 @@ export function OrganizationOnboarding() {
           <div className="mt-g21 grid gap-g13 sm:grid-cols-2">
             {([{ next: 'join', Icon: Users, label: t('onboarding.join', 'Join organization'), description: t('onboarding.join_hint', 'I have an invite code') },
               { next: 'profile', Icon: Building2, label: t('onboarding.create', 'Create organization'), description: t('onboarding.create_hint', 'Start a new workspace') }] as const).map(({ next, Icon, label, description }) => (
-              <Button variant="outline" key={next} type="button" aria-label={label} onClick={() => navigate(next)} className="text-left">
-                <Icon aria-hidden="true" className="mb-g13 h-g26 w-g26 text-(--moduix-color-muted-foreground)" />
-                <span className="block font-semibold">{label}</span><span className="mt-g3 block text-sm text-(--moduix-color-muted-foreground)">{description}</span>
+              <Button variant="outline" key={next} type="button" aria-label={label} onClick={() => navigate(next)} className="h-auto min-h-g144 w-full flex-col items-start justify-start gap-g13 whitespace-normal p-g21 text-left hover:border-primary/50 hover:bg-primary/5">
+                <span className="flex size-g42 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Icon aria-hidden="true" className="size-g21" />
+                </span>
+                <span className="flex w-full min-w-0 flex-col gap-g5">
+                  <span className="font-semibold wrap-anywhere">{label}</span>
+                  <span className="text-sm font-normal text-(--moduix-color-muted-foreground) wrap-anywhere">{description}</span>
+                </span>
               </Button>
             ))}
           </div>
@@ -125,7 +130,7 @@ export function OrganizationOnboarding() {
             </Fieldset>
             {error && <Alert status="error" id="onboarding-error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>}
             <div className="flex justify-between gap-g13 pt-g8">
-              <Button type="button" variant="outline" disabled={busy} onClick={() => navigate(stage === 'region' ? 'profile' : 'choose')}>{t('onboarding.back', 'Back')}</Button>
+              <Button type="button" variant="secondary" className="border-muted-foreground/70" disabled={busy} onClick={() => navigate(stage === 'region' ? 'profile' : 'choose')}><ArrowLeft aria-hidden="true" className="size-g16" />{t('onboarding.back', 'Back')}</Button>
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner size="sm" decorative />}
                 {stage === 'profile' ? t('onboarding.continue', 'Continue') : stage === 'join' ? t('onboarding.join', 'Join organization') : t('onboarding.create', 'Create organization')}
@@ -134,7 +139,7 @@ export function OrganizationOnboarding() {
             </div>
           </form>
         )}
-        <div className="mt-g21 border-t border-(--moduix-color-border) pt-g13"><Button type="button" variant="ghost" disabled={busy} onClick={() => void logout()}>{t('app.kembali_ke_login', 'Back to login')}</Button></div>
+        <div className="mt-g21"><Button type="button" variant="destructive" disabled={busy} onClick={() => void logout()}><ArrowLeft aria-hidden="true" className="size-g16" />{t('app.kembali_ke_login', 'Back to login')}</Button></div>
       </section></Card>
     </main>
   );

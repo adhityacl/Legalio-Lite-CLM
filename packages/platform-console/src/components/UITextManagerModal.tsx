@@ -15,9 +15,8 @@ import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell }
 import { DialogHeader, DialogTitle, DialogCloseIcon } from '@legalio/ui-components/dialog';
 import { Card } from '@legalio/ui-components/card';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
-import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { FileUpload, FileUploadHiddenInput, FileUploadTrigger } from '@legalio/ui-components/file-upload';
-import { Editable, EditableArea, EditableControls, EditableInput, EditablePreview } from '@legalio/ui-components/editable';
+import { Editable, EditableArea, EditableContext, EditableControl, EditableEditTrigger, EditableInput, EditablePreview, EditableSubmitTrigger } from '@legalio/ui-components/editable';
 import { Text } from '@legalio/ui-components/text';
 interface UITextManagerModalProps {
   isOpen?: boolean;
@@ -113,7 +112,6 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
   };
 
   const renderCell = (key: string, lang: Language) => {
-    const custom = customTranslations[lang]?.[key];
     const htmlLang = LANGUAGE_OPTIONS.find((o) => o.code === lang)?.htmlLang;
     const label = t('ui_text.edit_in', 'Edit dalam {lang}', { lang: languageName(lang) });
     return (
@@ -121,18 +119,40 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
         placeholder={t('ui_text.missing', '(belum diterjemahkan)')}
         translations={{ input: label, edit: label, submit: t('common.save', 'Simpan'), cancel: t('common.cancel', 'Batal') }}
         onValueCommit={(details) => { if (details.value !== valueOf(key, lang)) void handleSaveEdit(key, lang, details.value); }}
-        className="flex-row items-center gap-g3">
-        <EditableArea className="min-w-0 flex-1">
-          <EditableInput lang={htmlLang} />
-          <EditablePreview lang={htmlLang} className={custom ? 'font-medium text-accent-foreground' : undefined} />
-        </EditableArea>
-        <EditableControls />
+        className="group/text-cell grid w-full items-center gap-g5">
+        <EditableContext>
+          {({ editing, cancel }) => (
+            <>
+              <EditableArea className={editing
+                ? 'min-w-0 border-status-success bg-background px-g8 py-g3 data-focus:outline-status-success'
+                : 'min-w-0 border-transparent bg-transparent px-0 py-g3'}>
+                {editing && <EditableInput lang={htmlLang} autoFocus onKeyDownCapture={event => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    cancel();
+                  }
+                }} />}
+                <EditablePreview lang={htmlLang} className="whitespace-normal wrap-anywhere font-normal" />
+              </EditableArea>
+              <EditableControl>
+                {editing ? (
+                  <EditableSubmitTrigger className="size-g26 rounded-full border-0 bg-status-success text-primary-foreground hover:bg-status-success/90" />
+                ) : (
+                  <EditableEditTrigger aria-label={label} title={label} className="size-g26 border-0 bg-transparent text-status-success opacity-0 group-hover/text-cell:opacity-100 group-focus-within/text-cell:opacity-100 focus-visible:opacity-100 hover:bg-status-success-soft [@media(hover:none)]:opacity-100" />
+                )}
+              </EditableControl>
+            </>
+          )}
+        </EditableContext>
       </Editable>
     );
   };
 
   return (
-    <ModalFrame size="xl" onClose={onClose} className="flex flex-col overflow-hidden">
+    <ModalFrame size="xl" onClose={onClose} onEscapeKeyDown={event => {
+      if (document.activeElement?.getAttribute('data-slot') === 'editable-input') event.preventDefault();
+    }} className="flex flex-col overflow-hidden">
 
         <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
           <div className="flex flex-wrap items-center gap-g8">
@@ -161,10 +181,10 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
               <FileUploadTrigger asChild>
                 <Button variant="ghost" type="button">
                   <Upload aria-hidden />
-                  {t('ui_text.import', 'Unggah CSV Hasil Revisi')}
+                  {t('ui_text.import', 'Unggah CSV')}
                 </Button>
               </FileUploadTrigger>
-              <FileUploadHiddenInput aria-label={t('ui_text.import', 'Unggah CSV Hasil Revisi')} />
+              <FileUploadHiddenInput aria-label={t('ui_text.import', 'Unggah CSV')} />
             </FileUpload>
             {totalCustomCount > 0 && (
               <Button variant="destructive"
@@ -172,7 +192,7 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
                 onClick={handleReset}
                 disabled={translationsBusy}
               >
-                <RotateCcw className="w-g13 h-g13 text-status-danger" aria-hidden />
+                <RotateCcw className="size-g16" aria-hidden="true" />
                 <span>{t('ui_text.reset_to_default', 'Kembalikan ke Bawaan')}</span>
               </Button>
             )}
@@ -246,17 +266,17 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
 
         <div className="flex-1 overflow-y-auto p-g13 sm:p-g21 bg-card ">
           <Card className="overflow-x-auto">
-            <Table className="w-full text-left">
+            <Table className="w-full min-w-[960px] table-fixed text-left">
               <TableHeader>
                 <TableRow>
-                  <TableColumnHeader scope="col" className="w-1/5">{t('ui_text.col_key', 'Key teks')}</TableColumnHeader>
-                  <TableColumnHeader scope="col" className="w-1/8">{t('ui_text.col_module', 'Modul')}</TableColumnHeader>
+                  <TableColumnHeader scope="col" className="w-[19%]">{t('ui_text.col_key', 'Key teks')}</TableColumnHeader>
+                  <TableColumnHeader scope="col" className="w-[13%]">{t('ui_text.col_module', 'Modul')}</TableColumnHeader>
                   {CODES.map((code) => (
                     <TableColumnHeader key={code} scope="col" className="w-1/5">
                       {languageName(code)} ({LANGUAGE_OPTIONS.find((o) => o.code === code)?.label})
                     </TableColumnHeader>
                   ))}
-                  <TableColumnHeader scope="col" className="text-center w-g89">{t('ui_text.col_status', 'Status')}</TableColumnHeader>
+                  <TableColumnHeader scope="col" className="w-[8%] text-center">{t('ui_text.col_status', 'Status')}</TableColumnHeader>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -266,18 +286,18 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
                   currentKeys.map((key) => {
                     const isCustom = CODES.some((code) => customTranslations[code]?.[key]);
                     return (
-                      <TableRow key={key} className="align-top">
-                        <TableCell>{key}</TableCell>
-                        <TableCell>
-                          <Badge tone={statusTone('Neutral')}>{moduleLabel(moduleOf(key))}</Badge>
+                      <TableRow key={key} className="hover:bg-muted/35 focus-within:bg-muted/35">
+                        <TableCell className="py-g13 whitespace-normal wrap-anywhere">{key}</TableCell>
+                        <TableCell className="py-g13">
+                          <Badge tone={statusTone('Neutral')} className={BADGE}>{moduleLabel(moduleOf(key))}</Badge>
                         </TableCell>
                         {CODES.map((code) => (
-                          <TableCell key={code}>
+                          <TableCell key={code} className="py-g13">
                             {renderCell(key, code)}
                           </TableCell>
                         ))}
-                        <TableCell className="text-center whitespace-nowrap">
-                          <Badge tone={statusTone(isCustom ? 'Aktif' : 'Neutral')}>
+                        <TableCell className="py-g13 text-center whitespace-nowrap">
+                          <Badge tone={statusTone(isCustom ? 'Aktif' : 'Neutral')} className={BADGE}>
                             {isCustom ? t('ui_text.status_custom', 'Kustom') : t('ui_text.status_default', 'Bawaan')}
                           </Badge>
                         </TableCell>

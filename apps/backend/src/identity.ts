@@ -9,6 +9,7 @@
 import type express from 'express';
 import type Database from 'better-sqlite3';
 import crypto from 'crypto';
+import { getPublicBaseUrl } from './installationSettings';
 import {
   isTenantRole, membershipContext, platformContext, platformPermissionsFor, platformRoleOf,
   type OrgContext, type PlatformRole,
@@ -132,13 +133,13 @@ export function resolveIdentity(db: DB, req: express.Request): Identity {
 /* ------------------------------------------------------------------ */
 
 const extraOrigins = (process.env.TRUSTED_ORIGINS || '').split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean);
-const publicBaseUrl = (process.env.BETTER_AUTH_URL || '').trim().replace(/\/$/, '');
 
 export function isSameOriginRequest(req: express.Request): boolean {
   const origin = String(req.headers.origin || '') || (() => {
     try { return new URL(String(req.headers.referer || '')).origin; } catch { return ''; }
   })();
   if (!origin) return false;
+  const publicBaseUrl = getPublicBaseUrl();
   if (extraOrigins.includes(origin) || (publicBaseUrl && origin === publicBaseUrl)) return true;
   try {
     const host = new URL(origin).host;

@@ -109,6 +109,8 @@ interface PartnerSpendingViewProps {
   userEmail?: string;
   userName?: string;
   userRole?: string;
+  openSpendingId?: string;
+  onSpendingOpened?: () => void;
 }
 
 export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
@@ -118,6 +120,8 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   userEmail,
   userName,
   userRole,
+  openSpendingId,
+  onSpendingOpened,
 }) => {
   const { hasPermission } = usePermissions();
   const { t, language } = useLanguage();
@@ -667,6 +671,18 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  useEffect(() => {
+    if (!openSpendingId) return;
+    const spending = spendings.find(item => item.id === openSpendingId);
+    if (spending && hasPermission('document.view') && canViewSpending(spending, partners, user)) {
+      setSearchTerm(spending.invoice_number || spending.vendor_name);
+      setSelectedVendorFilter(spending.vendor_name);
+      setSelectedYear('ALL');
+      setSelectedMonthFilter('ALL');
+      setCurrentPage(1);
+    }
+    onSpendingOpened?.();
+  }, [openSpendingId, spendings, partners, user, hasPermission, onSpendingOpened]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) setSelectedRows(sortedSpendings.map(item => item.id || ''));

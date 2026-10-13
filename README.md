@@ -15,6 +15,7 @@
 - **One workspace for partners, contracts and spending**: partners with due diligence, evaluations and invoices; contracts and service orders with notice periods, renewal and termination tracking.
 - **Contract editor**: start from a blank page or a template, fill fields from a side panel, and keep autosaved versions with compare, restore and redlining.
 - **Document calendar**: contract starts, cancellation notices, ends, renewals and terminations on a yearly calendar.
+- **Workspace search**: search a vendor name to find related contracts, service orders/IOs, spending invoices and partner evaluations within your access. Select a result to open its details or the matching spending list.
 - **Multi-tenant with role-based access**: organizations, departments and roles (admin, manager, editor, viewer), enforced on the server.
 - **AI assistance**: Google Gemini reads contracts, partner documents and invoices, drafts due diligence notes and generates templates.
 - **Standalone system console** (`/sys`) for superusers: accounts, organizations, Google credentials, AI model, SMTP, UI texts, database browser, backup and restore.
@@ -41,7 +42,13 @@ Start the app and open **http://localhost:3000**:
 npm run dev
 ```
 
-On the first visit, create the superuser account. A demo workspace (*Bank Mindiri*, with five partners and their contracts) is loaded so you can explore right away.
+On the first visit, confirm the website's public URL and create the superuser
+account. The URL starts with the address you opened; include `http://` or
+`https://` and the public port if needed. Setup saves it in the installation
+database and applies it to authentication immediately, without a restart. If you
+enter a different URL, setup sends you there to sign in. A demo workspace
+(*Bank Mindiri*, with five partners and their contracts) is loaded so you can
+explore right away.
 
 | Sign in | Contracts |
 | --- | --- |
@@ -77,6 +84,47 @@ For production, the quickest route is Docker. The workspace is served on **http:
 npm run setup
 docker compose up --build
 ```
+
+First-run onboarding stores the website URL in the database, including for
+Docker installations. `BETTER_AUTH_URL` is an optional deployment override and
+takes priority over the onboarding value. Existing installations without a
+stored URL continue to detect the request's origin.
+
+To set the override manually, pin authentication to the URL users open by adding
+`BETTER_AUTH_URL` to `apps/backend/.env`. Use the exact URL users open, including
+the scheme and public port if applicable. From the repository root, ensure the
+environment file exists and open it in a text editor:
+
+```bash
+npm run setup
+nano apps/backend/.env
+```
+
+Find `# BETTER_AUTH_URL=`, remove the leading `#`, and fill in the URL. If an
+active `BETTER_AUTH_URL=` line already exists, edit that line instead of adding
+a duplicate. If neither line exists, add one. Replace `<YOUR_PUBLIC_URL>` below
+with your installation's actual public URL; do not keep the angle brackets:
+
+```dotenv
+BETTER_AUTH_URL=<YOUR_PUBLIC_URL>
+```
+
+Leave the other settings, including `BETTER_AUTH_SECRET`, unchanged. In nano,
+save with **Ctrl+O**, press **Enter**, then exit with **Ctrl+X**. You can use
+another text editor if nano is not installed.
+
+After changing `.env`, recreate the backend container so it receives the updated
+environment (a container restart alone does not reload `env_file`):
+
+```bash
+docker compose up -d --force-recreate backend
+```
+
+If login reports `Invalid origin` when using a public port, ensure nginx forwards
+`Host $http_host`, which includes that port. The bundled nginx template does this
+for `/api`, `/uploads`, and `/sys`. Rebuild the frontend image to apply template
+changes with `docker compose up -d --build frontend`. When using your own nginx
+configuration, preserve the public host and port there too.
 
 Without Docker, run `npm run build`, then start the API with `NODE_ENV=production npm start`. Serve `apps/frontend/dist` from a web server such as nginx, and proxy `/api`, `/uploads` and `/sys` to port 3000.
 

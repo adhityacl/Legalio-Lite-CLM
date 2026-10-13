@@ -205,7 +205,8 @@ export const SQLiteDatabaseCard: React.FC = () => {
   const totalPages = tableData ? Math.ceil(tableData.total / limit) || 1 : 1;
 
   return (
-    <Card id="card-sqlite-database" className="overflow-hidden">
+    <div id="card-sqlite-database" className="space-y-g21">
+    <Card id="sqlite-database-summary" className="overflow-hidden">
       <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-g13">
         <div className="space-y-g2">
           <CardTitle className="flex items-center gap-g8">
@@ -303,8 +304,13 @@ export const SQLiteDatabaseCard: React.FC = () => {
           </Card>
         </div>
 
+      </CardBody>
+    </Card>
+
+    <Card id="sqlite-database-tables" className="overflow-hidden">
+      <CardBody>
         {/* Table Selector & Search */}
-        <div className="pt-g8 space-y-g13">
+        <div className="space-y-g13">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-g8">
             {/* Table Selector */}
             <AlphabeticalSelect
@@ -347,7 +353,7 @@ export const SQLiteDatabaseCard: React.FC = () => {
             </form>
           </div>
 
-          {/* Data Table: the section Card above is the only frame, so the table gets none of its own. */}
+          {/* The table and pagination share the explorer card's frame. */}
           <div className="-mx-g21 overflow-hidden border-t border-border">
             <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')} className="max-h-g377">
               {loadingData ? (
@@ -427,6 +433,7 @@ export const SQLiteDatabaseCard: React.FC = () => {
           </div>
         </div>
       </CardBody>
+    </Card>
 
       {/* Expanded Cell View Modal */}
       <Dialog open={!!expandedCell} onOpenChange={details => { if (!details.open) setExpandedCell(null); }}>
@@ -446,6 +453,6 @@ export const SQLiteDatabaseCard: React.FC = () => {
           </DialogContent>
         </DialogPositioner>
       </Dialog>
-    </Card>
+    </div>
   );
 };

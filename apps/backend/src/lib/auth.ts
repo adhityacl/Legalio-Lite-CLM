@@ -8,14 +8,17 @@ import { adminAc, defaultStatements, memberAc } from "better-auth/plugins/organi
 import Database from "better-sqlite3";
 import { applyPendingRestore } from '../sqliteBackups';
 import { AUTH_DB_PATH, APP_DATA_DIR } from "../runtimePaths";
+import { getPublicBaseUrl, loadInstallationSettings } from '../installationSettings';
 
 const googleClientId = (process.env.GOOGLE_CLIENT_ID || "").trim();
 const googleClientSecret = (process.env.GOOGLE_CLIENT_SECRET || "").trim();
 
 /*
+ * First-run onboarding stores the public URL in the installation database.
+ * BETTER_AUTH_URL overrides that URL for automated deployments.
  * Deployment URL configuration (PRD §5.4). BETTER_AUTH_URL / TRUSTED_ORIGINS
  * are optional overrides for pinning or widening the allowed origins (e.g. a
- * separate front-end domain). Left unset, `trustedOrigins` below trusts
+ * separate front-end domain). Without either URL, `trustedOrigins` below trusts
  * whatever host/scheme the request actually arrived on instead — `server.ts`'s
  * toNodeHandler call builds every `/api/auth/*` request's URL from its real
  * `Host`/`X-Forwarded-Proto` headers (see better-call's node adapter), and the
@@ -26,7 +29,6 @@ const googleClientSecret = (process.env.GOOGLE_CLIENT_SECRET || "").trim();
  * time: a fresh clone logs in correctly on whatever domain it's reached at.
  */
 const isProduction = process.env.NODE_ENV === "production";
-const publicBaseUrl = (process.env.BETTER_AUTH_URL || "").trim().replace(/\/$/, "");
 const extraOrigins = (process.env.TRUSTED_ORIGINS || "")
   .split(",")
   .map((o) => o.trim().replace(/\/$/, ""))
@@ -561,11 +563,13 @@ if (!(sqliteDb.prepare('PRAGMA table_info("user")').all() as Array<{ name: strin
   sqliteDb.exec('ALTER TABLE "user" ADD COLUMN bio TEXT');
 }
 
-export const auth = betterAuth({
+loadInstallationSettings(sqliteDb);
+
+const createAuth = () => betterAuth({
   // Unset: Better Auth derives the base URL per request from its real
   // Host/X-Forwarded-Proto headers (see the comment above) instead of a
   // fixed host baked in at startup.
-  baseURL: publicBaseUrl || undefined,
+  baseURL: getPublicBaseUrl() || undefined,
   database: sqliteDb,
   user: {
     additionalFields: {
@@ -633,6 +637,14 @@ export const auth = betterAuth({
   },
   // A function, not a static array, so Better Auth re-evaluates it per
   // request instead of once at startup — see selfOrigin() above.
-  trustedOrigins: async (request?: Request) => [...extraOrigins, ...selfOrigin(request)],
+  trustedOrigins: async (request?: Request) => [...extraOrigins, ...(getPublicBaseUrl() ? [getPublicBaseUrl()] : []), ...selfOrigin(request)],
   secret: authSecret || "insecure-development-secret-change-me",
 });
+
+export let auth = createAuth();
+
+/** Apply first-run URL configuration before the new administrator signs in. */
+export function reloadAuthConfiguration(): void {
+  loadInstallationSettings(sqliteDb);
+  auth = createAuth();
+}

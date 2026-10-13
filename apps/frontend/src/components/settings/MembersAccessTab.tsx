@@ -264,14 +264,14 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
                       <TableCell><Badge tone={m.status === 'active' ? 'success' : 'warning'}>{m.status === 'active' ? t('tb.status_active', 'Active') : t('tb.status_suspended', 'Suspended')}</Badge></TableCell>
                       <TableCell className="text-right">
                         {manage ? (
-                          <div className="flex justify-end gap-g3">
+                          <div className="flex items-center justify-end gap-g3">
                             {(can('tenant.member.role.update') || can('tenant.member.departments.update')) && (
-                              <Button type="button" variant="ghost" size="sm" onClick={() => setDialog({ kind: 'edit', member: m })} aria-label={t('tb.edit_access_for', 'Edit access for {name}', { name: m.name || m.email })}><Pencil className="h-g16 w-g16" aria-hidden="true" /></Button>
+                              <Button type="button" variant="ghost" size="icon-sm" onClick={() => setDialog({ kind: 'edit', member: m })} aria-label={t('tb.edit_access_for', 'Edit access for {name}', { name: m.name || m.email })}><Pencil className="h-g13 w-g13" aria-hidden="true" /></Button>
                             )}
                             {can('tenant.member.status.update') && (m.status === 'active'
-                              ? <Button type="button" variant="ghost" size="sm" onClick={() => setStatus(m, 'suspended')} aria-label={t('tb.suspend_for', 'Suspend membership of {name}', { name: m.name || m.email })}><UserX className="h-g16 w-g16" aria-hidden="true" /></Button>
-                              : <Button type="button" variant="ghost" size="sm" onClick={() => setStatus(m, 'active')} aria-label={t('tb.reactivate_for', 'Reactivate membership of {name}', { name: m.name || m.email })}><UserCheck className="h-g16 w-g16" aria-hidden="true" /></Button>)}
-                            {can('tenant.member.remove') && <Button type="button" variant="ghost" size="sm" onClick={() => remove(m)} aria-label={t('tb.remove_for', 'Remove membership of {name}', { name: m.name || m.email })}><UserMinus className="h-g16 w-g16" aria-hidden="true" /></Button>}
+                              ? <Button type="button" variant="ghost" size="icon-sm" onClick={() => setStatus(m, 'suspended')} aria-label={t('tb.suspend_for', 'Suspend membership of {name}', { name: m.name || m.email })}><UserX className="h-g13 w-g13" aria-hidden="true" /></Button>
+                              : <Button type="button" variant="ghost" size="icon-sm" onClick={() => setStatus(m, 'active')} aria-label={t('tb.reactivate_for', 'Reactivate membership of {name}', { name: m.name || m.email })}><UserCheck className="h-g13 w-g13" aria-hidden="true" /></Button>)}
+                            {can('tenant.member.remove') && <Button type="button" variant="ghost" size="icon-sm" onClick={() => remove(m)} aria-label={t('tb.remove_for', 'Remove membership of {name}', { name: m.name || m.email })}><UserMinus className="h-g13 w-g13" aria-hidden="true" /></Button>}
                           </div>
                         ) : <MoreHorizontal className="ml-auto h-g16 w-g16 text-primary-foreground" aria-hidden="true" />}
                       </TableCell>

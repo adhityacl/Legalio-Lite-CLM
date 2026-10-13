@@ -16,7 +16,6 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import { useTenantSettings, type TenantPolicyView } from '../context/TenantSettingsContext';
 import { downloadCsv, parseCSV } from '../lib/csv';
-import { PRICING_MODELS } from '@legalio/types';
 import { Partner, Contract, InsertionOrder } from '@legalio/types';
 
 import { Button } from '@legalio/ui-components/button';
@@ -24,13 +23,12 @@ import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell, 
 import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
-import { SegmentGroup, SegmentGroupIndicator, SegmentGroupItems } from '@legalio/ui-components/segment-group';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 import { FileUpload, FileUploadDropzone, FileUploadHiddenInput, FileUploadTrigger } from '@legalio/ui-components/file-upload';
 import { Text } from '@legalio/ui-components/text';
 import { Tag } from '@legalio/ui-components/tag';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { Spinner } from '@legalio/ui-components/spinner';
-import { List, ListItem } from '@legalio/ui-components/list';
 import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,7 +58,7 @@ interface BulkImportViewProps {
 
 // ─── CSV Templates ─────────────────────────────────────────────────────────────
 
-interface ImportTemplate { headers: string[]; example: string[]; notes: string[] }
+interface ImportTemplate { headers: string[]; example: string[] }
 
 // Examples follow the active organization's country and industry. All names are fictional
 // (example.com, RFC 2606); dates are ISO 8601 and multi-value cells are separated by ";".
@@ -89,11 +87,6 @@ function buildTemplates(policy: TenantPolicyView): Record<ImportType, ImportTemp
         partnerName, category, 'Procurement', 'Vendor', contactName, contactName, 'contact@contoh.example.com',
         phone, 'Jl. Contoh No. 1, Jakarta 10110', country, legalForm, identifiers, 'Preferred vendor', category,
       ],
-      notes: [
-        'identifiers: "scheme:value" pairs separated by ";", e.g. ' + (identifiers || 'id_npwp:01.234.567.8-012.000') + '.',
-        'tags: separated by ";". country: ISO 3166-1 alpha-2 code.',
-        'Partners with the same name that already exist are skipped.',
-      ],
     },
     contracts: {
       headers: [
@@ -104,11 +97,6 @@ function buildTemplates(policy: TenantPolicyView): Record<ImportType, ImportTemp
       example: [
         'MSA/2026/001', 'Master Services Agreement', partnerName, 'Master Agreement', '', category,
         '2026-01-01', '2026-12-31', currency, '1200000000', 'Ya', 'Signed', '30', 'Both', 'Legal', 'Annual agreement',
-      ],
-      notes: [
-        'jenis_dokumen: Master Agreement or Agreement Addendum. An addendum needs parent_contract_nomor of an existing contract.',
-        'status_approval: Draft, Review, Signed or Active. notice_type_required: Termination, Extension, Both or None.',
-        'auto_renewal: Ya/Yes/True or Tidak/No. kategori_kerjasama: separated by ";". partner_nama must match an existing partner.',
       ],
     },
     ios: {
@@ -122,10 +110,6 @@ function buildTemplates(policy: TenantPolicyView): Record<ImportType, ImportTemp
         '2026-01-01', '2026-12-31', 'Fixed', 'Postpaid', currency, '300000000',
         'Monthly service delivery', '14', 'Termination', '',
       ],
-      notes: [
-        `pricing_model: ${PRICING_MODELS.join(', ')} (other values are kept as a custom model).`,
-        'charging_type: Prepaid, Postpaid or Milestone-based. contract_nomor must match an existing contract.',
-      ],
     },
     evaluations: {
       headers: [
@@ -136,11 +120,6 @@ function buildTemplates(policy: TenantPolicyView): Record<ImportType, ImportTemp
         partnerName, '2026-06-30', category, '85',
         'Met', 'Rare', 'Good', 'Moderate', 'Recommended', 'Good overall performance',
       ],
-      notes: [
-        'All five rating columns are required. obligation_target: Met, Not met, Sangat baik, Baik, Kurang baik.',
-        'incident_frequency: Never, Rare, Frequent. communication: Good, Poor/Needs Improvement, Sangat baik, Baik, Kurang baik.',
-        'pricing: Cheap, Moderate, Expensive. final_evaluation: Recommended, Recommended with notes, Not recommended, Not reviewed.',
-      ],
     },
     spendings: {
       headers: [
@@ -150,10 +129,6 @@ function buildTemplates(policy: TenantPolicyView): Record<ImportType, ImportTemp
       example: [
         partnerName, 'INV/2026/01/0001', '2026-02-03', '2026-01', 'Layanan Januari 2026',
         'Monthly managed service January 2026 incl. VAT', currency, '333000000', 'Unpaid', 'Bank Contoh', '000-000-0000', partnerName,
-      ],
-      notes: [
-        'invoice_month: YYYY-MM, several months separated by ";". The USD amount is calculated from currency.',
-        'vendor_name must match an existing partner to be linked to it.',
       ],
     },
   };
@@ -312,23 +287,23 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
       </div>
 
       {/* ── Type Selector ────────────────────────────────────────────────────── */}
-      <Card className="p-g13">
-        <SegmentGroup aria-label={t('import.type_label', 'Jenis data')} value={activeType}
-          onValueChange={details => details.value && handleTypeChange(details.value as ImportType)} className="max-w-full flex-wrap">
-          <SegmentGroupIndicator />
-          <SegmentGroupItems items={IMPORT_TYPES.map(item => {
+      <Tabs value={activeType} onValueChange={details => handleTypeChange(details.value as ImportType)} className="gap-g21">
+      <Card className="flex-row flex-wrap items-center gap-g13 p-g13">
+        <TabsList aria-label={t('import.type_label', 'Jenis data')} className="w-full sm:w-auto">
+          {IMPORT_TYPES.map(item => {
             const Icon = item.icon;
-            return { value: item.id, label: <span className="inline-flex items-center gap-g5"><Icon className="size-g16" />{item.label}</span> };
-          })} />
-        </SegmentGroup>
+            return <TabsTrigger key={item.id} value={item.id}><Icon aria-hidden="true" />{item.label}</TabsTrigger>;
+          })}
+        </TabsList>
       </Card>
 
+      <TabsContent value={activeType} className="mt-0 flex flex-col gap-g21">
       {/* ── Template Download + Upload ───────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-g13 items-stretch">
 
         {/* Template Download */}
-        <Card className="p-g21 flex flex-col justify-between">
-          <div className="space-y-g13">
+        <Card className="h-g377 p-g21 flex flex-col justify-between">
+          <div className="flex min-h-0 flex-1 flex-col gap-g13">
             <div className="flex items-center gap-g13">
               <Avatar size="md" className="shrink-0 rounded-md border bg-status-info-soft border border-status-info-border"><AvatarFallback className="bg-transparent text-inherit"><Download className="w-g21 h-g21 text-status-info" /></AvatarFallback></Avatar>
               <div>
@@ -338,23 +313,20 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
               </div>
             </div>
 
-            <Card variant="subtle" size="sm" className="gap-g8 p-g13">
+            <Card variant="subtle" size="sm" className="min-h-0 flex-1 gap-g8 overflow-y-auto p-g13">
               <Text size="xs" weight="semibold" tone="muted">{t('bulk_import.kolom_template', 'Kolom Template:')}</Text>
               <div className="flex flex-wrap gap-g5">
                 {templates[activeType].headers.map((h) => <Tag key={h} size="sm" variant="outline">{h}</Tag>)}
               </div>
             </Card>
 
-            <List size="xs" tone="muted" marker="disc" className="space-y-g3">
-              {templates[activeType].notes.map((note) => <ListItem key={note}>{note}</ListItem>)}
-            </List>
           </div>
 
-          <div className="pt-g13 mt-auto">
+          <div className="flex min-h-g55 shrink-0 items-end pt-g13">
             <Button variant="outline"
               type="button"
               onClick={() => downloadTemplate(activeType, templates[activeType])}
-              className="w-full"
+              className="w-full whitespace-normal"
             >
               <Download className="w-g16 h-g16" />
               <span>
@@ -365,8 +337,8 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
         </Card>
 
         {/* Upload */}
-        <Card className="p-g21 flex flex-col justify-between">
-          <div className="flex flex-1 flex-col gap-g13">
+        <Card className="h-g377 p-g21 flex flex-col justify-between">
+          <div className="flex min-h-0 flex-1 flex-col gap-g13 overflow-y-auto">
             <div className="flex items-center gap-g13">
               <Avatar size="md" className="shrink-0 rounded-md border bg-accent border border-primary/30"><AvatarFallback className="bg-transparent text-inherit"><Upload className="w-g21 h-g21 text-accent-foreground" /></AvatarFallback></Avatar>
               <div>
@@ -376,7 +348,7 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
               </div>
             </div>
 
-            <FileUpload key={uploadKey} accept=".csv,text/csv" maxFiles={1} onFileAccept={details => handleFileChange(details.files[0])} className="flex-1">
+            <FileUpload key={uploadKey} accept=".csv,text/csv" maxFiles={1} onFileAccept={details => handleFileChange(details.files[0])} className="min-h-0 flex-1">
               <FileUploadDropzone aria-label={t('import.choose_file', 'Pilih File CSV')} className="min-h-g144 flex-1">
                 <FileSpreadsheet className="size-g34 text-muted-foreground" aria-hidden="true" />
                 {fileName
@@ -396,8 +368,8 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
             )}
           </div>
 
-          <div className="pt-g13 mt-auto">
-            <div className="flex items-center gap-g8">
+          <div className="flex min-h-g55 shrink-0 items-end pt-g13">
+            <div className="flex w-full items-center gap-g8">
               <Button
                 type="button"
                 onClick={handleImport}
@@ -533,6 +505,8 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
           </div>
         </Card>
       )}
+      </TabsContent>
+      </Tabs>
     </div>
   );
 };

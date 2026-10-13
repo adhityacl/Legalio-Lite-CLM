@@ -27,6 +27,7 @@ import { isGoogleTokenValid, getGoogleTokenRemainingMinutes } from '../lib/googl
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { usePermissions } from '../lib/permissions';
 import { useTenantSettings } from '../context/TenantSettingsContext';
+import { matchesWorkspaceSearch, type WorkspaceSearchResult } from '../lib/workspaceSearch';
 import {
   Sidebar,
   SidebarCollapsedContent,
@@ -55,8 +56,8 @@ import { Menu, MenuContent, MenuItem, MenuPositioner, MenuTrigger, MenuViewport 
 import { Drawer, DrawerBackdrop, DrawerBody, DrawerCloseIcon, DrawerContent, DrawerFooter, DrawerHeader, DrawerPositioner, DrawerTitle } from '@legalio/ui-components/drawer';
 
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
-import { CommandPalette, CommandPaletteCombobox, CommandPaletteEmpty, CommandPaletteItem, CommandPaletteItemGroup, CommandPaletteItemGroupLabel, CommandPaletteItemIcon, CommandPaletteItemLabel, CommandPaletteItemText, CommandPaletteList, CommandPalettePanel, CommandPaletteSearch } from '@legalio/ui-components/command-palette';
-import { useFilter, useListCollection } from '@legalio/ui-components/combobox';
+import { CommandPalette, CommandPaletteCombobox, CommandPaletteEmpty, CommandPaletteItem, CommandPaletteItemDescription, CommandPaletteItemGroup, CommandPaletteItemGroupLabel, CommandPaletteItemIcon, CommandPaletteItemLabel, CommandPaletteItemText, CommandPaletteList, CommandPalettePanel, CommandPaletteSearch } from '@legalio/ui-components/command-palette';
+import { useListCollection } from '@legalio/ui-components/combobox';
 export interface AppNavigationProps {
   showSystemAdmin?: boolean;
   activeTab: string;
@@ -274,27 +275,62 @@ function StatusFooter({ googleConfig }: { googleConfig?: GoogleSheetsConfig }) {
   );
 }
 
-/** moduix App header block search: a CommandPalette over every navigation destination the user can open. */
-function NavigationCommandPalette({ sections, onNavigate }: { sections: NavSection[]; onNavigate: (tab: string) => void }) {
+interface PaletteItem {
+  id: string;
+  label: string;
+  section: string;
+  icon: Icon;
+  target: string;
+  description?: string;
+  keywords?: string;
+  record?: WorkspaceSearchResult;
+}
+const EMPTY_SEARCH_RESULTS: WorkspaceSearchResult[] = [];
+
+/** Search available navigation and the current workspace's visible records. */
+function NavigationCommandPalette({ sections, onNavigate, searchResults = EMPTY_SEARCH_RESULTS, searchLoading, onSelectSearchResult }: {
+  sections: NavSection[];
+  onNavigate: (tab: string) => void;
+  searchResults?: WorkspaceSearchResult[];
+  searchLoading?: boolean;
+  onSelectSearchResult?: (result: WorkspaceSearchResult) => void;
+}) {
   const { t } = useLanguage();
-  const items = React.useMemo(() => sections.flatMap(section => section.items.flatMap(item => (
+  const [query, setQuery] = useState('');
+  const menus = React.useMemo<PaletteItem[]>(() => sections.flatMap(section => section.items.flatMap(item => (
     item.children?.length
-      ? item.children.map(child => ({ id: child.id, label: child.label, section: section.title, icon: child.icon }))
-      : [{ id: item.target || item.id, label: item.label, section: section.title, icon: item.icon }]
+      ? item.children.map(child => ({ id: child.id, target: child.id, label: child.label, section: section.title, icon: child.icon }))
+      : [{ id: item.target || item.id, target: item.target || item.id, label: item.label, section: section.title, icon: item.icon }]
   ))), [sections]);
-  const { contains } = useFilter({ sensitivity: 'base' });
-  const { collection, filter, set } = useListCollection({
-    initialItems: items, itemToString: item => `${item.label} ${item.section}`, itemToValue: item => item.id,
-    filter: contains, groupBy: item => item.section,
+  const items = React.useMemo<PaletteItem[]>(() => {
+    const destinations = new Map(menus.map(item => [item.target, item]));
+    const records = query.trim() && onSelectSearchResult ? searchResults.flatMap(record => {
+      const destination = destinations.get(record.tab);
+      return destination ? [{
+        id: `record:${record.kind}:${record.recordId}`, target: record.tab, label: record.label,
+        section: destination.label, icon: destination.icon, description: record.description, keywords: record.keywords, record,
+      }] : [];
+    }) : [];
+    return [...menus, ...records].filter(item => matchesWorkspaceSearch(`${item.label} ${item.section} ${item.description || ''} ${item.keywords || ''}`, query));
+  }, [menus, searchResults, onSelectSearchResult, query]);
+  const { collection, set } = useListCollection<PaletteItem>({
+    initialItems: items, itemToString: item => item.label, itemToValue: item => item.id, groupBy: item => item.section,
   });
   useEffect(() => { set(items); }, [items, set]);
   return (
     <CommandPalettePanel>
-      <CommandPaletteCombobox collection={collection} onInputValueChange={details => filter(details.inputValue)}
-        onSelect={details => onNavigate(details.itemValue)}>
-        <CommandPaletteSearch placeholder={t('nav.search_placeholder', 'Cari menu...')} />
+      <CommandPaletteCombobox collection={collection} inputValue={query} onInputValueChange={details => setQuery(details.inputValue)}
+        onSelect={details => {
+          const item = items.find(candidate => candidate.id === details.itemValue);
+          if (item?.record) onSelectSearchResult?.(item.record);
+          else if (item) onNavigate(item.target);
+          setQuery('');
+        }}>
+        <CommandPaletteSearch placeholder={onSelectSearchResult ? t('nav.workspace_search_placeholder', 'Search menu, vendor, or document...') : t('nav.search_placeholder', 'Cari menu...')} />
         <CommandPaletteList>
-          <CommandPaletteEmpty>{t('nav.search_empty', 'Menu tidak ditemukan.')}</CommandPaletteEmpty>
+          <CommandPaletteEmpty>{query.trim() && searchLoading
+            ? t('nav.search_loading', 'Loading documents...')
+            : onSelectSearchResult ? t('nav.workspace_search_empty', 'No matching menu or documents.') : t('nav.search_empty', 'Menu tidak ditemukan.')}</CommandPaletteEmpty>
           {collection.group().map(([section, group]) => (
             <CommandPaletteItemGroup key={section}>
               <CommandPaletteItemGroupLabel>{section}</CommandPaletteItemGroupLabel>
@@ -303,7 +339,10 @@ function NavigationCommandPalette({ sections, onNavigate }: { sections: NavSecti
                 return (
                   <CommandPaletteItem key={item.id} item={item}>
                     <CommandPaletteItemIcon><Icon aria-hidden /></CommandPaletteItemIcon>
-                    <CommandPaletteItemText><CommandPaletteItemLabel>{item.label}</CommandPaletteItemLabel></CommandPaletteItemText>
+                    <CommandPaletteItemText>
+                      <CommandPaletteItemLabel>{item.label}</CommandPaletteItemLabel>
+                      {item.description && <CommandPaletteItemDescription>{item.description}</CommandPaletteItemDescription>}
+                    </CommandPaletteItemText>
                   </CommandPaletteItem>
                 );
               })}
@@ -319,11 +358,14 @@ function NavigationCommandPalette({ sections, onNavigate }: { sections: NavSecti
  * Application shell (moduix Sidebar dashboard block): a resizable, collapsible navigation panel beside
  * the content inset on desktop, and the same navigation in a moduix Drawer on small screens.
  */
-export function AppShell({ navigation, header, children, className }: {
+export function AppShell({ navigation, header, children, className, searchResults, searchLoading, onSelectSearchResult }: {
   navigation: AppNavigationProps;
   header: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  searchResults?: WorkspaceSearchResult[];
+  searchLoading?: boolean;
+  onSelectSearchResult?: (result: WorkspaceSearchResult) => void;
 }) {
   const { t } = useLanguage();
   const desktop = useIsDesktop();
@@ -376,7 +418,7 @@ export function AppShell({ navigation, header, children, className }: {
           </DrawerPositioner>
         </Drawer>
       )}
-      <NavigationCommandPalette sections={sections} onNavigate={navigate} />
+      <NavigationCommandPalette sections={sections} onNavigate={navigate} searchResults={searchResults} searchLoading={searchLoading} onSelectSearchResult={onSelectSearchResult} />
     </CommandPalette>
   );
 }

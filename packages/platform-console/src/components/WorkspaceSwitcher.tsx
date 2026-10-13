@@ -51,7 +51,6 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ className 
 
   // Tooltip and Menu share one trigger id; MenuTrigger must wrap the button itself so it receives aria-haspopup and the click handler.
   const triggerId = `workspace-switcher-${useId()}`;
-  const tooltip = canSwitch ? name : t('workspace.akses_switch_workspace_terkunci', '{name} (Akses Switch Workspace Terkunci)', { name });
   const button = (
     <SidebarNavigationButton size="md" className={className}>
       <WorkspaceAvatar size="sm" name={name} letter={letter} logoUrl={logoUrl} />
@@ -61,11 +60,11 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ className 
       {canSwitch && <MenuIndicator><ChevronsUpDown /></MenuIndicator>}
     </SidebarNavigationButton>
   );
-  if (!canSwitch) return <Tooltip><TooltipTrigger asChild>{button}</TooltipTrigger><TooltipBody>{tooltip}</TooltipBody></Tooltip>;
+  if (!canSwitch) return button;
 
   return (
     <Menu ids={{ trigger: triggerId }} positioning={{ placement: 'bottom-start', gutter: 8 }}>
-      <Tooltip ids={{ trigger: triggerId }}><TooltipTrigger asChild><MenuTrigger asChild>{button}</MenuTrigger></TooltipTrigger><TooltipBody>{tooltip}</TooltipBody></Tooltip>
+      <Tooltip ids={{ trigger: triggerId }}><TooltipTrigger asChild><MenuTrigger asChild>{button}</MenuTrigger></TooltipTrigger><TooltipBody>{name}</TooltipBody></Tooltip>
       <MenuPositioner>
         <MenuContent className="min-w-g233" aria-label={t('workspace.pilih_ruang_kerja', 'Pilih Ruang Kerja')}>
           <MenuViewport className="max-h-g233">

@@ -5,7 +5,7 @@ import { ModalFrame } from './ui/modal-frame';
 import { formatBusinessDate } from '../lib/displayDate';
 import { FilterSummary } from './ui/filter-summary';
 import { TableEmptyState } from './ui/table-empty-state';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Partner, PartnerEvaluation, Contract } from '@legalio/types';
 import { DateInput } from './DateInput';
 import { XCircle, Clock, Filter, ClipboardCheck,
@@ -59,6 +59,8 @@ interface PartnerEvaluationViewProps {
   userEmail?: string;
   userName?: string;
   userRole?: string;
+  openEvaluationId?: string;
+  onEvaluationOpened?: () => void;
 }
 
 export const computeScoreFromFields = (
@@ -125,6 +127,8 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
   userEmail,
   userName,
   userRole,
+  openEvaluationId,
+  onEvaluationOpened,
 }) => {
   const { hasPermission } = usePermissions();
   const { t } = useLanguage();
@@ -284,6 +288,12 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
   const [editingItem, setEditingItem] = useState<PartnerEvaluation | null>(null);
   const [viewingDetailItem, setViewingDetailItem] = useState<PartnerEvaluation | null>(null);
+  useEffect(() => {
+    if (!openEvaluationId) return;
+    const evaluation = evaluations.find(item => item.id === openEvaluationId);
+    if (evaluation && hasPermission('document.view')) setViewingDetailItem(evaluation);
+    onEvaluationOpened?.();
+  }, [openEvaluationId, evaluations, hasPermission, onEvaluationOpened]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 

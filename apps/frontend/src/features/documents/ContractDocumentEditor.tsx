@@ -1483,14 +1483,15 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
           {/* View Mode Toggle: Edit vs Pratinjau */}
           <SegmentGroup
-                        aria-label={t('contract_creator.mode_label', 'Mode tampilan')}
+            aria-label={t('contract_creator.mode_label', 'Mode tampilan')}
             value={viewMode}
             onValueChange={details => details.value && switchViewMode(details.value as 'editor' | 'preview')}
+            className="grid grid-cols-2"
           >
             <SegmentGroupIndicator />
             <SegmentGroupItems items={[
-              { value: 'editor', label: <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-g5"><Edit3 className="size-g16" aria-hidden="true" />{t('contract_creator.mode_edit_label', 'Edit')}</span></TooltipTrigger><TooltipBody>{t('contract_creator.mode_edit_title', 'Sunting langsung teks kontrak dalam Bahasa Indonesia')}</TooltipBody></Tooltip> },
-              { value: 'preview', label: <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-g5"><FileText className="size-g16" aria-hidden="true" />{t('contract_creator.mode_preview_label', 'Pratinjau')}</span></TooltipTrigger><TooltipBody>{t('contract_creator.mode_preview_title', 'Pratinjau tampilan dokumen final')}</TooltipBody></Tooltip> },
+              { value: 'editor', label: <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-g8"><Edit3 className="size-g16" aria-hidden="true" />{t('contract_creator.mode_edit_label', 'Edit')}</span></TooltipTrigger><TooltipBody>{t('contract_creator.mode_edit_title', 'Sunting langsung teks kontrak dalam Bahasa Indonesia')}</TooltipBody></Tooltip> },
+              { value: 'preview', label: <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-g8"><FileText className="size-g16" aria-hidden="true" />{t('contract_creator.mode_preview_label', 'Pratinjau')}</span></TooltipTrigger><TooltipBody>{t('contract_creator.mode_preview_title', 'Pratinjau tampilan dokumen final')}</TooltipBody></Tooltip> },
             ]} />
           </SegmentGroup>
 

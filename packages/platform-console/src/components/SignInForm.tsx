@@ -35,6 +35,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [publicUrl, setPublicUrl] = useState(() => window.location.origin);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
@@ -58,7 +59,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
         if (!res.ok && !allowRegistration) throw new Error(t('sys.status_failed', 'Could not load system status. Refresh to retry.'));
         return res.ok ? res.json() : null;
       })
-      .then((status) => { setSetupMode(Boolean(status?.needsSetup)); setStatusReady(true); })
+      .then((status) => { setSetupMode(Boolean(status?.needsSetup)); setPublicUrl(status?.publicUrl || window.location.origin); setStatusReady(true); })
       .catch((err) => { if (!allowRegistration) setError(err.message); });
   }, [allowRegistration]);
 
@@ -92,12 +93,17 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
         const res = await fetch('/api/system/setup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password }),
+          body: JSON.stringify({ name, email, password, publicUrl }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           if (data.error === 'ALREADY_SET_UP') setSetupMode(false);
           setError(data.message || t('login.setup_failed', 'Could not create the admin account.'));
+          return;
+        }
+        setSetupMode(false);
+        if (data.publicUrl && data.publicUrl !== window.location.origin) {
+          window.location.assign(data.publicUrl);
           return;
         }
         await login(email, password);
@@ -163,7 +169,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
 
   if (registrationSuccess) {
     return shell(
-      <Card className="w-full gap-g21 rounded-xl p-g21 shadow-xl sm:p-g34">
+      <Card className="auth-card w-full gap-g21 rounded-xl p-g21 shadow-xl sm:p-g34">
         <Avatar size="lg" className="bg-status-warning-soft text-status-warning" aria-hidden="true"><AvatarFallback className="bg-transparent text-inherit"><Clock className="size-g34" /></AvatarFallback></Avatar>
         <div className="flex flex-col gap-g8">
           <CardTitle asChild className="text-xl font-extrabold"><h1>{t('login.account_created_title')}</h1></CardTitle>
@@ -181,10 +187,10 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
   }
 
   const title = setupMode ? t('login.setup_title', 'Create your admin account') : isRegister ? t('login.create_account') : t('login.welcome_back', 'Welcome back');
-  const subtitle = setupMode ? t('login.setup_subtitle', 'First-time setup: this account will manage the whole workspace.') : isRegister ? t('login.fill_form_reg') : t('login.welcome_subtitle', 'Please sign in with your Legalio account');
+  const subtitle = setupMode ? t('login.setup_subtitle', 'Set your website URL and create the first superuser.') : isRegister ? t('login.fill_form_reg') : t('login.welcome_subtitle', 'Please sign in with your Legalio account');
 
   return shell(
-    <Card className="w-full gap-g21 rounded-xl p-g21 shadow-xl sm:p-g34">
+    <Card className={`auth-card ${setupMode ? 'auth-setup-card' : ''} w-full gap-g21 rounded-xl p-g21 shadow-xl sm:p-g34`}>
       <div className="flex flex-col gap-g8">
         <CardTitle asChild className="text-xl font-extrabold sm:text-2xl"><h1>{title}</h1></CardTitle>
         <CardDescription>{subtitle}</CardDescription>
@@ -209,6 +215,13 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
       )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-g13" aria-busy={loading}>
+        {setupMode && (
+          <Field required>
+            <FieldLabel htmlFor="setup-public-url">{t('login.public_url_label', 'Website URL')}</FieldLabel>
+            <Input id="setup-public-url" type="url" required autoComplete="url" value={publicUrl} onChange={e => setPublicUrl(e.target.value)} aria-describedby="setup-public-url-help" />
+            <Text id="setup-public-url-help" size="xs" tone="muted">{t('login.public_url_help', 'Include http:// or https:// and the public port if needed.')}</Text>
+          </Field>
+        )}
         {(isRegister || setupMode) && (
           <Field required>
             <FieldLabel htmlFor="signin-name">{t('login.fullname_label')}</FieldLabel>
@@ -271,19 +284,21 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
 
 /** Full-page sign-in scene: dark backdrop, product pitch on the major side, the card on the minor side. */
 const AuthShell: React.FC<{ children: React.ReactNode; language: Language; setLanguage: (lang: Language) => void; t: (k: string, d?: string, v?: Record<string, unknown>) => string; onOpenPrivacy: (e: React.MouseEvent) => void; onOpenTerms: (e: React.MouseEvent) => void }> = ({ children, language, setLanguage, t, onOpenPrivacy, onOpenTerms }) => (
-  <main className="auth-backdrop relative isolate flex min-h-dvh w-full overflow-x-hidden bg-auth-ink text-auth-foreground">
-    <div aria-hidden="true" className="auth-glow-blue pointer-events-none absolute -start-g55 -top-g55 -z-10 size-g233 rounded-full lg:start-g68 lg:top-g89 lg:size-g610" />
-    <div aria-hidden="true" className="auth-glow-violet pointer-events-none absolute end-0 top-g377 -z-10 size-g233 rounded-full lg:end-g89 lg:top-g110 lg:size-g377" />
-    <div className="absolute end-g21 top-g34 lg:end-g42"><LanguageSwitcher language={language} setLanguage={setLanguage} t={t} /></div>
-    <div className="mx-auto flex w-full max-w-g1597 flex-col gap-g21 px-g21 py-g34 lg:flex-row lg:items-center lg:justify-between lg:gap-g55 lg:px-g110 lg:py-g89">
-      <section className="flex max-w-g610 flex-col gap-g21 lg:gap-g34">
+  <main className="auth-backdrop relative isolate flex h-dvh w-full flex-col overflow-x-hidden overflow-y-auto bg-auth-ink text-auth-foreground">
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      <div className="auth-glow-blue absolute -start-g55 -top-g55 size-g233 rounded-full lg:start-g68 lg:top-g89 lg:size-g610" />
+      <div className="auth-glow-violet absolute end-0 top-g377 size-g233 rounded-full lg:end-g89 lg:top-g110 lg:size-g377" />
+    </div>
+    <div className="auth-language flex shrink-0 justify-end px-g21 pt-g21 lg:px-g42"><LanguageSwitcher language={language} setLanguage={setLanguage} t={t} /></div>
+    <div className="auth-layout mx-auto flex w-full max-w-g1597 flex-1 shrink-0 flex-col gap-g21 px-g21 py-g21 lg:flex-row lg:items-center lg:justify-between lg:gap-g34 lg:px-g42 lg:py-g34 xl:gap-g55 xl:px-g110 xl:py-g55">
+      <section className="auth-hero flex min-w-0 max-w-g610 flex-col gap-g21 lg:flex-1 lg:gap-g34">
         <Image src={new URL('../assets/logo-light.png', import.meta.url).href} alt="Legalio" layout="fixed" height={42} width={206} className="h-g34 w-auto self-start object-contain lg:h-g42" />
         <div className="flex flex-col gap-g13 lg:gap-g21">
           <p className="text-2xl font-extrabold leading-snug lg:text-3xl">{t('login.hero_title', 'All in one workspace for partner, contracts, and spending tracker.')}</p>
           <p className="text-sm text-auth-muted lg:text-md lg:leading-relaxed">{t('login.hero_desc', 'Monitor agreements, discuss with AI, upload supporting documents, evaluate vendors, and keep every operational record organized')}</p>
         </div>
       </section>
-      <div className="flex w-full flex-col items-center gap-g21 lg:w-g377 lg:shrink-0">
+      <div className="auth-form flex w-full max-w-g377 flex-col items-center gap-g21 self-center lg:shrink-0">
         {children}
         <Text size="xs" className="flex flex-wrap items-center justify-center gap-x-g5 text-auth-muted">
           <span>{new Date().getFullYear()} ACL •</span>
