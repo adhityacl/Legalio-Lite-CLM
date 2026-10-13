@@ -1292,7 +1292,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                   </CardTitle>
                 </CardHeader>
                 <CardBody className="space-y-g13">
-                  <RadioGroup aria-label={t('settings.ai_config_title', 'Pilihan Model Google Gemini')} value={aiModel} onValueChange={details => details.value && handleSaveAiModel(details.value)} className="gap-g13">
+                  <RadioGroup aria-label={t('settings.ai_config_title', 'Pilihan Model Google Gemini')} value={aiModel} onValueChange={details => details.value && handleSaveAiModel(details.value)} className="grid w-full grid-cols-1 gap-g13 md:grid-cols-2">
                     {[
                       {
                         id: 'gemini-3.8-flash',
@@ -1325,15 +1325,15 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                         badge: t('settings.ringan_instan', 'Ringan & Instan'),
                       },
                     ].map((model) => (
-                      <RadioGroupItem key={model.id} value={model.id} className="items-start justify-between gap-g13 rounded-lg border border-border p-g13 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
-                        <span className="grid gap-g3">
+                      <RadioGroupItem key={model.id} value={model.id} className="relative h-full w-full min-w-0 items-start justify-between gap-g13 rounded-lg border border-border p-g13 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
+                        <span className="grid min-w-0 flex-1 gap-g3">
                           <span className="flex flex-wrap items-center gap-g8">
                             <RadioGroupItemText className="text-sm font-semibold">{model.title}</RadioGroupItemText>
                             <Badge>{model.badge}</Badge>
                           </span>
                           <Text as="span" size="xs" tone="muted">{model.desc}</Text>
                         </span>
-                        <RadioGroupItemControl />
+                        <RadioGroupItemControl className="shrink-0" />
                         <RadioGroupItemHiddenInput />
                       </RadioGroupItem>
                     ))}
@@ -1371,8 +1371,8 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                 <CardBody className="space-y-g13">
                   <form onSubmit={handleSaveSmtp} className="space-y-g13">
                     {/* Toggle Enable SMTP */}
-                    <Card className="p-g13 flex items-center justify-between gap-g13">
-                      <div>
+                    <Card className="flex flex-row items-center justify-between gap-g13 p-g13">
+                      <div className="min-w-0 flex-1 text-start">
                         <Text size="xs" weight="semibold">
                           {t('settings.smtp_enable_label', 'Aktifkan Pengiriman Email via SMTP Relay')}
                         </Text>
@@ -1380,7 +1380,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           {t('settings.jika_aktif_reminder_h_90_h', 'Jika aktif, reminder H-90, H-60, H-30, dan H-14 akan dikirimkan otomatis ke email nyata.')}
                         </Text>
                       </div>
-                      <Switch checked={smtpEnabled} onCheckedChange={details => setSmtpEnabled(details.checked)} aria-label={t('settings.smtp_enable_label', 'Aktifkan Pengiriman Email via SMTP Relay')}>
+                      <Switch className="relative shrink-0" checked={smtpEnabled} onCheckedChange={details => setSmtpEnabled(details.checked)} aria-label={t('settings.smtp_enable_label', 'Aktifkan Pengiriman Email via SMTP Relay')}>
                         <SwitchControl><SwitchThumb /></SwitchControl>
                         <SwitchHiddenInput />
                       </Switch>
@@ -1547,7 +1547,6 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                 </CardTitle>
               </CardHeader>
               <CardBody className="space-y-g13">
-                <Alert status="warning" role="note"><AlertIndicator /><AlertContent><AlertDescription>{t('tb.texts_shared_note')}</AlertDescription></AlertContent></Alert>
                 {translationsBusy && <p role="status">{t('tb.texts_syncing')}</p>}
                 {translationsError && <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{translationsError}</AlertDescription></AlertContent></Alert>}
                 <Card className="p-g13 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-g13">

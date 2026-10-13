@@ -1,24 +1,14 @@
 import React, { useState } from 'react';
-import {
-  Building2,
-  Plus,
-  Search,
-  Check,
-  Edit2,
-  Trash2,
-  Users,
-  Layers,
-  ExternalLink,
-  ShieldCheck,
-  FolderTree,
-} from 'lucide-react';
+import { Plus, Search, Check, Edit2, Trash2, ArrowUpRight } from 'lucide-react';
 import { ConsoleOrganization } from './types';
 import { useLanguage } from '../../context/LanguageContext';
 
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { Button } from '@legalio/ui-components/button';
 import { Card } from '@legalio/ui-components/card';
-import { Heading } from '@legalio/ui-components/heading';
+import { Text } from '@legalio/ui-components/text';
+import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
+import { TableEmptyState } from '../ui/table-empty-state';
 import { Avatar, AvatarFallback, AvatarImage } from '@legalio/ui-components/avatar';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { Badge } from '@legalio/ui-components/badge';
@@ -39,7 +29,7 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
   onOpenEditOrg,
   onDeleteOrg,
 }) => {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredOrgs = (organizations || []).filter(
@@ -67,127 +57,72 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
           type="button"
           onClick={onOpenCreateOrg}
         >
-          <Plus className="w-g16 h-g16" />
+          <Plus className="w-g16 h-g16" aria-hidden="true" />
           <span>{t('admin.btn_create_org', 'Buat Organisasi Baru')}</span>
         </Button>
       </Card>
 
-      {/* Organizations Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-g13">
-        {filteredOrgs.map((org) => {
-          const isActive = activeOrg?.id === org.id;
-
-          return (
-            <Card
-              key={org.id}
-              className={` p-g21 transition-all flex flex-col justify-between overflow-hidden relative ${
- isActive
- ? 'ring-1 ring-ring/20 bg-accent'
- : ''
- }`}
-            >
-              <div className="min-w-0">
-                {/* Header info */}
-                <div className="flex items-start justify-between gap-g8 mb-g13">
-                  <div className="flex items-start gap-g13 min-w-0 flex-1">
-                    <Avatar className="mt-g2 shrink-0">
-                      {org.logo && org.logo !== '/favicon.png' && <AvatarImage src={org.logo} alt={org.name || t('documents.info.organization', 'Organization')} />}
-                      <AvatarFallback>{(org.name || 'O').charAt(0).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <Tooltip><TooltipTrigger asChild><Heading as="h3" size="xs" weight="semibold" className="truncate">
-                        {org.name || t('documents.info.organization', 'Organisasi')}
-                      </Heading></TooltipTrigger><TooltipBody>{org.name || ''}</TooltipBody></Tooltip>
-                      <div className="flex flex-wrap items-center gap-x-g5 gap-y-g3 text-xs font-mono text-muted-foreground mt-g3">
-                        <Tooltip><TooltipTrigger asChild><span className="truncate max-w-g110">@{org.slug}</span></TooltipTrigger><TooltipBody>{`@${org.slug}`}</TooltipBody></Tooltip>
-                        <span className="text-primary-foreground select-none">•</span>
-                        <Tooltip><TooltipTrigger asChild><Badge tone="neutral" className="font-mono max-w-full truncate">{t('admin.id_2', 'ID: {id}', { id: org.id })}</Badge></TooltipTrigger><TooltipBody>{org.id}</TooltipBody></Tooltip>
+      <Card className="overflow-hidden">
+        <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
+          <Table className="min-w-g987">
+            <TableHeader><TableRow>
+              <TableColumnHeader scope="col">{t('documents.info.organization', 'Organization')}</TableColumnHeader>
+              <TableColumnHeader scope="col">{t('tb.slug', 'Slug')}</TableColumnHeader>
+              <TableColumnHeader scope="col">ID</TableColumnHeader>
+              <TableColumnHeader scope="col">{t('admin.org_departments', 'Departments')}</TableColumnHeader>
+              <TableColumnHeader scope="col">{t('admin.org_currency', 'Default currency')}</TableColumnHeader>
+              <TableColumnHeader scope="col">{t('admin.org_folder_iso', 'Folder isolation')}</TableColumnHeader>
+              <TableColumnHeader scope="col" className="text-right">{t('tb.col_action', 'Action')}</TableColumnHeader>
+            </TableRow></TableHeader>
+            <TableBody>
+              {filteredOrgs.map((org) => {
+                const isActive = activeOrg?.id === org.id;
+                const deleteDisabled = isActive || Boolean(org.metadata?.isDefault);
+                const deleteLabel = org.metadata?.isDefault
+                  ? t('admin.cant_delete_default_org', 'Organisasi default sistem tidak dapat dihapus.')
+                  : isActive
+                  ? t('admin.cant_delete_active_org', 'Beralih ke organisasi lain terlebih dahulu sebelum menghapus.')
+                  : t('admin.btn_delete_org', 'Hapus Organisasi');
+                return (
+                  <TableRow key={org.id} className={isActive ? 'bg-accent/50' : undefined}>
+                    <TableCell>
+                      <div className="flex items-center gap-g8">
+                        <Avatar className="size-g26 shrink-0 text-xs">
+                          {org.logo && org.logo !== '/favicon.png' && <AvatarImage src={org.logo} alt={org.name || t('documents.info.organization', 'Organization')} />}
+                          <AvatarFallback>{(org.name || 'O').charAt(0).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 max-w-g233">
+                          <Text size="sm" weight="semibold">{org.name || t('documents.info.organization', 'Organization')}</Text>
+                          {isActive && <Badge tone="success" className="mt-g3"><Check className="size-g13" aria-hidden="true" />{t('admin.badge_active', 'Active')}</Badge>}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-
-                  {isActive && (
-                    <Badge tone="success" className="shrink-0 whitespace-nowrap self-start"><Check className="w-g13 h-g13 shrink-0" /><span>{t('admin.badge_active', 'Aktif')}</span></Badge>
-                  )}
-                </div>
-
-                {/* Metrics pill */}
-                <div className="grid grid-cols-2 gap-g8 mb-g13 p-g8 rounded-lg bg-card text-xs">
-                  <div className="flex items-center gap-g8">
-                    <Layers className="w-g13 h-g13 text-muted-foreground" />
-                    <div>
-                      <div className="text-xs text-muted-foreground uppercase">{t('admin.org_departments', 'Departemen')}</div>
-                      <div className="font-semibold text-foreground font-mono">
-                        {org.teamCount ?? 0} {t('admin.teams', 'Teams')}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">@{org.slug}</TableCell>
+                    <TableCell className="font-mono text-xs">{org.id}</TableCell>
+                    <TableCell className="tabular-nums">{org.teamCount ?? 0}</TableCell>
+                    <TableCell className="font-mono text-xs">{org.metadata?.settings?.defaultCurrency || org.metadata?.currency || '—'}</TableCell>
+                    <TableCell className="max-w-g233 text-xs">{t('admin.vendors_4', '/{name}/[Vendors]', { name: org.name })}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-g3 whitespace-nowrap">
+                        <Tooltip><TooltipTrigger asChild>
+                          <Button type="button" variant="ghost" size="icon-sm" onClick={() => onOpenEditOrg(org)} aria-label={`${t('admin.btn_edit', 'Edit')}: ${org.name}`}><Edit2 className="size-g13" aria-hidden="true" /></Button>
+                        </TooltipTrigger><TooltipBody>{t('admin.btn_edit', 'Edit')}</TooltipBody></Tooltip>
+                        <Tooltip><TooltipTrigger asChild>
+                          <Button type="button" variant="ghost" size="icon-sm" onClick={() => onDeleteOrg(org)} disabled={deleteDisabled} aria-label={`${deleteLabel}: ${org.name}`}><Trash2 className="size-g13" aria-hidden="true" /></Button>
+                        </TooltipTrigger><TooltipBody>{deleteLabel}</TooltipBody></Tooltip>
+                        {onSelectOrg && <Tooltip><TooltipTrigger asChild>
+                          <Button type="button" variant="secondary" size="icon-sm" onClick={() => onSelectOrg(org)} aria-label={`${t('tb.manage_organization', 'Manage organization')}: ${org.name}`}><ArrowUpRight className="size-g16" aria-hidden="true" /></Button>
+                        </TooltipTrigger><TooltipBody>{t('tb.manage_organization', 'Manage organization')}</TooltipBody></Tooltip>}
                       </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-g8">
-                    <ShieldCheck className="w-g13 h-g13 text-muted-foreground" />
-                    <div>
-                      <div className="text-xs text-muted-foreground uppercase">{t('admin.org_currency', 'Mata Uang')}</div>
-                      <div className="font-semibold text-foreground font-mono">
-                        {org.metadata?.settings?.defaultCurrency || org.metadata?.currency || '—'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Storage structure info */}
-                <div className="text-xs text-muted-foreground flex items-center gap-g5 mb-g13">
-                  <FolderTree className="w-g13 h-g13 text-accent-foreground" />
-                  <span>{t('admin.org_folder_iso', 'Isolasi Folder')}: <strong>{t('admin.vendors_4', '/{name}/[Vendors]', { name: org.name })}</strong></span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-g13 border-t border-border flex items-center justify-between gap-g8">
-                <div className="flex items-center gap-g5">
-                  <Button variant="secondary" size="sm"
-                    type="button"
-                    onClick={() => onOpenEditOrg(org)}
-                  >
-                    <Edit2 className="w-g13 h-g13" />
-                    <span>{t('admin.btn_edit', 'Edit')}</span>
-                  </Button>
-
-                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm"
-                    type="button"
-                    onClick={() => onDeleteOrg(org)}
-                    disabled={isActive || Boolean(org.metadata?.isDefault)} aria-label={Boolean(org.metadata?.isDefault)
-                        ? t('admin.cant_delete_default_org', 'Organisasi default sistem tidak dapat dihapus.')
-                        : isActive
-                        ? t('admin.cant_delete_active_org', 'Beralih ke organisasi lain terlebih dahulu sebelum menghapus.')
-                        : t('admin.btn_delete_org', 'Hapus Organisasi')}
-                    className={ /*extra*/` ${
- isActive || Boolean(org.metadata?.isDefault)
- ? ''
- : ''
- }`}
-                  >
-                    <Trash2 className="w-g13 h-g13" />
-                    <span>{t('admin.btn_delete', 'Hapus')}</span>
-                  </Button></TooltipTrigger><TooltipBody>{Boolean(org.metadata?.isDefault)
-                        ? t('admin.cant_delete_default_org', 'Organisasi default sistem tidak dapat dihapus.')
-                        : isActive
-                        ? t('admin.cant_delete_active_org', 'Beralih ke organisasi lain terlebih dahulu sebelum menghapus.')
-                        : t('admin.btn_delete_org', 'Hapus Organisasi')}</TooltipBody></Tooltip>
-                </div>
-
-                {onSelectOrg && (
-                  <Button variant="outline" size="sm"
-                    type="button"
-                    onClick={() => onSelectOrg(org)}
-                   
-                  >
-                    {t('tb.manage_organization', 'Manage organization')}
-                  </Button>
-                )}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {filteredOrgs.length === 0 && <TableEmptyState colSpan={7} />}
+            </TableBody>
+          </Table>
+        </TableScrollArea>
+      </Card>
     </div>
   );
 };

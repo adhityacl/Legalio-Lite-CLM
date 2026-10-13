@@ -72,3 +72,46 @@
 
 /* Recharts makes the chart surface focusable for keyboard tooltips; the chart card shows focus instead. */
 .recharts-wrapper :focus, .recharts-wrapper :focus-visible { outline: none; }
+
+/* Dashboard metrics echo the animated overview without extra WebGL canvases. */
+.dashboard-overview-metric {
+  isolation: isolate;
+  overflow: hidden;
+  color: #f5f7fc;
+  border: 0;
+  background: linear-gradient(110deg,
+    #1b222f 0%,
+    color-mix(in srgb, var(--metric-accent) 18%, #202839) 48%,
+    color-mix(in srgb, var(--metric-accent) 40%, #253045) 100%);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.dashboard-overview-metric::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: -30%;
+  background: radial-gradient(circle farthest-side at 78% 50%,
+    color-mix(in srgb, var(--metric-accent) 10%, transparent) 0%,
+    transparent 75%);
+  animation: dashboard-metric-drift 12s ease-in-out infinite alternate;
+}
+.dashboard-overview-metric:nth-child(even)::before { animation-delay: -6s; }
+.dashboard-overview-metric-icon {
+  color: color-mix(in srgb, var(--metric-accent) 55%, white);
+  background: rgb(14 23 42 / 35%);
+  border: 1px solid color-mix(in srgb, var(--metric-accent) 35%, transparent);
+}
+.dashboard-overview-metric:hover,
+.dashboard-overview-metric:focus-within {
+  border-color: color-mix(in srgb, var(--metric-accent) 65%, #18243a);
+  box-shadow: 0 8px 24px rgb(12 18 40 / 15%);
+}
+@keyframes dashboard-metric-drift {
+  from { transform: translate(-3%, -2%) scale(1); }
+  to { transform: translate(3%, 2%) scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-overview-metric { transition: none; }
+  .dashboard-overview-metric::before { animation: none; }
+}
