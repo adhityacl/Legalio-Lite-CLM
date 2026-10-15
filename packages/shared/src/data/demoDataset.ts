@@ -166,7 +166,6 @@ function partnerRow(p: PartnerSeed): Row {
     nama_pic: p.pic,
     email_pic: p.email,
     telepon_pic: p.phone,
-    pic_partner: `${p.pic} (${p.email} | ${p.phone})`,
     kontak_pic: `${p.email} / ${p.phone}`,
     alamat_pic: p.address,
     pic_internal: p.picInternal,

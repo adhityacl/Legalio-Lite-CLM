@@ -2,7 +2,7 @@ import { ModalFrame } from '../ui/modal-frame';
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleSheetsConfig, Tenant } from '@legalio/types';
 import { useAuth } from '../../context/AuthContext';
-import { GoogleCredentialsDialog } from '../settings/GoogleCredentialsDialog';
+import { GoogleCredentialsForm } from '../settings/GoogleCredentialsDialog';
 import { useLanguage } from '../../context/LanguageContext';
 import { useConfirm } from '../../context/ConfirmDialogContext';
 import { getAuthHeaders } from '../../lib/apiFetch';
@@ -1157,26 +1157,12 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
               {/* Google Cloud Credentials */}
               {activeSection === 'google-credentials' && isSuperuser && (
-                <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-g13 p-g13">
-                  <div>
-                    <Heading as="h4" size="xs" weight="bold">
-                      {t('google_setup.settings_title', 'Kredensial Google Cloud')}
-                    </Heading>
-                    <Text size="xs" tone="muted" className="mt-g2">
-                      {t(
-                        'google_setup.settings_desc',
-                        'Unggah file JSON Service Account dan OAuth Client dari Google Cloud Console. Menggantikan variabel GOOGLE_* di .env.',
-                      )}
-                    </Text>
-                  </div>
-                  <GoogleCredentialsDialog
-                    trigger={
-                      <Button type="button" className="shrink-0">
-                        {t('google_setup.manage', 'Kelola file kredensial')}
-                      </Button>
-                    }
-                  />
-                </Card>
+                <section className="max-w-6xl space-y-g13" aria-label={t('google_setup.settings_title', 'Kredensial Google Cloud')}>
+                  <Text size="sm" tone="muted" className="max-w-prose leading-relaxed">
+                    {t('google_setup.description', 'Unggah dua file JSON yang diekspor dari Google Cloud Console. File disimpan di server, menggantikan variabel GOOGLE_* di .env, dan isinya yang rahasia tidak pernah ditampilkan lagi.')}
+                  </Text>
+                  <GoogleCredentialsForm />
+                </section>
               )}
             </div>
           )}
@@ -1565,23 +1551,26 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                 </Card>
 
                 <div className="flex items-center gap-g8 pt-g8 flex-wrap">
-                  <Button
-                    variant="outline"
-                    onClick={exportToCSV}
-                    disabled={translationsBusy}
-                  >
-                    <Download className="w-g13 h-g13 text-muted-foreground" />
-                    <span>{t('settings.export_csv_dict', 'Ekspor Kamus CSV')}</span>
-                  </Button>
+                  <div className="grid w-full grid-cols-2 gap-g8 sm:w-auto">
+                    <Button
+                      variant="outline"
+                      onClick={exportToCSV}
+                      disabled={translationsBusy}
+                      className="w-full"
+                    >
+                      <Download className="w-g13 h-g13 text-muted-foreground" />
+                      <span>{t('settings.export_csv_dict', 'Ekspor Kamus CSV')}</span>
+                    </Button>
 
-                  <FileUpload key={csvImportKey} accept=".csv" maxFiles={1} disabled={translationsBusy} onFileAccept={details => { handleQuickImportCSV(details.files[0]); setCsvImportKey(key => key + 1); }}>
-                    <FileUploadTrigger asChild>
-                      <Button variant="outline" disabled={translationsBusy}>
-                        <Upload aria-hidden="true" />{t('settings.import_csv_dict', 'Impor Kamus CSV')}
-                      </Button>
-                    </FileUploadTrigger>
-                    <FileUploadHiddenInput />
-                  </FileUpload>
+                    <FileUpload className="w-full" key={csvImportKey} accept=".csv" maxFiles={1} disabled={translationsBusy} onFileAccept={details => { handleQuickImportCSV(details.files[0]); setCsvImportKey(key => key + 1); }}>
+                      <FileUploadTrigger asChild>
+                        <Button variant="outline" disabled={translationsBusy} className="w-full">
+                          <Upload aria-hidden="true" />{t('settings.import_csv_dict', 'Impor Kamus CSV')}
+                        </Button>
+                      </FileUploadTrigger>
+                      <FileUploadHiddenInput />
+                    </FileUpload>
+                  </div>
 
                   <Button
                     variant="outline"

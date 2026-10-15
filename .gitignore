@@ -39,6 +39,10 @@ dumps/
 auth.db
 auth.db-wal
 auth.db-shm
+kaelyn.db
+kaelyn.db-wal
+kaelyn.db-shm
+SQLITE_STORAGE.md
 data_store.json
 backups/
 

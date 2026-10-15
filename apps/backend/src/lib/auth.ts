@@ -1,4 +1,6 @@
-import { synchronizeCoreData, normalizeSqliteId, isValidAllowedUserRow } from '../coreDataStore';
+import { normalizedCoreReady, readBusinessRows } from '../normalizedCoreStore';
+import { migratePartnerContact } from '../partnerContact';
+import { synchronizeCoreData } from '../coreDataStore';
 import { ensureTenantBoundarySchema } from '../organizationSettingsStore';
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { APIError } from "better-auth/api";
@@ -8,7 +10,7 @@ import { dash, sentinel } from "@better-auth/infra";
 import { createAccessControl } from "better-auth/plugins/access";
 import { adminAc, defaultStatements, memberAc } from "better-auth/plugins/organization/access";
 import Database from "better-sqlite3";
-import { applyPendingRestore } from '../sqliteBackups';
+import { applyPendingRestore, migrateLegacyDatabaseFilename } from '../sqliteBackups';
 import { AUTH_DB_PATH, APP_DATA_DIR } from "../runtimePaths";
 import { getPublicBaseUrl, loadInstallationSettings } from '../installationSettings';
 
@@ -106,6 +108,7 @@ const orgRoles = {
 };
 
 // --- Database & Schema Initialization ---
+migrateLegacyDatabaseFilename(AUTH_DB_PATH, APP_DATA_DIR);
 applyPendingRestore(AUTH_DB_PATH, APP_DATA_DIR);
 export const sqliteDb = new Database(AUTH_DB_PATH);
 sqliteDb.pragma("journal_mode = WAL");
@@ -179,6 +182,7 @@ CREATE TABLE IF NOT EXISTS apikey (
 `);
 
 export function initializeCoreDataSchema() {
+  if (normalizedCoreReady(sqliteDb)) return;
   sqliteDb.exec(`
     CREATE TABLE IF NOT EXISTS allowed_users (
       id TEXT PRIMARY KEY,
@@ -319,143 +323,24 @@ export function initializeCoreDataSchema() {
 }
 
 export function hydrateCoreDataFromJson(data: any) {
-  if (!data || typeof data !== 'object') return;
-
-  const tableConfigs = [
-    { table: 'allowed_users', rows: Array.isArray(data.allowedUsers) ? data.allowedUsers.filter(isValidAllowedUserRow) : [] },
-    { table: 'partners', rows: Array.isArray(data.partners) ? data.partners : [] },
-    { table: 'contracts', rows: Array.isArray(data.contracts) ? data.contracts : [] },
-    { table: 'insertion_orders', rows: Array.isArray(data.ios) ? data.ios : [] },
-    { table: 'notifications', rows: Array.isArray(data.notifications) ? data.notifications : [] },
-    { table: 'activity_logs', rows: Array.isArray(data.activityLogs) ? data.activityLogs : [] },
-    { table: 'evaluations', rows: Array.isArray(data.evaluations) ? data.evaluations : [] },
-    { table: 'spendings', rows: Array.isArray(data.spendings) ? data.spendings : [] },
-    { table: 'tenants', rows: Array.isArray(data.tenants) ? data.tenants : [] },
-    { table: 'departments', rows: Array.isArray(data.departments) ? data.departments : [] },
-    { table: 'templates', rows: Array.isArray(data.templates) ? data.templates : [] },
-  ];
-
-  for (const config of tableConfigs) {
-    const rows = config.rows;
-    if (!rows.length) {
-      sqliteDb.prepare(`DELETE FROM ${config.table}`).run();
-      continue;
-    }
-
-    sqliteDb.transaction(() => {
-      sqliteDb.prepare(`DELETE FROM ${config.table}`).run();
-      for (const row of rows) {
-        if (config.table === 'allowed_users') {
-          const email = String(row.email || row.emailAddress || row.userEmail || '').trim();
-          const rowId = normalizeSqliteId(row, `row-${Math.random().toString(36).slice(2, 10)}`);
-          sqliteDb.prepare(`
-            INSERT INTO allowed_users (id, email, name, role, status, organizationId, payload, createdAt, updatedAt)
-            VALUES (@id, @email, @name, @role, @status, @organizationId, @payload, @createdAt, @updatedAt)
-            ON CONFLICT(id) DO UPDATE SET
-              email = excluded.email,
-              name = excluded.name,
-              role = excluded.role,
-              status = excluded.status,
-              organizationId = excluded.organizationId,
-              payload = excluded.payload,
-              createdAt = excluded.createdAt,
-              updatedAt = excluded.updatedAt
-          `).run({
-            id: String(rowId),
-            email,
-            name: row.name ?? row.fullName ?? null,
-            role: row.role ?? null,
-            status: row.status ?? null,
-            organizationId: row.organizationId ?? null,
-            payload: JSON.stringify(row),
-            createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
-            updatedAt: row.updatedAt ?? row.updated_at ?? new Date().toISOString(),
-          });
-          continue;
-        }
-
-        const insertStmt = sqliteDb.prepare(`
-          INSERT INTO ${config.table} (id, organizationId, payload, createdAt, updatedAt)
-          VALUES (@id, @organizationId, @payload, @createdAt, @updatedAt)
-          ON CONFLICT(id) DO UPDATE SET
-            organizationId = excluded.organizationId,
-            payload = excluded.payload,
-            createdAt = excluded.createdAt,
-            updatedAt = excluded.updatedAt
-        `);
-        const rowId = normalizeSqliteId(row, `row-${Math.random().toString(36).slice(2, 10)}`);
-        insertStmt.run({
-          id: String(rowId),
-          organizationId: row?.organizationId ?? null,
-          payload: JSON.stringify(row),
-          createdAt: row?.createdAt ?? row?.created_at ?? new Date().toISOString(),
-          updatedAt: row?.updatedAt ?? row?.updated_at ?? new Date().toISOString(),
-        });
-      }
-    })();
-  }
-
-  if (data.branding) {
-    sqliteDb.prepare(`
-      INSERT INTO branding (id, organizationId, payload, updatedAt)
-      VALUES (@id, @organizationId, @payload, @updatedAt)
-      ON CONFLICT(id) DO UPDATE SET
-        organizationId = excluded.organizationId,
-        payload = excluded.payload,
-        updatedAt = excluded.updatedAt
-    `).run({
-      id: 'branding',
-      organizationId: data.branding.organizationId ?? null,
-      payload: JSON.stringify(data.branding),
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
-  if (data.googleConfig || data.appSettings) {
-    const payload = data.googleConfig ?? data.appSettings ?? {};
-    sqliteDb.prepare(`
-      INSERT INTO app_settings (id, organizationId, payload, updatedAt)
-      VALUES (@id, @organizationId, @payload, @updatedAt)
-      ON CONFLICT(id) DO UPDATE SET
-        organizationId = excluded.organizationId,
-        payload = excluded.payload,
-        updatedAt = excluded.updatedAt
-    `).run({
-      id: 'google_config',
-      organizationId: payload.organizationId ?? null,
-      payload: JSON.stringify(payload),
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
-  if (data.newsTicker) {
-    sqliteDb.prepare(`
-      INSERT INTO news_ticker (id, payload, updatedAt)
-      VALUES (@id, @payload, @updatedAt)
-      ON CONFLICT(id) DO UPDATE SET
-        payload = excluded.payload,
-        updatedAt = excluded.updatedAt
-    `).run({
-      id: 'default',
-      payload: JSON.stringify(data.newsTicker),
-      updatedAt: new Date().toISOString(),
-    });
-  }
+  synchronizeCoreData(sqliteDb, data);
 }
 
 export function loadCoreDataFromSqlite() {
+  const normalized = normalizedCoreReady(sqliteDb);
+  const business = (table: string) => normalized ? readBusinessRows(sqliteDb, table) : sqliteDb.prepare(`SELECT payload FROM ${table}`).all().map((r: any) => JSON.parse(r.payload));
   const rows = {
     allowedUsers: sqliteDb.prepare(`SELECT payload FROM allowed_users`).all().map((r: any) => JSON.parse(r.payload)),
-    partners: sqliteDb.prepare(`SELECT payload FROM partners`).all().map((r: any) => JSON.parse(r.payload)),
-    contracts: sqliteDb.prepare(`SELECT payload FROM contracts`).all().map((r: any) => JSON.parse(r.payload)),
-    ios: sqliteDb.prepare(`SELECT payload FROM insertion_orders`).all().map((r: any) => JSON.parse(r.payload)),
-    notifications: sqliteDb.prepare(`SELECT payload FROM notifications`).all().map((r: any) => JSON.parse(r.payload)),
-    activityLogs: sqliteDb.prepare(`SELECT payload FROM activity_logs`).all().map((r: any) => JSON.parse(r.payload)),
-    evaluations: sqliteDb.prepare(`SELECT payload FROM evaluations`).all().map((r: any) => JSON.parse(r.payload)),
-    spendings: sqliteDb.prepare(`SELECT payload FROM spendings`).all().map((r: any) => JSON.parse(r.payload)),
+    partners: business('partners').map(migratePartnerContact),
+    contracts: business('contracts'),
+    ios: business('insertion_orders'),
+    notifications: business('notifications'),
+    activityLogs: business('activity_logs'),
+    evaluations: business('evaluations'),
+    spendings: business('spendings'),
     tenants: sqliteDb.prepare(`SELECT payload FROM tenants`).all().map((r: any) => JSON.parse(r.payload)),
     departments: sqliteDb.prepare(`SELECT payload FROM departments`).all().map((r: any) => JSON.parse(r.payload)),
-    templates: sqliteDb.prepare(`SELECT payload FROM templates`).all().map((r: any) => JSON.parse(r.payload)),
+    templates: business('templates'),
     branding: (() => {
       const row = sqliteDb.prepare(`SELECT payload FROM branding WHERE id = 'branding'`).get() as any;
       return row ? JSON.parse(row.payload) : null;

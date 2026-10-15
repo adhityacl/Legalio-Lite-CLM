@@ -65,7 +65,7 @@ export async function ensureUserAccountsExist(defaultPassword = process.env.DEMO
     let hashedDef: string | null = null;
     // While the bootstrap admin is still seeded, its credential must track
     // DEMO_ADMIN_PASSWORD on every boot — otherwise editing .env after the
-    // account already exists (e.g. auth.db was copied from another install)
+    // account already exists (e.g. kaelyn.db was copied from another install)
     // silently has no effect and the configured login just stops working.
     const reseedBootstrapAdmin = process.env.SEED_DEMO_ADMIN !== 'false' && defaultPassword === process.env.DEMO_ADMIN_PASSWORD;
 
@@ -712,7 +712,7 @@ authConsoleRouter.get('/sqlite/tables', (req: Request, res: Response) => {
       try {
         const countRow = sqliteDb.prepare(`SELECT COUNT(*) as count FROM "${t.name}"`).get() as any;
         count = countRow?.count || 0;
-        const cols = sqliteDb.prepare(`PRAGMA table_info("${t.name}")`).all() as any[];
+        const cols = sqliteDb.prepare(`PRAGMA table_xinfo("${t.name}")`).all() as any[];
         columnsCount = cols.length;
       } catch (e) {}
       return {
@@ -739,6 +739,7 @@ const SQLITE_BROWSER_REDACTED_COLUMNS: Record<string, string[]> = {
   verification: ['value'],
   apikey: ['keyHash'],
   integration_credentials: ['payload'],
+  app_settings: ['payload'],
 };
 function redactSensitiveColumns(tableName: string, rows: any[]): any[] {
   const columnsToRedact = SQLITE_BROWSER_REDACTED_COLUMNS[tableName];
@@ -769,7 +770,7 @@ authConsoleRouter.get('/sqlite/table-data', (req: Request, res: Response) => {
     const offset = Math.max(parseInt(String(req.query.offset || '0'), 10) || 0, 0);
     const search = String(req.query.search || '').trim();
 
-    const columns = sqliteDb.prepare(`PRAGMA table_info("${tableName}")`).all() as {
+    const columns = sqliteDb.prepare(`PRAGMA table_xinfo("${tableName}")`).all() as {
       cid: number;
       name: string;
       type: string;

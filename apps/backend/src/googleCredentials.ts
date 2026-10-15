@@ -23,9 +23,9 @@ interface StoredRow<T> {
 }
 
 /**
- * Google credentials uploaded by a superuser, stored in auth.db and preferred over .env.
+ * Google credentials uploaded by a superuser, stored in kaelyn.db and preferred over .env.
  * ponytail: stored unencrypted, same exposure as the .env file they replace; encrypt the payload
- * (e.g. KMS or a BETTER_AUTH_SECRET-derived key) if copies of auth.db ever leave the server.
+ * (e.g. KMS or a BETTER_AUTH_SECRET-derived key) if copies of kaelyn.db ever leave the server.
  */
 export function createGoogleCredentialStore(db: Database) {
   db.exec(`

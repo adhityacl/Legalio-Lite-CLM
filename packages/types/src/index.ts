@@ -79,7 +79,6 @@ export interface Partner {
   entity_type?: string;
   identifiers?: PartyIdentifier[];
   jenis_partner?: PartnerJenis;
-  pic_partner: string; // nama & kontak (email / phone)
   nama_pic?: string;
   email_pic?: string;
   telepon_pic?: string;

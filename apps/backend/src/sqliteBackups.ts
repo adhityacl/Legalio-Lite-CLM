@@ -9,6 +9,8 @@ import type { RequestHandler, Response } from 'express';
 import { ApiError } from './organizationSettingsStore';
 
 const run = promisify(execFile);
+const DATABASE_FILENAME = 'kaelyn.db';
+const LEGACY_DATABASE_FILENAME = 'auth.db';
 const validId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id);
 export interface BackupEntry { id: string; createdAt: string; status: 'success' | 'failed'; sizeBytes: number; purpose: 'manual' | 'safety'; }
 const invalid = (message: string) => new ApiError(400, 'INVALID_BACKUP', message);
@@ -35,17 +37,61 @@ function inventory(root: string, prefix = ''): Record<string, string> {
 function schema(db: Database.Database) {
   return JSON.stringify(db.prepare("SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name").all());
 }
+function databaseFile(payload: string) {
+  const candidates = [DATABASE_FILENAME, LEGACY_DATABASE_FILENAME].filter((name) => fs.existsSync(path.join(payload, name)));
+  if (candidates.length !== 1) throw invalid('Backup must contain exactly one SQLite database file.');
+  return path.join(payload, candidates[0]);
+}
 function validate(directory: string, expectedSchema?: string) {
   const payload = path.join(directory, 'payload');
   const manifest = JSON.parse(fs.readFileSync(path.join(payload, 'manifest.json'), 'utf8'));
   if (manifest.format !== 'legalio-backup-v1' || JSON.stringify(inventory(payload)) !== JSON.stringify(manifest.files)) throw invalid('Backup integrity validation failed.');
-  const db = new Database(path.join(payload, 'auth.db'), { readonly: true, fileMustExist: true });
+  const db = new Database(databaseFile(payload), { readonly: true, fileMustExist: true });
   try {
     if ((db.pragma('quick_check', { simple: true }) !== 'ok') || (db.pragma('foreign_key_check') as unknown[]).length) throw invalid('SQLite integrity validation failed.');
     if (expectedSchema && schema(db) !== expectedSchema) throw invalid('Backup schema differs from this application version.');
     if (!db.prepare("SELECT 1 FROM user WHERE role = 'superuser' LIMIT 1").get()) throw invalid('Backup must contain a superuser account.');
   } finally { db.close(); }
   return payload;
+}
+
+/** One-time, idempotent rename for installations created before kaelyn.db became the default. */
+export function migrateLegacyDatabaseFilename(dbPath: string, dataDir: string) {
+  if (path.basename(dbPath) !== DATABASE_FILENAME || fs.existsSync(dbPath)) return false;
+  const legacyPath = path.join(path.dirname(dbPath), LEGACY_DATABASE_FILENAME);
+  if (!fs.existsSync(legacyPath)) return false;
+  const stagedPath = dbPath + '.migrate';
+  fs.rmSync(stagedPath, { force: true });
+  const source = new Database(legacyPath, { fileMustExist: true });
+  try {
+    if (source.pragma('quick_check', { simple: true }) !== 'ok') throw new Error('Legacy SQLite integrity validation failed.');
+    source.prepare('VACUUM INTO ?').run(stagedPath);
+  } finally { source.close(); }
+  try {
+    const candidate = new Database(stagedPath, { readonly: true, fileMustExist: true });
+    try {
+      if (candidate.pragma('quick_check', { simple: true }) !== 'ok' || (candidate.pragma('foreign_key_check') as unknown[]).length) {
+        throw new Error('Migrated SQLite integrity validation failed.');
+      }
+    } finally { candidate.close(); }
+    fs.chmodSync(stagedPath, 0o600);
+    fs.renameSync(stagedPath, dbPath);
+  } catch (error) {
+    fs.rmSync(stagedPath, { force: true });
+    throw error;
+  }
+
+  const rollbackDirectory = path.join(dataDir, 'backups', 'pre-kaelyn-filename-migration');
+  fs.mkdirSync(rollbackDirectory, { recursive: true, mode: 0o700 });
+  for (const suffix of ['', '-wal', '-shm']) {
+    const sourcePath = legacyPath + suffix;
+    if (!fs.existsSync(sourcePath)) continue;
+    const rollbackPath = path.join(rollbackDirectory, LEGACY_DATABASE_FILENAME + suffix);
+    if (!fs.existsSync(rollbackPath)) fs.renameSync(sourcePath, rollbackPath);
+    fs.chmodSync(rollbackPath, 0o600);
+  }
+  console.log(`SQLite database renamed from ${LEGACY_DATABASE_FILENAME} to ${DATABASE_FILENAME}.`);
+  return true;
 }
 function writeJson(file: string, value: unknown) {
   fs.writeFileSync(file + '.tmp', JSON.stringify(value), { mode: 0o600 });
@@ -64,7 +110,7 @@ export function applyPendingRestore(dbPath: string, dataDir: string) {
   const staged = uploads + '.restore';
   fs.rmSync(staged, { recursive: true, force: true });
   fs.cpSync(path.join(payload, 'uploads'), staged, { recursive: true });
-  fs.copyFileSync(path.join(payload, 'auth.db'), dbPath + '.restore');
+  fs.copyFileSync(databaseFile(payload), dbPath + '.restore');
   fs.chmodSync(dbPath + '.restore', 0o600);
   const candidate = new Database(dbPath + '.restore');
   try { candidate.exec('DELETE FROM session'); } finally { candidate.close(); }
@@ -126,10 +172,10 @@ export class SQLiteBackups {
     fs.chmodSync(this.root, 0o700);
     const entry: BackupEntry = { id, createdAt: new Date().toISOString(), status: 'failed', sizeBytes: 0, purpose };
     try {
-      await this.db.backup(path.join(payload, 'auth.db'));
-      const snapshot = new Database(path.join(payload, 'auth.db'));
+      await this.db.backup(path.join(payload, DATABASE_FILENAME));
+      const snapshot = new Database(path.join(payload, DATABASE_FILENAME));
       try { snapshot.pragma('journal_mode = DELETE'); } finally { snapshot.close(); }
-      fs.chmodSync(path.join(payload, 'auth.db'), 0o600);
+      fs.chmodSync(path.join(payload, DATABASE_FILENAME), 0o600);
       const uploads = path.join(this.dataDir, 'uploads');
       if (fs.existsSync(uploads)) await cp(uploads, path.join(payload, 'uploads'), { recursive: true, filter: (source) => {
         const stat = fs.lstatSync(source);
@@ -137,7 +183,7 @@ export class SQLiteBackups {
         return true;
       } });
       writeJson(path.join(payload, 'manifest.json'), { format: 'legalio-backup-v1', files: inventory(payload) });
-      await run('tar', ['-czf', path.join(directory, 'backup.tar.gz'), '-C', payload, 'auth.db', 'uploads', 'manifest.json']);
+      await run('tar', ['-czf', path.join(directory, 'backup.tar.gz'), '-C', payload, DATABASE_FILENAME, 'uploads', 'manifest.json']);
       fs.chmodSync(path.join(directory, 'backup.tar.gz'), 0o600);
       entry.sizeBytes = fs.statSync(path.join(directory, 'backup.tar.gz')).size;
       entry.status = 'success';
@@ -169,7 +215,7 @@ export class SQLiteBackups {
         const name = members[i];
         const parts = name.replace(/\/$/, '').split('/');
         if (parts.some((part) => !part || part === '.' || part === '..' || part.includes('\\')) ||
-            !(name === 'auth.db' || name === 'manifest.json' || name === 'uploads/' || name.startsWith('uploads/')) ||
+            !([DATABASE_FILENAME, LEGACY_DATABASE_FILENAME, 'manifest.json'].includes(name) || name === 'uploads/' || name.startsWith('uploads/')) ||
             !['-', 'd'].includes(rows[i][0])) throw invalid('Backup contains an unsafe archive member.');
         const size = Number(rows[i].split(/\s+/)[2]);
         if (!Number.isSafeInteger(size) || size < 0) throw invalid('Invalid archive size.');

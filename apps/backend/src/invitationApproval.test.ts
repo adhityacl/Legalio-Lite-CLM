@@ -11,7 +11,7 @@ test('tenant invitations approve registration and existing pending accounts with
   const envKeys = ['APP_TEST_MODE', 'AUTH_DB_PATH', 'APP_DATA_DIR', 'BETTER_AUTH_URL', 'BETTER_AUTH_ENABLE_INFRA'] as const;
   const previous = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
   Object.assign(process.env, {
-    APP_TEST_MODE: '1', AUTH_DB_PATH: path.join(dir, 'auth.db'), APP_DATA_DIR: dir,
+    APP_TEST_MODE: '1', AUTH_DB_PATH: path.join(dir, 'kaelyn.db'), APP_DATA_DIR: dir,
     BETTER_AUTH_URL: 'http://localhost:3000', BETTER_AUTH_ENABLE_INFRA: 'false',
   });
   const { auth, sqliteDb: db } = await import('./lib/auth');

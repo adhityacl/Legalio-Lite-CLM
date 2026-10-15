@@ -195,7 +195,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
       p.nama_partner.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.codename && p.codename.toLowerCase().includes(searchTerm.toLowerCase())) ||
       countryLabel(pCountry).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.pic_partner.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      [p.nama_pic, p.email_pic, p.telepon_pic].some((value) => value?.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (p.pic_internal && p.pic_internal.toLowerCase().includes(searchTerm.toLowerCase())) ||
       p.partner_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       partnerTags.some((t) => t.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -243,8 +243,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
           valB = getPartnerStatus(b.partner_id).toLowerCase();
           break;
         case 'pic':
-          valA = (a.nama_pic || a.pic_partner || '').toLowerCase();
-          valB = (b.nama_pic || b.pic_partner || '').toLowerCase();
+          valA = (a.nama_pic || '').toLowerCase();
+          valB = (b.nama_pic || '').toLowerCase();
           break;
         case 'status_dd':
           valA = (a.status_dd || '').toLowerCase();
@@ -349,7 +349,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
         `${activeContractsCount}`,
         `"${partnerCountry(p)}"`,
         `"${pTags.replace(/"/g, '""')}"`,
-        `"${(p.pic_partner || '').replace(/"/g, '""')}"`,
+        `"${([p.nama_pic, p.email_pic, p.telepon_pic].filter(Boolean).join(' / ')).replace(/"/g, '""')}"`,
         `"${(p.status_dd || '').replace(/"/g, '""')}"`,
         `${progress}%`,
         `${wajibDocs.length > 0 ? adaWajib.length : adaDocs}`,
@@ -619,7 +619,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                             {/* 3. PIC Partner */}
                             {visibleColumns.pic && (
                               <TableCell>
-                                {partner.nama_pic || partner.pic_partner || '-'}
+                                {partner.nama_pic || '-'}
                               </TableCell>
                             )}
 
@@ -742,7 +742,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   <span>{selectedPartnerDetail.nama_partner}</span>
                 </DialogTitle>
                 <Text size="xs" tone="muted" className="mt-g2">
-                  {t('partners.status_dd', 'Status DD:')} <strong className="text-foreground">{selectedPartnerDetail.status_dd}</strong> {t('partners.pic', '• PIC: {pic_partner}', { pic_partner: selectedPartnerDetail.pic_partner })}
+                  {t('partners.status_dd', 'Status DD:')} <strong className="text-foreground">{selectedPartnerDetail.status_dd}</strong> {t('partners.pic', '• PIC: {nama_pic}', { nama_pic: selectedPartnerDetail.nama_pic || '-' })}
                 </Text>
               </div>
 

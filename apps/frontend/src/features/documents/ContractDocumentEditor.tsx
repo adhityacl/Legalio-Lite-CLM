@@ -1146,7 +1146,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     const p = partner as any;
     const pName = partner?.nama_partner || 'Mitra';
     const pAddress = p?.alamat_pic || p?.alamat || '';
-    const pPic = p?.nama_pic || p?.pic_name || partner?.pic_partner || 'Direktur';
+    const pPic = p?.nama_pic || p?.pic_name || partner?.nama_pic || 'Direktur';
     const pPosition = p?.pic_position || 'Direktur Utama';
     const pEmail = p?.email_pic || p?.email || 'legal@mitra.co.id';
 

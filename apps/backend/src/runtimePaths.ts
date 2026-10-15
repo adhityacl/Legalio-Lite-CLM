@@ -1,7 +1,7 @@
 /**
  * Single source for mutable runtime locations (tenant-boundaries PRD §15).
  *
- * - AUTH_DB_PATH: absolute SQLite path; development default is ./auth.db.
+ * - AUTH_DB_PATH: absolute SQLite path; development default is ./kaelyn.db.
  * - APP_DATA_DIR: absolute directory for uploads/ and legacy data_store.json;
  *   development default is the working directory.
  * - APP_TEST_MODE=1: both paths must be explicit, absolute and inside the OS
@@ -33,7 +33,7 @@ function resolveExplicit(name: 'AUTH_DB_PATH' | 'APP_DATA_DIR', fallback: string
   return resolved;
 }
 
-export const AUTH_DB_PATH = resolveExplicit('AUTH_DB_PATH', path.join(REPOSITORY_DIR, 'auth.db'));
+export const AUTH_DB_PATH = resolveExplicit('AUTH_DB_PATH', path.join(REPOSITORY_DIR, 'kaelyn.db'));
 export const APP_DATA_DIR = resolveExplicit('APP_DATA_DIR', REPOSITORY_DIR);
 export const UPLOADS_DIR = path.join(APP_DATA_DIR, 'uploads');
 export const LEGACY_DATA_FILE = path.join(APP_DATA_DIR, 'data_store.json');

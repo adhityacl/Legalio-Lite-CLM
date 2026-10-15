@@ -97,14 +97,14 @@ export const ResetWorkspaceDialog: React.FC<ResetWorkspaceDialogProps> = ({ open
 
           <form onSubmit={submit} noValidate aria-busy={status.kind === 'running'} className="flex min-h-0 flex-1 flex-col">
             <DialogBody className="mt-0 grid gap-g13 overflow-y-auto px-g21 py-g21 text-foreground">
-              <RadioGroup value={mode} onValueChange={(details) => details.value && setMode(details.value as ResetMode)}>
-                <RadioGroupLabel>{t('settings.reset.mode_label', 'After the reset')}</RadioGroupLabel>
+              <RadioGroup className="grid gap-g8 sm:grid-cols-2" value={mode} onValueChange={(details) => details.value && setMode(details.value as ResetMode)}>
+                <RadioGroupLabel className="sm:col-span-2">{t('settings.reset.mode_label', 'After the reset')}</RadioGroupLabel>
                 {modes.map((option) => (
-                  <RadioGroupItem key={option.value} value={option.value} className="items-start gap-g13 rounded-lg border border-border p-g13 data-[state=checked]:border-status-danger-border data-[state=checked]:bg-status-danger-soft">
+                  <RadioGroupItem key={option.value} value={option.value} className="grid h-full w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-x-g8 gap-y-g3 rounded-lg border border-border p-g13 data-[state=checked]:border-status-danger-border data-[state=checked]:bg-status-danger-soft">
                     <RadioGroupItemControl className="mt-g2" />
-                    <span className="grid gap-g2">
+                    <span className="grid min-w-0 gap-g3">
                       <RadioGroupItemText className="font-semibold">{option.title}</RadioGroupItemText>
-                      <Text as="span" size="sm" tone="muted">{option.description}</Text>
+                      <Text as="span" size="sm" tone="muted" className="leading-5">{option.description}</Text>
                     </span>
                     <RadioGroupItemHiddenInput />
                   </RadioGroupItem>

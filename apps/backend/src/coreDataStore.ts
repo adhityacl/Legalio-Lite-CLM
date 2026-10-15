@@ -1,10 +1,14 @@
+import { normalizedCoreReady, synchronizeBusinessRows } from './normalizedCoreStore';
+import { ENTITIES } from './normalizedSchema';
+import { migratePartnerContact } from './partnerContact';
 import type Database from 'better-sqlite3';
 
 export function normalizeSqliteId(row: any, fallback: string) {
   if (row?.id) return String(row.id);
+  if (row?.notif_id) return String(row.notif_id);
+  if (row?.io_id) return String(row.io_id);
   if (row?.contract_id) return String(row.contract_id);
   if (row?.partner_id) return String(row.partner_id);
-  if (row?.io_id) return String(row.io_id);
   if (row?.email) return String(row.email);
   if (row?.templateId) return String(row.templateId);
   if (row?.tenantId) return String(row.tenantId);
@@ -18,10 +22,12 @@ export function isValidAllowedUserRow(row: any) {
   return email.length > 0;
 }
 
-export function synchronizeCoreData(sqliteDb: Database.Database, data: any) {
+function synchronizeCoreDataTransaction(sqliteDb: Database.Database, data: any) {
   if (!data || typeof data !== 'object') return;
 
+  const normalized = normalizedCoreReady(sqliteDb);
   const syncTable = (table: string, rows: any[] = []) => {
+    if (normalized && ENTITIES.some(entity => entity.table === table)) return;
     sqliteDb.transaction(() => {
       const existing = new Map((sqliteDb.prepare(`SELECT id, payload FROM ${table}`).all() as { id: string; payload: string }[])
         .map(row => [row.id, row.payload]));
@@ -44,6 +50,7 @@ export function synchronizeCoreData(sqliteDb: Database.Database, data: any) {
         const id = normalizeSqliteId(row, `${table}-${Math.random().toString(36).slice(2, 10)}`);
         if (seen.has(id)) throw new Error(`Duplicate id in ${table}: ${id}`);
         seen.add(id);
+        if (table === 'partners') migratePartnerContact(row);
         const payload = JSON.stringify(row);
         if (existing.get(id) === payload) continue;
         const record = {
@@ -60,6 +67,7 @@ export function synchronizeCoreData(sqliteDb: Database.Database, data: any) {
     })();
   };
 
+  if (normalized) synchronizeBusinessRows(sqliteDb, data);
   syncTable('allowed_users', Array.isArray(data.allowedUsers) ? data.allowedUsers.filter(isValidAllowedUserRow) : []);
   syncTable('partners', Array.isArray(data.partners) ? data.partners : []);
   syncTable('contracts', Array.isArray(data.contracts) ? data.contracts : []);
@@ -122,4 +130,8 @@ export function synchronizeCoreData(sqliteDb: Database.Database, data: any) {
       updatedAt: new Date().toISOString(),
     });
   }
+}
+
+export function synchronizeCoreData(sqliteDb: Database.Database, data: any) {
+  sqliteDb.transaction(() => synchronizeCoreDataTransaction(sqliteDb, data))();
 }

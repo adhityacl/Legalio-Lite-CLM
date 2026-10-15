@@ -48,28 +48,12 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
 }) => {
   const { t } = useLanguage();
 
-  const getInitialNamaPic = () => {
-    if (partnerToEdit?.nama_pic) return partnerToEdit.nama_pic;
-    if (!partnerToEdit?.pic_partner) return '';
-    const match = partnerToEdit.pic_partner.match(/^(.*?)\s*(?:\((.*?)\))?$/);
-    return match ? match[1].trim() : partnerToEdit.pic_partner;
-  };
-
   const getInitialEmailPic = () => {
     if (partnerToEdit?.email_pic) return partnerToEdit.email_pic;
     if (partnerToEdit?.kontak_pic) {
       const parts = partnerToEdit.kontak_pic.split(/[/|]/);
       const emailPart = parts.find((p) => p.includes('@'));
       if (emailPart) return emailPart.trim();
-    }
-    if (partnerToEdit?.pic_partner) {
-      const match = partnerToEdit.pic_partner.match(/\((.*?)\)/);
-      if (match) {
-        const inside = match[1];
-        const parts = inside.split(/[/|]/);
-        const emailPart = parts.find((p) => p.includes('@'));
-        if (emailPart) return emailPart.trim();
-      }
     }
     return '';
   };
@@ -80,15 +64,6 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
       const parts = partnerToEdit.kontak_pic.split(/[/|]/);
       const phonePart = parts.find((p) => !p.includes('@') && /\d/.test(p));
       if (phonePart) return phonePart.trim();
-    }
-    if (partnerToEdit?.pic_partner) {
-      const match = partnerToEdit.pic_partner.match(/\((.*?)\)/);
-      if (match) {
-        const inside = match[1];
-        const parts = inside.split(/[/|]/);
-        const phonePart = parts.find((p) => !p.includes('@') && /\d/.test(p));
-        if (phonePart) return phonePart.trim();
-      }
     }
     return '';
   };
@@ -123,7 +98,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
     }
     return false;
   });
-  const [namaPic, setNamaPic] = useState(getInitialNamaPic);
+  const [namaPic, setNamaPic] = useState(partnerToEdit?.nama_pic || '');
   const [emailPic, setEmailPic] = useState(getInitialEmailPic);
   const [teleponPic, setTeleponPic] = useState(getInitialTeleponPic);
   const [alamatPic, setAlamatPic] = useState(partnerToEdit?.alamat_pic || '');
@@ -294,7 +269,6 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
       saveMultipleCategories(tags);
     }
 
-    const fullPicString = `${namaPic.trim()} (${emailPic.trim()} | ${teleponPic.trim()})`;
     const kontakString = `${emailPic.trim()} / ${teleponPic.trim()}`;
 
     await onSave({
@@ -304,7 +278,6 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
       entity_type: entityType.trim(),
       identifiers: identifiers.filter((i) => i.value.trim()).map((i) => ({ ...i, value: i.value.trim() })),
       jenis_partner: partnerToEdit?.jenis_partner || 'Vendor',
-      pic_partner: fullPicString,
       nama_pic: namaPic.trim(),
       email_pic: emailPic.trim(),
       telepon_pic: teleponPic.trim(),

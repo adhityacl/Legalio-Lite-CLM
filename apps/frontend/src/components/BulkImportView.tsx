@@ -80,11 +80,11 @@ function buildTemplates(policy: TenantPolicyView): Record<ImportType, ImportTemp
   return {
     partners: {
       headers: [
-        'nama_partner', 'partner_channel', 'internal_pic', 'jenis_partner', 'pic_partner', 'nama_pic', 'email_pic',
+        'nama_partner', 'partner_channel', 'internal_pic', 'jenis_partner', 'nama_pic', 'email_pic',
         'telepon_pic', 'alamat_pic', 'country', 'entity_type', 'identifiers', 'catatan', 'tags',
       ],
       example: [
-        partnerName, category, 'Procurement', 'Vendor', contactName, contactName, 'contact@contoh.example.com',
+        partnerName, category, 'Procurement', 'Vendor', contactName, 'contact@contoh.example.com',
         phone, 'Jl. Contoh No. 1, Jakarta 10110', country, legalForm, identifiers, 'Preferred vendor', category,
       ],
     },

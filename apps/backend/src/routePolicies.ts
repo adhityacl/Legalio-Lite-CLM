@@ -165,6 +165,7 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['POST', '/api/tenants/:id/setup-google', orgParam('tenant.integration.update')],
   ['POST', '/api/tenants/:id/sync-google', orgParam('tenant.integration.update', 'SYNC_UNAVAILABLE')],
 
+  ['GET', '/api/search', tenant('document.view', 'search over permitted records only')],
   ['GET', '/api/partners', tenant('document.view')],
   ['POST', '/api/partners', tenant('document.create')],
   ['POST', '/api/partners/parse', tenant('document.create', 'AI extraction')],

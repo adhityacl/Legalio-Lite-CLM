@@ -1,3 +1,7 @@
+import { forwardAsyncRouteErrors } from './asyncRoutes';
+import { migrateNormalizedCore } from './migrations/003_normalized_core';
+import { removeLegacyCoreTables } from './migrations/004_remove_legacy_core';
+import { readBusinessRows, searchBusinessRows } from './normalizedCoreStore';
 import { SQLiteBackups } from './sqliteBackups';
 import { createSQLiteBackupRouter } from './sqliteBackupRoutes';
 import { mountSystemConsole } from './systemConsoleHosting';
@@ -126,6 +130,7 @@ import {
 } from "./lib/cheapOcrPipeline";
 
 const app = express();
+forwardAsyncRouteErrors(app);
 const sqliteBackups = new SQLiteBackups(sqliteDb, APP_DATA_DIR);
 app.use(sqliteBackups.middleware);
 // This app is only ever meant to run behind a reverse proxy (nginx, Cloud
@@ -706,7 +711,9 @@ function scopeOf(req: express.Request) {
 }
 /** Records of `kind` the caller may see: own organization, department scope, before any aggregation. */
 function scopedRecords<T = any>(req: express.Request, kind: RecordKind, rows: T[] | undefined): T[] {
-  return filterRecords(orgContextOf(req), scopeOf(req), kind, rows);
+  const tables: Record<RecordKind, string> = { partner: 'partners', contract: 'contracts', io: 'insertion_orders', spending: 'spendings', evaluation: 'evaluations', notification: 'notifications' };
+  const records = readBusinessRows(sqliteDb, tables[kind], orgContextOf(req).organizationId) as T[];
+  return filterRecords(orgContextOf(req), scopeOf(req), kind, records);
 }
 /**
  * Resource boundary for reads/updates/deletes (PRD §5.4): the persisted
@@ -1287,7 +1294,8 @@ __name(
  * legacy administrative projection is hydrated or saved.
  */
 ensureTenantBoundarySchema(sqliteDb);
-if (isEmptyInstall(sqliteDb)) {
+const freshInstall = isEmptyInstall(sqliteDb);
+if (freshInstall) {
   if (!IS_TEST_MODE) {
     seedOrganizationsFromDataset(sqliteDb, demoData, {
       bootstrapSuperuser: shouldSeedDemoAdmin && demoAdminEmail && demoAdminPassword
@@ -1307,12 +1315,23 @@ if (!migrationBlock && !IS_TEST_MODE && shouldSeedDemoAdmin && demoAdminEmail &&
   });
   console.log(`Seeded bootstrap superuser: ${demoAdminEmail}`);
 }
+if (!migrationBlock) {
+  const result = migrateNormalizedCore(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-normalized-core-${Date.now()}.db`));
+  if (result.applied) console.log('Normalized SQLite business schema:', result.counts);
+  const cleanup = removeLegacyCoreTables(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-remove-legacy-core-${Date.now()}.db`));
+  if (cleanup.applied) console.log('Removed legacy SQLite snapshots:', cleanup.tables);
+}
 const sqliteInitialData = loadCoreDataFromSqlite();
 const sqliteHasCoreData = ["partners", "contracts", "ios", "spendings", "evaluations", "notifications", "templates", "activityLogs"]
   .some((key) => Array.isArray((sqliteInitialData as any)[key]) && (sqliteInitialData as any)[key].length > 0);
 
-if (sqliteHasCoreData) {
-  db = { ...db, ...sqliteInitialData };
+// An initialized workspace may intentionally contain no business records after a reset.
+if (sqliteHasCoreData || !freshInstall) {
+  db = { ...db, ...sqliteInitialData,
+    branding: sqliteInitialData.branding ?? db.branding,
+    googleConfig: sqliteInitialData.googleConfig ?? db.googleConfig,
+    newsTicker: sqliteInitialData.newsTicker ?? db.newsTicker,
+  };
   console.log("Database loaded from SQLite as the source of truth.");
 } else if (!IS_TEST_MODE && fs.existsSync(dataFilePath)) {
   try {
@@ -1535,6 +1554,9 @@ function saveDb() {
     syncDbToSqlite(db);
   } catch (err) {
     console.error("Failed to save core data to SQLite", err);
+    Object.assign(db, loadCoreDataFromSqlite());
+    if (String((err as any)?.code || '').startsWith('SQLITE_CONSTRAINT')) (err as any).status = 409;
+    throw err;
   }
 }
 function triggerAutoPushToGoogleSheet(_req?: any, _options?: any): Promise<void> {
@@ -2366,6 +2388,18 @@ app.get("/api/activity-logs", (req: express.Request, res: express.Response) => {
   const orgId = getRequestTenantId(req);
   res.json((db.activityLogs || []).filter((log: any) => log?.organizationId === orgId));
 });
+app.get("/api/search", (req: express.Request, res: express.Response) => {
+  const organizationId = getRequestTenantId(req);
+  const kinds: Record<string, RecordKind> = { partners: 'partner', contracts: 'contract', insertion_orders: 'io', spendings: 'spending', evaluations: 'evaluation' };
+  const hits = searchBusinessRows(sqliteDb, organizationId, String(req.query.q || '').slice(0, 1000));
+  const permitted = hits.filter(hit => {
+    const kind = kinds[hit.entity_type];
+    if (!kind) return false;
+    const record = readBusinessRows(sqliteDb, hit.entity_type, organizationId, [hit.entity_id])[0];
+    return record && recordVisible(orgContextOf(req), scopeOf(req), kind, record);
+  });
+  res.json({ results: permitted.slice(0, 50), total: permitted.length });
+});
 app.get("/api/partners", (req: express.Request, res: express.Response) => {
   const partnerList = scopedRecords(req, "partner", db.partners);
   const normalizedPartners = partnerList.map((p) => ({
@@ -2565,7 +2599,6 @@ app.post("/api/partners", async (req: express.Request, res: express.Response) =>
     entity_type,
     identifiers,
     jenis_partner,
-    pic_partner,
     nama_pic,
     email_pic,
     telepon_pic,
@@ -2619,11 +2652,6 @@ app.post("/api/partners", async (req: express.Request, res: express.Response) =>
   }
   const partnerCountry = sanitizeCountryCode(country);
   const defaultDD = normalizePartnerDocuments({ organizationId: targetOrgId, country: partnerCountry, daftar_dokumen_dd: [] });
-  const computedPicPartner =
-    pic_partner ||
-    (nama_pic
-      ? `${nama_pic} (${email_pic || ""} | ${telepon_pic || ""})`
-      : "-");
   const newPartner = {
     partner_id: generateNextPartnerId(),
     organizationId: targetOrgId,
@@ -2633,7 +2661,6 @@ app.post("/api/partners", async (req: express.Request, res: express.Response) =>
     entity_type: String(entity_type || "").slice(0, 120),
     identifiers: sanitizeIdentifiers(identifiers),
     jenis_partner: jenis_partner || "Vendor",
-    pic_partner: computedPicPartner,
     nama_pic: nama_pic || "",
     email_pic: email_pic || "",
     telepon_pic: telepon_pic || "",
@@ -2675,7 +2702,6 @@ app.put("/api/partners/:id", async (req: express.Request, res: express.Response)
     entity_type,
     identifiers,
     jenis_partner,
-    pic_partner,
     nama_pic,
     email_pic,
     telepon_pic,
@@ -2711,7 +2737,6 @@ app.put("/api/partners/:id", async (req: express.Request, res: express.Response)
     entity_type: entity_type !== void 0 ? String(entity_type).slice(0, 120) : existing.entity_type || "",
     identifiers: identifiers !== void 0 ? sanitizeIdentifiers(identifiers) : existing.identifiers || [],
     jenis_partner: jenis_partner || existing.jenis_partner || "Vendor",
-    pic_partner: pic_partner !== void 0 ? pic_partner : existing.pic_partner,
     nama_pic: nama_pic !== void 0 ? nama_pic : existing.nama_pic,
     email_pic: email_pic !== void 0 ? email_pic : existing.email_pic,
     telepon_pic: telepon_pic !== void 0 ? telepon_pic : existing.telepon_pic,
@@ -2771,6 +2796,8 @@ app.delete("/api/partners/:id", async (req: express.Request, res: express.Respon
   );
   db.ios = db.ios.filter((io) => !partnerIOs.includes(io));
   db.contracts = db.contracts.filter((c) => !partnerContracts.includes(c));
+  for (const spending of db.spendings) if (sameOrg(spending) && spending.vendor_id === id) spending.vendor_id = null;
+  for (const evaluation of db.evaluations) if (sameOrg(evaluation) && evaluation.partner_id === id) evaluation.partner_id = null;
   db.partners.splice(partnerIndex, 1);
   saveDb();
   addActivityLog(
@@ -5025,6 +5052,9 @@ app.delete("/api/contracts/:id", async (req: express.Request, res: express.Respo
   if (!ctr) return res.status(404).json({ error: "Kontrak tidak ditemukan." });
   const tenantDenial = assertRecordAccess(req, "contract", ctr);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
+  for (const io of db.ios) if (io.organizationId === ctr.organizationId && io.contract_id === id) io.contract_id = null;
+  for (const child of db.contracts) if (child.organizationId === ctr.organizationId && child.parent_contract_id === id) child.parent_contract_id = null;
+  db.notifications = db.notifications.filter((n) => !(n.organizationId === ctr.organizationId && n.parent_type === 'Contract' && n.parent_id === id));
   db.contracts = db.contracts.filter((c) => c !== ctr);
   saveDb();
   addActivityLog(
@@ -6418,8 +6448,15 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
    * membership in the new organization; the acting superuser manages it in
    * platform context. The append-only audit log is never cleared.
    */
+  const previousState = { ...db };
   try {
     sqliteDb.transaction(() => {
+      // Clear editor data and extraction caches with the same reset.
+      for (const table of ["contract_comments", "document_metadata", "contract_drafts", "contract_documents", "metadata_fields", "ai_ocr_cache", "tenants", "departments", "search_records"]) {
+        if (sqliteDb.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)) {
+          sqliteDb.prepare(`DELETE FROM "${table}"`).run();
+        }
+      }
       removeDemoAccounts(sqliteDb, [], identity.userId);
       for (const table of ["invitation", "apikey", "teamMember", "team", "member", "organization_settings", "organization_integrations", "organization"]) {
         sqliteDb.prepare(`DELETE FROM ${table}`).run();
@@ -6430,54 +6467,58 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
         allowedUsers: mode === "demo" && process.env.NODE_ENV !== "production" ? dataset.allowedUsers : [],
       });
       sqliteDb.prepare("UPDATE session SET activeOrganizationId = NULL, activeTeamId = NULL").run();
+
+      // Mutate `db` in place: the auth console holds a reference to this object.
+      const provider = db.googleConfig || {};
+      Object.assign(db, {
+        tenants: [],
+        allowedUsers: [],
+        partners: dataset.partners,
+        contracts: dataset.contracts,
+        ios: dataset.ios,
+        spendings: dataset.spendings,
+        evaluations: dataset.evaluations,
+        notifications: dataset.notifications,
+        activityLogs: dataset.activityLogs,
+        templates: [],
+        newsTicker: { byTenant: {} },
+        branding: { ...DEFAULT_BRANDING },
+        customTranslations: {},
+        googleConfig: {
+          spreadsheetId: "",
+          driveFolderId: "",
+          masterSpreadsheetId: "",
+          masterSpreadsheetUrl: "",
+          isConnected: false,
+          autoSync: false,
+          aiModel: provider.aiModel || "gemini-3.8-flash",
+          geminiApiKey: provider.geminiApiKey || "",
+          smtpEnabled: Boolean(provider.smtpEnabled),
+          smtpHost: provider.smtpHost || "",
+          smtpPort: provider.smtpPort,
+          smtpSecure: provider.smtpSecure,
+          smtpUser: provider.smtpUser || "",
+          smtpPassword: provider.smtpPassword || "",
+          smtpFromEmail: provider.smtpFromEmail || "",
+          smtpFromName: provider.smtpFromName || "",
+          refreshToken: "",
+          accessToken: "",
+        },
+      });
+      refreshTenantProjection();
+      migrateLegacyRecords();
+      // Organization replacement and its referencing business records must commit together.
+      syncDbToSqlite(db);
       appendAudit(sqliteDb, auditActorFor(req, identity), {
         organizationId: null, action: "platform.application.reset", targetType: "installation", targetId: "installation",
         outcome: "success", changedFields: [`mode:${mode}`],
       });
     })();
   } catch (err) {
+    Object.assign(db, previousState);
     console.error("Error resetting auth organization tables:", err);
     return res.status(500).json({ error: "Failed to reset organization tables." });
   }
-
-  // Mutate `db` in place: the auth console holds a reference to this object.
-  const provider = db.googleConfig || {};
-  Object.assign(db, {
-    tenants: [],
-    allowedUsers: [],
-    partners: dataset.partners,
-    contracts: dataset.contracts,
-    ios: dataset.ios,
-    spendings: dataset.spendings,
-    evaluations: dataset.evaluations,
-    notifications: dataset.notifications,
-    activityLogs: dataset.activityLogs,
-    templates: [],
-    newsTicker: { byTenant: {} },
-    branding: { ...DEFAULT_BRANDING },
-    customTranslations: {},
-    googleConfig: {
-      spreadsheetId: "",
-      driveFolderId: "",
-      masterSpreadsheetId: "",
-      masterSpreadsheetUrl: "",
-      isConnected: false,
-      autoSync: false,
-      aiModel: provider.aiModel || "gemini-3.8-flash",
-      geminiApiKey: provider.geminiApiKey || "",
-      smtpEnabled: Boolean(provider.smtpEnabled),
-      smtpHost: provider.smtpHost || "",
-      smtpPort: provider.smtpPort,
-      smtpSecure: provider.smtpSecure,
-      smtpUser: provider.smtpUser || "",
-      smtpPassword: provider.smtpPassword || "",
-      smtpFromEmail: provider.smtpFromEmail || "",
-      smtpFromName: provider.smtpFromName || "",
-      refreshToken: "",
-      accessToken: "",
-    },
-  });
-  refreshTenantProjection();
 
   if (fs.existsSync(uploadsDir)) {
     try {
@@ -6489,7 +6530,6 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
     }
   }
 
-  migrateLegacyRecords();
   recalculateStatuses();
   saveDb();
   // Demo accounts get a password only when DEMO_ADMIN_PASSWORD is set.
@@ -6616,11 +6656,6 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           failed.push({ rowIndex, identifier: name, message: `Department "${internalPic}" does not exist in this organization.` });
           continue;
         }
-        const fullPicPartner =
-          row.pic_partner ||
-          (row.nama_pic
-            ? `${row.nama_pic.trim()} (${(row.email_pic || "").trim()} | ${(row.telepon_pic || "").trim()})`
-            : "");
         const fullKontakPic =
           row.kontak_pic ||
           (row.email_pic || row.telepon_pic
@@ -6634,7 +6669,6 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           pic_internal: internalPic,
           internal_pic: internalPic,
           jenis_partner: row.jenis_partner || "Vendor",
-          pic_partner: fullPicPartner,
           nama_pic: row.nama_pic || "",
           email_pic: row.email_pic || "",
           telepon_pic: row.telepon_pic || "",
@@ -7194,7 +7228,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
      */
     const dbContext = {
       organization: { name: ctx.organizationName, country: ctx.countryName, industry: ctx.industryName },
-      partners: (db.partners || []).filter(visibleTo("partner")).map((p: any) => ({
+      partners: readBusinessRows(sqliteDb, 'partners', tenantId).filter(visibleTo("partner")).map((p: any) => ({
         partner_id: p.partner_id || p.id,
         name: p.nama_partner,
         codename: p.codename || p.partner_channel || "",
@@ -7216,7 +7250,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
             }))
           : [],
       })),
-      contracts: (db.contracts || []).filter(visibleTo("contract")).map((c: any) => ({
+      contracts: readBusinessRows(sqliteDb, 'contracts', tenantId).filter(visibleTo("contract")).map((c: any) => ({
         contract_id: c.contract_id || c.id,
         reference: c.nomor_kontrak,
         title: c.judul_kontrak,
@@ -7241,7 +7275,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
         changed_fields: c.field_yang_berubah || [],
         days_remaining: c.sisa_hari,
       })),
-      commercial_documents: (db.ios || []).filter(visibleTo("io")).map((i: any) => {
+      commercial_documents: readBusinessRows(sqliteDb, 'insertion_orders', tenantId).filter(visibleTo("io")).map((i: any) => {
         const endDateStr = i.tanggal_berakhir || i.tanggal_selesai || i.period_end || "";
         const lifecycle = computeLifecycle(i.organizationId, endDateStr, i.status);
         return {
@@ -7267,7 +7301,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
           days_remaining: lifecycle.daysRemaining,
         };
       }),
-      spendings_and_invoices: (db.spendings || []).filter(visibleTo("spending")).map((s: any) => ({
+      spendings_and_invoices: readBusinessRows(sqliteDb, 'spendings', tenantId).filter(visibleTo("spending")).map((s: any) => ({
         spending_id: s.id,
         vendor_name: s.vendor_name || s.partner_name || "",
         vendor_id: s.vendor_id || s.partner_id || "",
@@ -7281,7 +7315,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
         payment_status: s.payment_status || "",
         bank: [s.bank_name, maskTail(s.bank_account_number)].filter(Boolean).join(" "),
       })),
-      evaluations: (db.evaluations || []).filter(visibleTo("evaluation")).map((e: any) => ({
+      evaluations: readBusinessRows(sqliteDb, 'evaluations', tenantId).filter(visibleTo("evaluation")).map((e: any) => ({
         evaluation_id: e.id,
         supplier_name: e.supplier_name,
         review_date: e.review_date,
