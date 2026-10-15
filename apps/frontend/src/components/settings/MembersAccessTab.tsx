@@ -1,6 +1,6 @@
-import React, { Suspense, lazy, useEffect, useId, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useId, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Copy, KeyRound, History, Layers, Loader2, Mail, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Trash2, UserMinus, UserCheck, UserX, X } from 'lucide-react';
+import { AlertCircle, Copy, KeyRound, History, Layers, Loader2, Mail, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2, UserMinus, UserCheck, UserX, X } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useIdentity } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmDialogContext';
@@ -17,7 +17,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components
 import { OrgApiError, orgApi, orgPath } from './orgApi';
 
 import { Input } from '@legalio/ui-components/input';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { NativeSelect } from '@legalio/ui-components/native-select';
 import { Card, CardHeader } from '@legalio/ui-components/card';
 import { DialogTitle } from '@legalio/ui-components/dialog';
@@ -75,20 +74,11 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
   const caps = usePermissions();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>(intent === 'pending-invitations' ? 'pending' : 'active');
-  const [search, setSearch] = useState('');
-  const [debounced, setDebounced] = useState('');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [dialog, setDialog] = useState<null | { kind: 'invite'; codeOnly?: boolean } | { kind: 'departments' } | { kind: 'history' } | { kind: 'edit'; member: Member } | { kind: 'link'; url: string; code?: string; expiresAt?: string }>(
     intent === 'departments' ? { kind: 'departments' } : intent === 'history' ? { kind: 'history' } : null,
   );
-  const searchId = useId();
-
-  useEffect(() => {
-    const handle = setTimeout(() => { setDebounced(search.trim()); setPage(0); }, 250);
-    return () => clearTimeout(handle);
-  }, [search]);
-
   const can = caps.hasPermission;
   const isPlatform = caps.accessMode === 'platform';
   const myRole = caps.tenantRole;
@@ -107,14 +97,14 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
   const departmentName = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments]);
   const names = (ids: string[]) => ids.map((id) => departmentName.get(id) || t('tb.other_department', 'Other department')).join(', ') || '—';
 
-  const query = new URLSearchParams({ limit: String(pageSize), offset: String(page * pageSize), ...(debounced ? { search: debounced } : {}) });
+  const query = new URLSearchParams({ limit: String(pageSize), offset: String(page * pageSize) });
   const membersQuery = useQuery<{ members: Member[]; total: number }>({
-    queryKey: key('members', filter, debounced, page, pageSize),
+    queryKey: key('members', filter, page, pageSize),
     queryFn: ({ signal }) => orgApi(orgPath(organizationId, `/members?status=${filter}&${query}`), { signal }),
     enabled: filter !== 'pending',
   });
   const invitationsQuery = useQuery<{ invitations: Invitation[]; total: number }>({
-    queryKey: key('invitations', debounced, page),
+    queryKey: key('invitations', page, pageSize),
     queryFn: ({ signal }) => orgApi(orgPath(organizationId, `/invitations?status=pending&${query}`), { signal }),
     enabled: filter === 'pending' && can('tenant.invitation.read'),
   });
@@ -188,18 +178,6 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
             <SegmentGroupIndicator />
             <SegmentGroupItems items={([['active', t('tb.filter_active', 'Active')], ['suspended', t('tb.filter_suspended', 'Suspended')], ...(can('tenant.invitation.read') ? [['pending', t('tb.filter_pending', 'Pending')]] : [])] as Array<[Filter, string]>).map(([value, label]) => ({ value, label }))} />
           </SegmentGroup>
-          <InputGroup className="relative min-w-g233 max-w-g377 flex-1">
-            <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
-            <InputGroupInput
-              id={searchId}
-              type="search"
-              aria-label={t('tb.search_members', 'Search members')}
-              placeholder={t('tb.search_members', 'Search members...')}
-              value={search}
-              maxLength={200}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </InputGroup>
         </div>
         <div className="flex shrink-0 flex-wrap gap-g8">
           {can('tenant.audit.read') && <Button type="button" variant="outline" onClick={() => setDialog({ kind: 'history' })}><History className="h-g16 w-g16" aria-hidden="true" />{t('tb.history', 'History')}</Button>}

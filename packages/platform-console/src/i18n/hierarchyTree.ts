@@ -1,5 +1,6 @@
 export const TREE_TRANSLATIONS = {
   ID: {
+    "tree.view_documents": "Lihat dokumen",
     "tree.documents_status": "DOKUMEN & STATUS LEGAL",
     "tree.partner": "Partner",
     "tree.contract": "Kontrak",
@@ -37,6 +38,7 @@ export const TREE_TRANSLATIONS = {
     "tree.notes": "Catatan & scope"
 },
   EN: {
+    "tree.view_documents": "View documents",
     "tree.documents_status": "DOCUMENTS & LEGAL STATUS",
     "tree.partner": "Partner",
     "tree.contract": "Contract",
@@ -74,6 +76,7 @@ export const TREE_TRANSLATIONS = {
     "tree.notes": "Notes & scope"
 },
   ZH: {
+    "tree.view_documents": "查看文件",
     "tree.documents_status": "文件与法律状态",
     "tree.partner": "合作伙伴",
     "tree.contract": "合同",

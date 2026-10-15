@@ -1,5 +1,5 @@
 import React, { useId, useRef, useState } from 'react';
-import { AlertCircle, ArrowLeft, ChevronDown, ChevronRight, ExternalLink, FileText, Folder, FolderOpen, Pencil, Plus, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, FileText, Folder, FolderOpen, Pencil, type LucideIcon } from 'lucide-react';
 import type { Contract, DDDokumenItem, InsertionOrder, Partner } from '@legalio/types';
 import { DD_STATUS_LABEL_KEY, DOC_STATUS_LABEL_KEY } from '@legalio/types/domainStatus';
 import { isTerminationNoticeDocument, localizeDueDiligenceDocument } from '@legalio/shared/dueDiligence';
@@ -9,8 +9,9 @@ import { Button } from '@legalio/ui-components/button';
 import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
-import { Empty, EmptyContent, EmptyDescription, EmptyIcon, EmptyTitle } from '@legalio/ui-components/empty';
+import { TableEmptyMessage } from './ui/table-empty-state';
 import { Spinner } from '@legalio/ui-components/spinner';
+import { Menu, MenuContent, MenuItem, MenuPositioner, MenuTrigger, MenuViewport } from '@legalio/ui-components/menu';
 import { useLanguage } from '../context/LanguageContext';
 import { useTenantSettings } from '../context/TenantSettingsContext';
 import { usePermissions } from '../lib/permissions';
@@ -123,7 +124,7 @@ export function HierarchyTreeView(props: Props) {
   const renderIO = (item: InsertionOrder) => {
     const key = `io:${item.io_id}`, open = isOpen(key);
     return <li key={key}>
-      <TreeRow title={item.nomor_io} subtitle={`${t('hierarchy.insertion_order_badge')} · ${period(item)} · ${formatMoney(item.nilai_io, item.currency || item.mata_uang)}`} icon={open ? FolderOpen : Folder} badge={treeBadge(item.status)} controls={`${prefix}-${key}`} expanded={open} onToggle={() => toggle(key)} toggleLabel={toggleLabel(item.nomor_io, open)} {...rowProps({ kind: 'io', id: item.io_id })} />
+      <TreeRow title={item.nomor_io} subtitle={`${t('hierarchy.insertion_order_badge')} · ${period(item)}`} icon={open ? FolderOpen : Folder} badge={treeBadge(item.status)} controls={`${prefix}-${key}`} expanded={open} onToggle={() => toggle(key)} toggleLabel={toggleLabel(item.nomor_io, open)} {...rowProps({ kind: 'io', id: item.io_id })} />
       {open && <ul id={`${prefix}-${key}`} className={branchClass}>{fileRows('io', item.io_id)}{!filesFor('io', item.io_id).length && <li className="px-g8 py-g8 text-xs text-muted-foreground">{t('hierarchy.no_document')}</li>}</ul>}
     </li>;
   };
@@ -131,11 +132,12 @@ export function HierarchyTreeView(props: Props) {
   const detailTitle = file?.name || (ownerKind === 'partner' ? partner?.nama_partner : ownerKind === 'io' ? io?.nomor_io : contract?.nomor_kontrak);
   const edit = () => { if (ownerKind === 'partner' && partner) props.onSelectPartner(partner); else if (ownerKind === 'io' && io) props.onSelectIO(io); else if (contract) props.onSelectContract(contract); };
   const canEdit = hasPermission('document.edit');
-  const primaryUrl = file?.url || (active?.kind !== 'file' ? safeLink(ownerKind === 'partner' ? partner?.link_folder_dd : ownerKind === 'io' ? io?.link_file_io : contract?.link_file_kontrak) : '');
+  const uploadedFiles = (active?.kind === 'file' ? (file ? [file] : []) : selectedFiles).filter(item => item.url);
+  const primaryDocument = uploadedFiles.length === 1 ? uploadedFiles[0] : undefined;
 
   if (loading) return <Card className="p-g21"><span role="status" className="flex items-center gap-g8"><Spinner size="sm" decorative />{t('sys.loading', 'Loading…')}</span></Card>;
   if (error) return <Alert status="error"><AlertIndicator /><AlertContent><AlertDescription>{t('app.failed_to_fetch_initial_data')}</AlertDescription>{onRetry && <Button variant="outline" className="mt-g8" onClick={onRetry}>{t('common.retry')}</Button>}</AlertContent></Alert>;
-  if (!filteredPartners.length) return <Card><Empty><EmptyIcon><Folder aria-hidden="true" /></EmptyIcon><EmptyContent><EmptyTitle>{t('hierarchy.no_data')}</EmptyTitle><EmptyDescription>{t('hierarchy.search_hint')}</EmptyDescription></EmptyContent>{!partners.length && hasPermission('document.create') && <Button onClick={props.onOpenAddPartner}><Plus aria-hidden="true" />{t('hierarchy.new_partner')}</Button>}</Empty></Card>;
+  if (!filteredPartners.length) return <TableEmptyMessage />;
 
   return <div className="grid min-w-0 items-start gap-g13 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
     <Card ref={treeRef} role="region" tabIndex={-1} className="min-w-0 overflow-hidden bg-card/60 lg:min-h-[48rem]" aria-label={t('tree.documents_status')}>
@@ -143,26 +145,15 @@ export function HierarchyTreeView(props: Props) {
       <ul className="space-y-g3 p-g8">
         {filteredPartners.map((item, index) => {
           const key = `partner:${item.partner_id}`, open = isOpen(key, index === 0);
-          const docs = checklist(item), ready = docs.filter(doc => doc.status === 'Available').length;
-          const missing = docs.filter(doc => doc.wajib && doc.status !== 'Available').length;
           const linkedContracts = partnerContracts(item.partner_id);
           const activeVendor = linkedContracts.some(c => ['Active', 'Expiring'].includes(c.status));
-          const ddKey = `dd:${item.partner_id}`, ddOpen = isOpen(ddKey);
           return <li key={key}>
-            <TreeRow title={item.nama_partner} subtitle={`${item.jenis_partner || t('tree.partner')} · DD ${ready}/${docs.length} · ${statusLabel(item.status_dd)}`} icon={open ? FolderOpen : Folder} badge={treeBadge(activeVendor ? 'Active' : 'Review')} expanded={open} controls={`${prefix}-${key}`} onToggle={() => toggle(key, index === 0)} toggleLabel={toggleLabel(item.nama_partner, open)} {...rowProps({ kind: 'partner', id: item.partner_id })} />
+            <TreeRow title={item.nama_partner} subtitle={`${item.jenis_partner || t('tree.partner')} · ${item.tags?.join(', ') || '—'}`} icon={open ? FolderOpen : Folder} badge={treeBadge(activeVendor ? 'Active' : 'Review')} expanded={open} controls={`${prefix}-${key}`} onToggle={() => toggle(key, index === 0)} toggleLabel={toggleLabel(item.nama_partner, open)} {...rowProps({ kind: 'partner', id: item.partner_id })} />
             {open && <ul id={`${prefix}-${key}`} className={branchClass}>
-              <li>
-                <TreeRow title={t('tree.legal_documents')} subtitle={statusLabel(item.status_dd)} icon={ddOpen ? FolderOpen : Folder} badge={<Badge tone={ready === docs.length && docs.length > 0 ? 'success' : 'warning'}>{ready}/{docs.length}</Badge>} expanded={ddOpen} controls={`${prefix}-${ddKey}`} onToggle={() => toggle(ddKey)} toggleLabel={toggleLabel(t('tree.legal_documents'), ddOpen)} {...rowProps({ kind: 'partner', id: item.partner_id })} selected={false} />
-                {ddOpen && <ul id={`${prefix}-${ddKey}`} className={branchClass}>
-                  {fileRows('partner', item.partner_id)}
-                  {missing > 0 && <li className="flex items-start gap-g5 px-g8 py-g8 text-xs text-status-warning"><AlertCircle aria-hidden="true" className="mt-g2 size-g13 shrink-0" />{t('tree.missing_required', undefined, { count: missing })}</li>}
-                  {!docs.length && <li className="px-g8 py-g8 text-xs text-muted-foreground">{t('hierarchy.standard_dd_docs_hint')}</li>}
-                </ul>}
-              </li>
               {linkedContracts.map(itemContract => {
                 const contractKey = `contract:${itemContract.contract_id}`, contractOpen = isOpen(contractKey);
                 return <li key={contractKey}>
-                  <TreeRow title={itemContract.nomor_kontrak} subtitle={`${t('tree.contract')} · ${period(itemContract)} · ${t('hierarchy.notice_period')} ${itemContract.notice_period_hari || 0} ${t('hierarchy.days')}`} icon={contractOpen ? FolderOpen : Folder} badge={treeBadge(itemContract.status)} expanded={contractOpen} controls={`${prefix}-${contractKey}`} onToggle={() => toggle(contractKey)} toggleLabel={toggleLabel(itemContract.nomor_kontrak, contractOpen)} {...rowProps({ kind: 'contract', id: itemContract.contract_id })} />
+                  <TreeRow title={itemContract.nomor_kontrak} subtitle={`${t('tree.contract')} · ${period(itemContract)}`} icon={contractOpen ? FolderOpen : Folder} badge={treeBadge(itemContract.status)} expanded={contractOpen} controls={`${prefix}-${contractKey}`} onToggle={() => toggle(contractKey)} toggleLabel={toggleLabel(itemContract.nomor_kontrak, contractOpen)} {...rowProps({ kind: 'contract', id: itemContract.contract_id })} />
                   {contractOpen && <ul id={`${prefix}-${contractKey}`} className={branchClass}>{fileRows('contract', itemContract.contract_id)}{contractIOs(itemContract.contract_id).map(renderIO)}</ul>}
                 </li>;
               })}
@@ -181,7 +172,16 @@ export function HierarchyTreeView(props: Props) {
       <p className="mt-g8 text-sm text-muted-foreground wrap-anywhere">{active?.kind === 'file' ? t('tree.file_context') : ownerKind === 'partner' ? t('tree.partner_context') : ownerKind === 'io' ? io?.judul_io : contract?.judul_kontrak}</p>
       <div className="mt-g8 flex flex-wrap gap-g5">{active?.kind === 'file' && file ? <Badge tone={statusTone(file.status)}>{statusLabel(file.status)}</Badge> : treeBadge(ownerKind === 'partner' ? operational : io?.status || contract?.status || '')}{partner && ownerKind === 'partner' && <Badge tone={statusTone(partner.status_dd)}>{statusLabel(partner.status_dd)}</Badge>}{ownerKind === 'contract' && contract?.status_approval && treeBadge(contract.status_approval)}</div>
       <div className="my-g21 flex flex-wrap gap-g8">
-        {primaryUrl ? <Button asChild className="min-h-11 min-w-0 flex-1"><a href={primaryUrl} target="_blank" rel="noopener noreferrer"><ExternalLink aria-hidden="true" />{t('tree.open_document')}</a></Button> : active?.kind === 'file' ? <Button disabled className="min-h-11 flex-1">{t('tree.no_file_link')}</Button> : <Button className="min-h-11 flex-1" onClick={edit}>{t('tree.view_record')}</Button>}
+        {primaryDocument ? (
+          <Button asChild className="min-h-11 min-w-0 flex-1"><a href={primaryDocument.url} target="_blank" rel="noopener noreferrer"><ExternalLink aria-hidden="true" />{t('tree.open_document')}</a></Button>
+        ) : uploadedFiles.length > 1 ? (
+          <Menu positioning={{ placement: 'bottom-start', gutter: 8 }}>
+            <MenuTrigger asChild><Button className="min-h-11 min-w-0 flex-1"><FileText aria-hidden="true" />{t('tree.view_documents')}<ChevronDown aria-hidden="true" /></Button></MenuTrigger>
+            <MenuPositioner><MenuContent className="max-w-[calc(100vw-2rem)]"><MenuViewport className="max-h-g377">
+              {uploadedFiles.map(item => <MenuItem key={item.key} value={item.key} asChild><a href={item.url} target="_blank" rel="noopener noreferrer" className="whitespace-normal wrap-anywhere"><FileText aria-hidden="true" />{item.name}<ExternalLink aria-hidden="true" /></a></MenuItem>)}
+            </MenuViewport></MenuContent></MenuPositioner>
+          </Menu>
+        ) : <Button disabled className="min-h-11 flex-1">{t(selectedFiles.length ? 'tree.no_file_link' : 'hierarchy.no_document')}</Button>}
         {canEdit && <Button variant="outline" className="min-h-11" onClick={edit}><Pencil aria-hidden="true" />{t('hierarchy.edit_btn')}</Button>}
       </div>
       <section className="border-t border-border py-g13">
@@ -200,7 +200,6 @@ export function HierarchyTreeView(props: Props) {
       </section>}
       {missingRequired > 0 && <Alert status="warning" className="mt-g8"><AlertIndicator /><AlertContent><AlertDescription className="text-xs leading-relaxed"><strong className="mb-g5 block">{t('tree.missing_required', undefined, { count: missingRequired })}</strong>{t('tree.legal_warning')}</AlertDescription></AlertContent></Alert>}
       {(io?.deliverables || io?.internal_notes || contract?.internal_notes || (ownerKind === 'partner' && partner?.catatan)) && <section className="mt-g13 border-t border-border pt-g13"><h4 className="mb-g8 text-xs font-medium tracking-wider text-muted-foreground uppercase">{t('tree.notes')}</h4><p className="text-sm leading-relaxed whitespace-pre-line wrap-anywhere">{io?.deliverables || io?.internal_notes || contract?.internal_notes || partner?.catatan}</p></section>}
-      {active?.kind !== 'file' && hasPermission('document.create') && <Button variant="outline" className="mt-g21 min-h-11 self-start" onClick={() => ownerKind === 'partner' ? props.onOpenAddContract(partner?.partner_id) : props.onOpenAddIO(contract?.contract_id, partner?.partner_id)}><Plus aria-hidden="true" />{t(ownerKind === 'partner' ? 'hierarchy.kontrak_induk_short' : 'hierarchy.new_io')}</Button>}
     </Card>
   </div>;
 }
