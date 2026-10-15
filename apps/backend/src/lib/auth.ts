@@ -1,6 +1,8 @@
 import { synchronizeCoreData, normalizeSqliteId, isValidAllowedUserRow } from '../coreDataStore';
 import { ensureTenantBoundarySchema } from '../organizationSettingsStore';
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthPlugin } from "better-auth";
+import { APIError } from "better-auth/api";
+import { hasApprovalInvitation } from "../organizationAdminRoutes";
 import { admin, organization } from "better-auth/plugins";
 import { dash, sentinel } from "@better-auth/infra";
 import { createAccessControl } from "better-auth/plugins/access";
@@ -565,6 +567,22 @@ if (!(sqliteDb.prepare('PRAGMA table_info("user")').all() as Array<{ name: strin
 
 loadInstallationSettings(sqliteDb);
 
+// Run after credentials/OAuth are verified, before the admin plugin checks bans.
+// This also unblocks accounts registered before invitation-based approval existed.
+const invitationApprovalPlugin = {
+  id: 'invitation-approval',
+  init: () => ({ options: { databaseHooks: {
+    session: { create: { before: async (session, ctx) => {
+      const user = sqliteDb.prepare('SELECT email, banned, banReason FROM "user" WHERE id = ?').get(session.userId) as
+        { email: string; banned: number | null; banReason: string | null } | undefined;
+      if (user?.banned && user.banReason === 'PENDING_APPROVAL' &&
+          hasApprovalInvitation(sqliteDb, user.email, ctx?.headers?.get('x-invitation-token'))) {
+        await ctx?.context.internalAdapter.updateUser(session.userId, { banned: false, banReason: null, banExpires: null });
+      }
+    } } },
+  } } }),
+} satisfies BetterAuthPlugin;
+
 const createAuth = () => betterAuth({
   // Unset: Better Auth derives the base URL per request from its real
   // Host/X-Forwarded-Proto headers (see the comment above) instead of a
@@ -597,6 +615,7 @@ const createAuth = () => betterAuth({
     },
   },
   plugins: [
+    invitationApprovalPlugin,
     admin({
       ac,
       roles,
@@ -627,11 +646,14 @@ const createAuth = () => betterAuth({
   databaseHooks: {
     user: {
       create: {
-        // Every self-registered account waits for manual superuser approval.
-        // An invitation never approves an account or grants platform privileges.
-        before: async (user) => ({
-          data: { ...user, role: "user", banned: true, banReason: "PENDING_APPROVAL", banExpires: null },
-        }),
+        before: async (user, ctx) => {
+          const token = ctx?.headers?.get('x-invitation-token');
+          const invited = hasApprovalInvitation(sqliteDb, user.email, token);
+          if (token && !invited) throw APIError.from('BAD_REQUEST', {
+            code: 'INVALID_INVITATION', message: 'This invitation is invalid, expired, or belongs to a different account.',
+          });
+          return { data: { ...user, role: "user", banned: !invited, banReason: invited ? null : "PENDING_APPROVAL", banExpires: null } };
+        },
       },
     },
   },

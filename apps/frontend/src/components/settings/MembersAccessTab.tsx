@@ -384,7 +384,7 @@ const InviteLinkDialog: React.FC<{ url: string; code?: string; expiresAt?: strin
     <ModalFrame size="md" onClose={onClose} >
       <DialogHeader title={code ? t('onboarding.code_created', 'Invite code created') : t('tb.invitation_not_sent_title', 'Invitation created; email not sent')} onClose={onClose} />
       <div className="flex flex-col gap-g13 p-g21">
-        <Text size="sm">{code ? t('onboarding.code_hint', 'Share this code with an approved account. It expires in 24 hours and can be used once.') : t('tb.invitation_not_sent', 'The invitation is saved, but no email was delivered. Share this link with the invited person yourself.')}</Text>
+        <Text size="sm">{code ? t('onboarding.code_hint', 'Share this code to create an account or join your organization. No superuser approval is needed. It expires in 24 hours and can be used once.') : t('tb.invitation_not_sent', 'The invitation is saved, but no email was delivered. Share this link with the invited person yourself.')}</Text>
         <Clipboard value={code || url} onStatusChange={details => setCopied(details.copied)}>
           <ClipboardLabel>{code ? t('onboarding.invite_code', 'Invite code') : t('tb.invitation_link', 'Invitation link')}</ClipboardLabel>
           <ClipboardControl>

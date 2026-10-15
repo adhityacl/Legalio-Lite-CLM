@@ -23,7 +23,7 @@ import {
   ApiError, appendAudit, buildTenantProjection, ensureTenantBoundarySchema, isEmptyInstall, markMigrationApplied,
   migrationApplied, readIntegration, writeIntegrationRow, patchOrganizationSettings, readOrganizationSettings, patchIntegration,
 } from "./organizationSettingsStore";
-import { auditActorFor, capabilitiesOf, createOrganizationAdminRouter, identityResponse, selectActiveOrganization } from "./organizationAdminRoutes";
+import { auditActorFor, capabilitiesOf, createOrganizationAdminRouter, hasApprovalInvitation, identityResponse, selectActiveOrganization } from "./organizationAdminRoutes";
 import { createOrganizationRecord, seedOrganizationsFromDataset } from "./organizationProvisioning";
 import { GoogleGenAI, Type } from "@google/genai";
 import { OAuth2Client } from "google-auth-library";
@@ -5748,30 +5748,31 @@ app.post(
         });
       }
 
-      /*
-       * Onboarding (PRD §8.4): an existing identity signs in; a new one is
-       * created pending manual superuser approval — always as platform
-       * `user`, never with a
-       * membership. The caller's Google tokens are never stored as platform
-       * configuration.
-       */
+      // Google proved the email above; invitations satisfy account approval,
+      // while membership is still granted only by explicit invitation acceptance.
+      const invited = hasApprovalInvitation(sqliteDb, cleanEmail, req.get('x-invitation-token'));
       let existingUser: any = sqliteDb.prepare(`SELECT id, name, role, banned, banReason, banExpires FROM "user" WHERE LOWER(email) = ?`).get(cleanEmail);
       if (!existingUser) {
         const newId = `usr_${crypto.randomUUID()}`;
         sqliteDb.prepare(`
           INSERT INTO "user" (id, name, email, emailVerified, image, role, banned, banReason, createdAt, updatedAt)
-          VALUES (?, ?, ?, 1, ?, 'user', 1, 'PENDING_APPROVAL', ?, ?)
-        `).run(newId, userName, cleanEmail, photoURL || null, now, now);
-        return res.status(403).json({ success: false, error: "ACCOUNT_PENDING_APPROVAL", message: "Your account is waiting for manual superuser approval." });
-      } else {
-        if (isIdentityBanned(existingUser)) {
-          const pending = existingUser.banReason === 'PENDING_APPROVAL';
-          return res.status(403).json({ success: false, error: pending ? "ACCOUNT_PENDING_APPROVAL" : "ACCOUNT_DISABLED",
-            message: pending ? "Your account is waiting for manual superuser approval." : "This account is disabled." });
-        }
-        // Google verified this address, so the identity's email is verified.
-        sqliteDb.prepare(`UPDATE "user" SET image = COALESCE(?, image), emailVerified = 1, updatedAt = ? WHERE id = ?`).run(photoURL || null, now, existingUser.id);
+          VALUES (?, ?, ?, 1, ?, 'user', ?, ?, ?, ?)
+        `).run(newId, userName, cleanEmail, photoURL || null, invited ? 0 : 1, invited ? null : 'PENDING_APPROVAL', now, now);
+        existingUser = sqliteDb.prepare('SELECT id, name, role, banned, banReason, banExpires FROM "user" WHERE id = ?').get(newId);
       }
+      if (existingUser.banReason === 'PENDING_APPROVAL' && invited) {
+        sqliteDb.prepare('UPDATE "user" SET banned = 0, banReason = NULL, banExpires = NULL, updatedAt = ? WHERE id = ?').run(now, existingUser.id);
+        existingUser.banned = 0;
+        existingUser.banReason = null;
+        existingUser.banExpires = null;
+      }
+      if (isIdentityBanned(existingUser)) {
+        const pending = existingUser.banReason === 'PENDING_APPROVAL';
+        return res.status(403).json({ success: false, error: pending ? "ACCOUNT_PENDING_APPROVAL" : "ACCOUNT_DISABLED",
+          message: pending ? "Your account is waiting for manual superuser approval." : "This account is disabled." });
+      }
+      // Google verified this address, so the identity's email is verified.
+      sqliteDb.prepare(`UPDATE "user" SET image = COALESCE(?, image), emailVerified = 1, updatedAt = ? WHERE id = ?`).run(photoURL || null, now, existingUser.id);
       const userId = existingUser.id;
       const existingAcc: any = sqliteDb.prepare("SELECT id FROM account WHERE userId = ? AND providerId = 'google'").get(userId);
       if (!existingAcc) {
@@ -7548,7 +7549,7 @@ app.use("/api", createOrganizationAdminRouter({
   },
   inviteUrl: (req: express.Request, token: string) => {
     const base = getPublicBaseUrl() || `${req.protocol}://${req.get("host")}`;
-    return `${base}/?accept_invite=${encodeURIComponent(token)}`;
+    return `${base}/app?accept_invite=${encodeURIComponent(token)}`;
   },
   sendInvitation: async ({ email, organizationName, tenantRole, inviteUrl, expiresAt, inviterName }) => {
     if (IS_TEST_MODE) return false;

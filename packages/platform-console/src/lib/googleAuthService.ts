@@ -233,11 +233,11 @@ export const syncTokenToServer = async (
 };
 
 /** Exchanges a verified Google access token for an app (Better Auth) session; '' if the server refused. */
-const createAppSession = async (profile: GoogleUserProfile, accessToken: string): Promise<string> => {
+const createAppSession = async (profile: GoogleUserProfile, accessToken: string, invitationToken?: string): Promise<string> => {
   try {
     const syncRes = await fetch('/api/auth/google/sync-session', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(invitationToken ? { 'x-invitation-token': invitationToken } : {}) },
       credentials: 'include',
       body: JSON.stringify({ email: profile.email, name: profile.name, photoURL: profile.photoURL, accessToken }),
     });
@@ -253,9 +253,9 @@ const createAppSession = async (profile: GoogleUserProfile, accessToken: string)
   }
 };
 
-export const signInWithGoogle = async (): Promise<{ accessToken: string; profile: GoogleUserProfile; sessionToken?: string }> => {
+export const signInWithGoogle = async (invitationToken?: string): Promise<{ accessToken: string; profile: GoogleUserProfile; sessionToken?: string }> => {
   const result = await signInWithGoogleCodeFlow();
-  return { ...result, sessionToken: await createAppSession(result.profile, result.accessToken) };
+  return { ...result, sessionToken: await createAppSession(result.profile, result.accessToken, invitationToken) };
 };
 
 export const getGoogleTokenRemainingMinutes = (): number => {

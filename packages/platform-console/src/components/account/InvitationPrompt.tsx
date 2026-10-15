@@ -12,17 +12,18 @@ import { Spinner } from '@legalio/ui-components/spinner';
 import { Text } from '@legalio/ui-components/text';
 const KEY = 'pendingInvitation';
 
-/** Captures `?accept_invite=<token>` once and keeps it through sign-in (sessionStorage, this tab only). */
+/** Keep invitation links through sign-in, including malformed tokens so preview can explain the error. */
 export function capturePendingInvitation(): string | null {
   try {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('accept_invite');
-    if (token && /^[A-Za-z0-9_-]{8,128}$/.test(token)) {
-      sessionStorage.setItem(KEY, token);
+    if (token && token.length <= 512) {
+      try { sessionStorage.setItem(KEY, token); } catch { return token; }
       params.delete('accept_invite');
       params.delete('email');
       const query = params.toString();
       window.history.replaceState(window.history.state, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+      return token;
     }
     return sessionStorage.getItem(KEY);
   } catch {
@@ -34,11 +35,13 @@ const clearPendingInvitation = () => {
   try { sessionStorage.removeItem(KEY); } catch { /* ignore */ }
 };
 
-export interface InvitationPreview { organizationName: string; tenantRole: string; expiresAt: string; status: string }
+export interface InvitationPreview { organizationName: string; email: string | null; tenantRole: string; expiresAt: string; status: string }
 
 export async function loadInvitationPreview(token: string): Promise<InvitationPreview | null> {
   const res = await fetch(`/api/invitations/${encodeURIComponent(token)}/preview`, { cache: 'no-store' });
-  return res.ok ? res.json() : null;
+  if (res.status === 404 || res.status === 409) return null;
+  if (!res.ok) throw new Error('Could not load invitation.');
+  return res.json();
 }
 
 /**

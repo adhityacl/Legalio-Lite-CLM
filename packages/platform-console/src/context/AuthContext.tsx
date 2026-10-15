@@ -35,7 +35,7 @@ export interface Identity {
 interface IdentityContextType {
   identity: Identity | null;
   loading: boolean;
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean, invitationToken?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserName: (newName: string) => void;
   refreshUser: () => Promise<void>;
@@ -104,8 +104,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [adopt, refreshUser]);
 
-  const login = async (email: string, password: string, rememberMe = true) => {
-    const { data, error } = await authClient.signIn.email({ email, password, rememberMe });
+  const login = async (email: string, password: string, rememberMe = true, invitationToken?: string) => {
+    const { data, error } = await authClient.signIn.email({ email, password, rememberMe }, { headers: invitationToken ? { 'x-invitation-token': invitationToken } : {} });
     if (error) throw error;
     const token = data?.token || (data as any)?.session?.token;
     if (token) localStorage.setItem('auth_session_token', token);

@@ -461,9 +461,9 @@ const tokenOk = (token: unknown): token is string => typeof token === 'string' &
 /** Minimal token preview (§8.3). No mutation. */
 export function previewInvitation(db: DB, token: string) {
   if (!tokenOk(token)) throw new ApiError(404, 'RESOURCE_NOT_FOUND');
-  const row = db.prepare(`SELECT i.role, i.status, i.expiresAt, o.name AS organizationName FROM invitation i JOIN organization o ON o.id = i.organizationId WHERE i.id = ?`).get(token) as any;
+  const row = db.prepare(`SELECT i.email, i.role, i.status, i.expiresAt, o.name AS organizationName FROM invitation i JOIN organization o ON o.id = i.organizationId WHERE i.id = ?`).get(token) as any;
   if (!row) throw new ApiError(404, 'RESOURCE_NOT_FOUND');
-  return { organizationName: row.organizationName, tenantRole: row.role, expiresAt: row.expiresAt, status: invitationStatus(row) };
+  return { organizationName: row.organizationName, email: row.email || null, tenantRole: row.role, expiresAt: row.expiresAt, status: invitationStatus(row) };
 }
 
 /** Whether the inviter could still issue this invitation today (§8.3: revoked/demoted inviters lose outstanding invitations). */
@@ -481,6 +481,28 @@ function inviterStillAuthorized(db: DB, row: any): boolean {
   return checkInvite(ctx, row.role, invitationDepartmentIds(row)).ok;
 }
 
+/** Approval and acceptance use the same current invitation checks. */
+function invitationIsUsable(db: DB, row: any): boolean {
+  if (invitationStatus(row) !== 'pending' || !isTenantRole(row.role)) return false;
+  if (!db.prepare('SELECT 1 FROM organization WHERE id = ?').get(row.organizationId)) return false;
+  const departmentIds = invitationDepartmentIds(row);
+  const departmentsValid = departmentIds.every((id) => db.prepare(`SELECT 1 FROM team WHERE id = ? AND organizationId = ?`).get(id, row.organizationId));
+  const comboValid = row.role === 'admin' ? departmentIds.length === 0 : departmentIds.length > 0;
+  return departmentsValid && comboValid && inviterStillAuthorized(db, row);
+}
+
+/** An email invitation approves its recipient; an invite code requires possession. */
+export function hasApprovalInvitation(db: DB, email: string, token?: string | null): boolean {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (token) {
+    if (!tokenOk(token)) return false;
+    const row = db.prepare('SELECT * FROM invitation WHERE id = ?').get(token) as any;
+    return Boolean(row && (!row.email || String(row.email).toLowerCase() === normalizedEmail) && invitationIsUsable(db, row));
+  }
+  return (db.prepare("SELECT * FROM invitation WHERE LOWER(email) = ? AND email <> '' AND status = 'pending'").all(normalizedEmail) as any[])
+    .some((row) => invitationIsUsable(db, row));
+}
+
 export function acceptInvitation(db: DB, identity: Identity, token: string, req: express.Request) {
   if (!tokenOk(token)) throw new ApiError(404, 'RESOURCE_NOT_FOUND');
   return db.transaction(() => {
@@ -490,9 +512,7 @@ export function acceptInvitation(db: DB, identity: Identity, token: string, req:
     if (row.email && identity.email !== String(row.email).toLowerCase()) throw new ApiError(403, 'INVITATION_IDENTITY_MISMATCH', 'This invitation was issued to a different account.');
     if (!isTenantRole(row.role)) throw new ApiError(409, 'INVITATION_NOT_ACCEPTABLE', 'This invitation can no longer be accepted.');
     const departmentIds = invitationDepartmentIds(row);
-    const departmentsValid = departmentIds.every((id) => db.prepare(`SELECT 1 FROM team WHERE id = ? AND organizationId = ?`).get(id, row.organizationId));
-    const comboValid = row.role === 'admin' ? departmentIds.length === 0 : departmentIds.length > 0;
-    if (!departmentsValid || !comboValid || !inviterStillAuthorized(db, row)) {
+    if (!invitationIsUsable(db, row)) {
       throw new ApiError(409, 'INVITATION_NOT_ACCEPTABLE', 'This invitation can no longer be accepted.');
     }
     if (membershipOf(db, identity.userId, row.organizationId)) throw new ApiError(409, 'MEMBERSHIP_EXISTS', 'You are already a member of this organization.');

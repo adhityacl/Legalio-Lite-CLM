@@ -3,7 +3,8 @@ import { authClient } from '../lib/auth-client';
 import { useAuth } from '../context/AuthContext';
 import { LANGUAGE_OPTIONS, useLanguage, type Language } from '../context/LanguageContext';
 import { signInWithGoogle } from '../lib/googleAuthService';
-import { Clock } from 'lucide-react';
+import { Clock, Mail } from 'lucide-react';
+import { Spinner } from '@legalio/ui-components/spinner';
 import { Button } from '@legalio/ui-components/button';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 import { Card, CardDescription, CardTitle } from '@legalio/ui-components/card';
@@ -26,12 +27,14 @@ interface SignInFormProps {
  * Sign-in / registration screen.
  *
  * Built on the moduix Sign in block (Card, Field, InputGroup, PasswordInput, Alert).
- * Behaviour and the auth calls are unchanged.
+ * Invitation links carry their context through registration and sign-in.
  */
 export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onOpenTermsOfService, allowRegistration = true }) => {
   const { t, language, setLanguage } = useLanguage();
   const { login } = useAuth();
-  const [isRegister, setIsRegister] = useState(false);
+  const [inviteCode, setInviteCode] = useState(() => allowRegistration ? capturePendingInvitation() || '' : '');
+  const [linkToken, setLinkToken] = useState(inviteCode);
+  const [isRegister, setIsRegister] = useState(Boolean(inviteCode));
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,11 +50,24 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
 
   // An invitation link survives sign-in/registration in this tab (PRD §8.4).
   const [invitation, setInvitation] = useState<InvitationPreview | null>(null);
+  const [invitationState, setInvitationState] = useState<'idle' | 'loading' | 'ready' | 'invalid' | 'error'>(inviteCode ? 'loading' : 'idle');
+  const [previewAttempt, setPreviewAttempt] = useState(0);
   useEffect(() => {
-    if (!allowRegistration) return;
-    const token = capturePendingInvitation();
-    if (token) loadInvitationPreview(token).then(setInvitation).catch(() => {});
-  }, [allowRegistration]);
+    if (!allowRegistration || !linkToken) {
+      setInvitation(null);
+      setInvitationState('idle');
+      return;
+    }
+    let active = true;
+    setInvitationState('loading');
+    loadInvitationPreview(linkToken).then(preview => {
+      if (!active) return;
+      setInvitation(preview);
+      if (preview?.status === 'pending' && preview.email) setEmail(preview.email);
+      setInvitationState(preview?.status === 'pending' ? 'ready' : 'invalid');
+    }).catch(() => { if (active) setInvitationState('error'); });
+    return () => { active = false; };
+  }, [allowRegistration, linkToken, previewAttempt]);
 
   useEffect(() => {
     fetch('/api/system/public-status', { cache: 'no-store' })
@@ -89,6 +105,12 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
     setError('');
 
     try {
+      if (allowRegistration && !setupMode) {
+        try {
+          if (inviteCode.trim()) sessionStorage.setItem('pendingInvitation', inviteCode.trim());
+          else sessionStorage.removeItem('pendingInvitation');
+        } catch { /* storage unavailable */ }
+      }
       if (setupMode) {
         const res = await fetch('/api/system/setup', {
           method: 'POST',
@@ -108,7 +130,10 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
         }
         await login(email, password);
       } else if (allowRegistration && isRegister) {
-        const { error } = await authClient.signUp.email({ name, email, password });
+        const token = inviteCode.trim();
+        const { data, error } = await authClient.signUp.email({ name, email, password }, {
+          headers: token ? { 'x-invitation-token': token } : {},
+        });
         if (error) {
           const msg = (error.message || '').toLowerCase();
           const code = (error as any).code || '';
@@ -120,12 +145,14 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
           } else {
             setError(error.message || t('login.err_register_failed'));
           }
+        } else if ((data?.user as { banned?: boolean } | undefined)?.banned === false) {
+          await login(email, password, rememberMe, token);
         } else {
           try { await (authClient.signOut as any)(); } catch (_) {}
           setRegistrationSuccess(true);
         }
       } else {
-        await login(email, password, rememberMe);
+        await login(email, password, rememberMe, inviteCode.trim() || undefined);
       }
     } catch (err: any) {
       const msg = (err?.message || '').toLowerCase();
@@ -146,7 +173,12 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
     setLoading(true);
     setError('');
     try {
-      const result = await signInWithGoogle();
+      const token = inviteCode.trim();
+      try {
+        if (token) sessionStorage.setItem('pendingInvitation', token);
+        else sessionStorage.removeItem('pendingInvitation');
+      } catch { /* storage unavailable */ }
+      const result = await signInWithGoogle(token || undefined);
       if (result.sessionToken) {
         window.location.reload();
         return;
@@ -162,10 +194,39 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
   };
 
   const isPending = /menunggu|pending/i.test(error);
-  const blocked = loading || (!allowRegistration && !statusReady);
+  const blocked = loading || (!allowRegistration && !statusReady) || (Boolean(linkToken) && invitationState !== 'ready');
+  const invited = invitationState === 'ready' && invitation !== null && !setupMode;
   const shell = (card: React.ReactNode) => (
-    <AuthShell language={language} setLanguage={setLanguage} t={t} onOpenPrivacy={handleOpenPrivacy} onOpenTerms={handleOpenTerms}>{card}</AuthShell>
+    <AuthShell invitationContext={Boolean(linkToken)} language={language} setLanguage={setLanguage} t={t} onOpenPrivacy={handleOpenPrivacy} onOpenTerms={handleOpenTerms}>{card}</AuthShell>
   );
+
+  if (linkToken && !setupMode && invitationState !== 'ready' && invitationState !== 'idle') {
+    const checking = invitationState === 'loading';
+    const unavailable = invitationState === 'error';
+    return shell(
+      <Card className="auth-card w-full gap-g21 rounded-xl p-g21 shadow-xl sm:p-g34" aria-busy={checking}>
+        <div className="flex size-g42 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
+          {checking ? <Spinner size="sm" decorative /> : <Mail className="size-g21" />}
+        </div>
+        <div className="flex flex-col gap-g8" role={checking ? 'status' : 'alert'}>
+          <CardTitle asChild className="text-xl font-extrabold"><h1>{checking
+            ? t('invite.checking', 'Checking your invitation')
+            : unavailable ? t('invite.load_failed', 'We couldn’t load your invitation') : t('invite.invalid_title', 'This invitation is no longer available')}</h1></CardTitle>
+          <CardDescription>{checking
+            ? t('invite.checking_hint', 'Getting your workspace details…')
+            : unavailable ? t('invite.retry_hint', 'Check your connection and try again.')
+            : t('invite.invalid_hint', 'The link may have expired, been canceled, or already been used. Ask your organization administrator for a new invitation.')}</CardDescription>
+        </div>
+        {!checking && <div className="flex flex-col gap-g8">
+          {unavailable && <Button onClick={() => setPreviewAttempt(value => value + 1)}>{t('invite.retry', 'Try again')}</Button>}
+          <Button variant="outline" onClick={() => {
+            setInviteCode(''); setLinkToken(''); setInvitation(null); setInvitationState('idle'); setIsRegister(false);
+            try { sessionStorage.removeItem('pendingInvitation'); } catch { /* storage unavailable */ }
+          }}>{t('invite.continue_without', 'Continue without an invitation')}</Button>
+        </div>}
+      </Card>
+    );
+  }
 
   if (registrationSuccess) {
     return shell(
@@ -174,9 +235,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
         <div className="flex flex-col gap-g8">
           <CardTitle asChild className="text-xl font-extrabold"><h1>{t('login.account_created_title')}</h1></CardTitle>
           <CardDescription>
-            {invitation
-              ? t('tb.invited_registration_done', 'Your account was created and is waiting for manual superuser approval. Once approved, sign in to accept the invitation to {org}.', { org: invitation.organizationName })
-              : t('onboarding.registration_done', 'Your account was created and is waiting for manual superuser approval. Once approved, sign in to join or create an organization.')}
+            {t('onboarding.registration_done', 'Your account was created and is waiting for manual superuser approval. Once approved, sign in to join or create an organization.')}
           </CardDescription>
         </div>
         <Button variant="outline" className="w-full" onClick={() => { setRegistrationSuccess(false); setIsRegister(false); setError(''); setName(''); setPassword(''); }}>
@@ -186,21 +245,18 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
     );
   }
 
-  const title = setupMode ? t('login.setup_title', 'Create your admin account') : isRegister ? t('login.create_account') : t('login.welcome_back', 'Welcome back');
-  const subtitle = setupMode ? t('login.setup_subtitle', 'Set your website URL and create the first superuser.') : isRegister ? t('login.fill_form_reg') : t('login.welcome_subtitle', 'Please sign in with your Legalio account');
+  const title = invited ? t('invite.title', 'You’ve been invited to join {org}', { org: invitation.organizationName }) : setupMode ? t('login.setup_title', 'Create your admin account') : isRegister ? t('login.create_account') : t('login.welcome_back', 'Welcome back');
+  const subtitle = invited ? (isRegister
+    ? t('invite.register_hint', 'Create your account to accept your invitation and get started with your team.')
+    : t('invite.signin_hint', 'Sign in with your existing account to accept your invitation.')) : setupMode ? t('login.setup_subtitle', 'Set your website URL and create the first superuser.') : isRegister ? t('login.fill_form_reg') : t('login.welcome_subtitle', 'Please sign in with your Legalio account');
 
   return shell(
     <Card className={`auth-card ${setupMode ? 'auth-setup-card' : ''} w-full gap-g21 rounded-xl p-g21 shadow-xl sm:p-g34`}>
+      {invited && <Text size="sm" className="flex items-center gap-g8 font-semibold text-primary"><Mail className="size-g16 shrink-0" aria-hidden="true" />{t('tb.invitation_title', 'Organization invitation')}</Text>}
       <div className="flex flex-col gap-g8">
-        <CardTitle asChild className="text-xl font-extrabold sm:text-2xl"><h1>{title}</h1></CardTitle>
+        <CardTitle asChild className="break-words text-xl font-extrabold leading-tight sm:text-2xl"><h1>{title}</h1></CardTitle>
         <CardDescription>{subtitle}</CardDescription>
       </div>
-      {invitation && (
-        <Alert status="info">
-          <AlertIndicator />
-          <AlertContent><AlertDescription className="text-sm">{t('tb.invitation_signin_hint', 'You were invited to join {org} as {role}. Sign in or create an account with the invited email address to accept.', { org: invitation.organizationName, role: invitation.tenantRole })}</AlertDescription></AlertContent>
-        </Alert>
-      )}
       {error && (
         <Alert status={isPending ? 'warning' : 'error'}>
           <AlertIndicator />
@@ -225,17 +281,17 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
         {(isRegister || setupMode) && (
           <Field required>
             <FieldLabel htmlFor="signin-name">{t('login.fullname_label')}</FieldLabel>
-            <Input id="signin-name" type="text" autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder={t('login.fullname_placeholder')} />
+            <Input id="signin-name" type="text" required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder={t('login.fullname_placeholder')} />
           </Field>
         )}
         <Field required>
           <FieldLabel htmlFor="signin-email">{t('login.email_label')}</FieldLabel>
-          <Input id="signin-email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('login.email_example', 'name@company.com')} />
+          <Input id="signin-email" type="email" required autoComplete="email" readOnly={Boolean(invited && invitation.email)} value={email} onChange={e => setEmail(e.target.value)} placeholder={t('login.email_example', 'name@company.com')} />
         </Field>
-        <PasswordInput ids={{ input: 'signin-password' }} autoComplete={setupMode ? 'new-password' : 'current-password'}>
+        <PasswordInput ids={{ input: 'signin-password' }} autoComplete={setupMode || isRegister ? 'new-password' : 'current-password'}>
           <PasswordInputLabel>{t('login.password_label')}</PasswordInputLabel>
           <PasswordInputControl>
-            <PasswordInputInput required minLength={setupMode ? 8 : undefined} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••••••" />
+            <PasswordInputInput required minLength={setupMode || isRegister ? 8 : undefined} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••••••" />
             <PasswordInputVisibilityTrigger><PasswordInputIndicator /></PasswordInputVisibilityTrigger>
           </PasswordInputControl>
         </PasswordInput>
@@ -247,8 +303,14 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
             <Button type="button" variant="link" size="sm" className="px-0 font-semibold text-foreground no-underline hover:underline" onClick={() => setResetHint(true)}>{t('login.forgot_password', 'Forgot password?')}</Button>
           </div>
         )}
+        {allowRegistration && isRegister && !setupMode && !invited && (
+          <Field>
+            <FieldLabel htmlFor="signin-invite-code">{t('onboarding.invite_code_optional', 'Invite code (optional)')}</FieldLabel>
+            <Input id="signin-invite-code" value={inviteCode} onChange={e => setInviteCode(e.target.value)} maxLength={128} autoComplete="off" spellCheck={false} />
+          </Field>
+        )}
         <Button type="submit" loading={loading} disabled={blocked} className="w-full">
-          {setupMode ? t('login.setup_submit', 'Create admin account') : isRegister ? t('login.btn_register') : t('login.sign_in_securely', 'Sign in securely')}
+          {invited ? (isRegister ? t('invite.create_account', 'Create account & continue') : t('invite.sign_in', 'Sign in & continue')) : setupMode ? t('login.setup_submit', 'Create admin account') : isRegister ? t('login.btn_register') : t('login.sign_in_securely', 'Sign in securely')}
         </Button>
       </form>
 
@@ -272,7 +334,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
             <Text size="sm" tone="muted" className="flex flex-wrap items-center justify-center gap-x-g5">
               {isRegister ? t('login.have_account', 'Already have an account?') : t('login.new_here', 'New here?')}
               <Button variant="link" size="sm" className="px-0 font-semibold text-foreground no-underline hover:underline" onClick={() => { setIsRegister(!isRegister); setError(''); setResetHint(false); }}>
-                {isRegister ? t('login.sign_in_link', 'Sign in') : t('login.request_access', 'Request access')}
+                {isRegister ? t('login.sign_in_link', 'Sign in') : invited ? t('login.create_account', 'Create account') : t('login.request_access', 'Request access')}
               </Button>
             </Text>
           )}
@@ -283,7 +345,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
 };
 
 /** Full-page sign-in scene: dark backdrop, product pitch on the major side, the card on the minor side. */
-const AuthShell: React.FC<{ children: React.ReactNode; language: Language; setLanguage: (lang: Language) => void; t: (k: string, d?: string, v?: Record<string, unknown>) => string; onOpenPrivacy: (e: React.MouseEvent) => void; onOpenTerms: (e: React.MouseEvent) => void }> = ({ children, language, setLanguage, t, onOpenPrivacy, onOpenTerms }) => (
+const AuthShell: React.FC<{ children: React.ReactNode; invitationContext?: boolean; language: Language; setLanguage: (lang: Language) => void; t: (k: string, d?: string, v?: Record<string, unknown>) => string; onOpenPrivacy: (e: React.MouseEvent) => void; onOpenTerms: (e: React.MouseEvent) => void }> = ({ children, invitationContext = false, language, setLanguage, t, onOpenPrivacy, onOpenTerms }) => (
   <main className="auth-backdrop relative isolate flex h-dvh w-full flex-col overflow-x-hidden overflow-y-auto bg-auth-ink text-auth-foreground">
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
       <div className="auth-glow-blue absolute -start-g55 -top-g55 size-g233 rounded-full lg:start-g68 lg:top-g89 lg:size-g610" />
@@ -293,7 +355,7 @@ const AuthShell: React.FC<{ children: React.ReactNode; language: Language; setLa
     <div className="auth-layout mx-auto flex w-full max-w-g1597 flex-1 shrink-0 flex-col gap-g21 px-g21 py-g21 lg:flex-row lg:items-center lg:justify-between lg:gap-g34 lg:px-g42 lg:py-g34 xl:gap-g55 xl:px-g110 xl:py-g55">
       <section className="auth-hero flex min-w-0 max-w-g610 flex-col gap-g21 lg:flex-1 lg:gap-g34">
         <Image src={new URL('../assets/logo-light.png', import.meta.url).href} alt="Legalio" layout="fixed" height={42} width={206} className="h-g34 w-auto self-start object-contain lg:h-g42" />
-        <div className="flex flex-col gap-g13 lg:gap-g21">
+        <div className={`${invitationContext ? 'hidden lg:flex' : 'flex'} flex-col gap-g13 lg:gap-g21`}>
           <p className="text-2xl font-extrabold leading-snug lg:text-3xl">{t('login.hero_title', 'All in one workspace for partner, contracts, and spending tracker.')}</p>
           <p className="text-sm text-auth-muted lg:text-md lg:leading-relaxed">{t('login.hero_desc', 'Monitor agreements, discuss with AI, upload supporting documents, evaluate vendors, and keep every operational record organized')}</p>
         </div>
