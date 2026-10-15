@@ -7,7 +7,9 @@
 [![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3-003B57?logo=sqlite&logoColor=white)](https://github.com/WiseLibs/better-sqlite3)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#-feedback-and-contributing)
 
-![Legalio dashboard](assets/screenshots/dashboard.png)
+[![Legalio in 15 seconds: partners, contracts, AI assistance, spending and key dates](assets/video/legalio-preview.gif)](assets/video/legalio-intro.mp4)
+
+**[Watch the 15-second film with music and sound effects](assets/video/legalio-intro.mp4)** · [Visit Legalio](https://legalio.web.id/) · [Video transcript](assets/video/README.md#on-screen-script)
 
 
 ## 🌟 Highlights
@@ -27,6 +29,9 @@
 Legalio is a contract lifecycle management (CLM) application for legal, procurement and finance teams who track many partners at once. It keeps every partner, contract, service order, invoice and evaluation in one place. It reminds you before notice periods run out and gives each organization its own workspace, branding and access rules.
 
 The app runs as a single Node.js server with an SQLite database file, so it can be self-hosted on one machine without extra infrastructure. The interface is built with React 19 and a design system based on [Moduix](https://moduix.dev) (Ark UI) components, sized on a golden-ratio scale.
+
+
+![Legalio dashboard](assets/screenshots/dashboard.png)
 
 
 ### ✍️ Authors
