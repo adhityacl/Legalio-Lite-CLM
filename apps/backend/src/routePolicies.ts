@@ -148,6 +148,7 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/auth-console/sqlite/status', platform('platform.database.read')],
   ['GET', '/api/auth-console/sqlite/tables', platform('platform.database.read')],
   ['GET', '/api/auth-console/sqlite/table-data', platform('platform.database.read')],
+  ['PATCH', '/api/auth-console/sqlite/table-data', platform('platform.database.update')],
   ['POST', '/api/auth-console/sqlite/optimize', platform('platform.database.optimize')],
 
   /* ---------------- legacy tenant operations ---------------- */

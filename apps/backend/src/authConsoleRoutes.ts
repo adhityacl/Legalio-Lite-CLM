@@ -7,6 +7,8 @@
  * nothing here creates or changes a membership implicitly.
  */
 import { Router, Request, Response } from 'express';
+import { editableColumns, editBusinessRow } from './sqliteEditing';
+import { ENTITIES } from './normalizedSchema';
 import { sqliteDb } from './lib/auth';
 import { hashPassword } from 'better-auth/crypto';
 import crypto from 'crypto';
@@ -779,35 +781,28 @@ authConsoleRouter.get('/sqlite/table-data', (req: Request, res: Response) => {
       pk: number;
     }[];
 
-    let rows: any[] = [];
-    let total = 0;
-
-    // Redacted columns are not searchable either: match counts would leak their contents.
+    // Sort only validated, visible columns; credentials must not leak through ordering.
     const redacted = new Set(SQLITE_BROWSER_REDACTED_COLUMNS[tableName] ?? []);
-    const searchable = columns.filter((c) => !redacted.has(c.name));
-
-    if (search && searchable.length > 0) {
-      const searchConditions = searchable.map((c) => `CAST("${c.name}" AS TEXT) LIKE ?`).join(' OR ');
-      const searchParam = `%${search}%`;
-      const searchParams = searchable.map(() => searchParam);
-
-      const totalRow = sqliteDb.prepare(`SELECT COUNT(*) as count FROM "${tableName}" WHERE ${searchConditions}`).get(...searchParams) as any;
-      total = totalRow?.count || 0;
-
-      rows = sqliteDb
-        .prepare(`SELECT * FROM "${tableName}" WHERE ${searchConditions} LIMIT ? OFFSET ?`)
-        .all(...searchParams, limit, offset);
-    } else {
-      const totalRow = sqliteDb.prepare(`SELECT COUNT(*) as count FROM "${tableName}"`).get() as any;
-      total = totalRow?.count || 0;
-
-      rows = sqliteDb.prepare(`SELECT * FROM "${tableName}" LIMIT ? OFFSET ?`).all(limit, offset);
+    const sort = String(req.query.sort || '');
+    const direction = String(req.query.direction || 'asc').toLowerCase();
+    if ((sort && !columns.some(c => c.name === sort && !redacted.has(c.name))) || !['asc', 'desc'].includes(direction)) {
+      return res.status(400).json({ error: 'Invalid sort column or direction' });
     }
+    const quote = (name: string) => '"' + name.replace(/"/g, '""') + '"';
+    const searchable = columns.filter(c => !redacted.has(c.name));
+    const where = search && searchable.length ? ` WHERE ${searchable.map(c => `CAST(${quote(c.name)} AS TEXT) LIKE ?`).join(' OR ')}` : '';
+    const params = where ? searchable.map(() => `%${search}%`) : [];
+    // Primary keys stabilize pagination when multiple rows have the same sort value.
+    const order = [...(sort ? [`${quote(sort)} ${direction}`] : []), ...columns.filter(c => c.pk && c.name !== sort).sort((a, b) => a.pk - b.pk).map(c => quote(c.name))];
+    const orderBy = order.length ? ` ORDER BY ${order.join(', ')}` : '';
+    const total = (sqliteDb.prepare(`SELECT COUNT(*) as count FROM "${tableName}"${where}`).get(...params) as any).count;
+    const rows = sqliteDb.prepare(`SELECT * FROM "${tableName}"${where}${orderBy} LIMIT ? OFFSET ?`).all(...params, limit, offset);
 
     return res.json({
       success: true,
       table: tableName,
-      columns,
+      columns: columns.map(column => ({ ...column, sortable: !redacted.has(column.name), editable: editableColumns(tableName).some(field => field.sql === column.name), editKind: editableColumns(tableName).find(field => field.sql === column.name)?.kind })),
+      primaryKey: ENTITIES.find(entity => entity.table === tableName)?.key ?? null,
       rows: redactSensitiveColumns(tableName, rows),
       total,
       limit,
@@ -818,6 +813,25 @@ authConsoleRouter.get('/sqlite/table-data', (req: Request, res: Response) => {
     return res.status(500).json({ error: err.message || 'Failed to fetch SQLite table data' });
   }
 });
+
+// Explicit platform write permission; raw credentials and internal tables never enter this path.
+authConsoleRouter.patch('/sqlite/table-data', platformHandler((req, res, identity) => {
+  if (!identity.platformPermissions.includes('platform.database.update')) throw new RequestDenied(403, 'INSUFFICIENT_PERMISSION');
+  if (!globalDbRef) throw new ApiError(503, 'NOT_READY', 'Business data is not ready.');
+  let result;
+  try {
+    result = sqliteDb.transaction(() => {
+      const updated = editBusinessRow(sqliteDb, req.body);
+      platformAudit(req, identity, 'platform.database.row.update', updated.entity.table, req.body.key, updated.changedFields);
+      return updated;
+    }).immediate();
+  } catch (err: any) {
+    if (String(err.code || '').startsWith('SQLITE_CONSTRAINT')) throw new ApiError(409, 'INVALID_ROW', 'The change violates a database constraint. No changes were saved.');
+    throw err;
+  }
+  globalDbRef[result.entity.collection] = result.rows;
+  return res.json({ success: true });
+}));
 
 // 13. SQLite DB Maintenance (Optimize / PRAGMA optimize)
 authConsoleRouter.post('/sqlite/optimize', (req: Request, res: Response) => {

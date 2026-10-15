@@ -51,7 +51,7 @@ export const PLATFORM_PERMISSIONS = [
   'platform.apikey.revoke', 'platform.apikey.delete',
   'platform.policy.read',
   'platform.configuration.read', 'platform.configuration.update',
-  'platform.database.read', 'platform.database.optimize',
+  'platform.database.read', 'platform.database.optimize', 'platform.database.update',
   'platform.application.reset', 'platform.audit.read',
 ] as const;
 export type PlatformPermission = (typeof PLATFORM_PERMISSIONS)[number];

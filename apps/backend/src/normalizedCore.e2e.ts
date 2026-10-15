@@ -63,6 +63,21 @@ try{
  const configBrowser=await call('/api/auth-console/sqlite/table-data?table=organization_settings');
  assert.ok(configBrowser.columns.some((c:any)=>c.name==='country_code'));
  checks.push('legacy migration, authenticated API reload and SQLite browser');
+ for (const direction of ['asc', 'desc']) {
+  const sorted = await call(`/api/auth-console/sqlite/table-data?table=partners&sort=nama_partner&direction=${direction}&limit=5&offset=5`);
+  const expected = sql.prepare(`SELECT partner_id FROM partners ORDER BY nama_partner ${direction}, partner_id LIMIT 5 OFFSET 5`).all() as any[];
+  assert.deepEqual(sorted.rows.map((row:any)=>row.partner_id), expected.map(row=>row.partner_id));
+ }
+ await call('/api/auth-console/sqlite/table-data?table=partners&sort=missing', {status:400});
+ await call('/api/auth-console/sqlite/table-data?table=partners&sort=partner_id%22%3BDROP%20TABLE%20partners', {status:400});
+ await call('/api/auth-console/sqlite/table-data?table=partners&sort=partner_id&direction=invalid', {status:400});
+ await call('/api/auth-console/sqlite/table-data?table=session&sort=token', {status:400});
+ await call('/api/auth-console/sqlite/table-data?table=partners', {token:'',status:401});
+ const sessionsBrowser=await call('/api/auth-console/sqlite/table-data?table=session');
+ assert.equal(sessionsBrowser.columns.find((column:any)=>column.name==='token').sortable,false);
+ assert.ok(sessionsBrowser.rows.every((row:any)=>row.token==='[redacted]'));
+ checks.push('SQLite explorer server-side sorting, stable pagination, validation and credential protection');
+
  const partner=(await call('/api/partners',{method:'POST',org,body:{nama_partner:'E2E Indexed Orchard',country:'ID',nama_pic:'Test Contact',email_pic:'private-index@example.com',telepon_pic:'+62123456',pic_internal:owner.name,tags:['Supplier']}})).partner;
  assert.ok(partner.partner_id);assert.equal('pic_partner' in partner,false);
  const contract=(await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,nomor_kontrak:'E2E-CTR-001',judul_kontrak:'E2E Agreement',tanggal_mulai:'2026-01-01',tanggal_berakhir:'2099-12-31',currency:'USD',nilai_kontrak:123.45,status_approval:'Signed',auto_renewal:false,pic_internal:owner.name}})).contract;
@@ -72,6 +87,36 @@ try{
  assert.ok(ios.every(io=>io?.io_id));assert.notEqual(ios[0].io_id,ios[1].io_id);
  assert.equal((sql.prepare('SELECT COUNT(*) AS n FROM insertion_orders WHERE contract_id=?').get(contract.contract_id) as any).n,2);
  checks.push('partner and contract CRUD; two IOs in one contract');
+ const editableRow=(await call(`/api/auth-console/sqlite/table-data?table=partners&search=${partner.partner_id}`)).rows.find((row:any)=>row.partner_id===partner.partner_id);
+ const editBody={table:'partners',key:partner.partner_id,original:editableRow,changes:{catatan:'ExplorerSearchProof',nama_pic:null}};
+ await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody,token:'',status:401});
+ const ordinaryToken=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'admin@example.com',password},token:''})).token;
+ await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody,token:ordinaryToken,status:403});
+ for(const table of ['session','account','business_search_idx','audit_log','activity_logs']) {
+  await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:{...editBody,table},status:403});
+ }
+ for(const changes of [{partner_id:'changed-key'},{organization_id:otherOrg},{extra_json:'{}'},{record_position:999}]) {
+  await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:{...editBody,changes},status:400});
+ }
+ const auditBefore=(sql.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='platform.database.row.update'").get() as any).n;
+ sql.exec("CREATE TRIGGER fail_explorer_audit BEFORE INSERT ON audit_log WHEN NEW.action='platform.database.row.update' BEGIN SELECT RAISE(ABORT,'injected failure'); END");
+ await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody,status:409});
+ sql.exec('DROP TRIGGER fail_explorer_audit');
+ assert.equal((sql.prepare('SELECT catatan FROM partners WHERE partner_id=?').get(partner.partner_id) as any).catatan,editableRow.catatan);
+ await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody});
+ await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody,status:409});
+ assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='platform.database.row.update'").get() as any).n,auditBefore+1);
+ assert.equal((await call('/api/partners',{org})).find((row:any)=>row.partner_id===partner.partner_id).nama_pic,null);
+ assert.ok((await call('/api/search?q=ExplorerSearchProof',{org})).results.some((hit:any)=>hit.entity_id===partner.partner_id));
+ await call(`/api/partners/${partner.partner_id}`,{method:'PUT',org,body:{telepon_pic:'+62123456'}});
+ const persistedEdit=(await call('/api/partners',{org})).find((row:any)=>row.partner_id===partner.partner_id);
+ assert.equal(persistedEdit.catatan,'ExplorerSearchProof');assert.equal(persistedEdit.nama_pic,null);
+ const contractRow=(await call(`/api/auth-console/sqlite/table-data?table=contracts&search=${contract.contract_id}`)).rows.find((row:any)=>row.contract_id===contract.contract_id);
+ for(const changes of [{auto_renewal:2},{notice_period_hari:'not-a-number'},{redline_analysis:'{invalid-json'},{risk_level:'Low'},{nilai_kontrak_minor:100}]) {
+  await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:{table:'contracts',key:contract.contract_id,original:contractRow,changes},status:400});
+ }
+ checks.push('SQLite editor permissions, locked fields, audit rollback, stale-write rejection, NULL, search and in-memory persistence');
+
 
  const updatedContract=(await call(`/api/contracts/${contract.contract_id}`,{method:'PUT',org,body:{judul_kontrak:'E2E Agreement Updated',nilai_kontrak:456.78,currency:'USD'}})).contract;
  assert.equal(updatedContract.judul_kontrak,'E2E Agreement Updated');
@@ -261,6 +306,74 @@ try{
   await systemPage.goto(backendURL+`/sys?tab=admin-system-${tab}`);
   await expect(systemPage.locator('main')).toBeVisible({timeout:30000});
  }
+
+ await systemPage.goto(backendURL+'/sys?tab=admin-system-database');
+ const explorer=systemPage.locator('#sqlite-database-tables');
+ const tableNav=explorer.getByRole('navigation');
+ await expect(tableNav.getByRole('button',{name:'partners',exact:true})).toHaveAttribute('aria-current','true');
+ await expect(explorer.locator('#sqlite-table-edit-status')).toHaveText(/Editable fields|Field dapat diedit/);
+ await expect(systemPage.locator('#sqlite-database-summary')).not.toContainText(/Read only|Hanya baca/);
+ await tableNav.getByRole('button',{name:'partners',exact:true}).click();
+ const grid=explorer.getByRole('table',{name:'partners',exact:true});
+ await expect(grid).toBeVisible();
+ await grid.getByRole('columnheader',{name:/nama_partner/}).getByRole('button').click();
+ await expect(grid.getByRole('columnheader',{name:/nama_partner/})).toHaveAttribute('aria-sort','ascending');
+ await grid.getByRole('columnheader',{name:/nama_partner/}).getByRole('button').click();
+ await expect(grid.getByRole('columnheader',{name:/nama_partner/})).toHaveAttribute('aria-sort','descending');
+ await grid.getByRole('row').nth(1).getByRole('button').first().click();
+ const detail=systemPage.locator('#sqlite-row-details');
+ await expect(detail.locator('#sqlite-field-partner_id')).not.toHaveValue('');
+ await detail.getByRole('textbox',{name:/Find a field|Cari field/}).fill('nama_partner');
+ await expect(detail.locator('textarea')).toHaveCount(1);
+ await detail.getByRole('textbox',{name:/Find a field|Cari field/}).fill('');
+ await systemPage.context().grantPermissions(['clipboard-read','clipboard-write']);
+ await detail.getByRole('button',{name:/Copy row JSON|Salin baris JSON/}).click();
+ const clipboard=await systemPage.evaluate<string>("navigator.clipboard.readText()");
+ assert.ok(JSON.parse(clipboard).partner_id);
+ const [pageExport]=await Promise.all([systemPage.waitForEvent('download'),explorer.getByRole('button',{name:/Export page CSV|Ekspor halaman CSV/}).click()]);
+ const exported=readFileSync((await pageExport.path())!,'utf8');assert.ok(exported.includes('"partner_id"'));assert.ok(exported.includes('"nama_partner"'));
+ await explorer.getByRole('button',{name:/^Structure$|^Struktur$/}).click();
+ await expect(explorer.getByRole('columnheader',{name:/Constraints|Batasan/})).toBeVisible();
+ await explorer.getByRole('button',{name:'Data',exact:true}).click();
+ await explorer.getByRole('textbox',{name:/^Search table\.\.\.$|^Cari tabel\.\.\.$/}).fill('E2E Browser CSV');
+ await explorer.locator('form').getByRole('button').click();
+ await expect(grid.getByRole('row')).toHaveCount(2);
+ await expect(grid.getByRole('button',{name:'E2E Browser CSV',exact:true})).toBeVisible();
+ await grid.getByRole('button',{name:'E2E Browser CSV',exact:true}).click();
+ await expect(detail.locator('#sqlite-field-nama_partner')).toHaveValue('E2E Browser CSV');
+
+ await detail.getByRole('button',{name:/^Edit row$|^Edit baris$/}).click();
+ await expect(detail.locator('#sqlite-field-partner_id')).toHaveAttribute('readonly','');
+ await detail.locator('#sqlite-field-nama_partner').fill('Canceled database edit');
+ await detail.getByRole('button',{name:/^Cancel$|^Batal$/}).click();
+ await expect(detail.locator('#sqlite-field-nama_partner')).toHaveValue('E2E Browser CSV');
+ await detail.getByRole('button',{name:/^Edit row$|^Edit baris$/}).click();
+ await detail.locator('#sqlite-field-catatan').fill('Saved from explorer UI');
+ await detail.getByRole('button',{name:/^Save$|^Simpan$/}).click();
+ await expect(systemPage.getByRole('status').filter({hasText:/Changes saved|Perubahan disimpan/})).toBeVisible();
+ await expect(grid.getByRole('button',{name:'E2E Browser CSV',exact:true})).toBeVisible();
+ await grid.getByRole('button',{name:'E2E Browser CSV',exact:true}).click();
+ await expect(detail.locator('#sqlite-field-catatan')).toHaveValue('Saved from explorer UI');
+ assert.equal((await call('/api/partners',{org})).find((item:any)=>item.nama_partner==='E2E Browser CSV').catatan,'Saved from explorer UI');
+ checks.push('Chromium row edit, locked identity, cancel, save and API persistence');
+ await systemPage.screenshot({path:path.join(directory,'sys-database-explorer-desktop.png'),fullPage:true});
+ await explorer.getByRole('textbox',{name:/^Find a table$|^Cari tabel$/}).fill('session');
+ await tableNav.getByRole('button',{name:'session',exact:true}).click();
+ const sessionGrid=explorer.getByRole('table',{name:'session',exact:true});
+ await expect(sessionGrid.getByRole('columnheader',{name:/^token/}).getByRole('button')).toBeDisabled();
+ await expect(explorer.locator('#sqlite-table-edit-status')).toHaveText(/Read-only table|Tabel hanya baca/);
+ await expect(detail.getByText(/Editing is disabled for this table|Pengeditan dinonaktifkan untuk tabel ini/)).toBeVisible();
+ await expect(detail.getByRole('button',{name:/^Edit row$|^Edit baris$/})).toHaveCount(0);
+ await expect(sessionGrid.getByRole('button',{name:'[redacted]',exact:true}).first()).toBeVisible();
+ await explorer.getByRole('textbox',{name:/^Find a table$|^Cari tabel$/}).fill('partners');
+ await tableNav.getByRole('button',{name:'partners',exact:true}).click();
+ await expect(grid).toBeVisible();
+ await grid.getByRole('row').nth(1).getByRole('button').first().click();
+ await systemPage.setViewportSize({width:390,height:844});
+ await systemPage.screenshot({path:path.join(directory,'sys-database-explorer-mobile.png'),fullPage:true});
+ assert.ok(await systemPage.evaluate<boolean>("document.documentElement.scrollWidth <= innerWidth"));
+ await systemPage.setViewportSize({width:1440,height:1000});
+ checks.push('Chromium database explorer sorting, selection, field search, copy, CSV export, schema, redaction and mobile');
  await systemPage.goto(backendURL+'/sys?tab=admin-system-google-credentials');
  await expect(systemPage.getByText(/Service Account \(JSON\)/).first()).toBeVisible({timeout:30000});
  await systemPage.screenshot({path:path.join(directory,'sys-google-credentials.png'),fullPage:true});
