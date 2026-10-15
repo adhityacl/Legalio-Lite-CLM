@@ -74,15 +74,32 @@
 .recharts-wrapper :focus, .recharts-wrapper :focus-visible { outline: none; }
 
 /* Dashboard metrics echo the animated overview without extra WebGL canvases. */
+.dashboard-overview-hero {
+  color: #172033;
+  text-shadow: none;
+}
+.dashboard-overview-hero-scrim {
+  background: linear-gradient(to top, rgb(248 250 255 / 92%) 0%, rgb(248 250 255 / 80%) 35%, transparent 100%);
+}
 .dashboard-overview-metric {
+  --metric-ink: #172033;
+  --metric-base: #ffffff;
+  --metric-mid: #f5f8ff;
+  --metric-edge: #edf2fc;
+  --metric-start-blend: 12%;
+  --metric-mid-blend: 24%;
+  --metric-blend: 38%;
+  --metric-glow: 10%;
+  --metric-icon-ink: color-mix(in srgb, var(--metric-accent) 28%, #172033);
+  --metric-icon-bg: rgb(255 255 255 / 65%);
   isolation: isolate;
   overflow: hidden;
-  color: #f5f7fc;
+  color: var(--metric-ink);
   border: 0;
   background: linear-gradient(110deg,
-    #1b222f 0%,
-    color-mix(in srgb, var(--metric-accent) 18%, #202839) 48%,
-    color-mix(in srgb, var(--metric-accent) 40%, #253045) 100%);
+    color-mix(in srgb, var(--metric-accent) var(--metric-start-blend), var(--metric-base)) 0%,
+    color-mix(in srgb, var(--metric-accent) var(--metric-mid-blend), var(--metric-mid)) 48%,
+    color-mix(in srgb, var(--metric-accent) var(--metric-blend), var(--metric-edge)) 100%);
   transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 .dashboard-overview-metric::before {
@@ -92,15 +109,34 @@
   pointer-events: none;
   inset: -30%;
   background: radial-gradient(circle farthest-side at 78% 50%,
-    color-mix(in srgb, var(--metric-accent) 10%, transparent) 0%,
+    color-mix(in srgb, var(--metric-accent) var(--metric-glow), transparent) 0%,
     transparent 75%);
   animation: dashboard-metric-drift 12s ease-in-out infinite alternate;
 }
 .dashboard-overview-metric:nth-child(even)::before { animation-delay: -6s; }
 .dashboard-overview-metric-icon {
-  color: color-mix(in srgb, var(--metric-accent) 55%, white);
-  background: rgb(14 23 42 / 35%);
+  color: var(--metric-icon-ink);
+  background: var(--metric-icon-bg);
   border: 1px solid color-mix(in srgb, var(--metric-accent) 35%, transparent);
+}
+[data-moduix-color-scheme='dark'] .dashboard-overview-hero {
+  color: #f5f7fc;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 35%);
+}
+[data-moduix-color-scheme='dark'] .dashboard-overview-hero-scrim {
+  background: linear-gradient(to top, rgb(8 13 28 / 90%) 0%, rgb(8 13 28 / 65%) 35%, transparent 100%);
+}
+[data-moduix-color-scheme='dark'] .dashboard-overview-metric {
+  --metric-ink: #f5f7fc;
+  --metric-base: #0d131e;
+  --metric-mid: #111927;
+  --metric-edge: #141e2e;
+  --metric-start-blend: 2%;
+  --metric-mid-blend: 5%;
+  --metric-blend: 9%;
+  --metric-glow: 3%;
+  --metric-icon-ink: color-mix(in srgb, var(--metric-accent) 55%, white);
+  --metric-icon-bg: rgb(10 17 31 / 45%);
 }
 .dashboard-overview-metric:hover,
 .dashboard-overview-metric:focus-within {

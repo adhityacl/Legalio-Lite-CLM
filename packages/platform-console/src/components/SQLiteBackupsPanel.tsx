@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Database, Download, Loader2, RefreshCw, RotateCcw, ShieldCheck, Upload } from 'lucide-react';
+import { Database, Download, RefreshCw, RotateCcw, ShieldCheck, Upload } from 'lucide-react';
 import { Button } from '@legalio/ui-components/button';
 import { PageHeader, FormField } from '@legalio/ui-components/blocks';
 import { Badge } from '@legalio/ui-components/badge';
@@ -64,22 +64,46 @@ export function SQLiteBackupsPanel() {
   const MAX_BYTES = 512 * 1024 * 1024;
   const invalidFile = (chosen: File | null) => !chosen || !chosen.name.toLowerCase().endsWith('.tar.gz') || chosen.size > MAX_BYTES;
   const closeRestore = () => { if (!busy) { setSelected(null); setFileMode(false); } };
-  return <div className="flex flex-col gap-g21">
+  const backupActions = (backup: Backup) => backup.status === 'success' && <div className="flex flex-wrap items-center gap-g8">
+    <Button asChild variant="outline" size="sm" className="min-h-11 flex-1 lg:min-h-0 lg:flex-none" aria-disabled={busy || restoring}>
+      <a href={`/api/auth-console/backups/${backup.id}/download`} onClick={event => { if (busy || restoring) event.preventDefault(); }}><Download aria-hidden="true" />{t('backup.download', 'Download')}</a>
+    </Button>
+    <Button variant="outline" size="sm" className="min-h-11 flex-1 lg:min-h-0 lg:flex-none" disabled={busy || restoring} onClick={() => { setSelected(backup); setFileMode(false); setFile(null); setConfirmation(''); setError(''); }}><RotateCcw aria-hidden="true" />{t('backup.restore', 'Restore')}</Button>
+  </div>;
+  return <div className="flex min-w-0 flex-col gap-g21">
     <PageHeader
-      title={<span className="inline-flex items-center gap-g8"><Database aria-hidden="true" className="size-g21 text-accent-foreground" />{t('backup.title', 'Backup & Restore')}</span>}
+      className="max-lg:[&_[data-slot=card-header]]:grid-cols-1 max-lg:[&_[data-slot=card-action]]:col-start-1 max-lg:[&_[data-slot=card-action]]:row-start-auto max-lg:[&_[data-slot=card-action]]:mt-g13 max-lg:[&_[data-slot=card-action]]:w-full"
+      title={<span className="inline-flex items-center gap-g8"><Database aria-hidden="true" className="size-g21 shrink-0 text-accent-foreground" />{t('backup.title', 'Backup & Restore')}</span>}
       description={t('backup.description', 'Full platform backup: SQLite, all organizations, accounts, settings and uploaded documents.')}
-      actions={<>
-        <Button variant="outline" disabled={busy || restoring} onClick={() => { setSelected(null); setFile(null); setFileMode(true); setConfirmation(''); setError(''); }}><Upload aria-hidden="true" />{t('backup.fromFile', 'Restore from file')}</Button>
-        <Button size="icon-md" variant="outline" disabled={busy || restoring} onClick={() => void refresh()} aria-label={t('backup.refresh', 'Refresh backups')}><RefreshCw aria-hidden="true" /></Button>
-        <Button loading={busy} disabled={restoring} onClick={() => void create()}>{busy ? <Spinner size="sm" decorative /> : <Database aria-hidden="true" />}{t('backup.create', 'Back up now')}</Button>
-      </>}
+      actions={<div className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-g8 lg:flex lg:w-auto lg:flex-wrap">
+        <Button className="min-h-11 lg:min-h-0" variant="outline" disabled={busy || restoring} onClick={() => { setSelected(null); setFile(null); setFileMode(true); setConfirmation(''); setError(''); }}><Upload aria-hidden="true" />{t('backup.fromFile', 'Restore from file')}</Button>
+        <Button className="min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" size="icon-md" variant="outline" disabled={busy || restoring} onClick={() => void refresh()} aria-label={t('backup.refresh', 'Refresh backups')}><RefreshCw aria-hidden="true" /></Button>
+        <Button className="col-span-2 min-h-11 lg:min-h-0" loading={busy} disabled={restoring} onClick={() => void create()}>{busy ? <Spinner size="sm" decorative /> : <Database aria-hidden="true" />}{t('backup.create', 'Back up now')}</Button>
+      </div>}
     />
     <Card>
       <CardBody className="flex items-start gap-g8"><ShieldCheck aria-hidden="true" className="size-g21 shrink-0 text-accent-foreground" />{t('backup.storage', 'Backups are stored on this server. Download a copy and keep it securely outside the server. Backups contain sensitive data and are not encrypted.')}</CardBody>
     </Card>
     {error && <Alert status="error"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>}
     {message && <Alert status="success" role="status"><AlertIndicator /><AlertContent><AlertDescription>{message}{restoring && <Button asChild variant="link" className="ml-g8"><a href="/sys?tab=admin-system-backups">{t('backup.reopen', 'Open console again')}</a></Button>}</AlertDescription></AlertContent></Alert>}
-    <Card className="overflow-hidden">
+    <div className="grid gap-g13 lg:hidden">
+      {loading ? <Card><CardBody><span role="status" className="inline-flex items-center gap-g8"><Spinner size="sm" decorative />{t('sys.loading', 'Loading…')}</span></CardBody></Card>
+        : !backups.length ? <Card><CardBody>{t('backup.empty', 'No backups yet.')}</CardBody></Card>
+        : backups.map(backup => <Card key={backup.id}>
+          <CardBody className="space-y-g13">
+            <div className="flex flex-wrap items-start justify-between gap-g8">
+              <div className="min-w-0"><Text weight="medium">{new Date(backup.createdAt).toLocaleString(locale)}</Text><Text size="xs" tone="muted" className="font-mono">{backup.id.slice(0, 8)}</Text></div>
+              <Badge tone={backup.status === 'success' ? 'success' : 'danger'}>{t(`backup.${backup.status}`)}</Badge>
+            </div>
+            <dl className="grid grid-cols-2 gap-g13 text-sm">
+              <div><dt className="text-muted-foreground">{t('backup.type')}</dt><dd>{t(`backup.${backup.purpose}`)}</dd></div>
+              <div><dt className="text-muted-foreground">{t('backup.size')}</dt><dd>{(backup.sizeBytes / 1024 / 1024).toFixed(2)} MB</dd></div>
+            </dl>
+            {backupActions(backup)}
+          </CardBody>
+        </Card>)}
+    </div>
+    <Card className="hidden overflow-hidden lg:flex">
       <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
         <Table>
           <TableHeader><TableRow>{['date', 'type', 'size', 'status', 'actions'].map(key => <TableColumnHeader key={key}>{t(`backup.${key}`)}</TableColumnHeader>)}</TableRow></TableHeader>
@@ -91,33 +115,28 @@ export function SQLiteBackupsPanel() {
                 <TableCell>{t(`backup.${backup.purpose}`)}</TableCell>
                 <TableCell numeric>{(backup.sizeBytes / 1024 / 1024).toFixed(2)} MB</TableCell>
                 <TableCell><Badge tone={backup.status === 'success' ? 'success' : 'danger'}>{t(`backup.${backup.status}`)}</Badge></TableCell>
-                <TableCell>{backup.status === 'success' && <div className="flex items-center gap-g8">
-                  <Button asChild variant="outline" size="sm" aria-disabled={busy || restoring}>
-                    <a href={`/api/auth-console/backups/${backup.id}/download`} onClick={event => { if (busy || restoring) event.preventDefault(); }}><Download aria-hidden="true" />{t('backup.download', 'Download')}</a>
-                  </Button>
-                  <Button variant="outline" size="sm" disabled={busy || restoring} onClick={() => { setSelected(backup); setFileMode(false); setFile(null); setConfirmation(''); setError(''); }}><RotateCcw aria-hidden="true" />{t('backup.restore', 'Restore')}</Button>
-                </div>}</TableCell>
+                <TableCell>{backupActions(backup)}</TableCell>
               </TableRow>)}
           </TableBody>
         </Table>
       </TableScrollArea>
     </Card>
     {(selected || fileMode) && <ModalFrame size="sm" role="alertdialog" onClose={closeRestore}>
-      <DialogHeader className="border-b border-border px-g21 py-g13"><DialogTitle>{t('backup.restore', 'Restore')}</DialogTitle><DialogCloseIcon /></DialogHeader>
+      <DialogHeader className="border-b border-border px-g21 py-g13"><DialogTitle>{t('backup.restore', 'Restore')}</DialogTitle><DialogCloseIcon className="max-lg:size-11" /></DialogHeader>
       <DialogBody className="mt-0 grid gap-g13 overflow-y-auto px-g21 py-g21">
         <DialogDescription>{t('backup.warning', 'This replaces the entire platform database and uploaded documents with the selected backup. A safety backup is created first. The backend stops and must restart; all users must sign in again using the restored accounts.')}</DialogDescription>
         {fileMode && <FormField label={t('backup.file', 'Backup file')} help={t('backup.fileHelp', 'Choose a Legalio .tar.gz backup, up to 512 MB. The archive is validated before restore.')} invalid={!!file && invalidFile(file)}>
           <FileUpload accept=".tar.gz,application/gzip" maxFiles={1} maxFileSize={MAX_BYTES} disabled={busy} onFileChange={details => { const chosen = details.acceptedFiles[0] ?? null; setFile(chosen); setError(chosen && invalidFile(chosen) ? t('backup.fileHelp', 'Choose a Legalio .tar.gz backup, up to 512 MB. The archive is validated before restore.') : ''); }}>
             <FileUploadHiddenInput />
-            <FileUploadTrigger>{t('backup.chooseFile', 'Choose file')}</FileUploadTrigger>
+            <FileUploadTrigger className="max-lg:min-h-11">{t('backup.chooseFile', 'Choose file')}</FileUploadTrigger>
             <FileUploadItemGroup><FileUploadItems /></FileUploadItemGroup>
           </FileUpload>
         </FormField>}
         {selected && <Text size="sm" tone="muted">{new Date(selected.createdAt).toLocaleString(locale)}</Text>}
-        <FormField label={t('backup.confirm', 'Type RESTORE to confirm')}><Input value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={busy} autoComplete="off" /></FormField>
+        <FormField label={t('backup.confirm', 'Type RESTORE to confirm')}><Input className="max-lg:min-h-11 max-lg:text-base" value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={busy} autoComplete="off" /></FormField>
         {error && <Alert status="error"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>}
       </DialogBody>
-      <DialogFooter className="mt-0 border-t border-border px-g21 py-g13">
+      <DialogFooter className="mt-0 border-t border-border px-g21 py-g13 max-lg:grid max-lg:grid-cols-2 [&>button]:max-lg:min-h-11">
         <Button variant="outline" disabled={busy} onClick={closeRestore}>{t('backup.cancel', 'Cancel')}</Button>
         <Button variant="destructive" loading={busy} disabled={confirmation !== 'RESTORE' || (fileMode && invalidFile(file))} onClick={() => void restore()}>{t('backup.restore', 'Restore')}</Button>
       </DialogFooter>

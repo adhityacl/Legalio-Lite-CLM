@@ -1,7 +1,8 @@
 import React from 'react';
 import { ArrowUpRight, CalendarDays, ShieldCheck, type LucideIcon } from 'lucide-react';
-import { SKY_INK, SkyGradient, skyPeriodAt } from '@legalio/ui-components/sky-gradient';
+import { SkyGradient, skyPeriodAt } from '@legalio/ui-components/sky-gradient';
 import { useLanguage } from '../context/LanguageContext';
+import { useTheme } from '../context/ThemeContext';
 import { Card, CardBody, CardHeader, CardLink, CardTitle } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { Text } from '@legalio/ui-components/text';
@@ -27,14 +28,15 @@ export function DashboardOverview({ greeting, expiring, metrics }: {
   metrics: OverviewMetric[];
 }) {
   const { t, language } = useLanguage();
+  const { theme } = useTheme();
   const today = new Date();
   const dateLabel = new Intl.DateTimeFormat(language === 'ID' ? 'id-ID' : language === 'ZH' ? 'zh-CN' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'long' }).format(today);
   const period = skyPeriodAt(today.getHours());
   return (
     <section className="grid grid-cols-1 gap-g13 xl:grid-cols-2" aria-label={t('ui.overview')}>
-      <Card className="relative min-h-g233 justify-between gap-g21 overflow-hidden border-0 p-g21" style={{ color: SKY_INK[period].color, textShadow: SKY_INK[period].textShadow }}>
-        <SkyGradient period={period} />
-        <div aria-hidden="true" className="absolute inset-0" style={{ background: `linear-gradient(to top, ${SKY_INK[period].scrim} 0%, ${SKY_INK[period].scrim} 35%, transparent 100%)` }} />
+      <Card className="dashboard-overview-hero relative min-h-g233 justify-between gap-g21 overflow-hidden border-0 p-g21">
+        <SkyGradient period={period} colorScheme={theme} />
+        <div aria-hidden="true" className="dashboard-overview-hero-scrim absolute inset-0" />
         <div className="relative flex flex-wrap items-center justify-between gap-g13">
           <span className="inline-flex min-h-g34 items-center gap-g8 rounded-full bg-background/80 px-g13 py-g5 text-xs font-medium text-foreground backdrop-blur-md [text-shadow:none]"><ShieldCheck aria-hidden="true" />Legalio</span>
           <time dateTime={`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`} className="inline-flex min-h-g34 items-center gap-g8 rounded-full bg-background/80 px-g13 py-g5 text-xs font-medium text-foreground backdrop-blur-md [text-shadow:none]"><CalendarDays className="size-g13" aria-hidden="true" />{dateLabel}</time>

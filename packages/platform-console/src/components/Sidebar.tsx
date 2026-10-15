@@ -139,7 +139,7 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
 
   const main: NavEntry[] = [
     can('document.view') && { id: 'dashboard', label: t('nav.dashboard', 'Dashboard'), icon: LayoutDashboard, active: activeTab === 'dashboard' },
-    can('document.view') && { id: 'hierarchy', label: t('nav.hierarchy', 'Struktur Dokumen'), icon: GitFork, active: activeTab === 'hierarchy' },
+    can('document.view') && { id: 'hierarchy', label: t('nav.hierarchy', 'Explore'), icon: GitFork, active: activeTab === 'hierarchy' },
     can('document.view') && { id: 'partners', label: t('nav.partners', 'Mitra Kerja'), icon: Building2, active: partnerChildren.some(c => c.active), children: partnerChildren },
     can('document.view') && { id: 'contracts', label: t('nav.contracts', 'Kontrak'), icon: FileText, active: activeTab === 'contracts', badge: expiringContractsCount },
     can('document.view') && modules.commercialDocuments && { id: 'ios', label: t('nav.ios', '{docs}'), icon: FileSpreadsheet, active: activeTab === 'ios' },

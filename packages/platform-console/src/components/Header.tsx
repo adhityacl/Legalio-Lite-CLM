@@ -56,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
       case 'admin-system-smtp': return t('tb.config_smtp', 'SMTP relay');
       case 'admin-system-ui-texts': return t('tb.config_texts_short', 'UI texts');
       case 'admin-system-reset': return t('sys.nav_reset', 'System reset');
-      case 'hierarchy': return t('nav.hierarchy', 'Struktur Dokumen');
+      case 'hierarchy': return t('nav.hierarchy', 'Explore');
       case 'partners': case 'partners-list': return t('nav.partners', 'Mitra Kerja');
       case 'partner-evaluation': return t('nav.partner_eval', 'Evaluasi Mitra');
       case 'partner-spending': return t('nav.partner_spending', 'Pengeluaran Mitra');

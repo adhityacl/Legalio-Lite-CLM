@@ -245,10 +245,10 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
                         {displayText(msg)}
                       </ReactMarkdown>
                     </Typeset>
-                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="self-start" onClick={() => handleCopy(msg)}
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" className="self-start max-sm:size-11 [&>svg]:size-g13" onClick={() => handleCopy(msg)}
                       aria-label={copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}>
                       {copiedId === msg.id ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-                      <span aria-live="polite">{copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin')}</span>
+                      <span className="sr-only" aria-live="polite">{copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin')}</span>
                     </Button></TooltipTrigger><TooltipBody>{copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}</TooltipBody></Tooltip>
                   </Card>
                 )}

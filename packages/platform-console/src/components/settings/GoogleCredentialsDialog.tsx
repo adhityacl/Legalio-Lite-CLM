@@ -135,27 +135,27 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
       <Card key={kind} size="sm" aria-labelledby={`${inputId}-title`} aria-busy={busy === kind}>
         <CardHeader>
           <CardTitle id={`${inputId}-title`} className="flex items-center gap-g8 text-sm">
-            <FileJson className="size-g16 text-muted-foreground" aria-hidden="true" />
+            <FileJson className="size-g16 shrink-0 text-muted-foreground" aria-hidden="true" />
             {isSa ? t('google_setup.sa_title', '1. Service Account (JSON)') : t('google_setup.oauth_title', '2. OAuth Client (JSON)')}
           </CardTitle>
-          <CardDescription>
+          <Badge className="col-start-2 row-start-1 max-w-g144 self-start justify-self-end whitespace-normal text-end" tone={info.source ? 'success' : 'warning'}>
+            {info.source === 'upload'
+              ? t('google_setup.source_upload', 'Terpasang dari file unggahan')
+              : info.source === 'env'
+                ? t('google_setup.source_env', 'Memakai nilai dari .env')
+                : t('google_setup.source_none', 'Belum dikonfigurasi')}
+          </Badge>
+          <CardDescription className="col-span-2">
             {isSa
               ? t('google_setup.sa_help', 'Google Cloud Console → IAM & Admin → Service Accounts → pilih akun → Keys → Add key → JSON. Dipakai untuk Google Drive & Sheets.')
               : t('google_setup.oauth_help', 'Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Download JSON. Dipakai untuk menghubungkan akun Google pengguna.')}
           </CardDescription>
         </CardHeader>
         <CardBody className="grid gap-g13">
-          <div className="flex flex-wrap items-center gap-g8 text-sm text-foreground">
-            <Badge tone={info.source ? 'success' : 'warning'}>
-              {info.source === 'upload'
-                ? t('google_setup.source_upload', 'Terpasang dari file unggahan')
-                : info.source === 'env'
-                  ? t('google_setup.source_env', 'Memakai nilai dari .env')
-                  : t('google_setup.source_none', 'Belum dikonfigurasi')}
-            </Badge>
+          {(info.source || info.updated_at) && <div className="flex flex-wrap items-center gap-g8 text-sm text-foreground">
             {info.source && <span className="font-mono text-xs break-all">{isSa ? data.serviceAccount.client_email : data.oauthClient.client_id}{info.project_id && ` · ${info.project_id}`}</span>}
             {info.updated_at && <Text as="span" size="xs" tone="muted"><RelativeTime iso={info.updated_at} /></Text>}
-          </div>
+          </div>}
 
           {isSa && info.source && (
             <Text size="xs" tone="muted">{t('google_setup.sa_share_hint', 'Bagikan folder Drive dan spreadsheet ke email service account di atas sebagai Editor.')}</Text>
@@ -175,9 +175,9 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
           <FileUpload key={uploadKey} ids={{ hiddenInput: inputId }} accept=".json,application/json" maxFiles={1} maxFileSize={MAX_FILE_BYTES} disabled={busy !== null}
             onFileAccept={details => upload(kind, details.files[0])}
             onFileReject={details => upload(kind, details.files[0]?.file)} className="min-w-0 flex-1">
-            <FileUploadDropzone aria-label={t('google_setup.drop_hint', 'atau seret file ke kotak ini')} className="flex-row flex-wrap justify-start gap-g8 p-g13">
+            <FileUploadDropzone aria-label={t('google_setup.drop_hint', 'atau seret file ke kotak ini')} className="flex min-h-0 flex-wrap items-center justify-start gap-g8 p-g13 text-start">
               <FileUploadTrigger asChild>
-                <Button size="sm" loading={busy === kind}>
+                <Button size="sm" className="max-sm:min-h-11 max-sm:w-full" loading={busy === kind}>
                   {busy === kind
                     ? t('common.saving', 'Menyimpan…')
                     : info.source === 'upload'
@@ -190,7 +190,7 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
             <FileUploadHiddenInput aria-describedby={errors[kind] ? errorId : undefined} />
           </FileUpload>
           {info.source === 'upload' && (
-            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" onClick={() => remove(kind)} disabled={busy !== null} className="mt-g8 shrink-0 text-destructive"
+            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" onClick={() => remove(kind)} disabled={busy !== null} className="mt-g8 shrink-0 text-destructive max-sm:size-11"
               aria-label={t('google_setup.reset', 'Reset file yang diunggah')}>
               <RotateCcw aria-hidden="true" />
             </Button></TooltipTrigger><TooltipBody>{t('google_setup.reset', 'Reset file yang diunggah')}</TooltipBody></Tooltip>
@@ -218,14 +218,14 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
       <DialogBackdrop />
       <DialogPositioner>
         <DialogContent className="flex w-full max-w-g610 flex-col overflow-hidden p-0">
-          <DialogHeader className="border-b border-border px-g21 py-g13">
-            <DialogTitle>{t('google_setup.title', 'Hubungkan Google')}</DialogTitle>
-            <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
-            <DialogDescription>
+          <DialogHeader className="shrink-0 border-b border-border px-g13 py-g13 sm:px-g21">
+            <DialogTitle className="pe-g42">{t('google_setup.title', 'Hubungkan Google')}</DialogTitle>
+            <DialogCloseIcon className="max-sm:top-g8 max-sm:end-g8 max-sm:size-11" aria-label={t('common.close', 'Tutup')} />
+            <DialogDescription className="text-sm leading-relaxed">
               {t('google_setup.description', 'Unggah dua file JSON yang diekspor dari Google Cloud Console. File disimpan di server, menggantikan variabel GOOGLE_* di .env, dan isinya yang rahasia tidak pernah ditampilkan lagi.')}
             </DialogDescription>
           </DialogHeader>
-          <DialogBody className="mt-0 grid gap-g13 overflow-y-auto px-g21 py-g21">
+          <DialogBody className="mt-0 grid min-h-0 gap-g13 overflow-y-auto overscroll-contain p-g13 sm:p-g21">
             {state.status === 'loading' && (
               <div role="status" className="grid gap-g13">
                 <span className="sr-only">{t('common.loading', 'Memuat…')}</span>
@@ -246,8 +246,8 @@ export const GoogleCredentialsDialog: React.FC<GoogleCredentialsDialogProps> = (
               </>
             )}
           </DialogBody>
-          <DialogFooter className="mt-0 border-t border-border px-g21 py-g13">
-            <DialogCloseTrigger asChild><Button>{t('google_setup.done', 'Selesai')}</Button></DialogCloseTrigger>
+          <DialogFooter className="mt-0 shrink-0 border-t border-border px-g13 py-g13 sm:px-g21">
+            <DialogCloseTrigger asChild><Button className="max-sm:min-h-11 max-sm:w-full">{t('google_setup.done', 'Selesai')}</Button></DialogCloseTrigger>
           </DialogFooter>
         </DialogContent>
       </DialogPositioner>

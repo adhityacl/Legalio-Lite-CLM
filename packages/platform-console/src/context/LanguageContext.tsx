@@ -1,3 +1,4 @@
+import { TREE_TRANSLATIONS } from '../i18n/hierarchyTree';
 import { BACKUP_TRANSLATIONS } from '../i18n/backups';
 import { UI_REFINEMENTS } from '../i18n/uiRefinements';
 import { DOCUMENT_CALENDAR_TRANSLATIONS } from '../i18n/documentCalendar';
@@ -90,8 +91,8 @@ const baseTranslations: Record<'ID' | 'EN', Record<string, string>> = {
     'nav.main_title': 'Navigasi utama',
     'nav.doc_title': 'Navigasi dokumen',
     'nav.admin_title': 'Navigasi admin',
-    'nav.dashboard': 'Dashboard Utama',
-    'nav.hierarchy': 'Struktur Dokumen',
+    'nav.dashboard': 'Dashboard',
+    'nav.hierarchy': 'Explore',
     'nav.partners': 'Partner',
     'nav.partners_list': 'Daftar Partner & DD',
     'nav.partner_eval': 'Evaluasi Partner',
@@ -208,7 +209,7 @@ const baseTranslations: Record<'ID' | 'EN', Record<string, string>> = {
     'redline.close': 'Tutup',
 
     // Hierarchy / Legal Document Structure View
-    'hierarchy.title': 'Struktur Dokumen',
+    'hierarchy.title': 'Explore',
     'hierarchy.new_partner': 'Partner Baru',
     'hierarchy.new_contract': 'Kontrak Baru',
     'hierarchy.new_io': 'Insertion Order Baru',
@@ -1140,8 +1141,8 @@ const baseTranslations: Record<'ID' | 'EN', Record<string, string>> = {
     'nav.main_title': 'Main navigation',
     'nav.doc_title': 'Document navigation',
     'nav.admin_title': 'Admin navigation',
-    'nav.dashboard': 'Main Dashboard',
-    'nav.hierarchy': 'Document Structure',
+    'nav.dashboard': 'Dashboard',
+    'nav.hierarchy': 'Explore',
     'nav.partners': 'Partners',
     'nav.partners_list': 'Partner List & DD',
     'nav.partner_eval': 'Partner Evaluation',
@@ -1258,7 +1259,7 @@ const baseTranslations: Record<'ID' | 'EN', Record<string, string>> = {
     'redline.close': 'Close',
 
     // Hierarchy / Legal Document Structure View
-    'hierarchy.title': 'Document Structure',
+    'hierarchy.title': 'Explore',
     'hierarchy.new_partner': 'New Partner',
     'hierarchy.new_contract': 'New Contract',
     'hierarchy.new_io': 'New IO',
@@ -2179,9 +2180,9 @@ const baseTranslations: Record<'ID' | 'EN', Record<string, string>> = {
 
 /** Built-in catalog: base keys plus newer feature keys kept in src/i18n. */
 export const translations: Record<Language, Record<string, string>> = {
-  ID: { ...baseTranslations.ID, ...EXTRA_TRANSLATIONS.ID, ...UI_REFINEMENTS.ID, ...BACKUP_TRANSLATIONS.ID, ...DOCUMENT_CALENDAR_TRANSLATIONS.ID, ...CONTRACT_TERMINATION_TRANSLATIONS.ID, ...TENANT_BOUNDARIES_TRANSLATIONS.ID },
-  EN: { ...baseTranslations.EN, ...EXTRA_TRANSLATIONS.EN, ...UI_REFINEMENTS.EN, ...BACKUP_TRANSLATIONS.EN, ...DOCUMENT_CALENDAR_TRANSLATIONS.EN, ...CONTRACT_TERMINATION_TRANSLATIONS.EN, ...TENANT_BOUNDARIES_TRANSLATIONS.EN },
-  ZH: { ...ZH_TRANSLATIONS, ...UI_REFINEMENTS.ZH, ...BACKUP_TRANSLATIONS.ZH, ...DOCUMENT_CALENDAR_TRANSLATIONS.ZH, ...CONTRACT_TERMINATION_TRANSLATIONS.ZH, ...TENANT_BOUNDARIES_TRANSLATIONS.ZH },
+  ID: { ...baseTranslations.ID, ...EXTRA_TRANSLATIONS.ID, ...UI_REFINEMENTS.ID, ...BACKUP_TRANSLATIONS.ID, ...DOCUMENT_CALENDAR_TRANSLATIONS.ID, ...CONTRACT_TERMINATION_TRANSLATIONS.ID, ...TENANT_BOUNDARIES_TRANSLATIONS.ID, ...TREE_TRANSLATIONS.ID },
+  EN: { ...baseTranslations.EN, ...EXTRA_TRANSLATIONS.EN, ...UI_REFINEMENTS.EN, ...BACKUP_TRANSLATIONS.EN, ...DOCUMENT_CALENDAR_TRANSLATIONS.EN, ...CONTRACT_TERMINATION_TRANSLATIONS.EN, ...TENANT_BOUNDARIES_TRANSLATIONS.EN, ...TREE_TRANSLATIONS.EN },
+  ZH: { ...ZH_TRANSLATIONS, ...UI_REFINEMENTS.ZH, ...BACKUP_TRANSLATIONS.ZH, ...DOCUMENT_CALENDAR_TRANSLATIONS.ZH, ...CONTRACT_TERMINATION_TRANSLATIONS.ZH, ...TENANT_BOUNDARIES_TRANSLATIONS.ZH, ...TREE_TRANSLATIONS.ZH },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);

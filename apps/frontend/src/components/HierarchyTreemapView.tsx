@@ -1,8 +1,7 @@
+import { HierarchyTreeView } from './HierarchyTreeView';
 import React, { useState } from 'react';
 import { downloadCsv } from '../lib/csv';
-import { isTerminationNoticeDocument, localizeDueDiligenceDocument } from '@legalio/shared/dueDiligence';
-import { useTenantSettings } from '../context/TenantSettingsContext';
-import { TableEmptyMessage } from './ui/table-empty-state';
+
 import { usePermissions } from '../lib/permissions';
 import { WorkspaceDocumentCalendar } from '../features/calendar/WorkspaceDocumentCalendar';
 import { TableEmptyState } from './ui/table-empty-state';
@@ -82,7 +81,7 @@ export const INITIAL_COLUMNS = [
 ];
 
 import { Partner, Contract, InsertionOrder, PartnerEvaluation, PartnerSpending } from '@legalio/types';
-import { convertToUsdWithFallback, formatMoney, getActiveFormattingLocale } from '@legalio/shared/currencyUtils';
+import { convertToUsdWithFallback, getActiveFormattingLocale } from '@legalio/shared/currencyUtils';
 
 /** Requirement keys (all country packs) grouped for the generic Explore columns. */
 const BUSINESS_REGISTRATION_KEYS = ['id_nib', 'sg_bizfile', 'my_ssm_profile', 'th_dbd_affidavit', 'vn_erc', 'ph_sec_certificate', 'ph_business_permit', 'in_incorporation', 'jp_registry_certificate', 'kr_business_registration', 'kr_corporate_registry', 'cn_business_licence', 'hk_br_certificate', 'ae_trade_licence', 'certificate_of_incorporation'];
@@ -90,52 +89,20 @@ const TAX_REGISTRATION_KEYS = ['id_npwp', 'sg_gst_certificate', 'my_sst_certific
 const INCORPORATION_KEYS = ['id_akta', 'hk_incorporation', 'in_incorporation', 'certificate_of_incorporation'];
 import { useLanguage } from '../context/LanguageContext';
 import { Badge, statusTone } from '@legalio/ui-components/badge';
-import {
-  Layers,
-  Building2,
-  FileText,
-  FileSpreadsheet,
-  Plus,
-  ChevronRight,
-  ChevronDown,
-  CheckCircle2,
-  AlertTriangle,
-  FileCheck,
-  Upload,
-  Search,
-  ArrowRight,
-  Sparkles,
-  ExternalLink,
-  ShieldCheck,
-  FolderOpen,
-  XCircle,
-  Info,
-  GitFork,
-  LayoutGrid,
-  Settings2,
-  Download,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  CheckSquare,
-  Square,
-  SlidersHorizontal,
-  FileDown,
-  CalendarDays
-} from 'lucide-react';
+import { FileSpreadsheet, Search, GitFork, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal, FileDown, CalendarDays } from 'lucide-react';
 
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { Button } from '@legalio/ui-components/button';
 import { Table, TableBody, TableCell, TableColumnHeader, TableHeader, TableRow, TableScrollArea } from '@legalio/ui-components/table';
 import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
-import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
-import { Empty, EmptyActions, EmptyContent, EmptyDescription, EmptyIcon, EmptyTitle } from '@legalio/ui-components/empty';
+
 import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuItemGroup, MenuItemGroupLabel, MenuItemIndicator, MenuItemText, MenuPositioner, MenuSeparator, MenuTrigger, MenuViewport } from '@legalio/ui-components/menu';
 import { Toggle } from '@legalio/ui-components/toggle';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
-import { Text } from '@legalio/ui-components/text';
+
 interface HierarchyTreemapViewProps {
   partners: Partner[];
   contracts: Contract[];
@@ -186,8 +153,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
   onSelectContract,
   onSelectIO,
 }) => {
-  const { t, language } = useLanguage();
-  const { policy } = useTenantSettings();
+  const { t } = useLanguage();
   const { hasPermission } = usePermissions();
 
   // State
@@ -203,41 +169,13 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
   const [showColPicker, setShowColPicker] = useState<boolean>(false);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedPartners, setExpandedPartners] = useState<Record<string, boolean>>({});
-  const [expandedContracts, setExpandedContracts] = useState<Record<string, boolean>>({});
-
-  const togglePartner = (id: string) => {
-    setExpandedPartners((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const toggleContract = (id: string) => {
-    setExpandedContracts((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  // Filtered partners
-  const filteredPartners = partners.filter((p) => {
-    const query = searchQuery.toLowerCase();
-    const matchPartner =
-      p.nama_partner.toLowerCase().includes(query) || p.jenis_partner.toLowerCase().includes(query);
-    const partnerContracts = contracts.filter((c) => c.partner_id === p.partner_id);
-    const matchContract = partnerContracts.some(
-      (c) => c.nomor_kontrak.toLowerCase().includes(query) || c.judul_kontrak.toLowerCase().includes(query)
-    );
-    return matchPartner || matchContract;
-  });
-
-  // Helper stats
-  const totalVerifiedDD = partners.filter((p) => p.status_dd === 'Complete').length;
-  const totalContractDocs = contracts.filter((c) => c.link_file_kontrak || c.fileName).length;
-  const totalIODocs = ios.filter((i) => i.link_file_io || i.fileName).length;
-
   return (
-    <div className="space-y-g21">
+    <div className="min-w-0 space-y-g21">
       {/* Top Header Banner */}
       <div className="flex flex-wrap items-center justify-between gap-g13">
         <div>
           <Heading as="h2" size="md" weight="semibold">
-            <span>{t('hierarchy.title', 'Struktur Dokumen')}</span>
+            <span>{t('hierarchy.title', 'Explore')}</span>
           </Heading>
         </div>
       </div>
@@ -245,14 +183,14 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
       {/* Control toolbar and view switcher */}
       <Tabs value={viewMode} onValueChange={details => setViewMode(details.value as typeof viewMode)} className="flex flex-col gap-g21">
       <Card className="flex-row flex-wrap items-center justify-between gap-g13 p-g13">
-        <TabsList aria-label={t('hierarchy.title')} className="w-full sm:w-auto">
+        <TabsList aria-label={t('hierarchy.title')} className="w-full sm:w-auto max-sm:grid max-sm:grid-cols-3 [&>[data-slot=tabs-trigger]]:max-sm:min-h-11 [&>[data-slot=tabs-trigger]]:max-sm:h-auto [&>[data-slot=tabs-trigger]]:max-sm:flex-col [&>[data-slot=tabs-trigger]]:max-sm:gap-g3 [&>[data-slot=tabs-trigger]]:max-sm:whitespace-normal [&>[data-slot=tabs-trigger]]:max-sm:px-g3 [&>[data-slot=tabs-trigger]]:max-sm:py-g5">
           <TabsTrigger value="treemap"><GitFork aria-hidden="true" />{t('hierarchy.tree_view', 'Tampilan Pohon')}</TabsTrigger>
           <TabsTrigger value="audit"><FileSpreadsheet aria-hidden="true" />{t('hierarchy.audit_view', 'Tampilan Tabel')}</TabsTrigger>
           <TabsTrigger value="calendar"><CalendarDays aria-hidden="true" />{t('hierarchy.calendar_view')}</TabsTrigger>
         </TabsList>
 
         {/* Search Input */}
-        {viewMode !== 'calendar' && <InputGroup className="relative w-full sm:w-g233">
+        {viewMode !== 'calendar' && <InputGroup className="relative w-full sm:w-g233 max-sm:min-h-11">
           <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
           <InputGroupInput aria-label={t('hierarchy.search_placeholder', 'Cari partner, nomor kontrak, atau IO...')}
             type="text"
@@ -267,334 +205,9 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
       {viewMode === 'calendar' && <WorkspaceDocumentCalendar contracts={contracts} ios={ios} partners={partners}
         loading={loading} error={error} onRetry={onRetry} onOpenDocument={onOpenCalendarDocument} />}
 
-      {/* VIEW MODE 1: VISUAL TREEMAP */}
-      {viewMode === 'treemap' && (
-        <div className="space-y-g13">
-          {filteredPartners.length === 0 ? (
-            <Card>
-              <TableEmptyMessage icon={Building2} />
-            </Card>
-          ) : (
-            filteredPartners.map((partner) => {
-              const partnerContracts = contracts.filter((c) => c.partner_id === partner.partner_id);
-              const isPartnerExpanded = expandedPartners[partner.partner_id] ?? false;
-
-              // DD Document stats
-              const ddDocs = (partner.daftar_dokumen_dd || []).filter((doc) => !isTerminationNoticeDocument(doc));
-              const verifiedDocsCount = ddDocs.filter((d) => d.status === 'Available').length;
-              const isDDComplete = partner.status_dd === 'Complete';
-
-              return (
-                <Card
-                  key={partner.partner_id}
-                  className="overflow-hidden hover:border-border"
-                >
-                  {/* LEVEL 1: CAMPAIGN HEADER (PARTNER) */}
-                  <div className="p-g13 border-b border-border text-foreground flex flex-col md:flex-row md:items-center justify-between gap-g13">
-                    <div className="flex items-center gap-g13">
-                      <Button variant="ghost" size="icon-sm"
-                        type="button"
-                        aria-label={`${isPartnerExpanded ? t('nav.tutup_submenu', 'Tutup Submenu') : t('nav.buka_submenu', 'Buka Submenu')}: ${partner.nama_partner}`}
-                        aria-expanded={isPartnerExpanded}
-                        onClick={() => togglePartner(partner.partner_id)}
-                      >
-                        {isPartnerExpanded ? (
-                          <ChevronDown aria-hidden="true" />
-                        ) : (
-                          <ChevronRight aria-hidden="true" />
-                        )}
-                      </Button>
-
-                      <Badge tone="info" className="font-mono">L1</Badge>
-
-                      <div>
-                        <Heading as="h3" size="sm" weight="bold">{partner.nama_partner}</Heading>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-g8 self-end md:self-center">
-                      <Button size="sm"
-                        onClick={() => onOpenAddContract(partner.partner_id)}
-                      >
-                        <Plus className="w-g13 h-g13" />
-                        <span>{t('hierarchy.kontrak_induk_short', 'New Contract')}</span>
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* LEVEL 1 DUE DILIGENCE EXPANDED SUMMARY */}
-                  {isPartnerExpanded && (
-                    <div className="bg-card border-b border-border p-g13">
-                      <div className="flex items-center justify-between mb-g8">
-                        <Text as="span" size="xs" weight="bold" className="uppercase tracking-wider flex items-center gap-g5">
-                          <FileCheck className="w-g13 h-g13 text-accent-foreground" />
-                          {t('hierarchy.dd_verification_title', 'Verifikasi Dokumen Legal Due Diligence (Level 1 Checklist):')}
-                        </Text>
-                        <Text as="span" size="xs" weight="semibold" tone="muted">
-                          {partnerContracts.length} {t('hierarchy.contracts_linked', 'Kontrak Terhubung')}
-                        </Text>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-g8 text-xs">
-                        {ddDocs.length > 0 ? (
-                          ddDocs.map((doc, idx) => {
-                            const displayName = localizeDueDiligenceDocument(doc, policy.dueDiligenceChecklist, language);
-                            return (
-                              <Card
-                                key={idx}
-                                size="sm" className={`flex-row items-center justify-between p-g8 ${doc.status === 'Available' ? 'border-status-success-border bg-status-success-soft' : ''}`}
-                              >
-                                <div className="truncate pr-g3">
-                                  <Tooltip><TooltipTrigger asChild><span className="font-bold block truncate text-foreground">{displayName}</span></TooltipTrigger><TooltipBody>{displayName}</TooltipBody></Tooltip>
-                                  <Text as="span" size="xs" tone="muted">
-                                    {doc.status === 'Available' ? (doc.nomorDokumen || t('status.doc_available', 'Available')) : t('hierarchy.no_document', 'No Document')}
-                                  </Text>
-                                </div>
-                                {doc.status === 'Available' ? (
-                                  <CheckCircle2 className="w-g16 h-g16 text-accent-foreground shrink-0" />
-                                ) : (
-                                  <AlertTriangle className="w-g16 h-g16 text-status-warning shrink-0" />
-                                )}
-                              </Card>
-                            );
-                          })
-                        ) : (
-                          <div className="col-span-4 text-xs text-muted-foreground italic">
-                            {t('hierarchy.standard_dd_docs_hint', 'The due-diligence checklist comes from your organization settings.')}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* LEVEL 2 & LEVEL 3 EXPANDED LIST */}
-                  {isPartnerExpanded && (
-                    <div className="p-g13 sm:p-g21 space-y-g13">
-                      {partnerContracts.length === 0 ? (
-                        <Empty><EmptyIcon><FileText aria-hidden="true" /></EmptyIcon><EmptyContent><EmptyTitle>{t('hierarchy.no_master_contract_for_partner', 'Belum ada Kontrak Induk terdaftar untuk Partner')} ({partner.nama_partner})</EmptyTitle><EmptyDescription>{t('hierarchy.commercial_contract_hint', 'Setiap kerjasama komersial membutuhkan kontrak induk sebelum rincian IO.')}</EmptyDescription></EmptyContent><EmptyActions><Button variant="ghost" size="sm"
-                            onClick={() => onOpenAddContract(partner.partner_id)}
-                            className="mt-g13"
-                          >
-                            <Plus className="w-g13 h-g13" />
-                            <span>{t('hierarchy.create_new_master_contract', 'Buat Kontrak Induk Baru')}</span>
-                          </Button></EmptyActions></Empty>
-                      ) : (
-                        partnerContracts.map((contract) => {
-                          const contractIOs = ios.filter((i) => i.contract_id === contract.contract_id);
-                          const isContractExpanded = expandedContracts[contract.contract_id] ?? true;
-                          const hasContractFile = Boolean(contract.link_file_kontrak || contract.fileName);
-                          const isContractAddendum =
-                            contract.jenis_dokumen === 'Agreement Addendum' ||
-                            Boolean(contract.parent_contract_id) ||
-                            /ADD/i.test(contract.nomor_kontrak || '') ||
-                            /Addendum/i.test(contract.judul_kontrak || '');
-
-                          return (
-                            <div
-                              key={contract.contract_id}
-                              className={`ml-0 sm:ml-g13 border-l-2 pl-g13 sm:pl-g13 space-y-g13 ${
- isContractAddendum ? 'border-status-special-border ' : 'border-primary'
- }`}
-                            >
-                              {/* LEVEL 2: CONTRACT CARD */}
-                              <Card className="p-g13 transition-all">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-g13">
-                                  <div className="flex items-center gap-g8">
-                                    <Button variant="ghost" size="icon-sm" aria-expanded={isContractExpanded} aria-label={`${isContractExpanded ? t('nav.tutup_submenu', 'Tutup Submenu') : t('nav.buka_submenu', 'Buka Submenu')}: ${contract.nomor_kontrak}`} onClick={() => toggleContract(contract.contract_id)}>
-                                      {isContractExpanded ? (
-                                        <ChevronDown className={`w-g16 h-g16 ${isContractAddendum ? 'text-status-special ' : 'text-accent-foreground'}`} />
-                                      ) : (
-                                        <ChevronRight className="w-g16 h-g16 text-muted-foreground" />
-                                      )}
-                                    </Button>
-
-                                    <Badge tone={isContractAddendum ? 'special' : 'info'} className="font-mono">L2</Badge>
-
-                                    <div>
-                                      <div className="flex items-center gap-g8 flex-wrap">
-                                        {isContractAddendum ? (
-                                          <Badge tone="special">{t('hierarchy.agreement_addendum_badge', 'AGREEMENT ADDENDUM')}</Badge>
-                                        ) : (
-                                          <Badge tone="info">{t('hierarchy.master_agreement_badge', 'KONTRAK INDUK (MASTER AGREEMENT)')}</Badge>
-                                        )}
-                                        <Badge className="font-mono">{contract.nomor_kontrak}</Badge>
-                                        <Badge tone={statusTone(contract.status)}>{t(`status.${(contract.status || '').toLowerCase().replace(' ', '_')}`, contract.status)}</Badge>
-                                      </div>
-                                      <Heading as="h4" size="xs" weight="semibold" className="mt-g3">{contract.judul_kontrak}</Heading>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-g8 self-end md:self-center">
-                                    {contract.link_file_kontrak && (
-                                      <Button asChild variant="outline" size="sm"><Tooltip><TooltipTrigger asChild><a href={contract.link_file_kontrak} target="_blank" rel="noopener noreferrer"><FileDown aria-hidden="true" />{t('hierarchy.download_doc', 'Unduh Dokumen')}</a></TooltipTrigger><TooltipBody>{t('hierarchy.download_contract_doc', 'Unduh Dokumen Kontrak')}</TooltipBody></Tooltip></Button>
-                                    )}
-
-                                    {hasPermission('document.edit') && (
-                                      <Button variant="outline" size="sm"
-                                        onClick={() => onSelectContract(contract)}
-                                      >
-                                        {t('hierarchy.edit_btn', 'Edit')}
-                                      </Button>
-                                    )}
-
-                                    <Button size="sm"
-                                      onClick={() => onOpenAddIO(contract.contract_id, contract.partner_id)}
-                                    >
-                                      <Plus className="w-g13 h-g13" />
-                                      <span>{t('hierarchy.new_io', 'Insertion Order Baru')}</span>
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                {/* Contract quick terms */}
-                                <div className="mt-g13 pt-g8 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-g8 text-xs text-foreground">
-                                  <div>
-                                    <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.commercial_value', 'Nilai Komersial:')}</Text>
-                                    <span className="font-bold text-accent-foreground">
-                                      {formatMoney(contract.nilai_kontrak, contract.currency)}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.validity_period', 'Masa Berlaku:')}</Text>
-                                    <span className="font-semibold text-foreground">
-                                      {contract.tanggal_mulai} s/d {contract.tanggal_berakhir}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.notice_period', 'Notice Period:')}</Text>
-                                    <span className="font-semibold">{contract.notice_period_hari} {t('hierarchy.days', 'Hari')}</span>
-                                  </div>
-                                  <div>
-                                    <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.executions_detail', 'Rincian Executions (IOs):')}</Text>
-                                    <span className="font-semibold text-accent-foreground">
-                                      {contractIOs.length} {t('hierarchy.executions_count', 'Executions')}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Contract Internal Notes */}
-                                {contract.internal_notes && (
-                                  <Card variant="subtle" size="sm" className="mt-g8 flex-row items-start gap-g8 p-g8 text-xs">
-                                    <FileText className="w-g13 h-g13 text-accent-foreground mt-g2 shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                      <Text as="span" size="xs" weight="bold" tone="muted" className="uppercase tracking-wide block mb-g2">
-                                        {t('hierarchy.contract_notes', 'Catatan Kontrak / Internal Notes')}:
-                                      </Text>
-                                      <Text size="xs" className="whitespace-pre-line leading-relaxed">
-                                        {contract.internal_notes}
-                                      </Text>
-                                    </div>
-                                  </Card>
-                                )}
-                              </Card>
-
-                              {/* LEVEL 3: INSERTION ORDERS */}
-                              {isContractExpanded && (
-                                <div className="ml-g13 sm:ml-g21 space-y-g8 border-l-2 border-primary pl-g13">
-                                  {contractIOs.length === 0 ? (
-                                    <Empty className="py-g13"><EmptyContent><EmptyDescription>{t('hierarchy.no_io_connected', 'Belum ada Insertion Order terhubung ke Kontrak ini.')}</EmptyDescription></EmptyContent><EmptyActions><Button variant="link"
-                                        onClick={() => onOpenAddIO(contract.contract_id, contract.partner_id)}
-                                      >
-                                        {t('hierarchy.add_new_io', 'Tambah IO Baru')}
-                                      </Button></EmptyActions></Empty>
-                                  ) : (
-                                    contractIOs.map((io) => {
-                                      const hasIOFile = Boolean(io.link_file_io || io.fileName);
-                                      const ioNoteContent = io.deliverables || (io as any).internal_notes;
-
-                                      return (
-                                        <Card
-                                          key={io.io_id}
-                                          className="p-g13 flex flex-col gap-g8 transition-all"
-                                        >
-                                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-g13">
-                                            <div className="flex items-center gap-g8">
-                                              <Badge tone="info" className="font-mono">L3</Badge>
-                                              <div>
-                                                <div className="flex items-center gap-g5 flex-wrap">
-                                                  <Badge tone="info">{t('hierarchy.insertion_order_badge', 'INSERTION ORDER (IO)')}</Badge>
-                                                  <Badge className="font-mono">{io.nomor_io}</Badge>
-                                                  <Badge>{io.kanal_media}</Badge>
-                                                </div>
-                                                <Heading as="h5" size="xs" weight="semibold" className="mt-g2">{io.judul_io}</Heading>
-                                              </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-g8 text-xs self-end sm:self-center">
-                                              {io.link_file_io && (
-                                                <Button asChild variant="outline" size="sm"><Tooltip><TooltipTrigger asChild><a href={io.link_file_io} target="_blank" rel="noopener noreferrer"><FileDown aria-hidden="true" />{t('hierarchy.download_doc', 'Unduh Dokumen')}</a></TooltipTrigger><TooltipBody>{t('hierarchy.download_io_doc', 'Unduh Dokumen Insertion Order')}</TooltipBody></Tooltip></Button>
-                                              )}
-
-                                              {hasPermission('document.edit') && (
-                                                <Button variant="outline" size="sm"
-                                                  onClick={() => onSelectIO(io)}
-                                                >
-                                                  {t('hierarchy.edit_btn', 'Edit')}
-                                                </Button>
-                                              )}
-                                            </div>
-                                          </div>
-
-                                          {/* IO Quick Details: Commercial Value, Validity Period, Pricing Model, Charging Type */}
-                                          <div className="pt-g8 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-g8 text-xs text-foreground">
-                                            <div>
-                                              <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.commercial_value', 'Nilai Komersial:')}</Text>
-                                              <span className="font-bold text-accent-foreground">
-                                                {formatMoney(io.nilai_io, io.currency || io.mata_uang)}
-                                              </span>
-                                            </div>
-                                            <div>
-                                              <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.validity_period', 'Masa Berlaku:')}</Text>
-                                              <span className="font-semibold text-foreground">
-                                                {io.tanggal_mulai} s/d {io.tanggal_berakhir}
-                                              </span>
-                                            </div>
-                                            <div>
-                                              <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.pricing_model', 'Model Biaya (Pricing Model):')}</Text>
-                                              <div className="mt-g2">
-                                                <Badge tone="info">{io.pricing_model || 'Fixed'}</Badge>
-                                              </div>
-                                            </div>
-                                            <div>
-                                              <Text as="span" size="xs" tone="muted" className="block">{t('hierarchy.charging_type', 'Skema Penagihan (Charging Type):')}</Text>
-                                              <div className="mt-g2">
-                                                <Badge>{io.charging_type || io.skema_pembayaran || '-'}</Badge>
-                                              </div>
-                                            </div>
-                                          </div>
-
-                                          {/* IO Notes / Deliverables */}
-                                          {ioNoteContent && (
-                                            <Card variant="subtle" size="sm" className="mt-g2 flex-row items-start gap-g8 p-g8 text-xs">
-                                              <FileText className="w-g13 h-g13 text-accent-foreground mt-g2 shrink-0" />
-                                              <div className="flex-1 min-w-0">
-                                                <Text as="span" size="xs" weight="bold" tone="muted" className="uppercase tracking-wide block mb-g2">
-                                                  {t('hierarchy.io_notes', 'Catatan Deliverables / Scope IO')}:
-                                                </Text>
-                                                <Text size="xs" className="whitespace-pre-line leading-relaxed">
-                                                  {ioNoteContent}
-                                                </Text>
-                                              </div>
-                                            </Card>
-                                          )}
-                                        </Card>
-                                      );
-                                    })
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                </Card>
-              );
-            })
-          )}
-        </div>
-      )}
+      {viewMode === 'treemap' && <HierarchyTreeView partners={partners} contracts={contracts} ios={ios} searchQuery={searchQuery}
+        loading={loading} error={error} onRetry={onRetry} onSelectPartner={onSelectPartner} onSelectContract={onSelectContract} onSelectIO={onSelectIO}
+        onOpenAddPartner={onOpenAddPartner} onOpenAddContract={onOpenAddContract} onOpenAddIO={onOpenAddIO} />}
 
       {/* VIEW MODE: AUDIT TABLE */}
       {viewMode === 'audit' && (() => {

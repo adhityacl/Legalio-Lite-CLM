@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from './utils';
 
 /**
@@ -18,6 +18,20 @@ export const SKY_PRESETS = {
 } satisfies Record<string, Preset>;
 
 export type SkyPeriod = keyof typeof SKY_PRESETS;
+
+/** Theme palettes only change colour; each period keeps its original motion settings. */
+const SKY_COLORS: Record<'light' | 'dark', Record<SkyPeriod, Pick<Preset, 'main' | 'low' | 'mid' | 'high'>>> = {
+  light: {
+    day: { main: [0.82, 0.91, 1], low: [0.65, 0.80, 0.98], mid: [0.75, 0.87, 1], high: [0.96, 0.98, 1] },
+    sunset: { main: [1, 0.93, 0.86], low: [0.96, 0.77, 0.65], mid: [1, 0.86, 0.77], high: [1, 0.98, 0.93] },
+    night: { main: [0.86, 0.87, 1], low: [0.72, 0.76, 0.96], mid: [0.81, 0.83, 1], high: [0.97, 0.97, 1] },
+  },
+  dark: {
+    day: { main: [0.16, 0.24, 0.38], low: [0.08, 0.13, 0.24], mid: [0.22, 0.34, 0.50], high: [0.40, 0.55, 0.70] },
+    sunset: { main: [0.28, 0.20, 0.30], low: [0.14, 0.10, 0.20], mid: [0.40, 0.28, 0.35], high: [0.62, 0.45, 0.43] },
+    night: { main: [0.20, 0.24, 0.40], low: [0.08, 0.11, 0.22], mid: [0.27, 0.32, 0.51], high: [0.47, 0.54, 0.73] },
+  },
+};
 
 /** Text colour and a bottom scrim (keeps AA contrast over bright clouds) per sky. Fixed on purpose: tenant theme tokens (e.g. a light primary) can leave dark text on a dark sky. */
 export const SKY_INK = {
@@ -159,10 +173,10 @@ function compile(gl: WebGLRenderingContext, kind: number, source: string) {
   return shader;
 }
 
-export function SkyGradient({ period, className }: { period: SkyPeriod; className?: string }) {
+export function SkyGradient({ period, colorScheme, className }: { period: SkyPeriod; colorScheme?: 'light' | 'dark'; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState(false);
-  const preset: Preset = SKY_PRESETS[period];
+  const preset: Preset = useMemo(() => ({ ...SKY_PRESETS[period], ...(colorScheme ? SKY_COLORS[colorScheme][period] : {}) }), [period, colorScheme]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
