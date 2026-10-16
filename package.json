@@ -27,7 +27,7 @@
     "auth:migrate": "npm run auth:migrate --workspace @legalio/backend",
     "build:sys": "npm run build:console --workspace @legalio/backend",
     "dev:sys": "npm run dev:console --workspace @legalio/backend",
-    "test:sqlite": "node --import tsx --test apps/backend/src/databaseFilename.test.ts apps/backend/src/normalizedCore.test.ts apps/backend/src/partnerContact.test.ts",
+    "test:sqlite": "node --import tsx --test apps/backend/src/databaseFilename.test.ts apps/backend/src/normalizedCore.test.ts apps/backend/src/partnerContact.test.ts apps/backend/src/approvalRoutes.test.ts",
     "test:e2e:sqlite": "npm run build --workspace @legalio/backend && node --import tsx apps/backend/src/normalizedCore.e2e.ts"
   },
   "devDependencies": {

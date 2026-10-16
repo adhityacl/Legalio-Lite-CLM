@@ -21,9 +21,6 @@ import { getSavedCategories } from '../lib/categoryUtils';
 import { Badge, statusTone } from '@legalio/ui-components/badge';
 import { spendingReportingAllocations } from '@legalio/shared/spendingAllocations';
 import { NewsTicker } from './NewsTicker';
-import { useDocumentList } from '../features/documents/useDocumentList';
-import { formatDateTime } from '@legalio/types/documents';
-import { typeLabel } from './documents/documentLabels';
 import {
   FileText,
   FileSpreadsheet,
@@ -37,7 +34,6 @@ import {
   DollarSign,
   TrendingUp,
   GitFork,
-  FileClock,
   BarChart3,
 } from 'lucide-react';
 import {
@@ -112,11 +108,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const userName = user?.name?.trim() || 'Admin';
     return `${greetingWord}, ${userName}`;
   };
-
-  // Documents awaiting review, for the "Pending Review" table below
-  const pendingReviewQuery = useDocumentList({ status: 'pending_review', page: '1', limit: '5', sort_by: 'modified_at', sort_dir: 'desc' });
-  const pendingReviewDocs = pendingReviewQuery.data?.documents || [];
-  const pendingReviewState = pendingReviewQuery.isError ? 'error' : pendingReviewQuery.data ? 'ready' : 'loading';
 
   // Department-scoped datasets based on RBAC and Internal PIC of Partner
   const scopedPartners = useMemo(() => (partners || []).filter((p) => canViewPartner(p, user)), [partners, user]);
@@ -333,89 +324,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </Card>
 
       <RecentDocumentsTable contracts={scopedContracts} ios={scopedIOs} onNavigate={onNavigateTab} />
-
-      <Card className="overflow-hidden">
-        <TableCardHeader tone="warning" icon={<FileClock />} title={t('dashboard.pending_review_table_title', 'Dokumen Menunggu Review (Pending Review)')} />
-
-        <TableScrollArea role="region" tabIndex={0} aria-label={t('dashboard.pending_review_table_title')}>
-          <Table className="dashboard-data-table w-full min-w-g610 text-left">
-            <TableHeader>
-              <TableRow>
-                <TableColumnHeader scope="col" className="w-g42">
-                  <div className="flex items-center justify-start">
-                    <Checkbox aria-label={t('dashboard.pilih_semua_dokumen_pending_review', 'Pilih semua dokumen pending review')} disabled><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
-                  </div>
-                </TableColumnHeader>
-                <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_name', 'Nama Dokumen')}</TableColumnHeader>
-                <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_type', 'Jenis')}</TableColumnHeader>
-                <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_modified_by', 'Diubah Oleh')}</TableColumnHeader>
-                <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_created_at', 'Dibuat')}</TableColumnHeader>
-                <TableColumnHeader scope="col">{t('dashboard.doc_pending_col_modified_at', 'Terakhir Diubah')}</TableColumnHeader>
-                <TableColumnHeader scope="col" className="text-right w-g89">
-                  <div className="flex items-center justify-end">{t('dashboard.action', 'Aksi')}</div>
-                </TableColumnHeader>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pendingReviewState === 'loading' ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center">
-                    {t('common.loading', 'Memuat Data...')}
-                  </TableCell>
-                </TableRow>
-              ) : pendingReviewDocs.length === 0 ? (
-                <TableEmptyState colSpan={7} />
-              ) : (
-                pendingReviewDocs.map((doc) => (
-                  <TableRow key={doc.id}>
-                    <TableCell>
-                      <div className="flex items-center justify-start">
-                        <Checkbox aria-label={t('dashboard.pilih_dokumen', 'Pilih dokumen {nama}', { nama: doc.name })} disabled><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
-                      </div>
-                    </TableCell>
-
-                    {/* 1. Nama Dokumen */}
-                    <TableCell className="max-w-g233">
-                      <Tooltip><TooltipTrigger asChild><span className="block truncate">{doc.name}</span></TooltipTrigger><TooltipBody>{doc.name}</TooltipBody></Tooltip>
-                    </TableCell>
-
-                    {/* 2. Jenis */}
-                    <TableCell className="whitespace-nowrap">
-                      {typeLabel(t, doc.type)}
-                    </TableCell>
-
-                    {/* 3. Diubah Oleh */}
-                    <TableCell className="whitespace-nowrap">
-                      {doc.modified_by_name || '—'}
-                    </TableCell>
-
-                    {/* 4. Dibuat */}
-                    <TableCell className="whitespace-nowrap">
-                      {formatDateTime(doc.created_at, language)}
-                    </TableCell>
-
-                    {/* 5. Terakhir Diubah */}
-                    <TableCell className="whitespace-nowrap">
-                      {formatDateTime(doc.modified_at, language)}
-                    </TableCell>
-
-                    {/* 6. Aksi */}
-                    <TableCell className="text-right w-g89">
-                      <Button variant="secondary" size="icon-sm"
-                        type="button"
-                        onClick={() => onNavigateTab('create-contract')}
-                        aria-label={`${t('common.open', 'Open')} ${doc.name}`}
-                      >
-                        <ArrowUpRight className="size-g16" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableScrollArea>
-      </Card>
 
       {/* Stacked Spending Chart Card (Under Table); hidden with the spending module (PRD §4.5.3) */}
       {policy.settings.modules.spending && (

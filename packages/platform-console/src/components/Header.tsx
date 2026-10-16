@@ -63,6 +63,7 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
       case 'partner-spending': return t('nav.partner_spending', 'Pengeluaran Mitra');
       case 'contracts': return t('nav.contracts', 'Kontrak');
       case 'create-contract': return t('nav.create_contract', 'Dokumen Saya');
+      case 'document-approval': return t('nav.document_approval', 'My Approval');
       case 'ios': return t('nav.ios', 'Insertion Order (IO)');
       case 'notifikasi': return t('nav.notifications', 'Notifikasi & Log');
       case 'bulk-import': return t('nav.bulk_import', 'Import Data');

@@ -27,6 +27,8 @@ import { isGoogleTokenValid, getGoogleTokenRemainingMinutes } from '../lib/googl
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { usePermissions } from '../lib/permissions';
 import { useTenantSettings } from '../context/TenantSettingsContext';
+import { useTenant } from '../context/TenantContext';
+import { useQuery } from '@tanstack/react-query';
 import { matchesWorkspaceSearch, type WorkspaceSearchResult } from '../lib/workspaceSearch';
 import {
   Sidebar,
@@ -104,6 +106,17 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
   const { t } = useLanguage();
   const modules = useTenantSettings().policy.settings.modules;
   const can = (permission?: string) => !permission || hasPermission(permission);
+  const { activeTenantId } = useTenant();
+  // Shares the ['approvals', tenant] prefix with the approval inbox, so decisions there refresh this badge.
+  const approvalInboxCount = useQuery({
+    queryKey: ['approvals', activeTenantId, 'badge'],
+    queryFn: async () => {
+      const res = await fetch('/api/approvals?box=inbox');
+      return res.ok ? ((await res.json()).stats?.waiting as number) : 0;
+    },
+    enabled: Boolean(activeTenantId) && !showSystemAdmin && hasPermission('document.view'),
+    refetchInterval: 60_000,
+  }).data || undefined;
 
   const partnerChildren: NavLeaf[] = [
     { id: 'partners', label: t('nav.partners_list', 'Daftar Mitra'), icon: Building2, active: activeTab === 'partners' },
@@ -148,6 +161,7 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
   ].filter(Boolean) as NavEntry[];
   const documents: NavEntry[] = [
     can('document.create') && { id: 'create-contract', label: t('nav.create_contract', 'Dokumen Saya'), icon: FileSignature, active: activeTab === 'create-contract' },
+    can('document.view') && { id: 'document-approval', label: t('nav.document_approval', 'My Approval'), icon: ClipboardCheck, active: activeTab === 'document-approval', badge: approvalInboxCount },
   ].filter(Boolean) as NavEntry[];
   /* Administration (PRD §6.1): System Admin only in the standalone console for platform administrators,
      Import Data for tenant admins, and exactly one Settings entry for whoever may open one of its tabs. */

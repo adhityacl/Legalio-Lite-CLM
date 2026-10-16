@@ -218,8 +218,8 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       {/* 1. Standard Header Card */}
       <div className="flex flex-wrap items-center justify-between gap-g13">
         <div>
-          <Heading as="h2" size="md" weight="semibold">
-            <span>{t('notifications.title', 'Pusat Notifikasi & Alarm Notice Period')}</span>
+          <Heading as="h2" size="md" weight="semibold" className="flex flex-wrap items-center gap-g8">
+            <span>{t('notifications.title', 'Pusat Notifikasi')}</span>
             {unreadCount > 0 && (
               <Badge tone={statusTone('warning')}>
                 {unreadCount} {t('notifications.unread_badge', 'Belum Dibaca')}
@@ -328,15 +328,15 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
       {/* Bulk Action Bar (Visible when items selected) */}
       {selectedIds.length > 0 && (
-        <Card className="p-g13 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-g8 text-xs font-medium text-foreground">
-            <span className="font-bold text-accent-foreground">{selectedIds.length}</span>
+        <Card className="flex flex-row flex-wrap items-center justify-between gap-g13 px-g21 py-g13 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-g5 text-sm font-medium text-foreground">
+            <span className="font-semibold text-accent-foreground">{selectedIds.length}</span>
             <span>{t('notifications.selected_count', 'notifikasi dipilih')}</span>
           </div>
 
-          <div className="flex items-center gap-g8">
+          <div className="flex flex-wrap items-center gap-g8">
             {onMarkRead && (
-              <Button variant="outline"
+              <Button variant="outline" size="sm"
                 type="button"
                 onClick={handleMarkSelectedRead}
               >
@@ -346,7 +346,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
             )}
 
             {onDeleteNotif && (
-              <Button variant="destructive-outline"
+              <Button variant="destructive-outline" size="sm"
                 type="button"
                 onClick={handleDeleteSelected}
               >

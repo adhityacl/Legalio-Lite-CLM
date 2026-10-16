@@ -6,7 +6,7 @@
  * Guards run before any lazy view mounts or loads data.
  */
 export const OPERATIONAL_TABS = [
-  'dashboard', 'hierarchy', 'contracts', 'create-contract', 'ios', 'io', 'partners',
+  'dashboard', 'hierarchy', 'contracts', 'create-contract', 'document-approval', 'ios', 'io', 'partners',
   'partner-evaluation', 'partner-spending', 'notifikasi', 'bulk-import', 'privacy', 'terms',
 ] as const;
 

@@ -19,6 +19,7 @@ const LazyDashboardView = lazy(() => import('./components/DashboardView').then((
 const LazyHierarchyTreemapView = lazy(() => import('./components/HierarchyTreemapView').then((m) => ({ default: m.HierarchyTreemapView })));
 const LazyContractsView = lazy(() => import('./components/ContractsView').then((m) => ({ default: m.ContractsView })));
 const LazyContractCreatorView = lazy(() => import('./components/ContractCreatorView').then((m) => ({ default: m.ContractCreatorView })));
+const LazyApprovalView = lazy(() => import('./features/approvals/ApprovalView').then((m) => ({ default: m.ApprovalView })));
 const LazyIOView = lazy(() => import('./components/IOView').then((m) => ({ default: m.IOView })));
 const LazyPartnersView = lazy(() => import('./components/PartnersView').then((m) => ({ default: m.PartnersView })));
 const LazyPartnerSpendingView = lazy(() => import('./components/PartnerSpendingView').then((m) => ({ default: m.PartnerSpendingView })));
@@ -738,6 +739,8 @@ const MainApp: React.FC = () => {
                   onNavigateToContracts={() => setActiveTab('contracts')}
                 />
               )}
+
+              {activeTab === 'document-approval' && <LazyApprovalView key={activeTenantId} />}
 
               {(activeTab === 'ios' || activeTab === 'io') && modules.commercialDocuments && (
                 <LazyIOView

@@ -188,8 +188,13 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
             <Field disabled={!canEdit} className="gap-g3">
               <FieldLabel htmlFor={statusSelectId} className={termClass}>{t('documents.field.status', 'Status')}</FieldLabel>
               <AlphabeticalSelect id={statusSelectId} value={document.status} onChange={(e) => isOneOf(DOCUMENT_STATUSES, e.target.value) && onUpdate({ status: e.target.value })} className="w-full" controlProps={{ className: 'w-full' }}>
-                {DOCUMENT_STATUSES.map(status => <option key={status} value={status}>{statusLabel(t, status)}</option>)}
+                {DOCUMENT_STATUSES.map(status => (
+                  <option key={status} value={status} disabled={status !== document.status && (status === 'pending_review' || status === 'approved' || (document.status === 'approved' && status === 'draft'))}>
+                    {statusLabel(t, status)}
+                  </option>
+                ))}
               </AlphabeticalSelect>
+              <Text size="xs" tone="muted">{t('documents.info.status_by_approval', 'Review and approval statuses are set through My Approval.')}</Text>
             </Field>
           </dl>
         )}

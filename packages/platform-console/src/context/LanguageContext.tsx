@@ -1,4 +1,5 @@
 import { MAILER_TRANSLATIONS } from '../i18n/mailer';
+import { APPROVAL_TRANSLATIONS } from '../i18n/approvals';
 import { TREE_TRANSLATIONS } from '../i18n/hierarchyTree';
 import { BACKUP_TRANSLATIONS } from '../i18n/backups';
 import { UI_REFINEMENTS } from '../i18n/uiRefinements';
@@ -420,7 +421,7 @@ const baseTranslations: Record<'ID' | 'EN', Record<string, string>> = {
     'amendments.summary_label': 'Ringkasan Track-Change Perubahan:',
 
     // Notifications View
-    'notifications.title': 'Pusat Notifikasi & Alarm Notice Period',
+    'notifications.title': 'Pusat Notifikasi',
     'notifications.unread_badge': 'Belum Dibaca',
     'notifications.mark_all': 'Tandai Semua Dibaca',
     'notifications.processing': 'Memproses...',
@@ -1471,7 +1472,7 @@ const baseTranslations: Record<'ID' | 'EN', Record<string, string>> = {
     'amendments.summary_label': 'Track-Change Summary of Changes:',
 
     // Notifications View
-    'notifications.title': 'Notification Center & Notice Period Alerts',
+    'notifications.title': 'Notification Center',
     'notifications.unread_badge': 'Unread',
     'notifications.mark_all': 'Mark All as Read',
     'notifications.processing': 'Processing...',
@@ -2181,9 +2182,9 @@ const baseTranslations: Record<'ID' | 'EN', Record<string, string>> = {
 
 /** Built-in catalog: base keys plus newer feature keys kept in src/i18n. */
 export const translations: Record<Language, Record<string, string>> = {
-  ID: { ...baseTranslations.ID, ...EXTRA_TRANSLATIONS.ID, ...UI_REFINEMENTS.ID, ...BACKUP_TRANSLATIONS.ID, ...MAILER_TRANSLATIONS.ID, ...DOCUMENT_CALENDAR_TRANSLATIONS.ID, ...CONTRACT_TERMINATION_TRANSLATIONS.ID, ...TENANT_BOUNDARIES_TRANSLATIONS.ID, ...TREE_TRANSLATIONS.ID },
-  EN: { ...baseTranslations.EN, ...EXTRA_TRANSLATIONS.EN, ...UI_REFINEMENTS.EN, ...BACKUP_TRANSLATIONS.EN, ...MAILER_TRANSLATIONS.EN, ...DOCUMENT_CALENDAR_TRANSLATIONS.EN, ...CONTRACT_TERMINATION_TRANSLATIONS.EN, ...TENANT_BOUNDARIES_TRANSLATIONS.EN, ...TREE_TRANSLATIONS.EN },
-  ZH: { ...ZH_TRANSLATIONS, ...UI_REFINEMENTS.ZH, ...BACKUP_TRANSLATIONS.ZH, ...MAILER_TRANSLATIONS.ZH, ...DOCUMENT_CALENDAR_TRANSLATIONS.ZH, ...CONTRACT_TERMINATION_TRANSLATIONS.ZH, ...TENANT_BOUNDARIES_TRANSLATIONS.ZH, ...TREE_TRANSLATIONS.ZH },
+  ID: { ...baseTranslations.ID, ...EXTRA_TRANSLATIONS.ID, ...UI_REFINEMENTS.ID, ...BACKUP_TRANSLATIONS.ID, ...MAILER_TRANSLATIONS.ID, ...DOCUMENT_CALENDAR_TRANSLATIONS.ID, ...CONTRACT_TERMINATION_TRANSLATIONS.ID, ...TENANT_BOUNDARIES_TRANSLATIONS.ID, ...TREE_TRANSLATIONS.ID, ...APPROVAL_TRANSLATIONS.ID },
+  EN: { ...baseTranslations.EN, ...EXTRA_TRANSLATIONS.EN, ...UI_REFINEMENTS.EN, ...BACKUP_TRANSLATIONS.EN, ...MAILER_TRANSLATIONS.EN, ...DOCUMENT_CALENDAR_TRANSLATIONS.EN, ...CONTRACT_TERMINATION_TRANSLATIONS.EN, ...TENANT_BOUNDARIES_TRANSLATIONS.EN, ...TREE_TRANSLATIONS.EN, ...APPROVAL_TRANSLATIONS.EN },
+  ZH: { ...ZH_TRANSLATIONS, ...UI_REFINEMENTS.ZH, ...BACKUP_TRANSLATIONS.ZH, ...MAILER_TRANSLATIONS.ZH, ...DOCUMENT_CALENDAR_TRANSLATIONS.ZH, ...CONTRACT_TERMINATION_TRANSLATIONS.ZH, ...TENANT_BOUNDARIES_TRANSLATIONS.ZH, ...TREE_TRANSLATIONS.ZH, ...APPROVAL_TRANSLATIONS.ZH },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);

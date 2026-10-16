@@ -11,6 +11,7 @@ import {
   type CommentAction,
   type DocumentSortKey,
 } from "@legalio/types/documents";
+import { approvalStatusLock, ensureApprovalSchema } from "./approvalRoutes";
 
 // ponytail: unnamed, unlabeled versions beyond this are pruned; named/labeled ones are kept forever.
 const MAX_UNNAMED_VERSIONS = 50;
@@ -156,6 +157,7 @@ const cleanName = (value: unknown) => str(value).slice(0, 200);
 
 export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
   ensureDocumentSchema(db);
+  ensureApprovalSchema(db);
   const router = express.Router();
   const actorOf = (req: express.Request) => (req as unknown as { actor?: Actor | null }).actor ?? null;
 
@@ -319,6 +321,8 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
       const { status, type } = req.body ?? {};
       if (status !== undefined && !isOneOf(DOCUMENT_STATUSES, status)) return res.status(400).json({ error: "Invalid status." });
       if (type !== undefined && !isOneOf(DOCUMENT_TYPES, type)) return res.status(400).json({ error: "Invalid type." });
+      const locked = status === undefined ? null : approvalStatusLock(db, doc.id, doc.status, status);
+      if (locked) return res.status(409).json({ error: "APPROVAL_OWNS_STATUS", message: locked });
       db.prepare(`
         UPDATE contract_documents SET name = ?, status = COALESCE(?, status), type = COALESCE(?, type), modified_by = ?, modified_at = ?
         WHERE id = ?
@@ -330,6 +334,8 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
   router.delete(
     "/documents/:id",
     withDocument((_req, res, doc) => {
+      const locked = approvalStatusLock(db, doc.id, doc.status, null);
+      if (locked) return res.status(409).json({ error: "APPROVAL_OWNS_STATUS", message: locked });
       db.transaction(() => {
         for (const table of ["contract_comments", "document_metadata", "contract_drafts"]) {
           db.prepare(`DELETE FROM ${table} WHERE contract_id = ?`).run(doc.id);

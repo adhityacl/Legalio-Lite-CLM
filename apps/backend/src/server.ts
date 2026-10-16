@@ -49,6 +49,7 @@ import {
   ensureUserAccountsExist,
 } from "./authConsoleRoutes";
 import { createDocumentRouter } from "./documentRoutes";
+import { createApprovalRouter } from "./approvalRoutes";
 import { isDemoAccountEmail, removeDemoAccounts } from "./demoAccounts";
 import Database from "better-sqlite3";
 import {
@@ -829,7 +830,7 @@ const dataFilePath = LEGACY_DATA_FILE;
 const DEFAULT_BRANDING = {
   appName: "Legalio CLM",
   logoUrl: "/favicon.png",
-  primaryColor: "#2653F6",
+  primaryColor: "#0090FF",
   footerText: "Legalio — open-source contract lifecycle management.",
   loginHeadline: "Contract, partner and commercial document management",
 };
@@ -4598,6 +4599,8 @@ app.use("/api", createGoogleCredentialsRouter(googleCredentials));
 
 // Create Contract documents: explorer, draft versions, metadata, comments/redlines.
 app.use("/api", createDocumentRouter({ db: sqliteDb, tenantOf: getRequestTenantId }));
+// Document Approval: sequential sign-off on a My Documents item or an uploaded file.
+app.use("/api", createApprovalRouter({ db: sqliteDb, tenantOf: getRequestTenantId }));
 
 async function persistContractTerminationFile(req: express.Request, record: { organizationId?: string; partner_id?: string }, file: TerminationFile) {
   const partner = db.partners.find(p => p.partner_id === record.partner_id);
@@ -5603,10 +5606,19 @@ app.delete("/api/ios/:id", async (req: express.Request, res: express.Response) =
 app.get("/api/notification-logs", (req: express.Request, res: express.Response) => {
   res.json(scopedRecords(req, "notification", db.notifications));
 });
+/**
+ * Matches in-memory notifications the caller may touch. scopedRecords re-reads rows from SQLite,
+ * so this matches by organization + notif_id; object identity never matches db.notifications.
+ */
+function visibleNotificationFilter(req: express.Request) {
+  const org = orgContextOf(req).organizationId;
+  const ids = new Set(scopedRecords(req, "notification", db.notifications).map((n: any) => n.notif_id));
+  return { has: (n: any) => n.organizationId === org && ids.has(n.notif_id) };
+}
 /** Only notifications attached to records the caller can see are touched (PRD §4.5.2). */
 app.post("/api/notification-logs/mark-read", (req: express.Request, res: express.Response) => {
   const { notif_id, markAll } = req.body || {};
-  const visible = new Set(scopedRecords(req, "notification", db.notifications));
+  const visible = visibleNotificationFilter(req);
   db.notifications = (db.notifications || []).map((n) =>
     visible.has(n) && (markAll || (notif_id && n.notif_id === notif_id)) ? { ...n, is_read: true } : n,
   );
@@ -5615,9 +5627,9 @@ app.post("/api/notification-logs/mark-read", (req: express.Request, res: express
 });
 app.post("/api/notification-logs/delete", (req: express.Request, res: express.Response) => {
   const { notif_id, notif_ids, deleteAll } = req.body || {};
-  const visible = new Set(scopedRecords(req, "notification", db.notifications));
-  const ids = new Set<string>(Array.isArray(notif_ids) ? notif_ids : notif_id ? [notif_id] : []);
-  db.notifications = (db.notifications || []).filter((n) => !(visible.has(n) && (deleteAll || ids.has(n.notif_id))));
+  const visible = visibleNotificationFilter(req);
+  const chosen = new Set<string>(Array.isArray(notif_ids) ? notif_ids : notif_id ? [notif_id] : []);
+  db.notifications = (db.notifications || []).filter((n) => !(visible.has(n) && (deleteAll || chosen.has(n.notif_id))));
   saveDb();
   res.json({ success: true, notifications: scopedRecords(req, "notification", db.notifications) });
 });
