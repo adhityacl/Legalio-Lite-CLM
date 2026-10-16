@@ -429,9 +429,11 @@ function saveLocalFile(
   try {
     const cleanOrg = (orgName || "Organization")
       .replace(/[/\\?%*:|"<>]/g, "_")
+      .replace(/^\.+$/, "_")
       .trim();
     const cleanVendor = (partnerName || "Vendor")
       .replace(/[/\\?%*:|"<>]/g, "_")
+      .replace(/^\.+$/, "_")
       .trim();
     const subDir = path.join(uploadsDir, cleanOrg, cleanVendor, category);
     if (!fs.existsSync(subDir)) {
@@ -6589,9 +6591,6 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
   const {
     type,
     rows,
-    userEmail,
-    userName,
-    userRole,
     defaultDepartment,
     overrideDepartment,
   } = req.body;
@@ -6736,6 +6735,10 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
       const partner = db.partners.find(
         (p) => inTenant(p) && p.nama_partner?.toLowerCase() === partnerNama.toLowerCase(),
       );
+      if (!partner) {
+        failed.push({ rowIndex, identifier: nomor, message: `Partner "${partnerNama}" tidak ditemukan. Impor partner lebih dulu atau samakan nama persis dengan data Partner.` });
+        continue;
+      }
       try {
         const kategori = bulkSplitList(row.kategori_kerjasama);
         const jenisDokumen = pickEnum(row.jenis_dokumen, BULK_ENUMS.jenis_dokumen);
@@ -6774,7 +6777,8 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           organizationId: tenantId,
           nomor_kontrak: nomor,
           judul_kontrak: row.judul_kontrak || nomor,
-          partner_id: partner?.partner_id || "",
+          partner_id: partner.partner_id,
+          partner_nama: partner.nama_partner,
           jenis_dokumen: jenisDokumen || "Master Agreement",
           ...(parentContract ? { parent_contract_id: parentContract.contract_id, parent_contract_nomor: parentContract.nomor_kontrak } : {}),
           kategori_kerjasama: kategori,
@@ -6793,7 +6797,6 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           updated_at: now,
         };
         db.contracts.push(newContract);
-        recalculateStatuses();
         succeeded.push({
           rowIndex,
           identifier: nomor,
@@ -6835,6 +6838,10 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
       const partner = db.partners.find(
         (p) => inTenant(p) && p.nama_partner?.toLowerCase() === partnerNama.toLowerCase(),
       );
+      if (!partner) {
+        failed.push({ rowIndex, identifier: nomor, message: `Partner "${partnerNama}" tidak ditemukan. Impor partner lebih dulu atau samakan nama persis dengan data Partner.` });
+        continue;
+      }
       const contractNomor = (row.contract_nomor || "").trim();
       const contract = db.contracts.find(
         (c) => inTenant(c) && c.nomor_kontrak?.toLowerCase() === contractNomor.toLowerCase(),
@@ -6857,7 +6864,8 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           organizationId: tenantId,
           nomor_io: nomor,
           judul_io: row.judul_io || nomor,
-          partner_id: partner?.partner_id || "",
+          partner_id: partner.partner_id,
+          partner_nama: partner.nama_partner,
           contract_id: contract?.contract_id || "",
           kanal_media: row.kanal_media || "",
           tanggal_mulai: row.tanggal_mulai || "",
@@ -6951,8 +6959,8 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           ...picks,
           notes: row.notes || "",
           calculated_score: computeEvaluationScore(picks.obligation_target, picks.incident_frequency, picks.communication, picks.pricing),
-          evaluator_email: userEmail || "system",
-          evaluator_name: userName || "System",
+          evaluator_email: (req as any).identity?.email || "system",
+          evaluator_name: (req as any).identity?.name || "System",
           created_at: now,
           updated_at: now,
         };
@@ -7042,22 +7050,14 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
       .status(400)
       .json({ error: `Tipe import tidak dikenal: ${type}` });
   }
-  saveDb();
+  recalculateStatuses(); // once per import: it saves the whole database
   const totalSucceeded = succeeded.length;
   if (totalSucceeded > 0) {
-    const logEntry = {
-      id: `log-${Date.now()}`,
-      timestamp: now,
-      userEmail: userEmail || "system",
-      userName: userName || "System",
-      userRole: userRole || "Admin",
-      action: "BULK_IMPORT",
-      entity: type.toUpperCase(),
-      entityId: "BULK",
-      details: `Bulk import ${type}: ${totalSucceeded} berhasil, ${skipped.length} dilewati, ${failed.length} gagal.`,
-    };
-    db.activityLogs.unshift(logEntry);
-    saveDb();
+    addActivityLog(
+      "system", "System", "User", "BULK_IMPORT", type.toUpperCase(),
+      `Bulk import ${type}: ${totalSucceeded} berhasil, ${skipped.length} dilewati, ${failed.length} gagal.`,
+      req,
+    );
   }
   return res.json({ succeeded, skipped, failed });
 });

@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlphabeticalSelect } from '../../components/ui/alphabetical-select';
 import { EditorSidePanel } from '../../components/editor/EditorSidePanel';
@@ -1649,9 +1650,10 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                   <div
                     className="ProseMirror"
                     dangerouslySetInnerHTML={{
-                      __html: stripFillableSlotsToPlainText(
+                      // Saved version HTML is stored unfiltered by the server, so clean it before rendering.
+                      __html: DOMPurify.sanitize(stripFillableSlotsToPlainText(
                         stripCommentAnchors(previewOverride?.kind === 'version' ? previewOverride.html : editor?.getHTML() || ''),
-                      ),
+                      )),
                     }}
                   />
                 )}

@@ -249,8 +249,9 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
     const at = now.toISOString();
     db.transaction(() => {
       const year = now.getFullYear();
+      // MAX, not COUNT: deleting an earlier request must not make the next code repeat.
       const { n } = db
-        .prepare(`SELECT COUNT(*) AS n FROM approval_requests WHERE organization_id = ? AND code LIKE ?`)
+        .prepare(`SELECT COALESCE(MAX(CAST(substr(code, 9) AS INTEGER)), 0) AS n FROM approval_requests WHERE organization_id = ? AND code LIKE ?`)
         .get(org, `OA-${year}-%`) as { n: number };
       const code = `OA-${year}-${String(n + 1).padStart(5, "0")}`;
       db.prepare(`
@@ -332,6 +333,9 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
   router.delete("/approvals/:id", withRequest((req, res, row, ctx) => {
     if (row.created_by !== ctx.userId) {
       return res.status(403).json({ error: "NOT_REQUESTER", message: "Only the requester can delete this approval." });
+    }
+    if (row.status !== "pending") {
+      return res.status(409).json({ error: "APPROVAL_FINISHED", message: "A decided approval is part of the record and cannot be deleted." });
     }
     db.transaction(() => {
       for (const table of ["approval_steps", "approval_events"]) db.prepare(`DELETE FROM ${table} WHERE request_id = ?`).run(row.id);

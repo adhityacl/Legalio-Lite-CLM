@@ -113,9 +113,16 @@ test('uploaded file: validation, rejection stops the chain, file is served to pa
     assert.equal((await call('bw', 'GET', '/approvals?box=all')).body.items.length, 1);
     assert.equal((await call('bw', 'GET', '/approvals?box=inbox')).body.items.length, 0);
 
-    assert.equal((await call('as', 'DELETE', `/approvals/${body.id}`)).status, 403);
-    assert.equal((await call('al', 'DELETE', `/approvals/${body.id}`)).status, 200);
-    assert.equal((await call('al', 'GET', `/approvals/${body.id}`)).status, 404);
-    assert.equal((await call('al', 'GET', '/approvals')).body.items.length, 0);
+    assert.equal((await call('al', 'DELETE', `/approvals/${body.id}`)).status, 409); // decided: kept as record
+    assert.equal((await call('al', 'GET', `/approvals/${body.id}`)).status, 200);
+
+    const first = (await call('al', 'POST', '/approvals', { ...base, file: pdf })).body;
+    const second = (await call('al', 'POST', '/approvals', { ...base, file: pdf })).body;
+    assert.equal((await call('as', 'DELETE', `/approvals/${first.id}`)).status, 403);
+    assert.equal((await call('al', 'DELETE', `/approvals/${first.id}`)).status, 200);
+    assert.equal((await call('al', 'GET', `/approvals/${first.id}`)).status, 404);
+    const third = (await call('al', 'POST', '/approvals', { ...base, file: pdf })).body;
+    const codes = [body.id, second.id, third.id].map(async (id) => (await call('al', 'GET', `/approvals/${id}`)).body.code);
+    assert.equal(new Set(await Promise.all(codes)).size, 3); // a delete must not make a code repeat
   } finally { close(); }
 });

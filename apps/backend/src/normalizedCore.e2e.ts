@@ -160,7 +160,7 @@ try{
  assert.equal((await call('/api/templates',{org})).some((item:any)=>item.id===template.id),false);
  const document=(await call('/api/documents',{method:'POST',org,status:201,body:{name:'E2E Editor Document',content:'<p>Version one</p>',type:'contract'}}));
  assert.equal((await call(`/api/documents/${document.id}`,{org})).name,'E2E Editor Document');
- assert.equal((await call(`/api/documents/${document.id}`,{method:'PATCH',org,body:{name:'E2E Editor Document Updated',status:'pending_review'}})).name,'E2E Editor Document Updated');
+ assert.equal((await call(`/api/documents/${document.id}`,{method:'PATCH',org,body:{name:'E2E Editor Document Updated',status:'archived'}})).name,'E2E Editor Document Updated');
  const draft=await call(`/api/documents/${document.id}/drafts`,{method:'POST',org,body:{content:'<p>Version two</p>',kind:'manual'}});
  assert.equal(draft.created,true);
  const field=await call('/api/metadata-fields',{method:'POST',org,status:201,body:{name:'E2E Reference',field_type:'text'}});
@@ -251,6 +251,13 @@ try{
  const csvPartner=(await call('/api/partners',{org})).find((p:any)=>p.nama_partner==='E2E CSV Imported');assert.equal(csvPartner.nama_pic,'CSV Contact');assert.equal('pic_partner' in csvPartner,false);
  assert.equal((sql.prepare('PRAGMA table_info(partners)').all() as any[]).some(c=>c.name==='payload'),false);
  checks.push('CSV import into SQL columns without pic_partner');
+ const contractImport=await call('/api/bulk-import',{method:'POST',org,body:{type:'contracts',userRole:'Forged',userEmail:'forged@example.com',rows:[
+  {nomor_kontrak:'E2E/IMP/001',judul_kontrak:'Known partner',partner_nama:'E2E CSV Imported',jenis_dokumen:'Master Agreement',tanggal_mulai:'2026-01-01',tanggal_berakhir:'2027-01-01',nilai_kontrak:'1000'},
+  {nomor_kontrak:'E2E/IMP/002',judul_kontrak:'Unknown partner',partner_nama:'No Such Partner',jenis_dokumen:'Master Agreement',tanggal_mulai:'2026-01-01',tanggal_berakhir:'2027-01-01',nilai_kontrak:'1000'}]}});
+ assert.equal(contractImport.succeeded.length,1);assert.equal(contractImport.failed.length,1);assert.match(contractImport.failed[0].message,/Partner "No Such Partner"/);
+ const importedContract=(await call('/api/contracts',{org})).find((c:any)=>c.nomor_kontrak==='E2E/IMP/001');assert.equal(importedContract.partner_nama,'E2E CSV Imported');assert.equal(importedContract.partner_id,csvPartner.partner_id);
+ assert.equal((sql.prepare("SELECT count(*) n FROM contracts WHERE nomor_kontrak='E2E/IMP/002'").get() as any).n,0);
+ checks.push('Contract import links partner and rejects unknown partner names');
  const editorToken=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'editor@example.com',password},token:''})).token;
  const hidden=(await call('/api/partners',{method:'POST',org,body:{nama_partner:'E2E Indexed Hidden',pic_internal:otherOwner.name,tags:['Supplier']}})).partner;
  const found=await call('/api/search?q=E2E%20Indexed',{org,token:editorToken});assert.ok(found.results.some((hit:any)=>hit.entity_id===partner.partner_id));assert.equal(found.results.some((hit:any)=>hit.entity_id===hidden.partner_id),false);

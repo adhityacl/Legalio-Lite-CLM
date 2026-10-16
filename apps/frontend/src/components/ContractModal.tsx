@@ -458,6 +458,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
         nomor_kontrak: nomorKontrak.trim(),
         judul_kontrak: judulKontrak.trim(),
         partner_id: partnerId,
+        partner_nama: selectedPartner?.nama_partner,
         kategori_kerjasama: kategoriTags,
         tanggal_mulai: tanggalMulai,
         tanggal_berakhir: tanggalBerakhir,

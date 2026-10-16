@@ -542,7 +542,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
                       {/* 2. Partner */}
                       {visibleColumns.partner && (
-                        <TableCell>{ctr.partner_nama}</TableCell>
+                        <TableCell>{ctr.partner_nama || partnersById.get(ctr.partner_id)?.nama_partner || '-'}</TableCell>
                       )}
 
                       {/* Kategori */}
