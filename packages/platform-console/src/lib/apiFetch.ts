@@ -30,7 +30,7 @@ const NO_SELECTOR = [
   /^\/api\/google-integration(\/(connect|disconnect|auto-provision-master|provision-folders))?$/,
   /^\/api\/integrations\/google\/credentials(\/|$)/,
   /^\/api\/google-service-account\//,
-  /^\/api\/(smtp|ai)\//,
+  /^\/api\/(smtp|ai|mailer)\//,
   /^\/api\/admin\//,
   /^\/api\/rbac\/(matrix|roles)$/,
   /^\/api\/cron\//,

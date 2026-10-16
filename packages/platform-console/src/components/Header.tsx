@@ -53,6 +53,7 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
       case 'admin-system-database': return t('sqlite.sqlite_database', 'SQLite Database');
       case 'admin-system-backups': return t('backup.title', 'Backup & Restore');
       case 'admin-system-ai': return t('sys.nav_ai', 'AI Model');
+      case 'admin-system-mailer': return t('mailer.nav', 'Mailer');
       case 'admin-system-smtp': return t('tb.config_smtp', 'SMTP relay');
       case 'admin-system-ui-texts': return t('tb.config_texts_short', 'UI texts');
       case 'admin-system-reset': return t('sys.nav_reset', 'System reset');

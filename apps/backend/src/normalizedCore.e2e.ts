@@ -37,7 +37,7 @@ fixtureDb.prepare("INSERT INTO teamMember(id,teamId,userId) VALUES('e2e-editor-t
 let server:ChildProcess|undefined;let frontend:ChildProcess|undefined;let browser:Awaited<ReturnType<typeof chromium.launch>>|undefined;
 const logs:string[]=[];const checks:string[]=[];
 const appTabs=['dashboard','hierarchy','partners','contracts','create-contract','ios','partner-spending','partner-evaluation','notifikasi','settings-organization','settings-access'];
-const systemTabs=['dashboard','users','accounts','sessions','organizations','apikeys','google','google-drive','google-credentials','ai','smtp','ui-texts','database','backups','reset'];
+const systemTabs=['dashboard','users','accounts','sessions','organizations','apikeys','google','google-drive','google-credentials','ai','smtp','mailer','ui-texts','database','backups','reset'];
 const run=(args:string[],cwd=repository,env=process.env)=>{const child=spawn('node',args,{cwd,env,stdio:['ignore','pipe','pipe']});child.stdout?.on('data',c=>logs.push(String(c)));child.stderr?.on('data',c=>logs.push(String(c)));return child;};
 const waitFor=async(url:string,child:ChildProcess)=>{const deadline=Date.now()+60000;while(Date.now()<deadline){if(child.exitCode!==null)throw new Error(`Server exited ${child.exitCode}`);try{if((await fetch(url)).ok)return;}catch{}await new Promise(r=>setTimeout(r,200));}throw new Error(`Timed out ${url}`);};
 const stop=async(child?:ChildProcess)=>{if(!child||child.exitCode!==null)return;child.kill('SIGTERM');await Promise.race([once(child,'exit'),new Promise(r=>setTimeout(r,5000))]);if(child.exitCode===null)child.kill('SIGKILL');};
@@ -62,6 +62,18 @@ try{
  assert.equal(tableList.tables.some((table:any)=>table.name.startsWith('_legacy_003_')),false);
  const configBrowser=await call('/api/auth-console/sqlite/table-data?table=organization_settings');
  assert.ok(configBrowser.columns.some((c:any)=>c.name==='country_code'));
+ const mailerUserToken=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'admin@example.com',password},token:''})).token;
+ await call('/api/mailer/templates',{token:mailerUserToken,status:403});
+ await call('/api/mailer/templates/verification',{method:'PUT',token:mailerUserToken,body:{},status:403});
+ const mailerCatalog = await call('/api/mailer/templates');
+ assert.equal(mailerCatalog.templates.length, 5);
+ await call('/api/mailer/templates', {token:'', status:401});
+ const verificationTemplate = mailerCatalog.templates.find((t:any) => t.id === 'verification');
+ await call('/api/mailer/templates/verification', {method:'PUT', body:{subject:'Missing link', html:'<p>Hi</p>',expectedVersion:0},status:400});
+ await call('/api/mailer/templates/verification', {method:'PUT', body:{subject:'Welcome {{name}}',html:verificationTemplate.html,expectedVersion:0}});
+ await call('/api/mailer/templates/verification', {method:'PUT', body:{subject:'Stale',html:verificationTemplate.html,expectedVersion:0},status:409});
+ assert.equal((await call('/api/mailer/templates')).templates.find((t:any)=>t.id==='verification').subject,'Welcome {{name}}');
+ checks.push('Mailer catalog, authentication, validation, persistence and concurrent update protection');
  checks.push('legacy migration, authenticated API reload and SQLite browser');
  for (const direction of ['asc', 'desc']) {
   const sorted = await call(`/api/auth-console/sqlite/table-data?table=partners&sort=nama_partner&direction=${direction}&limit=5&offset=5`);
@@ -307,6 +319,100 @@ try{
   await expect(systemPage.locator('main')).toBeVisible({timeout:30000});
  }
 
+ // Use the real language switcher; changing UI language must preserve an unsaved draft.
+ async function mailerLanguage(nativeName: string) {
+  await systemPage.locator('#header-language-trigger').click();
+  await systemPage.getByRole('menuitemradio',{name:nativeName,exact:true}).click();
+ }
+ await mailerLanguage('Bahasa Indonesia');
+ await systemPage.goto(backendURL+'/sys?tab=admin-system-mailer');
+ await expect(systemPage.getByRole('heading',{name:'Template email',exact:true,level:2})).toBeVisible();
+ const subjectField=systemPage.getByRole('textbox',{name:'Subjek email'});
+ await expect(subjectField).toHaveValue('Welcome {{name}}');
+ await subjectField.fill('Halo {{name}}');
+ await systemPage.getByRole('button',{name:'Preview',exact:true}).click();
+ await expect(systemPage.getByText('Subjek: Halo Andi',{exact:true})).toBeVisible();
+ await systemPage.getByRole('button',{name:'Simpan perubahan',exact:true}).click();
+ await expect(systemPage.getByRole('status')).toContainText('Template berhasil disimpan');
+ await systemPage.reload();
+ await expect(systemPage.getByRole('textbox',{name:'Subjek email'})).toHaveValue('Halo {{name}}');
+ const visualBody=systemPage.frameLocator('iframe[title="Editor visual email"]').getByRole('textbox',{name:'Isi email visual'});
+ await visualBody.fill('Halo {{name}} {{url}}');
+ await systemPage.getByRole('combobox',{name:'Format paragraf'}).selectOption('p');
+ await visualBody.press('ControlOrMeta+A');
+ await systemPage.getByRole('button',{name:'Tebal',exact:true}).click();
+ assert.match(await visualBody.innerHTML(), /<(b|strong)[ >]/);
+ await systemPage.getByRole('button',{name:'Sisipkan tautan',exact:true}).click();
+ await systemPage.getByRole('textbox',{name:'URL tautan'}).fill('{{url}}');
+ await systemPage.getByRole('button',{name:'Terapkan',exact:true}).click();
+ assert.match(await visualBody.innerHTML(), /href="\{\{url\}\}"/);
+ await visualBody.press('ArrowRight');
+ await systemPage.getByRole('button',{name:'{{email}}',exact:true}).click();
+ await expect(visualBody).toContainText('{{email}}');
+ await systemPage.getByRole('button',{name:'HTML',exact:true}).click();
+ const htmlField=systemPage.getByRole('textbox',{name:'Isi email (HTML)'});
+ await expect(htmlField).toHaveValue(/\{\{email\}\}/);
+ const styledEmail='<div style="padding:17px"><h2>Halo {{name}}</h2><a href="{{url}}">Verifikasi</a></div>';
+ await htmlField.fill(styledEmail);
+ await systemPage.getByRole('button',{name:'Visual',exact:true}).click();
+ await expect(visualBody.getByRole('heading',{name:'Halo {{name}}'})).toBeVisible();
+ await systemPage.getByRole('button',{name:'HTML',exact:true}).click();
+ await expect(htmlField).toHaveValue(styledEmail);
+ await systemPage.getByRole('button',{name:'Preview',exact:true}).click();
+ await expect(systemPage.frameLocator('iframe[title="Preview isi email"]').getByRole('heading',{name:'Halo Andi'})).toBeVisible();
+ await systemPage.getByRole('button',{name:'Simpan perubahan',exact:true}).click();
+ await expect(systemPage.getByRole('status')).toContainText('Template berhasil disimpan');
+ await systemPage.reload();
+ await expect(visualBody.getByRole('heading',{name:'Halo {{name}}'})).toBeVisible();
+ await systemPage.getByRole('button',{name:'HTML',exact:true}).click();
+ await expect(htmlField).toHaveValue(styledEmail);
+ await systemPage.getByRole('button',{name:'Visual',exact:true}).click();
+ await systemPage.setViewportSize({width:375,height:812});
+ await expect(systemPage.getByRole('heading',{name:'Template email',exact:true,level:2})).toBeVisible();
+ assert.ok(await systemPage.evaluate(()=>(globalThis as any).document.documentElement.scrollWidth<=(globalThis as any).innerWidth));
+ await systemPage.screenshot({path:path.join(directory,'mailer-mobile.png'),fullPage:true});
+ await systemPage.setViewportSize({width:1440,height:1000});
+ await systemPage.screenshot({path:path.join(directory,'mailer-desktop.png'),fullPage:true});
+ const languageDraft='<p>{{name}} {{url}} unsaved-language-test</p>';
+ await systemPage.getByRole('button',{name:'HTML',exact:true}).click();
+ await htmlField.fill(languageDraft);
+ for(const [nativeName,title,subjectLabel,bodyLabel,saveLabel,toolbarLabel,frameLabel,visualLabel,linkLabel,urlLabel,confirmLabel] of [
+  ['English','Email templates','Email subject','Email body (HTML)','Save changes','Bold','Visual email editor','Visual','Insert link','Link URL','Reset to default'],
+  ['简体中文','邮件模板','邮件主题','邮件正文（HTML）','保存更改','加粗','可视化邮件编辑器','可视化','插入链接','链接地址','恢复默认'],
+  ['Bahasa Indonesia','Template email','Subjek email','Isi email (HTML)','Simpan perubahan','Tebal','Editor visual email','Visual','Sisipkan tautan','URL tautan','Reset ke bawaan'],
+ ]) {
+  await mailerLanguage(nativeName);
+  await expect(systemPage.getByRole('heading',{name:title,exact:true})).toBeVisible();
+  await expect(systemPage.getByRole('textbox',{name:subjectLabel,exact:true})).toHaveValue('Halo {{name}}');
+  await expect(systemPage.getByRole('button',{name:saveLabel,exact:true})).toBeEnabled();
+  const translatedHtml=systemPage.getByRole('textbox',{name:bodyLabel,exact:true});
+  await expect(translatedHtml).toHaveValue(languageDraft);
+  await translatedHtml.fill('<p>{{unknown}}</p>');
+  const validationText=nativeName==='English'?'Unknown variable: unknown':nativeName==='简体中文'?'未知变量：unknown':'Variabel tidak dikenal: unknown';
+  await expect(systemPage.getByRole('alert')).toContainText(validationText);
+  await translatedHtml.fill(languageDraft);
+  await systemPage.getByRole('button',{name:visualLabel,exact:true}).click();
+  await expect(systemPage.getByRole('button',{name:toolbarLabel,exact:true})).toBeVisible();
+  await expect(systemPage.frameLocator(`iframe[title="${frameLabel}"]`).locator('body')).toContainText('unsaved-language-test');
+  await systemPage.getByRole('button',{name:linkLabel,exact:true}).click();
+  const linkInput=systemPage.getByRole('textbox',{name:urlLabel,exact:true});
+  await expect(linkInput).toBeVisible();
+  await linkInput.fill('javascript:alert(1)');
+  await systemPage.getByRole('button',{name:/^(Apply|应用|Terapkan)$/}).click();
+  const linkValidation=await linkInput.evaluate((input:any)=>input.validationMessage);
+  assert.ok(linkValidation.startsWith(nativeName==='English'?'Enter a valid':nativeName==='简体中文'?'请输入有效的':'Masukkan URL'));
+  await linkInput.fill('');
+  await systemPage.getByRole('button',{name:linkLabel,exact:true}).click();
+  await systemPage.getByRole('button',{name:confirmLabel,exact:true}).click();
+  const confirmDialog=systemPage.getByRole('alertdialog').or(systemPage.getByRole('dialog'));
+  await expect(confirmDialog).toBeVisible();
+  await confirmDialog.getByRole('button',{name:/Cancel|取消|Batal/,exact:true}).click();
+  await systemPage.getByRole('button',{name:'HTML',exact:true}).click();
+ }
+ // Restore the persisted template before leaving the page.
+ await htmlField.fill(styledEmail);
+ checks.push('Mailer ID/EN/ZH live switching, translated toolbar/dialog/validation and preservation of unsaved drafts');
+ checks.push('Mailer WYSIWYG formatting, cursor variable insertion, lossless Visual/HTML switch, save/reload, mobile and preview');
  await systemPage.goto(backendURL+'/sys?tab=admin-system-database');
  const explorer=systemPage.locator('#sqlite-database-tables');
  const tableNav=explorer.getByRole('navigation');

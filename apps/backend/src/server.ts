@@ -1,3 +1,4 @@
+import { createMailTemplateStore } from "./mailTemplateStore";
 import { forwardAsyncRouteErrors } from './asyncRoutes';
 import { migrateNormalizedCore } from './migrations/003_normalized_core';
 import { removeLegacyCoreTables } from './migrations/004_remove_legacy_core';
@@ -1607,6 +1608,7 @@ function syncAdderNames() {
 }
 syncAdderNames();
 saveDb();
+const mailTemplates = createMailTemplateStore(sqliteDb);
 async function sendSmtpEmail({
   to,
   subject,
@@ -1660,12 +1662,8 @@ async function sendPlatformMail(input: { to: string; subject: string; html: stri
   const result = await sendSmtpEmail(input);
   return Boolean(result?.success);
 }
-setVerificationMailer(async ({ email, url }) => {
-  const sent = await sendPlatformMail({
-    to: email,
-    subject: "Verify your email address",
-    html: `<p>Confirm your email address to finish setting up your Legalio account.</p><p><a href="${escapeHtml(url)}">Verify email</a></p>`,
-  });
+setVerificationMailer(async ({ email, name, url }) => {
+  const sent = await sendPlatformMail({ to: email, ...mailTemplates.render('verification', { email, name, url }) });
   if (!sent) throw new Error("Verification email delivery is unavailable.");
 });
 function daysUntilForTenant(tenantId: string | null | undefined, date: string): number | null {
@@ -1737,18 +1735,10 @@ function buildReminderEmail(params: {
     `E-mail otomatis dari Legalio untuk ${orgName}.`,
     `此邮件由 Legalio 为 ${orgName} 自动发送。`,
   );
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;">
-      <div style="background-color:${brandColor};color:#FFFFFF;padding:20px;text-align:center;">
-        <h2 style="margin:0;font-size:18px;">${escapeHtml(heading)}</h2>
-      </div>
-      <div style="padding:20px;color:#1E293B;font-size:14px;line-height:1.6;">
-        <p>${escapeHtml(intro)}</p>
-        <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;">${tableRows}</table>
-      </div>
-      <div style="background-color:#F8FAFC;padding:10px 20px;text-align:center;color:#64748B;font-size:12px;border-top:1px solid #E2E8F0;">${escapeHtml(footer)}</div>
-    </div>`;
-  return { subject, html };
+  return mailTemplates.render(params.kind === 'contract' ? 'contract-reminder' : 'commercial-reminder', {
+    subject, heading, intro, brandColor, details: tableRows, footer, organizationName: orgName,
+    reference: params.reference, title: params.title, endDate: params.endDate, daysRemaining: String(params.daysRemaining),
+  }, ['details']);
 }
 /** Roll an auto-renewing contract's end date forward past "today" (tenant timezone). */
 function rollForwardAutoRenewal(contract: any): void {
@@ -6104,6 +6094,19 @@ app.post("/api/google-integration", async (req: express.Request, res: express.Re
   const config = readPlatformConfiguration();
   res.json({ success: true, config: { ...config.google, ...config.ai, ...config.smtp } });
 });
+app.get('/api/mailer/templates', (_req, res) => res.json({ templates: mailTemplates.list() }));
+app.put('/api/mailer/templates/:id', (req, res) => {
+  const { subject, html, expectedVersion } = req.body || {};
+  const template = sqliteDb.transaction(() => {
+    const saved = mailTemplates.save(String(req.params.id), { subject, html }, expectedVersion);
+    appendAudit(sqliteDb, auditActorFor(req, resolveIdentity(sqliteDb, req)), {
+      organizationId: null, action: 'platform.configuration.update', targetType: 'mail_template', targetId: String(req.params.id),
+      outcome: 'success', changedFields: ['subject', 'html'],
+    });
+    return saved;
+  })();
+  res.json({ template });
+});
 app.post("/api/smtp/test", async (req: express.Request, res: express.Response) => {
   const adminCheck = await checkIsAdmin(req);
   if (!adminCheck.isAdmin) {
@@ -6156,20 +6159,7 @@ app.post("/api/smtp/test", async (req: express.Request, res: express.Response) =
     const info = await transporter.sendMail({
       from: `"${fromName}" <${fromAddress}>`,
       to: recipient,
-      subject: "\u2705 [TEST] Konfigurasi SMTP Relay Berhasil Terhubung!",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 500px; padding: 20px; border: 1px solid #10B981; border-radius: 12px; background: #F0FDF4;">
-          <h3 style="color: #047857; margin-top: 0;">Koneksi SMTP Relay Berhasil!</h3>
-          <p style="font-size: 13px; color: #065F46; line-height: 1.5;">
-            Email ini membuktikan bahwa konfigurasi SMTP Relay pada sistem <strong>Pengelola Kontrak & Insertion Order</strong> telah berhasil terhubung dan dapat mengirimkan email nyata ke inbox Anda.
-          </p>
-          <div style="background: #FFFFFF; border: 1px solid #A7F3D0; border-radius: 8px; padding: 12px; font-size: 12px; color: #047857; margin-top: 12px;">
-            <p style="margin: 4px 0;"><strong>SMTP Server:</strong> ${host}:${port}</p>
-            <p style="margin: 4px 0;"><strong>Email Pengirim:</strong> ${fromAddress}</p>
-            <p style="margin: 4px 0;"><strong>Waktu Pengujian:</strong> ${new Date().toISOString()}</p>
-          </div>
-        </div>
-      `,
+      ...mailTemplates.render('smtp-test', { host, port: String(port), fromAddress, testedAt: new Date().toISOString() }),
     });
     res.json({
       success: true,
@@ -7589,9 +7579,7 @@ app.use("/api", createOrganizationAdminRouter({
     if (IS_TEST_MODE) return false;
     return sendPlatformMail({
       to: email,
-      subject: `Invitation to join ${organizationName} on Legalio`,
-      html: `<p>${escapeHtml(inviterName || "An administrator")} invited you to join <strong>${escapeHtml(organizationName)}</strong> as <strong>${escapeHtml(tenantRole)}</strong>.</p>
-        <p><a href="${escapeHtml(inviteUrl)}">Accept invitation</a> (valid until ${escapeHtml(String(expiresAt).slice(0, 10))}).</p>`,
+      ...mailTemplates.render('invitation', { organizationName, tenantRole, inviteUrl, expiresAt: String(expiresAt).slice(0, 10), inviterName: inviterName || 'An administrator' }),
     });
   },
   platformConfiguration: {

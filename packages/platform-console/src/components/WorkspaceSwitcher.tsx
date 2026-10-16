@@ -21,9 +21,9 @@ const visibleLogo = (url?: string) => (url && url !== '/favicon.png' ? url : und
 
 function WorkspaceAvatar({ name, letter, logoUrl, size = 'md' }: { name: string; letter: string; logoUrl?: string; size?: 'sm' | 'md' }) {
   return (
-    <Avatar size={size} className={logoUrl ? 'rounded-none bg-transparent' : undefined} data-sidebar-icon>
+    <Avatar size={size} className={logoUrl ? 'rounded-none bg-transparent' : 'rounded-lg'} data-sidebar-icon>
       {logoUrl && <AvatarImage src={logoUrl} alt={name} className="rounded-none object-contain" />}
-      <AvatarFallback className="bg-primary text-primary-foreground">{letter}</AvatarFallback>
+      <AvatarFallback className="rounded-lg bg-primary text-primary-foreground">{letter}</AvatarFallback>
     </Avatar>
   );
 }

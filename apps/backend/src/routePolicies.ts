@@ -100,6 +100,8 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/google-auth/token', platform('platform.configuration.read', 'platform Google token')],
   ['POST', '/api/auth/google/refresh-token', platform('platform.configuration.read')],
   ['POST', '/api/google-auth/refresh-token', platform('platform.configuration.read')],
+  ['GET', '/api/mailer/templates', platform('platform.configuration.read')],
+  ['PUT', '/api/mailer/templates/:id', platform('platform.configuration.update')],
   ['POST', '/api/smtp/test', platform('platform.configuration.update')],
   ['POST', '/api/ai/test-key', platform('platform.configuration.update')],
   ['POST', '/api/google-integration/auto-provision-master', platform('platform.configuration.update')],

@@ -20,6 +20,7 @@ import { Alert, AlertActions, AlertContent, AlertDescription, AlertIndicator } f
 import { Spinner } from '@legalio/ui-components/spinner';
 import { Card } from '@legalio/ui-components/card';
 import { List, ListItem } from '@legalio/ui-components/list';
+const LazyMailer = lazy(() => import('./admin/MailerPanel').then(m => ({ default: m.MailerPanel })));
 const LazySQLiteBackups = lazy(() => import('./SQLiteBackupsPanel').then((m) => ({ default: m.SQLiteBackupsPanel })));
 const LazyPlatformConfigurationPanel = lazy(() => import('./admin/PlatformConfigurationPanel').then((m) => ({ default: m.PlatformConfigurationPanel })));
 
@@ -135,7 +136,7 @@ export const AdminUsersView: React.FC<{ initialTab?: SystemSubmenu; onManageOrga
   return (
     <div className="flex w-full flex-col space-y-g21 text-foreground">
 
-      {!configurationSection && activeTab !== 'backups' && (
+      {!configurationSection && activeTab !== 'backups' && activeTab !== 'mailer' && (
         <AdminConsoleHeader
           activeTab={activeTab}
           onRefresh={() => loadConsoleData(true)}
@@ -144,7 +145,9 @@ export const AdminUsersView: React.FC<{ initialTab?: SystemSubmenu; onManageOrga
       )}
 
       <div id={`admin-system-${activeTab}-panel`} role="region" aria-label={activeTab} className="w-full">
-        {activeTab === 'backups' ? (
+        {activeTab === 'mailer' ? (
+          <Suspense fallback={<p role="status">Memuat Mailer…</p>}><LazyMailer /></Suspense>
+        ) : activeTab === 'backups' ? (
           <Suspense fallback={<p role="status">{t('sys.loading', 'Loading…')}</p>}><LazySQLiteBackups /></Suspense>
         ) : configurationSection ? (
           <Suspense fallback={<div role="status" className="flex min-h-g233 items-center justify-center text-sm text-muted-foreground"><Spinner size="sm" decorative /></div>}>

@@ -129,6 +129,7 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
       systemLeaf('backups', t('backup.title', 'Backup & Restore'), Database),
     ]),
     systemLeaf('ai', t('sys.nav_ai', 'AI Model'), AiIcon),
+    systemLeaf('mailer', t('mailer.nav', 'Mailer'), Mail),
     systemLeaf('smtp', t('tb.config_smtp', 'SMTP relay'), Mail),
     systemLeaf('ui-texts', t('tb.config_texts_short', 'UI texts'), Languages),
     systemLeaf('reset', t('sys.nav_reset', 'System reset'), ShieldAlert),
