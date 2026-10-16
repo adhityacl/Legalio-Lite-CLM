@@ -98,7 +98,7 @@ export function MailerPanel() {
   }
   return <div className="space-y-g21">
     <div className="flex flex-wrap items-start justify-between gap-g13">
-      <div><Heading as="h2" size="lg" weight="semibold">{t('mailer.title', "Template email")}</Heading><p className="mt-2 text-sm text-muted-foreground">{t('mailer.description', "Kelola pesan otomatis yang dikirim dari sistem.")}</p></div>
+      <Heading as="h2" size="md" weight="semibold">{t('mailer.title', "Template email")}</Heading>
       <Button onClick={save} disabled={!dirty || saving || loading || Boolean(preview.error)}><Save aria-hidden="true" />{saving ? t('mailer.saving', "Menyimpan…") : t('mailer.save', "Simpan perubahan")}</Button>
     </div>
     {Boolean(error) && <div role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{errorText(error)} <Button variant="outline" onClick={async () => { if (!dirty || await confirm(t('mailer.reload_confirm', "Muat ulang dan buang perubahan yang belum disimpan?"))) void load(); }} disabled={saving}>{t('mailer.reload', "Muat ulang")}</Button></div>}
