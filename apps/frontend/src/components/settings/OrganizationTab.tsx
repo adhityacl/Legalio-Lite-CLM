@@ -408,15 +408,15 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
         <ModalFrame size="md" onClose={() => setLogoDialogOpen(false)} className="gap-g21 p-g21">
           <div className="flex items-start justify-between gap-g13">
             <div className="flex flex-col gap-g3">
-              <DialogTitle className="text-xl font-bold">{t('admin.org_logo_title', 'Organization Logo')}</DialogTitle>
+              <DialogTitle className="text-xl font-bold leading-g34">{t('admin.org_logo_title', 'Organization Logo')}</DialogTitle>
               <DialogDescription className="text-sm">{t('admin.org_logo_subtitle', 'Upload a clear logo for your organization workspace.')}</DialogDescription>
             </div>
             <DialogCloseIcon aria-label={t('common.close', 'Close')} />
           </div>
           <LogoUploadField logo={draftLogo} name={profile.name} onChange={setDraftLogo} hideLabel label={t('admin.org_logo_title', 'Organization Logo')} />
           <div className="flex justify-end gap-g8">
-            <Button type="button" variant="outline" onClick={() => setLogoDialogOpen(false)}>{t('admin.btn_cancel', 'Batal')}</Button>
-            <Button type="button" disabled={!canEdit} onClick={() => { setProfile({ ...profile, logoUrl: draftLogo }); setLogoDialogOpen(false); }}>{t('admin.btn_apply', 'Terapkan')}</Button>
+            <Button type="button" variant="outline" className="min-w-g89" onClick={() => setLogoDialogOpen(false)}>{t('admin.btn_cancel', 'Batal')}</Button>
+            <Button type="button" className="min-w-g89" disabled={!canEdit} onClick={() => { setProfile({ ...profile, logoUrl: draftLogo }); setLogoDialogOpen(false); }}>{t('admin.btn_apply', 'Terapkan')}</Button>
           </div>
         </ModalFrame>
       )}

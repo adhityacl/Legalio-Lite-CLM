@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Database, Download, RefreshCw, RotateCcw, ShieldCheck, Upload } from 'lucide-react';
 import { Button } from '@legalio/ui-components/button';
-import { PageHeader, FormField } from '@legalio/ui-components/blocks';
+import { FormField } from '@legalio/ui-components/blocks';
+import { Heading } from '@legalio/ui-components/heading';
 import { Badge } from '@legalio/ui-components/badge';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 import { Table, TableHeader, TableBody, TableRow, TableColumnHeader, TableCell, TableEmpty, TableScrollArea } from '@legalio/ui-components/table';
@@ -71,16 +72,20 @@ export function SQLiteBackupsPanel() {
     <Button variant="outline" size="sm" className="min-h-11 flex-1 lg:min-h-0 lg:flex-none" disabled={busy || restoring} onClick={() => { setSelected(backup); setFileMode(false); setFile(null); setConfirmation(''); setError(''); }}><RotateCcw aria-hidden="true" />{t('backup.restore', 'Restore')}</Button>
   </div>;
   return <div className="flex min-w-0 flex-col gap-g21">
-    <PageHeader
-      className="max-lg:[&_[data-slot=card-header]]:grid-cols-1 max-lg:[&_[data-slot=card-action]]:col-start-1 max-lg:[&_[data-slot=card-action]]:row-start-auto max-lg:[&_[data-slot=card-action]]:mt-g13 max-lg:[&_[data-slot=card-action]]:w-full"
-      title={<span className="inline-flex items-center gap-g8"><Database aria-hidden="true" className="size-g21 shrink-0 text-accent-foreground" />{t('backup.title', 'Backup & Restore')}</span>}
-      description={t('backup.description', 'Full platform backup: SQLite, all organizations, accounts, settings and uploaded documents.')}
-      actions={<div className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-g8 lg:flex lg:w-auto lg:flex-wrap">
+    <div className="flex flex-wrap items-center justify-between gap-g13">
+      <Heading as="h2" size="md" weight="semibold">{t('backup.title', 'Backup & Restore')}</Heading>
+    </div>
+    <Card className="flex flex-row flex-wrap items-center justify-between gap-g13 p-g13">
+      <div className="flex min-w-0 flex-1 items-center gap-g13">
+        <Database aria-hidden="true" className="size-g21 shrink-0 text-primary" />
+        <Text size="sm" tone="muted">{t('backup.description', 'Full platform backup: SQLite, all organizations, accounts, settings and uploaded documents.')}</Text>
+      </div>
+      <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-g8 lg:flex lg:w-auto lg:flex-wrap">
         <Button className="min-h-11 lg:min-h-0" variant="outline" disabled={busy || restoring} onClick={() => { setSelected(null); setFile(null); setFileMode(true); setConfirmation(''); setError(''); }}><Upload aria-hidden="true" />{t('backup.fromFile', 'Restore from file')}</Button>
         <Button className="min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" size="icon-md" variant="outline" disabled={busy || restoring} onClick={() => void refresh()} aria-label={t('backup.refresh', 'Refresh backups')}><RefreshCw aria-hidden="true" /></Button>
         <Button className="col-span-2 min-h-11 lg:min-h-0" loading={busy} disabled={restoring} onClick={() => void create()}>{busy ? <Spinner size="sm" decorative /> : <Database aria-hidden="true" />}{t('backup.create', 'Back up now')}</Button>
-      </div>}
-    />
+      </div>
+    </Card>
     <Card>
       <CardBody className="flex items-start gap-g8"><ShieldCheck aria-hidden="true" className="size-g21 shrink-0 text-accent-foreground" />{t('backup.storage', 'Backups are stored on this server. Download a copy and keep it securely outside the server. Backups contain sensitive data and are not encrypted.')}</CardBody>
     </Card>

@@ -32,7 +32,7 @@ function tenant(): Row {
     brandName: 'Bank Mindiri',
     tagline: 'Contract Lifecycle Management',
     logoUrl: '/favicon.png',
-    primaryColor: '#2653F6',
+    primaryColor: '#0090FF',
     currency: settings.defaultCurrency,
     settings,
     domainSlug: 'bank-mindiri',

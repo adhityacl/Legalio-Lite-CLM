@@ -86,8 +86,8 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
 
       <div className="flex w-full items-center gap-g13 rounded-lg border border-border bg-muted p-g13">
         <div className="relative shrink-0">
-          <Avatar size="xl" className="size-g68 rounded-md">
-            {logo && <AvatarImage src={logo} alt={name || t('admin.logo', 'Logo')} className="rounded-md" />}
+          <Avatar size="xl" className="size-g68 rounded-md sm:size-g89">
+            {logo && <AvatarImage src={logo} alt={name || t('admin.logo', 'Logo')} className="rounded-md bg-card object-contain" />}
             <AvatarFallback className="rounded-md bg-primary text-primary-foreground">{fallbackLetter}</AvatarFallback>
           </Avatar>
           {logo && (
@@ -103,16 +103,16 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
             <FileUpload key={uploadKey} accept="image/png,image/jpeg,image/webp" maxFiles={1} maxFileSize={2 * 1024 * 1024}
               onFileAccept={details => handleFileChange(details.files[0])}
               onFileReject={details => handleFileReject(details.files[0]?.errors)}>
-              <FileUploadDropzone className="min-h-0 gap-g3 border-solid bg-card p-g13">
+              <FileUploadDropzone className="flex min-h-g89 flex-col justify-center gap-g3 border-solid bg-card p-g13">
                 <Upload className="size-g16 text-muted-foreground" aria-hidden="true" />
-                <Text as="span" size="sm" weight="semibold" className="text-foreground">{t('admin.logo_choose_drag', 'Choose or drag a logo')}</Text>
-                <Text as="span" size="xs" tone="muted">{t('admin.logo_dropzone_hint', 'PNG, JPG, or WebP up to 2 MB')}</Text>
+                <Text as="span" size="sm" weight="medium" className="text-foreground">{t('admin.logo_choose_drag', 'Choose or drag a logo')}</Text>
+                <Text as="span" size="sm" tone="muted">{t('admin.logo_dropzone_hint', 'PNG, JPG, or WebP up to 2 MB')}</Text>
               </FileUploadDropzone>
               <FileUploadHiddenInput aria-label={fieldLabel} />
             </FileUpload>
           ) : (
-            <div className="flex items-center gap-g5">
-              <Input aria-label={fieldLabel} type="url" placeholder="https://example.com/logo.png" value={urlInput} onChange={(e) => setUrlInput(e.target.value)} className="flex-1" />
+            <div className="flex min-h-g89 flex-wrap items-center gap-g5">
+              <Input aria-label={fieldLabel} type="url" placeholder="https://example.com/logo.png" value={urlInput} onChange={(e) => setUrlInput(e.target.value)} className="min-w-0 flex-1 basis-full sm:basis-0" />
               <Button variant="outline" onClick={handleApplyUrl}>{t('admin.btn_apply', 'Terapkan')}</Button>
             </div>
           )}
@@ -120,10 +120,10 @@ export const LogoUploadField: React.FC<LogoUploadFieldProps> = ({
       </div>
 
       <div className="flex w-full flex-wrap items-center justify-between gap-g8">
-        <Text as="span" size="xs" tone="muted" className="flex items-center gap-g5">
+        <Text as="span" size="sm" tone="muted" className="flex items-center gap-g5">
           <Info className="size-g13 shrink-0" aria-hidden="true" />{t('admin.logo_raster_type', 'PNG, JPG, WebP. Max 2 MB.')}
         </Text>
-        <Button variant="outline" size="sm" onClick={() => setIsUrlMode(!isUrlMode)}>
+        <Button variant="outline" size="sm" className="bg-background" aria-pressed={isUrlMode} onClick={() => setIsUrlMode(!isUrlMode)}>
           {isUrlMode ? <Upload aria-hidden="true" /> : <Link2 aria-hidden="true" />}
           {isUrlMode ? t('admin.logo_mode_upload', 'Unggah File Gambar') : t('admin.logo_mode_url', 'Gunakan URL Gambar')}
         </Button>

@@ -18,11 +18,11 @@
   --moduix-muted-foreground: light-dark(#526176, #b4c1d4);
 
   /* Action. Organizations override these at runtime (organizationThemeTokens). */
-  --moduix-primary: light-dark(#2653f6, #2653f6);
+  --moduix-primary: light-dark(#0078d4, #0078d4);
   --moduix-primary-foreground: #ffffff;
-  --moduix-accent: light-dark(#eef2ff, #1c2c59);
-  --moduix-accent-foreground: light-dark(#1d3fc4, #a9bdff);
-  --moduix-ring: light-dark(#1d3fc4, #a9bdff);
+  --moduix-accent: light-dark(#e6f4fe, #0d2847);
+  --moduix-accent-foreground: light-dark(#0c6fc6, #70b8ff);
+  --moduix-ring: light-dark(#5eb1ef, #2870bd);
 
   /* Status */
   --moduix-destructive: light-dark(#b42332, #ff9ca8);

@@ -8,6 +8,10 @@ import { ModalFrame } from '../ui/modal-frame';
 
 import { DialogTitle } from '@legalio/ui-components/dialog';
 import { Toggle } from '@legalio/ui-components/toggle';
+
+// Neutral families remain supported for saved colors, but offer little visual distinction as accents.
+const selectablePalettes = accentPalettes.filter(item => !['gray', 'mauve', 'slate', 'sage', 'olive', 'sand'].includes(item.name));
+
 export function OrganizationColorPicker({ id, value, onChange, disabled }: {
   id: string;
   value: string;
@@ -36,7 +40,7 @@ export function OrganizationColorPicker({ id, value, onChange, disabled }: {
           </div>
           <div className="min-h-0 overflow-y-auto p-g21">
             <div className="grid grid-cols-1 gap-g13 sm:grid-cols-2 lg:grid-cols-3" role="group" aria-label={title}>
-              {accentPalettes.map(item => {
+              {selectablePalettes.map(item => {
                 const selected = chosen?.name === item.name;
                 return (
                   <Toggle key={item.name} variant="outline" pressed={selected} onPressedChange={() => setDraft(item.light[8].toUpperCase())}

@@ -1,19 +1,239 @@
 /** The catalog covers every outgoing mail path. HTML variables are escaped by default. */
 export interface MailTemplate { subject: string; html: string }
-const frame = (body: string) => `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;color:#1e293b;line-height:1.6">${body}</div>`;
 const reminder = {
   subject: '{{subject}}',
-  html: frame('<h2 style="background:{{brandColor}};color:#fff;padding:20px;border-radius:8px">{{heading}}</h2><p>{{intro}}</p><table style="width:100%;border-collapse:collapse">{{details}}</table><p style="font-size:12px;color:#64748b">{{footer}}</p>'),
+  html: `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{heading}}</title><style>.details td{border-bottom:1px solid #e2e8f0;vertical-align:top;}.details tr:last-child td{border-bottom:0;}.details td:first-child{width:40%;font-size:13px;color:#64748b;}.details td:last-child{font-weight:bold;color:#0f172a;}</style></head><body style="margin:0;padding:0;background-color:#f1f5f9;"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f1f5f9;">{{intro}}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;"><tr><td align="center" style="padding:32px 16px;"><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;border:1px solid #e2e8f0;"><tr><td style="padding:28px 40px 0 40px;font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:bold;color:#0f172a;letter-spacing:-0.3px;">Legalio</td></tr><tr><td style="padding:16px 40px 0 40px;"><div style="height:3px;width:40px;background-color:{{brandColor}};border-radius:2px;line-height:3px;font-size:0;">&nbsp;</div></td></tr><tr><td style="padding:28px 40px 0 40px;font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:1.3;font-weight:bold;color:#0f172a;">{{heading}}</td></tr><tr><td style="padding:16px 40px 24px 40px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.65;color:#334155;">{{intro}}</td></tr><tr><td style="padding:0 40px 32px 40px;"><table class="details" role="presentation" width="100%" cellpadding="12" cellspacing="0" border="0" style="border:1px solid #e2e8f0;border-radius:8px;border-collapse:separate;background-color:#f8fafc;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#0f172a;">{{details}}</table></td></tr><tr><td style="padding:0 40px;"><div style="height:1px;background-color:#e2e8f0;line-height:1px;font-size:0;">&nbsp;</div></td></tr><tr><td style="padding:20px 40px 32px 40px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#94a3b8;">{{footer}}</td></tr></table></td></tr></table></body></html>`,
 };
 export const MAIL_CATALOG = {
   verification: {
     name: 'Verifikasi akun', description: 'Dikirim saat pendaftaran atau permintaan ulang verifikasi email.', recipient: 'Pemilik akun',
-    defaults: { subject: 'Verify your email address', html: frame('<h2>Verify your email</h2><p>Hello {{name}},</p><p>Confirm your email address to finish setting up your Legalio account.</p><p><a href="{{url}}">Verify email</a></p>') },
+    defaults: { subject: 'Verifikasi email Legalio', html: `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Verifikasi email Legalio</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;">
+  <!-- Preheader -->
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f1f5f9;">
+    Konfirmasi email Anda untuk mengaktifkan akun Legalio.
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;border:1px solid #e2e8f0;">
+
+          <!-- Header -->
+          <tr>
+            <td style="padding:28px 40px 0 40px;font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:bold;color:#0f172a;letter-spacing:-0.3px;">
+              Legalio
+            </td>
+          </tr>
+
+          <!-- Accent line -->
+          <tr>
+            <td style="padding:16px 40px 0 40px;">
+              <div style="height:3px;width:40px;background-color:#2563eb;border-radius:2px;line-height:3px;font-size:0;">&nbsp;</div>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:28px 40px 8px 40px;font-family:Arial,Helvetica,sans-serif;color:#334155;font-size:16px;line-height:1.65;">
+              <h1 style="margin:0 0 20px 0;font-size:24px;line-height:1.3;color:#0f172a;font-weight:bold;">
+                Verifikasi alamat email Anda
+              </h1>
+              <p style="margin:0 0 16px 0;">Halo {{name}},</p>
+              <p style="margin:0 0 28px 0;">
+                Terima kasih telah mendaftar di Legalio. Konfirmasi alamat email Anda untuk menyelesaikan pengaturan akun.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Button -->
+          <tr>
+            <td align="left" style="padding:0 40px 28px 40px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" bgcolor="#2563eb" style="border-radius:8px;">
+                    <a href="{{url}}" target="_blank"
+                       style="display:inline-block;padding:14px 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;background-color:#2563eb;">
+                      Verifikasi Email
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Fallback link -->
+          <tr>
+            <td style="padding:0 40px 28px 40px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;color:#64748b;">
+              Tombol tidak berfungsi? Salin dan tempel tautan berikut ke browser Anda:<br>
+              <a href="{{url}}" target="_blank" style="color:#2563eb;word-break:break-all;">{{url}}</a>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding:0 40px;">
+              <div style="height:1px;background-color:#e2e8f0;line-height:1px;font-size:0;">&nbsp;</div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 40px 32px 40px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#94a3b8;">
+              Jika Anda tidak merasa mendaftar di Legalio, abaikan email ini. Tidak ada tindakan yang diperlukan.<br><br>
+              &copy; Legalio. Seluruh hak dilindungi.
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>` },
     sample: { name: 'Andi', email: 'andi@example.com', url: 'https://example.com/verify?token=contoh' }, required: ['url'],
   },
   invitation: {
     name: 'Undangan organisasi', description: 'Dikirim ketika anggota diundang atau undangan dikirim ulang.', recipient: 'Alamat email yang diundang',
-    defaults: { subject: 'Invitation to join {{organizationName}} on Legalio', html: frame('<p>{{inviterName}} invited you to join <strong>{{organizationName}}</strong> as <strong>{{tenantRole}}</strong>.</p><p><a href="{{inviteUrl}}">Accept invitation</a> (valid until {{expiresAt}}).</p>') },
+    defaults: { subject: 'Undangan bergabung ke {{organizationName}}', html: `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Undangan bergabung ke {{organizationName}}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;">
+  <!-- Preheader -->
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f1f5f9;">
+    {{inviterName}} mengundang Anda bergabung ke {{organizationName}} di Legalio.
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;border:1px solid #e2e8f0;">
+
+          <!-- Header -->
+          <tr>
+            <td style="padding:28px 40px 0 40px;font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:bold;color:#0f172a;letter-spacing:-0.3px;">
+              Legalio
+            </td>
+          </tr>
+
+          <!-- Accent line -->
+          <tr>
+            <td style="padding:16px 40px 0 40px;">
+              <div style="height:3px;width:40px;background-color:#2563eb;border-radius:2px;line-height:3px;font-size:0;">&nbsp;</div>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:28px 40px 8px 40px;font-family:Arial,Helvetica,sans-serif;color:#334155;font-size:16px;line-height:1.65;">
+              <h1 style="margin:0 0 20px 0;font-size:24px;line-height:1.3;color:#0f172a;font-weight:bold;">
+                Anda diundang bergabung
+              </h1>
+              <p style="margin:0 0 24px 0;">
+                <strong style="color:#0f172a;">{{inviterName}}</strong> mengundang Anda untuk bergabung ke organisasi di Legalio.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Details card -->
+          <tr>
+            <td style="padding:0 40px 28px 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+                <tr>
+                  <td style="padding:16px 20px 4px 20px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">
+                    Organisasi
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 20px 12px 20px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#0f172a;">
+                    {{organizationName}}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 20px;">
+                    <div style="height:1px;background-color:#e2e8f0;line-height:1px;font-size:0;">&nbsp;</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 20px 4px 20px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">
+                    Peran
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 20px 16px 20px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#0f172a;">
+                    {{tenantRole}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Button -->
+          <tr>
+            <td align="left" style="padding:0 40px 16px 40px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" bgcolor="#2563eb" style="border-radius:8px;">
+                    <a href="{{inviteUrl}}" target="_blank"
+                       style="display:inline-block;padding:14px 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;background-color:#2563eb;">
+                      Terima Undangan
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Expiry -->
+          <tr>
+            <td style="padding:0 40px 24px 40px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#64748b;">
+              Undangan berlaku hingga <strong style="color:#334155;">{{expiresAt}}</strong>.
+            </td>
+          </tr>
+
+          <!-- Fallback link -->
+          <tr>
+            <td style="padding:0 40px 28px 40px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;color:#64748b;">
+              Tombol tidak berfungsi? Salin dan tempel tautan berikut ke browser Anda:<br>
+              <a href="{{inviteUrl}}" target="_blank" style="color:#2563eb;word-break:break-all;">{{inviteUrl}}</a>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding:0 40px;">
+              <div style="height:1px;background-color:#e2e8f0;line-height:1px;font-size:0;">&nbsp;</div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 40px 32px 40px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#94a3b8;">
+              Tidak mengenal pengundang atau tidak ingin bergabung? Abaikan email ini. Undangan akan kedaluwarsa otomatis.<br><br>
+              &copy; Legalio. Seluruh hak dilindungi.
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>` },
     sample: { organizationName: 'PT Contoh Indonesia', inviterName: 'Admin Legal', tenantRole: 'editor', inviteUrl: 'https://example.com/app?accept_invite=contoh', expiresAt: '2026-10-17' }, required: ['inviteUrl'],
   },
   'contract-reminder': {
@@ -22,13 +242,13 @@ export const MAIL_CATALOG = {
     sample: { subject: '[Pengingat 30 hari] Kontrak CTR-001 — Perjanjian layanan', heading: 'Kontrak akan berakhir', intro: 'Kontrak berikut akan berakhir dalam 30 hari. Mohon tinjau kebutuhan perpanjangan atau pengakhiran.', details: '<tr><td>Nomor</td><td>CTR-001</td></tr><tr><td>Nilai</td><td>Rp 150.000.000</td></tr>', footer: 'E-mail otomatis dari Legalio untuk PT Contoh Indonesia.', brandColor: '#2563eb', organizationName: 'PT Contoh Indonesia', reference: 'CTR-001', title: 'Perjanjian layanan', endDate: '2026-11-15', daysRemaining: '30' }, required: [],
   },
   'commercial-reminder': {
-    name: 'Pengingat dokumen komersial / IO', description: 'Dikirim pada jadwal pengingat sebelum dokumen komersial berakhir.', recipient: 'PIC, email notifikasi finance, serta admin/manager organisasi',
+    name: 'Pengingat Dokumen IO', description: 'Dikirim pada jadwal pengingat sebelum dokumen komersial berakhir.', recipient: 'PIC, email notifikasi finance, serta admin/manager organisasi',
     defaults: reminder,
     sample: { subject: '[Pengingat 14 hari] IO IO-001 — Kampanye Oktober', heading: 'IO akan berakhir', intro: 'Dokumen berikut akan berakhir dalam 14 hari.', details: '<tr><td>Nomor</td><td>IO-001</td></tr><tr><td>Model harga</td><td>CPM</td></tr>', footer: 'E-mail otomatis dari Legalio untuk PT Contoh Indonesia.', brandColor: '#2563eb', organizationName: 'PT Contoh Indonesia', reference: 'IO-001', title: 'Kampanye Oktober', endDate: '2026-10-30', daysRemaining: '14' }, required: [],
   },
   'smtp-test': {
     name: 'Tes koneksi SMTP', description: 'Dikirim secara manual melalui tombol tes pada pengaturan SMTP.', recipient: 'Alamat penerima tes yang diisi admin',
-    defaults: { subject: '[TEST] Konfigurasi SMTP Relay Berhasil Terhubung!', html: frame('<h2>Koneksi SMTP Relay Berhasil!</h2><p>Email ini membuktikan bahwa konfigurasi SMTP Relay pada Legalio dapat mengirimkan email.</p><p>SMTP Server: {{host}}:{{port}}<br>Email Pengirim: {{fromAddress}}<br>Waktu Pengujian: {{testedAt}}</p>') },
+    defaults: { subject: '[TEST] Konfigurasi SMTP Relay Berhasil Terhubung!', html: `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Koneksi SMTP Relay Berhasil</title></head><body style="margin:0;padding:0;background-color:#f1f5f9;"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f1f5f9;">Konfigurasi SMTP Relay pada Legalio dapat mengirimkan email.</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;"><tr><td align="center" style="padding:32px 16px;"><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;border:1px solid #e2e8f0;"><tr><td style="padding:28px 40px 0 40px;font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:bold;color:#0f172a;letter-spacing:-0.3px;">Legalio</td></tr><tr><td style="padding:16px 40px 0 40px;"><div style="height:3px;width:40px;background-color:#16a34a;border-radius:2px;line-height:3px;font-size:0;">&nbsp;</div></td></tr><tr><td style="padding:28px 40px 0 40px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color:#dcfce7;color:#15803d;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;letter-spacing:0.5px;text-transform:uppercase;padding:6px 12px;border-radius:999px;">&#10003; Berhasil</td></tr></table></td></tr><tr><td style="padding:16px 40px 0 40px;font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:1.3;font-weight:bold;color:#0f172a;">Koneksi SMTP Relay Berhasil!</td></tr><tr><td style="padding:16px 40px 24px 40px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.65;color:#334155;">Email ini membuktikan bahwa konfigurasi SMTP Relay pada Legalio dapat mengirimkan email.</td></tr><tr><td style="padding:0 40px 32px 40px;"><table role="presentation" width="100%" cellpadding="12" cellspacing="0" border="0" style="border:1px solid #e2e8f0;border-radius:8px;border-collapse:separate;background-color:#f8fafc;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;"><tr><td style="border-bottom:1px solid #e2e8f0;vertical-align:top;width:40%;font-size:13px;color:#64748b;">SMTP Server</td><td style="border-bottom:1px solid #e2e8f0;vertical-align:top;font-weight:bold;color:#0f172a;">{{host}}:{{port}}</td></tr><tr><td style="border-bottom:1px solid #e2e8f0;vertical-align:top;width:40%;font-size:13px;color:#64748b;">Email Pengirim</td><td style="border-bottom:1px solid #e2e8f0;vertical-align:top;font-weight:bold;color:#0f172a;word-break:break-all;">{{fromAddress}}</td></tr><tr><td style="vertical-align:top;width:40%;font-size:13px;color:#64748b;">Waktu Pengujian</td><td style="vertical-align:top;font-weight:bold;color:#0f172a;">{{testedAt}}</td></tr></table></td></tr><tr><td style="padding:0 40px;"><div style="height:1px;background-color:#e2e8f0;line-height:1px;font-size:0;">&nbsp;</div></td></tr><tr><td style="padding:20px 40px 32px 40px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#94a3b8;">Email pengujian otomatis dari Legalio. Tidak ada tindakan yang diperlukan.</td></tr></table></td></tr></table></body></html>` },
     sample: { host: 'smtp.example.com', port: '587', fromAddress: 'noreply@example.com', testedAt: '2026-10-16T09:00:00.000Z' }, required: [],
   },
 } as const;
