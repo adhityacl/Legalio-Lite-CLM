@@ -1,8 +1,9 @@
 import { pageSizeMm, pageSizePx, type PageLayout } from '@legalio/shared/pageLayout';
 
 /**
- * Print / "Save as PDF" of the paged editor. The pages are cloned into an isolated frame sized to the paper, with
- * the gap between pages removed and a page break after each one, so each on-screen page prints as one sheet.
+ * Print / "Save as PDF" of the paged editor: the pages are cloned into an isolated frame sized to the paper, with the
+ * gap between pages removed and a page break after each one, so each on-screen page prints as one sheet. The same
+ * HTML is the read-only preview on screen, where the page gaps stay.
  */
 export const PRINT_FRAME_ATTRIBUTE = 'data-legalio-print-frame';
 
@@ -34,16 +35,23 @@ export function buildPrintHtml(pages: HTMLElement, layout: PageLayout, title: st
 ${documentStyles()}
 <style>
   @page { size: ${width}mm ${height}mm; margin: 0; }
-  html, body { margin: 0; padding: 0; background: #fff; }
-  .rm-with-pagination { border: 0 !important; box-shadow: none !important; height: ${sheetsHeight}px !important; min-height: 0 !important; overflow: hidden !important; }
-  /* One sheet per drawn page: no gap, and a hard page break where the gap was. */
-  .rm-pagination-gap { height: 0 !important; border: 0 !important; margin: 0 !important; break-after: page; page-break-after: always; }
-  .rm-page-break:last-child .rm-pagination-gap { break-after: auto; page-break-after: auto; }
+  html, body { margin: 0; padding: 0; background: transparent; }
   .fillable-slot { border: none !important; background: transparent !important; padding: 0 !important; box-shadow: none !important; color: inherit !important; }
   .fillable-slot .slot-icon-badge { display: none !important; }
   .comment-anchor { background: transparent !important; border: none !important; text-decoration: none !important; }
   .comment-anchor::after { content: none !important; }
+  [data-resize-handle] { display: none !important; }
+  .ProseMirror-selectednode, [data-resize-wrapper] { outline: none !important; }
+  /* The final document: header and footer in full, not dimmed as while editing the body. */
+  .rm-page-header-content, .rm-page-footer-content { opacity: 1 !important; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @media print {
+    html, body { background: #fff; }
+    .rm-with-pagination { border: 0 !important; box-shadow: none !important; height: ${sheetsHeight}px !important; min-height: 0 !important; overflow: hidden !important; }
+    /* One sheet per drawn page: no gap, and a hard page break where the gap was. */
+    .rm-pagination-gap { height: 0 !important; border: 0 !important; margin: 0 !important; break-after: page; page-break-after: always; }
+    .rm-page-break:last-child .rm-pagination-gap { break-after: auto; page-break-after: auto; }
+  }
 </style>
 </head>
 <body>${clone.outerHTML}</body>

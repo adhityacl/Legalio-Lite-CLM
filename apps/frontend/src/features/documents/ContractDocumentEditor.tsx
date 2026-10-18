@@ -16,7 +16,7 @@ import Highlight from '@tiptap/extension-highlight';
 import { TableKit } from '@tiptap/extension-table';
 import { PaginationPlus } from 'tiptap-pagination-plus';
 import { htmlToDocxBlob } from '../../lib/editorDocx';
-import { printEditorDocument } from '../../lib/printDocument';
+import { buildPrintHtml, printEditorDocument } from '../../lib/printDocument';
 import { DEFAULT_PAGE_LAYOUT, HEADER_FOOTER_DISTANCE_PX, PAGE_GAP_PX, mmToPx, mountedEditorDom, pageSizePx, paginationOptions, parsePageLayout, type PageLayout } from './pageLayout';
 import { PageBreak, PageNumber, ParagraphFormat } from '../../lib/tiptapPageFormat';
 import { DocumentImage, ImagePasteDrop, ImageTooLargeError } from '../../lib/tiptapImages';
@@ -33,7 +33,6 @@ import {
   ZoomOut,
   Shield,
   FileText,
-  Edit3,
   Download,
   Building2,
   Calendar,
@@ -390,6 +389,8 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
   const [hasUnsaved, setHasUnsaved] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [previewOverride, setPreviewOverride] = useState<PreviewOverride | null>(null);
+  // The current document's preview: its pages as they print (header, footer, page numbers, pictures), read-only.
+  const [previewPages, setPreviewPages] = useState<{ html: string; height: number } | null>(null);
   const currentDocRef = useRef<DocumentDetail | null>(null);
   const baselineRef = useRef<Baseline>(null);
   const docTitleRef = useRef(docTitle);
@@ -1265,6 +1266,9 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
   const switchViewMode = (mode: 'editor' | 'preview') => {
     setPreviewOverride(null);
+    // Taken from the drawn pages before the editor is hidden.
+    const pages = mode === 'preview' && editor ? mountedEditorDom(editor) : null;
+    setPreviewPages(pages ? { html: buildPrintHtml(pages, pageLayout, docTitle), height: pages.offsetHeight } : null);
     setViewMode(mode);
   };
 
@@ -1596,19 +1600,15 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
         {/* Action Controls & Mode Switcher */}
         <div className="flex items-center gap-g8 flex-wrap">
 
-          {/* View Mode Toggle: Edit vs Pratinjau */}
-          <SegmentGroup
-            aria-label={t('contract_creator.mode_label', 'Mode tampilan')}
-            value={viewMode}
-            onValueChange={details => details.value && switchViewMode(details.value as 'editor' | 'preview')}
-            className="grid grid-cols-2"
+          {/* Preview toggle: pressed shows the final document, released returns to editing. */}
+          <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'preview' ? 'secondary' : 'outline'} size="icon-md"
+            type="button"
+            aria-pressed={viewMode === 'preview'}
+            aria-label={t('contract_creator.mode_preview_title', 'Pratinjau tampilan dokumen final')}
+            onClick={() => switchViewMode(viewMode === 'preview' ? 'editor' : 'preview')}
           >
-            <SegmentGroupIndicator />
-            <SegmentGroupItems items={[
-              { value: 'editor', label: <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-g8"><Edit3 className="size-g16" aria-hidden="true" /><span className="sr-only">{t('contract_creator.mode_edit_label', 'Edit')}</span></span></TooltipTrigger><TooltipBody>{t('contract_creator.mode_edit_title', 'Sunting langsung teks kontrak dalam Bahasa Indonesia')}</TooltipBody></Tooltip> },
-              { value: 'preview', label: <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-g8"><FileText className="size-g16" aria-hidden="true" /><span className="sr-only">{t('contract_creator.mode_preview_label', 'Pratinjau')}</span></span></TooltipTrigger><TooltipBody>{t('contract_creator.mode_preview_title', 'Pratinjau tampilan dokumen final')}</TooltipBody></Tooltip> },
-            ]} />
-          </SegmentGroup>
+            <FileText className="size-g16" aria-hidden="true" />
+          </Button></TooltipTrigger><TooltipBody>{t('contract_creator.mode_preview_title', 'Pratinjau tampilan dokumen final')}</TooltipBody></Tooltip>
 
           {canEdit && (
             <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon-md"
@@ -1772,7 +1772,20 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                 </AlertActions>
               </Alert>
             )}
-            {/* White Paper Sheet */}
+            {!previewOverride && previewPages ? (
+              <iframe
+                title={t('contract_creator.mode_preview_title', 'Pratinjau tampilan dokumen final')}
+                srcDoc={previewPages.html}
+                // Same-origin only to measure the pages; no scripts run in the preview.
+                sandbox="allow-same-origin"
+                className="block w-full border-0"
+                style={{ height: previewPages.height }}
+                onLoad={(event) => {
+                  const height = event.currentTarget.contentDocument?.documentElement.scrollHeight;
+                  if (height) setPreviewPages((current) => (current && current.height !== height ? { ...current, height } : current));
+                }}
+              />
+            ) : (
             <Card className="text-foreground relative" style={{ minHeight: pageSizePx(pageLayout).height, paddingTop: mmToPx(pageLayout.margins.top), paddingBottom: mmToPx(pageLayout.margins.bottom), paddingLeft: mmToPx(pageLayout.margins.left), paddingRight: mmToPx(pageLayout.margins.right) }}>
               <div className="font-sans leading-relaxed text-foreground">
                 {/* "ProseMirror" class reused so this read-only preview picks up the exact
@@ -1809,6 +1822,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                 )}
               </div>
             </Card>
+            )}
           </div>
         </div>
 

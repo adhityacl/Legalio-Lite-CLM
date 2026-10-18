@@ -809,7 +809,7 @@ export const ContractEditorToolbar: React.FC<ContractEditorToolbarProps> = ({
   };
 
   return (
-    <div role="toolbar" aria-label={t('editor.toolbar', 'Document formatting')} className="z-10 shrink-0 border-b border-border bg-card [&_*:not([data-sample])]:text-[10px] [&_svg]:[stroke-width:1.5]">
+    <div role="toolbar" aria-label={t('editor.toolbar', 'Document formatting')} className="z-10 shrink-0 border-b border-border bg-card [&_*:not([data-sample])]:text-[12px] [&_svg]:[stroke-width:1.5]">
       {/* Flat tab bar: plain labels, the active one underlined, like Word on the web. */}
       <div role="tablist" aria-label={t('editor.toolbar', 'Document formatting')} className="flex items-end gap-g3 border-b border-border bg-muted/40 px-g8">
         {tabs.map((item, index) => (

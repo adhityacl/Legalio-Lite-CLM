@@ -409,3 +409,5 @@ p:has(> :is([data-resize-container], img):is([data-wrap='square'], [data-wrap='t
    pictures inside the measured header height. */
 .rm-with-pagination :is(.rm-page-header, .rm-page-footer) { overflow: visible !important; }
 .rm-with-pagination :is(.rm-page-header-content, .rm-page-footer-content) { overflow: visible !important; display: flow-root; }
+/* In-line pictures sit in the line of text (the CSS reset makes every <img> a block): header/footer, preview, print. */
+:is(.ProseMirror, .pg-hf-content) img:not([data-resize-wrapper] > img) { display: inline-block; }
