@@ -30,25 +30,25 @@ export function matchesWorkspaceSearch(text: string, query: string): boolean {
 export function buildWorkspaceSearchResults(data: SearchData, user: UserSession | null): WorkspaceSearchResult[] {
   if (!user || !data.organizationId) return [];
   const inScope = (record: { organizationId?: string }) => !record.organizationId || record.organizationId === data.organizationId;
-  const partners = new Map(data.partners.filter(inScope).map(partner => [partner.partner_id, partner.nama_partner]));
+  const partners = new Map(data.partners.filter(inScope).map(partner => [partner.partner_id, partner.partner_name]));
   const contracts = new Map(data.contracts.filter(inScope).map(contract => [contract.contract_id, contract]));
-  const contractNumbers = new Map(data.contracts.filter(inScope).map(contract => [contract.nomor_kontrak, contract]));
+  const contractNumbers = new Map(data.contracts.filter(inScope).map(contract => [contract.contract_number, contract]));
   const vendor = (id?: string, name?: string) => (id && partners.get(id)) || name || '';
   const title = (...parts: Array<string | undefined>) => parts.filter(Boolean).join(' · ');
   return [
     ...data.contracts.filter(record => inScope(record) && canViewContract(record, data.partners, user)).map(record => ({
       kind: 'contract' as const, recordId: record.contract_id, tab: 'contracts' as const,
-      label: title(record.nomor_kontrak, record.judul_kontrak),
+      label: title(record.contract_number, record.contract_title),
       description: vendor(record.partner_id),
       keywords: title('contract', vendor(record.partner_id)),
     })),
     ...data.ios.filter(record => inScope(record) && canViewIO(record, data.partners, user)).map(record => {
-      const contract = contracts.get(record.contract_id || '') || contractNumbers.get(record.contract_nomor || '');
+      const contract = contracts.get(record.contract_id || '') || contractNumbers.get(record.contract_number || '');
       return {
         kind: 'io' as const, recordId: record.io_id, tab: 'ios' as const,
-        label: title(record.nomor_io, record.judul_io),
+        label: title(record.io_number, record.io_title),
         description: vendor(record.partner_id) || vendor(contract?.partner_id),
-        keywords: title('io service order so sow', vendor(record.partner_id), record.contract_nomor),
+        keywords: title('io service order so sow', vendor(record.partner_id), record.contract_number),
       };
     }),
     ...data.spendings.filter(record => inScope(record) && canViewSpending(record, data.partners, user)).map(record => ({

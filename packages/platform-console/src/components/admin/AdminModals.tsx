@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Save,
+  RotateCcw,
 } from 'lucide-react';
 import {
   ConsoleUser,
@@ -855,6 +856,7 @@ interface EditOrganizationModalProps {
   onClose: () => void;
   onSubmit: (orgId: string, data: { name: string; slug: string; logo?: string }) => Promise<void>;
   onDelete?: (org: ConsoleOrganization) => void;
+  onReset?: (org: ConsoleOrganization) => void;
 }
 
 export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
@@ -863,6 +865,7 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
   onClose,
   onSubmit,
   onDelete,
+  onReset,
 }) => {
   const { t } = useLanguage();
   const [name, setName] = useState('');
@@ -987,19 +990,34 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
           </Card>
 
           <div className="pt-g8 flex items-center justify-between gap-g8">
-            {onDelete && !org.metadata?.isDefault ? (
-              <Button variant="ghost" size="sm"
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onDelete(org);
-                }}
-                className="text-destructive"
-              >
-                <Trash2 className="w-g13 h-g13" />
-                <span>{t('admin.btn_delete_org', 'Hapus Organisasi')}</span>
-              </Button>
-            ) : <div />}
+            <div className="flex flex-wrap items-center gap-g8">
+              {onReset ? (
+                <Button variant="ghost" size="sm"
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onReset(org);
+                  }}
+                  className="text-destructive"
+                >
+                  <RotateCcw className="w-g13 h-g13" />
+                  <span>{t('admin.btn_reset_org', 'Reset Organisasi')}</span>
+                </Button>
+              ) : null}
+              {onDelete && !org.metadata?.isDefault ? (
+                <Button variant="ghost" size="sm"
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onDelete(org);
+                  }}
+                  className="text-destructive"
+                >
+                  <Trash2 className="w-g13 h-g13" />
+                  <span>{t('admin.btn_delete_org', 'Hapus Organisasi')}</span>
+                </Button>
+              ) : null}
+            </div>
 
             <div className="flex items-center gap-g8">
               <Button variant="ghost"
@@ -1018,6 +1036,86 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
           </div>
         </form>
 
+    </ModalFrame>
+  );
+};
+
+// Reset organization modal: empties business data, keeps the organization, members and settings
+interface ResetOrganizationModalProps {
+  isOpen: boolean;
+  org: ConsoleOrganization | null;
+  onClose: () => void;
+  onConfirm: (org: ConsoleOrganization, confirm: string) => Promise<void>;
+}
+
+export const ResetOrganizationModal: React.FC<ResetOrganizationModalProps> = ({ isOpen, org, onClose, onConfirm }) => {
+  const { t } = useLanguage();
+  const [confirmText, setConfirmText] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) { setConfirmText(''); setError(null); }
+  }, [isOpen, org?.id]);
+
+  if (!isOpen || !org) return null;
+
+  const matches = confirmText.trim().toLowerCase() === (org.slug || '').toLowerCase();
+
+  const handleReset = async () => {
+    if (!matches || isResetting) return;
+    setIsResetting(true);
+    setError(null);
+    try {
+      await onConfirm(org, confirmText.trim());
+      onClose();
+    } catch (err: any) {
+      setError(err.message || t('admin.reset_org_failed', 'Gagal mereset organisasi.'));
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  return (
+    <ModalFrame size="md" onClose={onClose} className="overflow-hidden animate-in fade-in zoom-in-95 overflow-y-auto">
+      <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
+        <div className="flex items-center gap-g8">
+          <Avatar size="sm" className="rounded-lg bg-status-danger-soft text-status-danger"><AvatarFallback className="bg-transparent text-inherit"><RotateCcw className="w-g13 h-g13" /></AvatarFallback></Avatar>
+          <div>
+            <DialogTitle className="flex items-center gap-g8">{t('admin.reset_org_title', 'Reset Organisasi')}</DialogTitle>
+            <Text size="xs" tone="muted">{org.name} (@{org.slug})</Text>
+          </div>
+        </div>
+        <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
+      </DialogHeader>
+
+      <div className="p-g21 space-y-g13">
+        {error && (
+          <Alert status="error" role="alert"><AlertIndicator />
+            <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
+          </Alert>
+        )}
+        <Alert status="error"><AlertIndicator /><AlertContent>
+          <AlertTitle>{t('admin.reset_org_warning_title', 'Semua data bisnis organisasi ini akan dihapus permanen.')}</AlertTitle>
+          <AlertDescription>{t('admin.reset_org_warning', 'Partner, kontrak, IO, spending, evaluasi, notifikasi, template, dokumen & draft, approval, riwayat aktivitas, dan file unggahan lokalnya.')}</AlertDescription>
+        </AlertContent></Alert>
+        <Alert status="info"><AlertIndicator /><AlertContent>
+          <AlertDescription>{t('admin.reset_org_kept', 'Tetap dipertahankan: profil organisasi, pengaturan, anggota, departemen, undangan, dan integrasi. Salinan database dibuat otomatis sebelum reset.')}</AlertDescription>
+        </AlertContent></Alert>
+
+        <Field>
+          <FieldLabel htmlFor="reset-org-confirm">{t('admin.reset_org_type', 'Ketik slug organisasi ({slug}) untuk mengonfirmasi', { slug: org.slug })}</FieldLabel>
+          <Input id="reset-org-confirm" type="text" autoComplete="off" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder={org.slug} className="w-full" />
+        </Field>
+
+        <div className="pt-g8 flex items-center justify-end gap-g8">
+          <Button variant="ghost" type="button" onClick={onClose}>{t('admin.btn_cancel', 'Batal')}</Button>
+          <Button variant="destructive" type="button" onClick={handleReset} disabled={!matches || isResetting}>
+            <RotateCcw className="w-g13 h-g13" />
+            <span>{isResetting ? t('admin.resetting', 'Mereset...') : t('admin.btn_confirm_reset', 'Reset Permanen')}</span>
+          </Button>
+        </div>
+      </div>
     </ModalFrame>
   );
 };

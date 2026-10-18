@@ -1,4 +1,6 @@
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
+import { BulkSelectionBar } from './ui/bulk-selection-bar';
+import { deleteRecords } from '../lib/bulkDelete';
 import { downloadCsv } from '../lib/csv';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { formatBusinessDate } from '../lib/displayDate';
@@ -168,7 +170,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   const resetFormState = (item?: PartnerSpending | null) => {
     setEditingSpending(item || null);
     setFormVendorName(item?.vendor_name || '');
-    setFormVendorId(item?.vendor_id || partners.find(p => p.nama_partner === item?.vendor_name)?.partner_id || '');
+    setFormVendorId(item?.vendor_id || partners.find(p => p.partner_name === item?.vendor_name)?.partner_id || '');
     setFormInvoiceNumber(item?.invoice_number || '');
     setFormInvoiceDate(item?.invoice_date || '');
     setFormInvoiceTitle(item?.invoice_title || '');
@@ -202,8 +204,8 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   };
 
   const handleVendorSelect = (name: string, id?: string) => {
-    const partner = partners.find(p => id ? p.partner_id === id : p.nama_partner === name);
-    setFormVendorName(partner?.nama_partner || name);
+    const partner = partners.find(p => id ? p.partner_id === id : p.partner_name === name);
+    setFormVendorName(partner?.partner_name || name);
     setFormVendorId(partner?.partner_id || id || '');
     // Refresh bank autofill for the selected partner while preserving manual input.
     const previous = spendings.find(row => (partner && row.vendor_id === partner.partner_id) || row.vendor_name === name);
@@ -328,11 +330,11 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
           if (!formVendorName) {
             const rawH = p.account_holder.toLowerCase();
             const matchedP = partners.find((vendor) => {
-              const vName = vendor.nama_partner.toLowerCase();
+              const vName = vendor.partner_name.toLowerCase();
               return vName.includes(rawH) || rawH.includes(vName);
             });
             if (matchedP) {
-              setFormVendorName(matchedP.nama_partner);
+              setFormVendorName(matchedP.partner_name);
               setFormVendorId(matchedP.partner_id);
             }
           }
@@ -606,6 +608,22 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
     }
   };
 
+  const handleBulkDelete = async (ids: string[]) => {
+    const targets = ids.filter(Boolean);
+    if (targets.length === 0) return;
+    const ok = await confirmDialog({
+      description: t('bulk.confirm_delete', 'Hapus {count} {noun} terpilih? Tindakan ini tidak dapat dibatalkan.', { count: targets.length, noun: t('bulk.noun_spending', 'spending') }),
+      tone: 'danger',
+      confirmLabel: t('io.action_delete', 'Hapus'),
+    });
+    if (!ok) return;
+    const failed = await deleteRecords('/api/partner-spendings', targets, { userEmail, userName, userRole });
+    onRefreshData();
+    if (failed.length > 0) {
+      showAlert({ title: t('bulk.delete_failed_title', 'Sebagian gagal dihapus'), description: t('bulk.delete_failed_message', '{failed} dari {total} gagal dihapus.', { failed: failed.length, total: targets.length }), variant: 'destructive' });
+    }
+  };
+
 
   const handleExportCSV = () => {
     const headers = [
@@ -843,6 +861,13 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
       </Card>
 
       {/* Table */}
+      {canDeletePartner(user) && (
+        <BulkSelectionBar
+          count={selectedRows.length}
+          noun={t('bulk.noun_spending', 'spending')}
+          onDelete={async () => { await handleBulkDelete(selectedRows); setSelectedRows([]); }}
+        />
+      )}
       <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_year'), value: selectedYear, active: selectedYear !== 'ALL' }, { label: t('ui.filter_partner'), value: selectedVendorFilter, active: selectedVendorFilter !== 'ALL' }, { label: t('ui.filter_month'), value: selectedMonthFilter, active: selectedMonthFilter !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedYear('ALL'); setSelectedVendorFilter('ALL'); setSelectedMonthFilter('ALL'); }} />
         <Text size="xs" tone="muted" className="px-g13 py-g8 md:hidden">{t('ui.scroll_table')}</Text>
@@ -1029,11 +1054,11 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                         <FieldLabel htmlFor="spending-partner">{t('spending.partner_name', 'Partner Name')} <span className="text-status-danger">*</span></FieldLabel>
                         <AlphabeticalSelect id="spending-partner" required value={formVendorId || formVendorName} onChange={e => {
                           const partner = partners.find(p => p.partner_id === e.target.value);
-                          handleVendorSelect(partner?.nama_partner || e.target.value, partner?.partner_id);
+                          handleVendorSelect(partner?.partner_name || e.target.value, partner?.partner_id);
                         }}>
                           <option value="">{t('spending.vendor_select_ph', '-- Pilih Partner / Vendor --')}</option>
-                          {partners.map(p => <option key={p.partner_id} value={p.partner_id}>{p.nama_partner} ({p.partner_id})</option>)}
-                          {formVendorName && !partners.some(p => p.partner_id === formVendorId || p.nama_partner === formVendorName) && <option value={formVendorId || formVendorName}>{formVendorName}</option>}
+                          {partners.map(p => <option key={p.partner_id} value={p.partner_id}>{p.partner_name} ({p.partner_id})</option>)}
+                          {formVendorName && !partners.some(p => p.partner_id === formVendorId || p.partner_name === formVendorName) && <option value={formVendorId || formVendorName}>{formVendorName}</option>}
                         </AlphabeticalSelect>
                       </Field>
                       <Field className="min-w-0">

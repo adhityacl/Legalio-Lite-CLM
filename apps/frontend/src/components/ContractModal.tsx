@@ -54,29 +54,29 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   const { departments: ENTERPRISE_DEPARTMENTS } = useDepartments();
 
   const [jenisDokumen, setJenisDokumen] = useState<JenisDokumenContract>(
-    contractToEdit?.jenis_dokumen || 'Master Agreement'
+    contractToEdit?.document_type || 'Master Agreement'
   );
   const [parentContractId, setParentContractId] = useState<string>(
     contractToEdit?.parent_contract_id || ''
   );
-  const [nomorKontrak, setNomorKontrak] = useState(contractToEdit?.nomor_kontrak || '');
+  const [nomorKontrak, setNomorKontrak] = useState(contractToEdit?.contract_number || '');
   const [partnerId, setPartnerId] = useState(contractToEdit?.partner_id || (partners[0]?.partner_id || ''));
   const [kategoriTags, setKategoriTags] = useState<string[]>(
-    contractToEdit?.kategori_kerjasama || ['Advertising', 'Content']
+    contractToEdit?.cooperation_categories || ['Advertising', 'Content']
   );
   const [savedTemplates, setSavedTemplates] = useState<string[]>(() => {
     const loaded = getSavedCategories();
-    if (contractToEdit?.kategori_kerjasama && contractToEdit.kategori_kerjasama.length > 0) {
-      return saveMultipleCategories(contractToEdit.kategori_kerjasama);
+    if (contractToEdit?.cooperation_categories && contractToEdit.cooperation_categories.length > 0) {
+      return saveMultipleCategories(contractToEdit.cooperation_categories);
     }
     return loaded;
   });
-  const [tanggalMulai, setTanggalMulai] = useState(contractToEdit?.tanggal_mulai || '2026-08-01');
-  const [tanggalBerakhir, setTanggalBerakhir] = useState(contractToEdit?.tanggal_berakhir || '2027-07-31');
+  const [tanggalMulai, setTanggalMulai] = useState(contractToEdit?.start_date || '2026-08-01');
+  const [tanggalBerakhir, setTanggalBerakhir] = useState(contractToEdit?.end_date || '2027-07-31');
   const { policy } = useTenantSettings();
   const tenantCurrency = policy.settings.defaultCurrency;
   const [currency, setCurrency] = useState<string>(contractToEdit?.currency || tenantCurrency);
-  const [nilaiKontrak, setNilaiKontrak] = useState<number>(contractToEdit?.nilai_kontrak ?? 0);
+  const [nilaiKontrak, setNilaiKontrak] = useState<number>(contractToEdit?.contract_value ?? 0);
   const [historicalRate, setHistoricalRate] = useState<number>(() => getDefaultUsdRate(contractToEdit?.currency || tenantCurrency));
 
   useEffect(() => {
@@ -99,7 +99,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
   const getVendorName = (pId: string) => {
     const p = partners.find((item) => item.partner_id === pId);
-    return p ? p.nama_partner : 'Partner';
+    return p ? p.partner_name : 'Partner';
   };
 
   const generateAutoTitle = (
@@ -114,13 +114,13 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     return `${vendorName}_${docTypeStr}_${tagStr}_${tglMulai}`;
   };
 
-  const [isAutoTitle, setIsAutoTitle] = useState(!contractToEdit?.judul_kontrak);
+  const [isAutoTitle, setIsAutoTitle] = useState(!contractToEdit?.contract_title);
   const [judulKontrak, setJudulKontrak] = useState(() => {
-    if (contractToEdit?.judul_kontrak) return contractToEdit.judul_kontrak;
+    if (contractToEdit?.contract_title) return contractToEdit.contract_title;
     const initialPartnerId = contractToEdit?.partner_id || (partners[0]?.partner_id || '');
-    const initialJenis = contractToEdit?.jenis_dokumen || 'Master Agreement';
-    const initialTags = contractToEdit?.kategori_kerjasama || ['Advertising', 'Content'];
-    const initialStartDate = contractToEdit?.tanggal_mulai || '2026-08-01';
+    const initialJenis = contractToEdit?.document_type || 'Master Agreement';
+    const initialTags = contractToEdit?.cooperation_categories || ['Advertising', 'Content'];
+    const initialStartDate = contractToEdit?.start_date || '2026-08-01';
     return generateAutoTitle(initialPartnerId, initialJenis, initialTags, initialStartDate);
   });
 
@@ -140,27 +140,27 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   const [readingTerminationFile, setReadingTerminationFile] = useState(false);
   const lifecycleMode = status === 'Terminated' ? 'terminated' : 'normal';
   const lifecyclePreview = contractLifecycle({ lifecycle_mode: lifecycleMode, termination_date: terminationDate,
-    tanggal_berakhir: tanggalBerakhir, auto_renewal: autoRenewal }, policy.settings);
+    end_date: tanggalBerakhir, auto_renewal: autoRenewal }, policy.settings);
   const showEndingFields = lifecycleMode === 'terminated' || lifecyclePreview.status === 'Expired';
-  const [noticePeriodHari, setNoticePeriodHari] = useState(contractToEdit?.notice_period_hari || 30);
+  const [noticePeriodHari, setNoticePeriodHari] = useState(contractToEdit?.notice_period_days || 30);
   const [noticeTypeRequired, setNoticeTypeRequired] = useState<NoticeType>(
     contractToEdit?.notice_type_required || 'Termination'
   );
   const [picInternal, setPicInternal] = useState(() => {
-    if (contractToEdit?.pic_internal) return contractToEdit.pic_internal;
+    if (contractToEdit?.internal_pic) return contractToEdit.internal_pic;
     const initialPartnerId = contractToEdit?.partner_id || (partners[0]?.partner_id || '');
     const matchedPartner = partners.find((p) => p.partner_id === initialPartnerId);
-    return matchedPartner?.pic_internal || user?.department || 'Commercial & Marketing';
+    return matchedPartner?.internal_pic || user?.department || 'Commercial & Marketing';
   });
   const [internalNotes, setInternalNotes] = useState(
     contractToEdit?.internal_notes || ''
   );
 
   const [fieldYangBerubah, setFieldYangBerubah] = useState<string[]>(
-    contractToEdit?.field_yang_berubah || ['Nilai Kontrak / IO', 'Jangka Waktu Periode']
+    contractToEdit?.changed_fields || ['Nilai Kontrak / IO', 'Jangka Waktu Periode']
   );
   const [ringkasanPerubahan, setRingkasanPerubahan] = useState<string>(
-    contractToEdit?.ringkasan_perubahan || ''
+    contractToEdit?.change_summary || ''
   );
 
   const handleAutoRenewalChange = (checked: boolean) => {
@@ -181,7 +181,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   };
 
   const availableMasterContracts = contracts.filter((c) => {
-    const isMaster = (c.jenis_dokumen || 'Master Agreement') === 'Master Agreement';
+    const isMaster = (c.document_type || 'Master Agreement') === 'Master Agreement';
     const notSelf = contractToEdit ? c.contract_id !== contractToEdit.contract_id : true;
     const matchPartner = partnerId ? c.partner_id === partnerId : true;
     return isMaster && notSelf && matchPartner;
@@ -263,32 +263,32 @@ export const ContractModal: React.FC<ContractModalProps> = ({
       }
       if (result.success && result.data) {
         const parsed = result.data;
-        if (parsed.jenis_dokumen) {
-          const docType = parsed.jenis_dokumen.toLowerCase().includes('addendum') ? 'Agreement Addendum' : 'Master Agreement';
+        if (parsed.document_type) {
+          const docType = parsed.document_type.toLowerCase().includes('addendum') ? 'Agreement Addendum' : 'Master Agreement';
           setJenisDokumen(docType as any);
         }
-        if (parsed.nomor_kontrak) setNomorKontrak(parsed.nomor_kontrak);
-        if (parsed.tanggal_mulai) setTanggalMulai(parsed.tanggal_mulai);
-        if (parsed.tanggal_berakhir) setTanggalBerakhir(parsed.tanggal_berakhir);
-        if (parsed.nilai_kontrak !== undefined && parsed.nilai_kontrak !== null) setNilaiKontrak(Number(parsed.nilai_kontrak) || 0);
+        if (parsed.contract_number) setNomorKontrak(parsed.contract_number);
+        if (parsed.start_date) setTanggalMulai(parsed.start_date);
+        if (parsed.end_date) setTanggalBerakhir(parsed.end_date);
+        if (parsed.contract_value !== undefined && parsed.contract_value !== null) setNilaiKontrak(Number(parsed.contract_value) || 0);
         if (parsed.currency && SUPPORTED_CURRENCIES.some((c) => c.code === String(parsed.currency).toUpperCase())) setCurrency(String(parsed.currency).toUpperCase());
-        if (parsed.notice_period_hari !== undefined && parsed.notice_period_hari !== null) setNoticePeriodHari(Number(parsed.notice_period_hari) || 30);
+        if (parsed.notice_period_days !== undefined && parsed.notice_period_days !== null) setNoticePeriodHari(Number(parsed.notice_period_days) || 30);
         if (parsed.auto_renewal !== undefined) setAutoRenewal(Boolean(parsed.auto_renewal));
         if (parsed.internal_notes) setInternalNotes(String(parsed.internal_notes).trim());
-        if (parsed.ringkasan_perubahan) setRingkasanPerubahan(String(parsed.ringkasan_perubahan).trim());
-        if (Array.isArray(parsed.field_yang_berubah) && parsed.field_yang_berubah.length > 0) {
-          setFieldYangBerubah(parsed.field_yang_berubah);
+        if (parsed.change_summary) setRingkasanPerubahan(String(parsed.change_summary).trim());
+        if (Array.isArray(parsed.changed_fields) && parsed.changed_fields.length > 0) {
+          setFieldYangBerubah(parsed.changed_fields);
         }
         
         // Match partner name intelligently
         let matchedPartnerId = '';
-        if (parsed.nama_partner) {
-          const rawP = parsed.nama_partner.toLowerCase().trim();
+        if (parsed.partner_name) {
+          const rawP = parsed.partner_name.toLowerCase().trim();
           const cleanP = rawP.replace(/^(pt|cv|ltd|co\.|inc)\s+/i, '').replace(/[\.,]/g, '').trim();
           const matchedPartner = partners.find(p => {
-            const cleanTarget = p.nama_partner.toLowerCase().replace(/^(pt|cv|ltd|co\.|inc)\s+/i, '').replace(/[\.,]/g, '').trim();
-            return p.nama_partner.toLowerCase().includes(rawP) ||
-                   rawP.includes(p.nama_partner.toLowerCase()) ||
+            const cleanTarget = p.partner_name.toLowerCase().replace(/^(pt|cv|ltd|co\.|inc)\s+/i, '').replace(/[\.,]/g, '').trim();
+            return p.partner_name.toLowerCase().includes(rawP) ||
+                   rawP.includes(p.partner_name.toLowerCase()) ||
                    cleanTarget.includes(cleanP) ||
                    cleanP.includes(cleanTarget);
           });
@@ -299,12 +299,12 @@ export const ContractModal: React.FC<ContractModalProps> = ({
         }
 
         // Match parent contract if Addendum
-        if (parsed.nomor_kontrak_induk) {
-          const rawInduk = parsed.nomor_kontrak_induk.toLowerCase().trim();
+        if (parsed.parent_contract_number) {
+          const rawInduk = parsed.parent_contract_number.toLowerCase().trim();
           const matchedMaster = contracts.find(c => 
-            c.nomor_kontrak && (
-              c.nomor_kontrak.toLowerCase().includes(rawInduk) ||
-              rawInduk.includes(c.nomor_kontrak.toLowerCase())
+            c.contract_number && (
+              c.contract_number.toLowerCase().includes(rawInduk) ||
+              rawInduk.includes(c.contract_number.toLowerCase())
             )
           );
           if (matchedMaster) {
@@ -315,9 +315,9 @@ export const ContractModal: React.FC<ContractModalProps> = ({
           }
         }
 
-        if (parsed.judul_kontrak) {
+        if (parsed.contract_title) {
           setIsAutoTitle(false);
-          setJudulKontrak(parsed.judul_kontrak);
+          setJudulKontrak(parsed.contract_title);
         }
 
         if (result.cached) {
@@ -349,7 +349,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
       setRawFileName(file.name);
       const selectedPartner = partners.find((p) => p.partner_id === partnerId);
       const autoRenamed = formatContractFileName({
-        partnerName: selectedPartner?.nama_partner,
+        partnerName: selectedPartner?.partner_name,
         documentType: jenisDokumen,
         contractNumber: nomorKontrak.trim(),
         startDate: tanggalMulai,
@@ -406,11 +406,11 @@ export const ContractModal: React.FC<ContractModalProps> = ({
       }
     }
     if (!nomorKontrak.trim()) {
-      setError(t('form.contract.nomor_kontrak', 'Nomor Kontrak Legal wajib diisi.'));
+      setError(t('form.contract.contract_number', 'Nomor Kontrak Legal wajib diisi.'));
       return;
     }
     if (!judulKontrak.trim()) {
-      setError(t('form.contract.judul_kontrak', 'Judul Perjanjian Kontrak wajib diisi.'));
+      setError(t('form.contract.contract_title', 'Judul Perjanjian Kontrak wajib diisi.'));
       return;
     }
     if (!tanggalMulai || !tanggalBerakhir) {
@@ -423,7 +423,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     }
 
     const terminationError = validateContractTermination({ lifecycle_mode: lifecycleMode, termination_date: terminationDate,
-      tanggal_mulai: tanggalMulai, tanggal_berakhir: tanggalBerakhir });
+      start_date: tanggalMulai, end_date: tanggalBerakhir });
     if (terminationError) { setError(t(terminationError)); return; }
     if (readingTerminationFile) return;
     if ((fileData?.length || 0) + (terminationFile?.fileData.length || 0) > 24 * 1024 * 1024) {
@@ -438,7 +438,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
       let finalFileName = fileName;
       if (fileName) {
         finalFileName = formatContractFileName({
-          partnerName: selectedPartner?.nama_partner,
+          partnerName: selectedPartner?.partner_name,
           documentType: jenisDokumen,
           contractNumber: nomorKontrak.trim(),
           startDate: tanggalMulai,
@@ -451,31 +451,31 @@ export const ContractModal: React.FC<ContractModalProps> = ({
       }
 
       await onSave({
-        jenis_dokumen: jenisDokumen,
+        document_type: jenisDokumen,
         parent_contract_id: jenisDokumen === 'Agreement Addendum' ? parentContractId : undefined,
-        parent_contract_nomor:
-          jenisDokumen === 'Agreement Addendum' ? selectedMaster?.nomor_kontrak : undefined,
-        nomor_kontrak: nomorKontrak.trim(),
-        judul_kontrak: judulKontrak.trim(),
+        parent_contract_number:
+          jenisDokumen === 'Agreement Addendum' ? selectedMaster?.contract_number : undefined,
+        contract_number: nomorKontrak.trim(),
+        contract_title: judulKontrak.trim(),
         partner_id: partnerId,
-        kategori_kerjasama: kategoriTags,
-        tanggal_mulai: tanggalMulai,
-        tanggal_berakhir: tanggalBerakhir,
+        cooperation_categories: kategoriTags,
+        start_date: tanggalMulai,
+        end_date: tanggalBerakhir,
         currency,
-        nilai_kontrak: Number(nilaiKontrak),
-        nilai_kontrak_usd: estimatedUsd,
+        contract_value: Number(nilaiKontrak),
+        contract_value_usd: estimatedUsd,
         auto_renewal: autoRenewal,
-        notice_period_hari: Number(noticePeriodHari),
+        notice_period_days: Number(noticePeriodHari),
         notice_type_required: noticeTypeRequired,
         status: lifecyclePreview.status,
         lifecycle_mode: lifecycleMode,
         termination_date: lifecycleMode === 'terminated' ? terminationDate : null,
         termination_reason: terminationReason.trim(),
         termination_document_file: terminationFile,
-        pic_internal: (contractToEdit?.pic_internal || selectedPartner?.pic_internal || selectedPartner?.internal_pic || user?.department || 'Commercial & Marketing').trim(),
+        internal_pic: (contractToEdit?.internal_pic || selectedPartner?.internal_pic || user?.department || 'Commercial & Marketing').trim(),
         internal_notes: internalNotes.trim(),
-        field_yang_berubah: jenisDokumen === 'Agreement Addendum' ? fieldYangBerubah : undefined,
-        ringkasan_perubahan: jenisDokumen === 'Agreement Addendum' ? ringkasanPerubahan.trim() : undefined,
+        changed_fields: jenisDokumen === 'Agreement Addendum' ? fieldYangBerubah : undefined,
+        change_summary: jenisDokumen === 'Agreement Addendum' ? ringkasanPerubahan.trim() : undefined,
         fileName: finalFileName,
         fileData,
       });
@@ -532,7 +532,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                     className="w-full" controlProps={{ className: "w-full" }}
                   >
                     {partners.map((p) => (
-                      <option key={p.partner_id} value={p.partner_id}>{p.nama_partner} ({p.jenis_partner})</option>
+                      <option key={p.partner_id} value={p.partner_id}>{p.partner_name} ({p.partner_type})</option>
                     ))}
                   </AlphabeticalSelect>
                 </Field>
@@ -557,7 +557,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                         <option value="">{t('form.contract.select_master_placeholder', '-- Pilih Master Agreement Induk --')}</option>
                         {availableMasterContracts.map((m) => (
                           <option key={m.contract_id} value={m.contract_id}>
-                            {m.nomor_kontrak} | {m.judul_kontrak}
+                            {m.contract_number} | {m.contract_title}
                           </option>
                         ))}
                       </AlphabeticalSelect>
@@ -595,7 +595,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 <Field className="min-w-0">
                   <FieldLabel htmlFor="contract-field-5">
                     {jenisDokumen === 'Agreement Addendum'
-                      ? t('form.contract.nomor_addendum', 'Nomor Addendum *')
+                      ? t('form.contract.addendum_number', 'Nomor Addendum *')
                       : t('contract.form.number', 'Legal Contract Number *')}
                   </FieldLabel>
                   <Input id="contract-field-5"

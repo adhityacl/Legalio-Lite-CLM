@@ -3,6 +3,8 @@ import { forwardAsyncRouteErrors } from './asyncRoutes';
 import { migrateNormalizedCore } from './migrations/003_normalized_core';
 import { removeLegacyCoreTables } from './migrations/004_remove_legacy_core';
 import { addStatusIndexes } from './migrations/005_status_indexes';
+import { renameFieldsToEnglish } from './migrations/006_english_field_names';
+import { renameLegacyKeys, renameLegacyKeyTokens } from '@legalio/shared/fieldNames';
 import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
 import { readBusinessRows, searchBusinessRows } from './normalizedCoreStore';
 import { SQLiteBackups } from './sqliteBackups';
@@ -151,6 +153,12 @@ const upload = multer({
 });
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+// Older clients and CSV files still send the Indonesian field names; they are mapped once, here. Responses never use them.
+const LEGACY_FIELD_ROUTES = /^\/api\/(partners|contracts|ios|partner-spendings|partner-evaluations|bulk-import|notification-logs)(\/|$)/;
+app.use((req: express.Request, _res: express.Response, next: express.NextFunction) => {
+  if (req.body && typeof req.body === "object" && LEGACY_FIELD_ROUTES.test(req.path)) req.body = renameLegacyKeys(req.body);
+  next();
+});
 // Error/status messages follow the UI language (x-app-language header).
 app.use("/api", localizeApiMessages);
 
@@ -305,7 +313,7 @@ async function getPartnerFolderId(partner, token, orgId) {
   const targetOrgId = orgId || partner.organizationId;
   const orgFolder = await getOrgFolderId(targetOrgId, token);
   const parentFolderId = orgFolder.id || db.googleConfig.driveFolderId;
-  const extractedId = extractFolderIdFromLink(partner.link_folder_dd);
+  const extractedId = extractFolderIdFromLink(partner.dd_folder_link);
   if (extractedId) {
     return extractedId;
   }
@@ -313,16 +321,16 @@ async function getPartnerFolderId(partner, token, orgId) {
   if (activeToken || hasServiceAccountCredentials()) {
     try {
       const folderRes = await getOrCreateDriveFolder(
-        partner.nama_partner,
+        partner.partner_name,
         parentFolderId,
         activeToken,
       );
-      partner.link_folder_dd = folderRes.webViewLink;
+      partner.dd_folder_link = folderRes.webViewLink;
       saveDb();
       return folderRes.id;
     } catch (err) {
       console.warn(
-        `[Drive Hierarchical] Failed creating partner folder for '${partner.nama_partner}':`,
+        `[Drive Hierarchical] Failed creating partner folder for '${partner.partner_name}':`,
         err,
       );
     }
@@ -361,6 +369,9 @@ const UPLOAD_KINDS: Array<[RecordKind, string]> = [
   ["partner", "partners"], ["contract", "contracts"], ["io", "ios"], ["spending", "spendings"], ["evaluation", "evaluations"],
 ];
 let uploadIndex: Map<string, Array<{ kind: RecordKind; record: any }>> | null = null;
+// Declared up here because saveDb() already runs during startup, before later `let`s are initialised.
+// Statuses only change when a date passes or a contract is saved, so a minute-old pass is as good as a new one.
+let lifecyclesFreshUntil = 0;
 function normalizeUploadPath(value: string): string | null {
   try {
     const raw = value.split(/[?#]/)[0];
@@ -624,14 +635,14 @@ async function ensureAllPartnersFolders(token?: string, targetTenantId?: string)
       )
     : db.partners || [];
   for (const partner of partnersToProcess) {
-    if (!partner.nama_partner) continue;
+    if (!partner.partner_name) continue;
     const orgId = partner.organizationId;
     const tenant = findTenant(orgId);
     if (!tenant) continue; // unowned records are quarantined, never filed under another tenant
     const cleanOrg = (tenant?.name || "Organization")
       .replace(/[/\\?%*:|"<>]/g, "_")
       .trim();
-    const cleanVendor = partner.nama_partner
+    const cleanVendor = partner.partner_name
       .replace(/[/\\?%*:|"<>]/g, "_")
       .trim();
     const categories = [
@@ -679,7 +690,7 @@ async function ensureAllPartnersFolders(token?: string, targetTenantId?: string)
         }
       } catch (err) {
         console.error(
-          `Error provisioning Drive folders for partner ${partner.nama_partner} (${cleanOrg}):`,
+          `Error provisioning Drive folders for partner ${partner.partner_name} (${cleanOrg}):`,
           err?.message || err,
         );
         if (
@@ -1192,6 +1203,9 @@ if (!migrationBlock) {
   if (result.applied) console.log('Normalized SQLite business schema:', result.counts);
   const cleanup = removeLegacyCoreTables(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-remove-legacy-core-${Date.now()}.db`));
   if (cleanup.applied) console.log('Removed legacy SQLite snapshots:', cleanup.tables);
+  // Before the status indexes: those are declared with the English column names.
+  const english = renameFieldsToEnglish(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-english-field-names-${Date.now()}.db`));
+  if (english.applied) console.log('Renamed Indonesian data columns to English:', english.renamed);
   if (addStatusIndexes(sqliteDb).applied) console.log('Added status indexes for dashboard and list queries.');
 }
 const sqliteInitialData = loadCoreDataFromSqlite();
@@ -1209,7 +1223,7 @@ if (sqliteHasCoreData || !freshInstall) {
 } else if (!IS_TEST_MODE && fs.existsSync(dataFilePath)) {
   try {
     const raw = fs.readFileSync(dataFilePath, "utf-8");
-    const parsed = JSON.parse(raw);
+    const parsed = renameLegacyKeys(JSON.parse(raw));
     db = { ...db, ...parsed };
     if (!migrationBlock) hydrateCoreDataFromJson(db);
     console.log("Imported legacy data_store.json into SQLite.");
@@ -1244,22 +1258,21 @@ function migrateLegacyRecords() {
   // organization stay quarantined until the 002 migration maps them (PRD §14.3).
   if (!db.templates) db.templates = [];
   (db.partners || []).forEach((p: any) => {
-    if (p.country === undefined && p.badan_hukum) {
+    if (p.country === undefined && p.legal_status_flag) {
       // BHI = "Badan Hukum Indonesia"; BHA = foreign entity of unknown country.
-      p.country = p.badan_hukum === "BHI" ? "ID" : "";
+      p.country = p.legal_status_flag === "BHI" ? "ID" : "";
     }
-    p.daftar_dokumen_dd = normalizePartnerDocuments(p);
-    p.status_dd = computeDueDiligenceStatus(p.daftar_dokumen_dd);
+    p.dd_documents = normalizePartnerDocuments(p);
+    p.status_dd = computeDueDiligenceStatus(p.dd_documents);
   });
   (db.contracts || []).forEach((c: any) => {
     c.status = normalizeContractStatus(c.status);
     c.status_approval = normalizeApprovalStatus(c.status_approval);
-    c.currency = normalizeCurrencyCode(c.currency || c.mata_uang, tenantDefaultCurrency(c.organizationId));
+    c.currency = normalizeCurrencyCode(c.currency, tenantDefaultCurrency(c.organizationId));
   });
   (db.ios || []).forEach((io: any) => {
     io.status = normalizeContractStatus(io.status);
-    io.currency = normalizeCurrencyCode(io.currency || io.mata_uang, tenantDefaultCurrency(io.organizationId));
-    io.mata_uang = io.currency;
+    io.currency = normalizeCurrencyCode(io.currency, tenantDefaultCurrency(io.organizationId));
   });
   (db.spendings || []).forEach((sp: any) => {
     sp.currency = normalizeCurrencyCode(sp.currency, tenantDefaultCurrency(sp.organizationId));
@@ -1420,8 +1433,6 @@ if (db.partners && Array.isArray(db.partners)) {
   }));
   saveDb();
 }
-// Statuses only change when a date passes or a contract is saved, so a minute-old pass is as good as a new one.
-let lifecyclesFreshUntil = 0;
 function saveDb() {
   uploadIndex = null;
   lifecyclesFreshUntil = 0;
@@ -1618,18 +1629,18 @@ function buildReminderEmail(params: {
 /** Roll an auto-renewing contract's end date forward past "today" (tenant timezone). */
 function rollForwardAutoRenewal(contract: any): void {
   if (contractLifecycleMode(contract) === 'terminated') return;
-  if (!contract.auto_renewal || !contract.tanggal_mulai || !contract.tanggal_berakhir) return;
+  if (!contract.auto_renewal || !contract.start_date || !contract.end_date) return;
   const settings = getTenantSettings(contract.organizationId);
   const today = todayInTimezone(settings.timezone);
-  const start = String(contract.tanggal_mulai).slice(0, 10);
-  let end = String(contract.tanggal_berakhir).slice(0, 10);
+  const start = String(contract.start_date).slice(0, 10);
+  let end = String(contract.end_date).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || end >= today) return;
   const years = Math.max(1, Number(end.slice(0, 4)) - Number(start.slice(0, 4)) || 1);
   let guard = 0;
   while (end < today && guard++ < 200) {
     end = `${Number(end.slice(0, 4)) + years}${end.slice(4)}`;
   }
-  contract.tanggal_berakhir = end;
+  contract.end_date = end;
 }
 /** Recipients from the record's OWNING organization (PRD §11.5), never global config. */
 function reminderRecipients(tenantId: string, kind: "contract" | "commercial", owner?: string): string {
@@ -1657,36 +1668,36 @@ function recalculateStatuses() {
     const jenis = `Reminder ${daysRemaining}d`;
     const legacyJenis = `Reminder H-${daysRemaining}`;
     const exists = (db.notifications || []).some(
-      (n: any) => n.parent_id === parentId && (n.jenis_notifikasi === jenis || n.jenis_notifikasi === legacyJenis),
+      (n: any) => n.parent_id === parentId && (n.notification_type === jenis || n.notification_type === legacyJenis),
     );
     if (exists) return;
-    const reference = kind === "contract" ? record.nomor_kontrak : record.nomor_io;
-    const title = kind === "contract" ? record.judul_kontrak : record.judul_io;
-    const amount = kind === "contract" ? record.nilai_kontrak : record.nilai_io;
-    const recipients = reminderRecipients(tenantId, kind, record.pic_internal && String(record.pic_internal).includes("@") ? record.pic_internal : "");
+    const reference = kind === "contract" ? record.contract_number : record.io_number;
+    const title = kind === "contract" ? record.contract_title : record.io_title;
+    const amount = kind === "contract" ? record.contract_value : record.io_value;
+    const recipients = reminderRecipients(tenantId, kind, record.internal_pic && String(record.internal_pic).includes("@") ? record.internal_pic : "");
     // en/id/zh in that order, matching settings.language.
     const pick = <T,>(en: T, id: T, zh: T): T => (settings.language === "ID" ? id : settings.language === "ZH" ? zh : en);
     const noticeType = record.notice_type_required || "Termination";
-    const noticeDays = record.notice_period_hari || 30;
+    const noticeDays = record.notice_period_days || 30;
     const notif = {
       notif_id: `notif-${kind === "contract" ? "ctr" : "doc"}-${Date.now()}-${Math.floor(Math.random() * 1e3)}`,
       organizationId: tenantId,
       parent_type: kind === "contract" ? "Contract" : "IO",
       parent_id: parentId,
-      parent_nomor: reference,
-      parent_judul: title,
-      jenis_notifikasi: jenis,
-      tanggal_terkirim: new Date().toISOString(),
-      status_terkirim: true,
-      penerima: recipients,
-      pesan: pick(
+      parent_number: reference,
+      parent_title: title,
+      notification_type: jenis,
+      sent_at: new Date().toISOString(),
+      is_sent: true,
+      recipient: recipients,
+      message: pick(
         `${reference} (${title}) expires in ${daysRemaining} days.${kind === "contract" ? ` ${noticeType} notice is due ${noticeDays} days before expiry.` : ""}`,
         `${reference} (${title}) berakhir dalam ${daysRemaining} hari.${kind === "contract" ? ` Pemberitahuan ${noticeType} diperlukan ${noticeDays} hari sebelumnya.` : ""}`,
         `${reference}（${title}）将在 ${daysRemaining} 天后到期。${kind === "contract" ? `需在到期前 ${noticeDays} 天发出${noticeType}通知。` : ""}`,
       ),
-      // Lets the UI render the message in the viewer's language; `pesan` stays
+      // Lets the UI render the message in the viewer's language; `message` stays
       // in the organization language for e-mail/export and older clients.
-      pesan_params: { kind, daysRemaining, noticeType, noticeDays },
+      message_params: { kind, daysRemaining, noticeType, noticeDays },
       is_read: false,
     };
     db.notifications.unshift(notif);
@@ -1702,7 +1713,7 @@ function recalculateStatuses() {
         rows.push([pick("Pricing model", "Model harga", "定价模式"), record.pricing_model || "-"]);
       }
       const { subject, html } = buildReminderEmail({
-        tenantId, kind, reference, title, endDate: record.tanggal_berakhir, daysRemaining, rows,
+        tenantId, kind, reference, title, endDate: record.end_date, daysRemaining, rows,
       });
       const validRecipients = recipients.split(",").map((s: string) => s.trim()).filter((s: string) => s.includes("@"));
       if (validRecipients.length > 0) {
@@ -1718,18 +1729,18 @@ function recalculateStatuses() {
     return {
       ...contract,
       status,
-      sisa_hari: daysRemaining ?? contract.sisa_hari,
+      days_remaining: daysRemaining ?? contract.days_remaining,
       updated_at: contract.updated_at || new Date().toISOString(),
     };
   });
   db.ios = (db.ios || []).map((io) => {
     if (normalizeContractStatus(io.status) === "Terminated") return { ...io, status: "Terminated" };
-    const { daysRemaining, status } = computeLifecycle(io.organizationId, io.tanggal_berakhir, io.status, false);
+    const { daysRemaining, status } = computeLifecycle(io.organizationId, io.end_date, io.status, false);
     if (daysRemaining !== null) emitReminder("commercial", io, daysRemaining);
     return {
       ...io,
       status,
-      sisa_hari: daysRemaining ?? io.sisa_hari,
+      days_remaining: daysRemaining ?? io.days_remaining,
       updated_at: io.updated_at || new Date().toISOString(),
     };
   });
@@ -1744,15 +1755,15 @@ function refreshContractLifecycles() {
   let changed = false;
   const settingsByOrg = new Map<string, ReturnType<typeof getTenantSettings>>();
   for (const contract of db.contracts || []) {
-    const previousEnd = contract.tanggal_berakhir;
+    const previousEnd = contract.end_date;
     rollForwardAutoRenewal(contract);
     const orgKey = String(contract.organizationId ?? "");
     if (!settingsByOrg.has(orgKey)) settingsByOrg.set(orgKey, getTenantSettings(contract.organizationId));
     const lifecycle = contractLifecycle(contract, settingsByOrg.get(orgKey)!);
-    const remaining = lifecycle.daysRemaining ?? contract.sisa_hari;
-    if (previousEnd !== contract.tanggal_berakhir || contract.status !== lifecycle.status || contract.sisa_hari !== remaining) {
+    const remaining = lifecycle.daysRemaining ?? contract.days_remaining;
+    if (previousEnd !== contract.end_date || contract.status !== lifecycle.status || contract.days_remaining !== remaining) {
       contract.status = lifecycle.status;
-      contract.sisa_hari = remaining;
+      contract.days_remaining = remaining;
       changed = true;
     }
   }
@@ -2353,13 +2364,13 @@ app.post("/api/partners/parse", upload.single("file") as any, async (req: expres
     const ctx = aiPolicyContext(tenantId);
     const prompt = `You are an expert legal document assistant. Extract the following information about the counterparty (partner/vendor/customer) from this contract or agreement so it can be registered in a contract management system. Our own organization is "${ctx.organizationName}" — never return our organization as the counterparty.
 
-1. "nama_partner": the counterparty's full legal name exactly as written, including its legal form (e.g. "Pte. Ltd.", "Sdn. Bhd.", "PT", "Co., Ltd."). Do not abbreviate.
+1. "partner_name": the counterparty's full legal name exactly as written, including its legal form (e.g. "Pte. Ltd.", "Sdn. Bhd.", "PT", "Co., Ltd."). Do not abbreviate.
 2. "country": ISO 3166-1 alpha-2 code of the counterparty's country of incorporation (e.g. "SG", "ID", "IN", "JP"). Return "" if it cannot be determined.
 3. "entity_type": the counterparty's legal form as written (e.g. "Private Limited", "Sendirian Berhad", "Perseroan Terbatas"). Return "" if unknown.
-4. "nama_pic": the counterparty's contact person or team named in the notices/correspondence clause. Return "-" if absent.
-5. "email_pic": the counterparty's main notice e-mail address. Return "-" if absent.
-6. "telepon_pic": the counterparty's phone number in international format (E.164, e.g. "+6591234567") when possible. Return "-" if absent.
-7. "alamat_pic": the counterparty's registered or correspondence address. Return "-" if absent.
+4. "pic_name": the counterparty's contact person or team named in the notices/correspondence clause. Return "-" if absent.
+5. "pic_email": the counterparty's main notice e-mail address. Return "-" if absent.
+6. "pic_phone": the counterparty's phone number in international format (E.164, e.g. "+6591234567") when possible. Return "-" if absent.
+7. "pic_address": the counterparty's registered or correspondence address. Return "-" if absent.
 8. "notes": acting as a senior due-diligence and vendor-risk analyst, write ONE concise narrative paragraph in ${ctx.responseLanguage} describing the counterparty's core business, the services relevant to this agreement, notable technology or assets, and its jurisdictional context. No bullet points or headings; start directly with the entity name. Do not include personal identification numbers.
 
 Return strictly one valid JSON object matching the schema.`;
@@ -2380,13 +2391,13 @@ Return strictly one valid JSON object matching the schema.`;
           {
             type: Type.OBJECT,
             properties: {
-              nama_partner: { type: Type.STRING },
+              partner_name: { type: Type.STRING },
               country: { type: Type.STRING },
               entity_type: { type: Type.STRING },
-              nama_pic: { type: Type.STRING },
-              email_pic: { type: Type.STRING },
-              telepon_pic: { type: Type.STRING },
-              alamat_pic: { type: Type.STRING },
+              pic_name: { type: Type.STRING },
+              pic_email: { type: Type.STRING },
+              pic_phone: { type: Type.STRING },
+              pic_address: { type: Type.STRING },
               notes: { type: Type.STRING },
             },
           },
@@ -2415,8 +2426,8 @@ Return strictly one valid JSON object matching the schema.`;
 app.post("/api/partners/generate-dd-notes", async (req: express.Request, res: express.Response) => {
   if (!ensureAiAvailable(req, res)) return;
   try {
-    const { nama_partner, country, entity_type, tags, model, pdfBase64 } = req.body;
-    if (!nama_partner) {
+    const { partner_name, country, entity_type, tags, model, pdfBase64 } = req.body;
+    if (!partner_name) {
       return res
         .status(400)
         .json({ error: "Partner name is required." });
@@ -2439,7 +2450,7 @@ app.post("/api/partners/generate-dd-notes", async (req: express.Request, res: ex
 
 Summarise the counterparty below in ONE comprehensive, professional paragraph written in ${ctx.responseLanguage}.
 
-Counterparty: "${String(nama_partner).slice(0, 200)}"${countryName ? ` (incorporated in ${countryName})` : ""}${entity_type ? ` — legal form: ${String(entity_type).slice(0, 120)}` : ""}${Array.isArray(tags) && tags.length > 0 ? ` — relationship categories: ${tags.slice(0, 10).join(", ")}` : ""}
+Counterparty: "${String(partner_name).slice(0, 200)}"${countryName ? ` (incorporated in ${countryName})` : ""}${entity_type ? ` — legal form: ${String(entity_type).slice(0, 120)}` : ""}${Array.isArray(tags) && tags.length > 0 ? ` — relationship categories: ${tags.slice(0, 10).join(", ")}` : ""}
 
 The paragraph must flow through: (1) core business and specialisation, (2) the products or services relevant to this relationship, (3) notable technology, assets or certifications, and (4) jurisdictional and risk context relevant to ${ctx.industryName} (for example: ${ctx.reviewFocus.slice(0, 3).join(", ")}).
 
@@ -2463,25 +2474,25 @@ Output rules: exactly one paragraph, no bullet points or headings, no opening or
 });
 app.post("/api/partners", async (req: express.Request, res: express.Response) => {
   const {
-    nama_partner,
+    partner_name,
     codename,
     country,
     entity_type,
     identifiers,
-    jenis_partner,
-    nama_pic,
-    email_pic,
-    telepon_pic,
-    alamat_pic,
-    kontak_pic,
-    pic_internal,
-    catatan,
+    partner_type,
+    pic_name,
+    pic_email,
+    pic_phone,
+    pic_address,
+    pic_contact,
+    internal_pic,
+    notes,
     tags,
     userEmail,
     userName,
     userRole,
   } = req.body;
-  if (!nama_partner) {
+  if (!partner_name) {
     return res.status(400).json({ error: "Nama Partner wajib diisi." });
   }
   const targetOrgId = getRequestTenantId(req);
@@ -2490,13 +2501,13 @@ app.post("/api/partners", async (req: express.Request, res: express.Response) =>
       req.body.accessToken ||
       db.googleConfig.accessToken,
   );
-  let driveFolderLink = `https://drive.google.com/drive/folders/Folder_${nama_partner.replace(/\s+/g, "_")}`;
+  let driveFolderLink = `https://drive.google.com/drive/folders/Folder_${partner_name.replace(/\s+/g, "_")}`;
   if (token || hasServiceAccountCredentials()) {
     try {
       const orgFolder = await getOrgFolderId(targetOrgId, token);
       const parentFolderId = orgFolder.id || db.googleConfig.driveFolderId;
       const vendorFolder = await getOrCreateDriveFolder(
-        nama_partner,
+        partner_name,
         parentFolderId,
         token,
       );
@@ -2515,34 +2526,34 @@ app.post("/api/partners", async (req: express.Request, res: express.Response) =>
       }
     } catch (err) {
       console.warn(
-        `[Drive Hierarchical] Error creating folders for partner '${nama_partner}':`,
+        `[Drive Hierarchical] Error creating folders for partner '${partner_name}':`,
         err?.message || err,
       );
     }
   }
   const partnerCountry = sanitizeCountryCode(country);
-  const defaultDD = normalizePartnerDocuments({ organizationId: targetOrgId, country: partnerCountry, daftar_dokumen_dd: [] });
+  const defaultDD = normalizePartnerDocuments({ organizationId: targetOrgId, country: partnerCountry, dd_documents: [] });
   const newPartner = {
     partner_id: generateNextPartnerId(),
     organizationId: targetOrgId,
-    nama_partner,
+    partner_name,
     codename: codename || "",
     country: partnerCountry,
     entity_type: String(entity_type || "").slice(0, 120),
     identifiers: sanitizeIdentifiers(identifiers),
-    jenis_partner: jenis_partner || "Vendor",
-    nama_pic: nama_pic || "",
-    email_pic: email_pic || "",
-    telepon_pic: telepon_pic || "",
-    alamat_pic: alamat_pic || "",
-    kontak_pic:
-      kontak_pic ||
-      (email_pic && telepon_pic ? `${email_pic} / ${telepon_pic}` : ""),
-    pic_internal: pic_internal || "",
+    partner_type: partner_type || "Vendor",
+    pic_name: pic_name || "",
+    pic_email: pic_email || "",
+    pic_phone: pic_phone || "",
+    pic_address: pic_address || "",
+    pic_contact:
+      pic_contact ||
+      (pic_email && pic_phone ? `${pic_email} / ${pic_phone}` : ""),
+    internal_pic: internal_pic || "",
     status_dd: computeDueDiligenceStatus(defaultDD),
-    link_folder_dd: driveFolderLink,
-    daftar_dokumen_dd: defaultDD,
-    catatan: catatan || "",
+    dd_folder_link: driveFolderLink,
+    dd_documents: defaultDD,
+    notes: notes || "",
     tags: sanitizePartnerTags(tags),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -2557,7 +2568,7 @@ app.post("/api/partners", async (req: express.Request, res: express.Response) =>
     userRole || "Business Owner",
     "CREATE",
     "PARTNER",
-    `Menambahkan Partner baru: ${nama_partner}${partnerCountry ? ` (${partnerCountry})` : ""}`,
+    `Menambahkan Partner baru: ${partner_name}${partnerCountry ? ` (${partnerCountry})` : ""}`,
     req,
   );
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
@@ -2566,21 +2577,21 @@ app.post("/api/partners", async (req: express.Request, res: express.Response) =>
 app.put("/api/partners/:id", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const {
-    nama_partner,
+    partner_name,
     codename,
     country,
     entity_type,
     identifiers,
-    jenis_partner,
-    nama_pic,
-    email_pic,
-    telepon_pic,
-    alamat_pic,
-    kontak_pic,
-    pic_internal,
-    catatan,
+    partner_type,
+    pic_name,
+    pic_email,
+    pic_phone,
+    pic_address,
+    pic_contact,
+    internal_pic,
+    notes,
     tags,
-    daftar_dokumen_dd,
+    dd_documents,
     userEmail,
     userName,
     userRole,
@@ -2596,35 +2607,35 @@ app.put("/api/partners/:id", async (req: express.Request, res: express.Response)
   const nextDocuments = normalizePartnerDocuments({
     organizationId: existing.organizationId,
     country: nextCountry,
-    daftar_dokumen_dd: Array.isArray(daftar_dokumen_dd) ? daftar_dokumen_dd : existing.daftar_dokumen_dd,
+    dd_documents: Array.isArray(dd_documents) ? dd_documents : existing.dd_documents,
   });
   const status_dd = computeDueDiligenceStatus(nextDocuments);
   const updatedPartner = {
     ...existing,
-    nama_partner: nama_partner || existing.nama_partner,
+    partner_name: partner_name || existing.partner_name,
     codename: codename !== void 0 ? codename : existing.codename,
     country: nextCountry,
     entity_type: entity_type !== void 0 ? String(entity_type).slice(0, 120) : existing.entity_type || "",
     identifiers: identifiers !== void 0 ? sanitizeIdentifiers(identifiers) : existing.identifiers || [],
-    jenis_partner: jenis_partner || existing.jenis_partner || "Vendor",
-    nama_pic: nama_pic !== void 0 ? nama_pic : existing.nama_pic,
-    email_pic: email_pic !== void 0 ? email_pic : existing.email_pic,
-    telepon_pic: telepon_pic !== void 0 ? telepon_pic : existing.telepon_pic,
-    alamat_pic: alamat_pic !== void 0 ? alamat_pic : existing.alamat_pic,
-    kontak_pic: kontak_pic !== void 0 ? kontak_pic : existing.kontak_pic,
-    pic_internal:
-      pic_internal !== void 0 ? pic_internal : existing.pic_internal,
-    catatan: catatan !== void 0 ? catatan : existing.catatan,
+    partner_type: partner_type || existing.partner_type || "Vendor",
+    pic_name: pic_name !== void 0 ? pic_name : existing.pic_name,
+    pic_email: pic_email !== void 0 ? pic_email : existing.pic_email,
+    pic_phone: pic_phone !== void 0 ? pic_phone : existing.pic_phone,
+    pic_address: pic_address !== void 0 ? pic_address : existing.pic_address,
+    pic_contact: pic_contact !== void 0 ? pic_contact : existing.pic_contact,
+    internal_pic:
+      internal_pic !== void 0 ? internal_pic : existing.internal_pic,
+    notes: notes !== void 0 ? notes : existing.notes,
     tags:
       tags !== void 0
         ? sanitizePartnerTags(tags)
         : sanitizePartnerTags(existing.tags),
-    daftar_dokumen_dd: nextDocuments,
+    dd_documents: nextDocuments,
     status_dd,
-    tanggal_dd_diverifikasi:
+    dd_verified_date:
       status_dd === "Complete" && existing.status_dd !== "Complete"
         ? new Date().toISOString().split("T")[0]
-        : existing.tanggal_dd_diverifikasi,
+        : existing.dd_verified_date,
     updated_at: new Date().toISOString(),
   };
   updatedPartner.organizationId = existing.organizationId;
@@ -2638,7 +2649,7 @@ app.put("/api/partners/:id", async (req: express.Request, res: express.Response)
     userRole || "Legal",
     "DD_UPDATE",
     "PARTNER",
-    `Memperbarui profil & status DD Partner ${updatedPartner.nama_partner} menjadi '${status_dd}'`,
+    `Memperbarui profil & status DD Partner ${updatedPartner.partner_name} menjadi '${status_dd}'`,
     req,
   );
   await triggerAutoPushToGoogleSheet(req);
@@ -2676,7 +2687,7 @@ app.delete("/api/partners/:id", async (req: express.Request, res: express.Respon
     userRole || "Legal",
     "DELETE",
     "PARTNER",
-    `Menghapus Partner '${partner.nama_partner}' beserta ${partnerContracts.length} Kontrak dan ${partnerIOs.length} Insertion Order pendukung.`,
+    `Menghapus Partner '${partner.partner_name}' beserta ${partnerContracts.length} Kontrak dan ${partnerIOs.length} Insertion Order pendukung.`,
     req,
   );
   await triggerAutoPushToGoogleSheet(req);
@@ -3132,11 +3143,11 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
   const partner = db.partners.find(
     (p) =>
       p.partner_id === vendor_id ||
-      p.nama_partner.toLowerCase() === vendor_name.toLowerCase(),
+      p.partner_name.toLowerCase() === vendor_name.toLowerCase(),
   );
   if (invoice_file && invoice_file.fileData) {
     const targetInvoiceName = formatInvoiceFileName({
-      partnerName: partner?.nama_partner || vendor_name,
+      partnerName: partner?.partner_name || vendor_name,
       invoiceMonth: monthsArray,
       invoiceNumber: invoice_number,
       invoiceDate: invoice_date || new Date().toISOString().split("T")[0],
@@ -3145,7 +3156,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
     invoice_file_name = targetInvoiceName;
     if (!invoice_file_url) {
       invoice_file_url = saveLocalFile(
-        partner?.nama_partner || vendor_name,
+        partner?.partner_name || vendor_name,
         "Folder Invoice & Billing",
         targetInvoiceName,
         invoice_file.fileData,
@@ -3164,7 +3175,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
   }
   if (billing_file && billing_file.fileData) {
     const targetBillingName = formatBillingFileName({
-      partnerName: partner?.nama_partner || vendor_name,
+      partnerName: partner?.partner_name || vendor_name,
       invoiceMonth: monthsArray,
       invoiceNumber: invoice_number,
       invoiceDate: invoice_date || new Date().toISOString().split("T")[0],
@@ -3173,7 +3184,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
     billing_file_name = targetBillingName;
     if (!billing_file_url) {
       billing_file_url = saveLocalFile(
-        partner?.nama_partner || vendor_name,
+        partner?.partner_name || vendor_name,
         "Folder Invoice & Billing",
         targetBillingName,
         billing_file.fileData,
@@ -3211,7 +3222,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
     invoice_file_name,
     billing_file_url,
     billing_file_name,
-    folder_link: partner ? partner.link_folder_dd : void 0,
+    folder_link: partner ? partner.dd_folder_link : void 0,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -3297,7 +3308,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
   const partner = db.partners.find(
     (p) =>
       p.partner_id === updated.vendor_id ||
-      p.nama_partner.toLowerCase() === updated.vendor_name.toLowerCase(),
+      p.partner_name.toLowerCase() === updated.vendor_name.toLowerCase(),
   );
   const token = await resolveActiveGoogleToken(
     req.headers["x-google-access-token"] || req.body.accessToken,
@@ -3308,7 +3319,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
   const monthsArray = normalizeSpendingMonths(updated.invoice_month);
   if (invoice_file && invoice_file.fileData) {
     const targetInvoiceName = formatInvoiceFileName({
-      partnerName: partner?.nama_partner || updated.vendor_name,
+      partnerName: partner?.partner_name || updated.vendor_name,
       invoiceMonth: monthsArray,
       invoiceNumber: updated.invoice_number,
       invoiceDate:
@@ -3319,7 +3330,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
     let invoice_file_url = "";
     if (!invoice_file_url) {
       invoice_file_url = saveLocalFile(
-        partner?.nama_partner || updated.vendor_name,
+        partner?.partner_name || updated.vendor_name,
         "Folder Invoice & Billing",
         targetInvoiceName,
         invoice_file.fileData,
@@ -3338,7 +3349,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
   }
   if (billing_file && billing_file.fileData) {
     const targetBillingName = formatBillingFileName({
-      partnerName: partner?.nama_partner || updated.vendor_name,
+      partnerName: partner?.partner_name || updated.vendor_name,
       invoiceMonth: monthsArray,
       invoiceNumber: updated.invoice_number,
       invoiceDate:
@@ -3349,7 +3360,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
     let billing_file_url = "";
     if (!billing_file_url) {
       billing_file_url = saveLocalFile(
-        partner?.nama_partner || updated.vendor_name,
+        partner?.partner_name || updated.vendor_name,
         "Folder Invoice & Billing",
         targetBillingName,
         billing_file.fileData,
@@ -3413,8 +3424,8 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
     docName,
     fileName,
     fileData,
-    nomorDokumen,
-    tanggalKadaluarsa,
+    documentNumber,
+    expiryDate,
     userEmail,
     userName,
     userRole,
@@ -3428,14 +3439,14 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
   const token = await resolveActiveGoogleToken(
     req.headers["x-google-access-token"] || req.body.accessToken,
   );
-  const docObj = partner.daftar_dokumen_dd.find((d) => d.nama === docName);
+  const docObj = partner.dd_documents.find((d) => d.name === docName);
   const currentFilesCount = (docObj?.files || []).length;
   const finalFileName =
     fileName ||
     formatDueDiligenceFileName({
-      vendorName: partner.nama_partner,
+      vendorName: partner.partner_name,
       documentName: docName,
-      documentDate: tanggalKadaluarsa || new Date().toISOString(),
+      documentDate: expiryDate || new Date().toISOString(),
       sequence: currentFilesCount + 1,
       rawFileName: "document.pdf",
     });
@@ -3446,7 +3457,7 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
     fileData.includes("base64,")
   ) {
     driveLink = saveLocalFile(
-      partner.nama_partner,
+      partner.partner_name,
       "Folder DD",
       finalFileName,
       fileData,
@@ -3458,12 +3469,12 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
       userRole || "Legal",
       "UPLOAD_SUCCESS",
       "PARTNER",
-      `Dokumen DD '${finalFileName}' untuk vendor '${partner.nama_partner}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
+      `Dokumen DD '${finalFileName}' untuk vendor '${partner.partner_name}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
       req,
     );
   }
-  partner.daftar_dokumen_dd = partner.daftar_dokumen_dd.map((doc) => {
-    if (doc.nama === docName) {
+  partner.dd_documents = partner.dd_documents.map((doc) => {
+    if (doc.name === docName) {
       const nowIso = new Date().toISOString();
       const newFileItem = driveLink
         ? {
@@ -3476,7 +3487,7 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
             linkDrive: driveLink,
             uploadedAt: nowIso,
             year: new Date().getFullYear().toString(),
-            tanggalKadaluarsa: tanggalKadaluarsa || "",
+            expiryDate: expiryDate || "",
           }
         : null;
       const existingFiles = doc.files || [];
@@ -3487,13 +3498,13 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
       ) {
         existingFiles.push({
           id: "dd_file_prev_" + Date.now(),
-          fileName: `${doc.nama} (Versi Sebelumnya).pdf`,
+          fileName: `${doc.name} (Versi Sebelumnya).pdf`,
           linkDrive: doc.linkDrive,
           uploadedAt: doc.uploadedAt || nowIso,
           year: doc.uploadedAt
             ? new Date(doc.uploadedAt).getFullYear().toString()
             : "",
-          tanggalKadaluarsa: doc.tanggalKadaluarsa || "",
+          expiryDate: doc.expiryDate || "",
         });
       }
       const updatedFiles = newFileItem
@@ -3502,13 +3513,13 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
             ...existingFiles.filter((f) => f.linkDrive !== driveLink),
           ]
         : existingFiles;
-      const expiry = tanggalKadaluarsa || doc.tanggalKadaluarsa;
+      const expiry = expiryDate || doc.expiryDate;
       const expiryDays = expiry ? daysUntilForTenant(partner.organizationId, expiry) : null;
       return {
         ...doc,
         status: updatedFiles.length === 0 ? "Missing" : expiryDays !== null && expiryDays < 0 ? "Expired" : "Available",
-        nomorDokumen: nomorDokumen || doc.nomorDokumen || "",
-        tanggalKadaluarsa: tanggalKadaluarsa || doc.tanggalKadaluarsa,
+        documentNumber: documentNumber || doc.documentNumber || "",
+        expiryDate: expiryDate || doc.expiryDate,
         linkDrive: driveLink || doc.linkDrive || "",
         uploadedAt: driveLink ? nowIso : doc.uploadedAt,
         files: updatedFiles,
@@ -3517,9 +3528,9 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
     return doc;
   });
   const previousDdStatus = partner.status_dd;
-  partner.status_dd = computeDueDiligenceStatus(partner.daftar_dokumen_dd);
+  partner.status_dd = computeDueDiligenceStatus(partner.dd_documents);
   if (partner.status_dd === "Complete" && previousDdStatus !== "Complete") {
-    partner.tanggal_dd_diverifikasi = new Date().toISOString().split("T")[0];
+    partner.dd_verified_date = new Date().toISOString().split("T")[0];
   }
   partner.updated_at = new Date().toISOString();
   saveDb();
@@ -3529,7 +3540,7 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
     userRole || "Legal",
     "DD_UPDATE",
     "PARTNER",
-    `Mengunggah dokumen DD '${docName}' untuk partner ${partner.nama_partner}`,
+    `Mengunggah dokumen DD '${docName}' untuk partner ${partner.partner_name}`,
     req,
   );
   triggerAutoPushToGoogleSheet(req);
@@ -3544,8 +3555,8 @@ app.delete("/api/partners/:id/dd-file", async (req: express.Request, res: expres
   }
   const deleteDenial = assertRecordAccess(req, "partner", partner);
   if (deleteDenial) return res.status(deleteDenial.status).json(deleteDenial.body);
-  partner.daftar_dokumen_dd = partner.daftar_dokumen_dd.map((doc) => {
-    if (doc.nama === docName) {
+  partner.dd_documents = partner.dd_documents.map((doc) => {
+    if (doc.name === docName) {
       const remainingFiles = (doc.files || []).filter((f) => f.id !== fileId);
       const hasFiles = remainingFiles.length > 0;
       return {
@@ -3559,9 +3570,9 @@ app.delete("/api/partners/:id/dd-file", async (req: express.Request, res: expres
     return doc;
   });
   const previousDdStatus = partner.status_dd;
-  partner.status_dd = computeDueDiligenceStatus(partner.daftar_dokumen_dd);
+  partner.status_dd = computeDueDiligenceStatus(partner.dd_documents);
   if (partner.status_dd === "Complete" && previousDdStatus !== "Complete") {
-    partner.tanggal_dd_diverifikasi = new Date().toISOString().split("T")[0];
+    partner.dd_verified_date = new Date().toISOString().split("T")[0];
   }
   partner.updated_at = new Date().toISOString();
   saveDb();
@@ -3571,7 +3582,7 @@ app.delete("/api/partners/:id/dd-file", async (req: express.Request, res: expres
     userRole || "Legal",
     "DELETE",
     "PARTNER",
-    `Menghapus file dari dokumen DD '${docName}' partner ${partner.nama_partner}`,
+    `Menghapus file dari dokumen DD '${docName}' partner ${partner.partner_name}`,
     req,
   );
   res.json({ success: true, partner });
@@ -3581,7 +3592,7 @@ app.post("/api/contracts/export-google-docs", async (req: express.Request, res: 
   try {
     const title = req.body.title || req.body.docTitle || "Partnership Agreement";
     const contentHtml = req.body.contentHtml || req.body.htmlContent || req.body.html;
-    const partnerName = req.body.partnerName || req.body.partner_nama || req.body.partnerId;
+    const partnerName = req.body.partnerName || req.body.partner_name || req.body.partnerId;
 
     if (!title || !contentHtml) {
       return res.status(400).json({ error: "Title dan contentHtml wajib diisi." });
@@ -3598,7 +3609,7 @@ app.post("/api/contracts/export-google-docs", async (req: express.Request, res: 
     if (partnerName) {
       try {
         const partner = scopedRecords(req, "partner", db.partners).find(
-          (p: any) => p.nama_partner?.toLowerCase() === String(partnerName).toLowerCase() || p.partner_id === partnerName
+          (p: any) => p.partner_name?.toLowerCase() === String(partnerName).toLowerCase() || p.partner_id === partnerName
         );
         if (partner) {
           targetFolderId = await getPartnerCategoryFolderId(
@@ -3648,6 +3659,15 @@ app.post("/api/contracts/export-google-docs", async (req: express.Request, res: 
  * department-scoped before any client aggregation, no tenant directory and
  * no provider configuration — only non-sensitive service availability.
  */
+/** Admin UI-text overrides saved before the field rename carry old keys; they follow their texts to the new keys. */
+function withCurrentUiTextKeys(overrides: Record<string, Record<string, string>>) {
+  return Object.fromEntries(Object.entries(overrides).map(([language, texts]) => [
+    language,
+    Object.fromEntries(Object.entries(texts || {})
+      .filter(([key]) => renameLegacyKeyTokens(key) === key || !(renameLegacyKeyTokens(key) in texts))
+      .map(([key, text]) => [renameLegacyKeyTokens(key), text])),
+  ]));
+}
 app.get("/api/init-data", (req: express.Request, res: express.Response) => {
   refreshContractLifecycles();
   const organizationId = getRequestTenantId(req);
@@ -3675,17 +3695,17 @@ app.get("/api/contracts", (req: express.Request, res: express.Response) => {
   const contractsList = scopedRecords(req, "contract", db.contracts);
   const result = contractsList.map((c) => {
     const cur = normalizeCurrencyCode(c.currency, tenantDefaultCurrency(c.organizationId));
-    const amt = Number(c.nilai_kontrak) || 0;
+    const amt = Number(c.contract_value) || 0;
     const usdVal =
-      c.nilai_kontrak_usd !== void 0 && c.nilai_kontrak_usd !== null
-        ? c.nilai_kontrak_usd
+      c.contract_value_usd !== void 0 && c.contract_value_usd !== null
+        ? c.contract_value_usd
         : cur === "USD"
           ? amt
           : convertToUsdWithFallback(amt, cur);
     return {
       ...c,
       currency: cur,
-      nilai_kontrak_usd: usdVal,
+      contract_value_usd: usdVal,
     };
   });
   res.json(result);
@@ -3714,26 +3734,26 @@ app.post("/api/contracts/parse", upload.single("file") as any, async (req: expre
     const startTime = Date.now();
     const prompt = `You are an expert legal contract analyst. Our organization is "${ctx.organizationName}" (${ctx.industryName}, primary jurisdiction: ${ctx.countryName}). Extract the following from this contract so it can be registered in our contract repository. The contract may be written in any language and governed by any jurisdiction.
 
-1. "jenis_dokumen": "Agreement Addendum" if this is an amendment, addendum, variation or extension; otherwise "Master Agreement".
-2. "judul_kontrak": the full official title of the agreement.
-3. "nama_partner": the full legal name of the counterparty — the party that is NOT ${ctx.organizationName}.
-4. "nomor_kontrak": the contract reference number issued by ${ctx.organizationName}. When the document carries two reference numbers (ours and the counterparty's), prefer the one issued by ${ctx.organizationName}; if ours cannot be identified, return the first reference number shown.
-5. "nomor_kontrak_induk": for an addendum, the reference number of the master agreement it amends; otherwise "".
-6. "tanggal_mulai": the effective (or signing) date as ISO 8601 "YYYY-MM-DD".
-7. "tanggal_berakhir": the expiry date as "YYYY-MM-DD", computed precisely:
+1. "document_type": "Agreement Addendum" if this is an amendment, addendum, variation or extension; otherwise "Master Agreement".
+2. "contract_title": the full official title of the agreement.
+3. "partner_name": the full legal name of the counterparty — the party that is NOT ${ctx.organizationName}.
+4. "contract_number": the contract reference number issued by ${ctx.organizationName}. When the document carries two reference numbers (ours and the counterparty's), prefer the one issued by ${ctx.organizationName}; if ours cannot be identified, return the first reference number shown.
+5. "parent_contract_number": for an addendum, the reference number of the master agreement it amends; otherwise "".
+6. "start_date": the effective (or signing) date as ISO 8601 "YYYY-MM-DD".
+7. "end_date": the expiry date as "YYYY-MM-DD", computed precisely:
    a. An explicit end date without automatic renewal: use it as written.
    b. A relative term ("valid for 1 year from the start date"): end date = start date + term − 1 day (e.g. start 2024-11-04, 1 year → 2025-11-03; 6 months → 2025-05-03).
    c. A fixed end date plus automatic renewal for another period: add one renewal period to the written end date and set auto_renewal to true.
    d. Evergreen / renews until terminated by either party: return the day before the start date in year 9999 (start 2024-11-04 → "9999-11-03") and set auto_renewal to true.
    e. An extension addendum: compute the new end date from the previous term's end date.
-8. "klausul_jangka_waktu": quote verbatim the term/renewal clause.
-9. "durasi_perjanjian": the term as short text (e.g. "1 year", "6 months", "Until terminated").
-10. "nilai_kontrak": the total committed contract value as a number, or 0 when the value is variable, commission-based, or not stated.
+8. "term_clause": quote verbatim the term/renewal clause.
+9. "agreement_duration": the term as short text (e.g. "1 year", "6 months", "Until terminated").
+10. "contract_value": the total committed contract value as a number, or 0 when the value is variable, commission-based, or not stated.
 11. "currency": the ISO 4217 code of the contract value (e.g. "USD", "SGD", "IDR", "INR", "JPY"); "${ctx.defaultCurrency}" if no currency is stated.
 12. "auto_renewal": true when the contract renews automatically or runs until terminated; otherwise false.
-13. "notice_period_hari": the notice period in days for termination or non-renewal (default 30 when not specified).
-14. "ringkasan_perubahan": for an addendum, a clear summary of which clauses changed and how; otherwise "".
-15. "field_yang_berubah": for an addendum, an array containing any of exactly these codes: "Nilai Kontrak / IO", "Jangka Waktu Periode", "Ruang Lingkup / Deliverables", "Syarat Pembayaran", "Pihak Berwenang". Otherwise [].
+13. "notice_period_days": the notice period in days for termination or non-renewal (default 30 when not specified).
+14. "change_summary": for an addendum, a clear summary of which clauses changed and how; otherwise "".
+15. "changed_fields": for an addendum, an array containing any of exactly these codes: "Nilai Kontrak / IO", "Jangka Waktu Periode", "Ruang Lingkup / Deliverables", "Syarat Pembayaran", "Pihak Berwenang". Otherwise [].
 16. "internal_notes": a structured Markdown summary written in ${ctx.responseLanguage}, acting as a senior legal analyst.
    STRICT RULE: do not use the comma character (,) anywhere in internal_notes — use "and", "or", parentheses or hyphens instead — so the text can be exported to CSV safely.
    Use exactly these sections (translate the headings into ${ctx.responseLanguage}):
@@ -3764,21 +3784,21 @@ Return strictly one valid JSON object matching the schema. Use "" for any text f
           {
             type: Type.OBJECT,
             properties: {
-              jenis_dokumen: { type: Type.STRING },
-              judul_kontrak: { type: Type.STRING },
-              nama_partner: { type: Type.STRING },
-              nomor_kontrak: { type: Type.STRING },
-              nomor_kontrak_induk: { type: Type.STRING },
-              tanggal_mulai: { type: Type.STRING },
-              tanggal_berakhir: { type: Type.STRING },
-              klausul_jangka_waktu: { type: Type.STRING },
-              durasi_perjanjian: { type: Type.STRING },
-              nilai_kontrak: { type: Type.NUMBER },
+              document_type: { type: Type.STRING },
+              contract_title: { type: Type.STRING },
+              partner_name: { type: Type.STRING },
+              contract_number: { type: Type.STRING },
+              parent_contract_number: { type: Type.STRING },
+              start_date: { type: Type.STRING },
+              end_date: { type: Type.STRING },
+              term_clause: { type: Type.STRING },
+              agreement_duration: { type: Type.STRING },
+              contract_value: { type: Type.NUMBER },
               currency: { type: Type.STRING },
               auto_renewal: { type: Type.BOOLEAN },
-              notice_period_hari: { type: Type.NUMBER },
-              ringkasan_perubahan: { type: Type.STRING },
-              field_yang_berubah: {
+              notice_period_days: { type: Type.NUMBER },
+              change_summary: { type: Type.STRING },
+              changed_fields: {
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
               },
@@ -3792,43 +3812,43 @@ Return strictly one valid JSON object matching the schema. Use "" for any text f
     });
     const parsedData = JSON.parse((response as any).text);
     extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
-    if (parsedData.tanggal_mulai) {
-      parsedData.tanggal_mulai = normalizeParsedDate(parsedData.tanggal_mulai);
+    if (parsedData.start_date) {
+      parsedData.start_date = normalizeParsedDate(parsedData.start_date);
     }
-    if (parsedData.tanggal_berakhir) {
-      parsedData.tanggal_berakhir = normalizeParsedDate(
-        parsedData.tanggal_berakhir,
+    if (parsedData.end_date) {
+      parsedData.end_date = normalizeParsedDate(
+        parsedData.end_date,
       );
     }
-    const clauseText = `${parsedData.durasi_perjanjian || ""} ${parsedData.klausul_jangka_waktu || ""}`;
+    const clauseText = `${parsedData.agreement_duration || ""} ${parsedData.term_clause || ""}`;
     const isPerpetualClause =
       /sampai pengakhiran|until terminated|salah satu pihak mengakhiri|terus menerus|tanpa batas|unlimited|perpetual/i.test(
         clauseText,
       );
-    if (isPerpetualClause && parsedData.tanggal_mulai) {
+    if (isPerpetualClause && parsedData.start_date) {
       parsedData.auto_renewal = true;
-      const parts = parsedData.tanggal_mulai.split("-").map(Number);
+      const parts = parsedData.start_date.split("-").map(Number);
       if (parts.length === 3) {
         const prevDay = new Date(parts[0], parts[1] - 1, parts[2]);
         prevDay.setDate(prevDay.getDate() - 1);
         const prevMonth = String(prevDay.getMonth() + 1).padStart(2, "0");
         const prevDate = String(prevDay.getDate()).padStart(2, "0");
-        parsedData.tanggal_berakhir = `9999-${prevMonth}-${prevDate}`;
+        parsedData.end_date = `9999-${prevMonth}-${prevDate}`;
       }
     } else if (
-      parsedData.tanggal_mulai &&
-      (!parsedData.tanggal_berakhir ||
-        parsedData.tanggal_berakhir === parsedData.tanggal_mulai ||
-        new Date(parsedData.tanggal_berakhir) <=
-          new Date(parsedData.tanggal_mulai))
+      parsedData.start_date &&
+      (!parsedData.end_date ||
+        parsedData.end_date === parsedData.start_date ||
+        new Date(parsedData.end_date) <=
+          new Date(parsedData.start_date))
     ) {
       const computedResult = computeContractEndDateFromDuration(
-        parsedData.tanggal_mulai,
+        parsedData.start_date,
         clauseText || (parsedData.auto_renewal ? "1 tahun" : ""),
         Boolean(parsedData.auto_renewal),
       );
       if (computedResult) {
-        parsedData.tanggal_berakhir = computedResult.endDate;
+        parsedData.end_date = computedResult.endDate;
         if (computedResult.isAutoRenewal) {
           parsedData.auto_renewal = true;
         }
@@ -3903,16 +3923,16 @@ app.post("/api/contracts/:id/redline-analysis", async (req: express.Request, res
 Perform a risk and compliance analysis of the commercial contract below and propose balanced redlines. Write every narrative field in ${ctx.responseLanguage}.
 
 === CONTRACT ===
-Reference: ${contract.nomor_kontrak}
-Title: ${contract.judul_kontrak}
-Document type: ${contract.jenis_dokumen || "Master Agreement"}
-Counterparty: ${partner?.nama_partner || "-"}${partner?.country ? ` (${getCountryPack(partner.country).name})` : ""}
-Categories: ${(contract.kategori_kerjasama || []).join(", ") || "-"}
-Value: ${normalizeCurrencyCode(contract.currency, ctx.defaultCurrency)} ${Number(contract.nilai_kontrak || 0)}
-Term: ${contract.tanggal_mulai} to ${contract.tanggal_berakhir} (days remaining: ${contract.sisa_hari ?? "-"})
+Reference: ${contract.contract_number}
+Title: ${contract.contract_title}
+Document type: ${contract.document_type || "Master Agreement"}
+Counterparty: ${partner?.partner_name || "-"}${partner?.country ? ` (${getCountryPack(partner.country).name})` : ""}
+Categories: ${(contract.cooperation_categories || []).join(", ") || "-"}
+Value: ${normalizeCurrencyCode(contract.currency, ctx.defaultCurrency)} ${Number(contract.contract_value || 0)}
+Term: ${contract.start_date} to ${contract.end_date} (days remaining: ${contract.days_remaining ?? "-"})
 Auto-renewal: ${contract.auto_renewal ? "yes" : "no"}
-Notice period: ${contract.notice_period_hari || 30} days (${contract.notice_type_required || "termination/extension"})
-Internal notes / clause summary: ${contract.internal_notes || contract.ringkasan_perubahan || "Standard B2B commercial services agreement."}
+Notice period: ${contract.notice_period_days || 30} days (${contract.notice_type_required || "termination/extension"})
+Internal notes / clause summary: ${contract.internal_notes || contract.change_summary || "Standard B2B commercial services agreement."}
 Counterparty due-diligence status: ${partner?.status_dd || "unknown"}
 ${req.body.customClauseText ? `
 Additional clause text to review:
@@ -4296,7 +4316,7 @@ async function persistContractTerminationFile(req: express.Request, record: { or
   const partner = db.partners.find(p => p.partner_id === record.partner_id);
   const tenant = findTenant(record.organizationId);
   const storedName = `termination-${randomUUID()}.${file.extension}`;
-  const url = saveLocalFile(partner?.nama_partner, 'Folder Termination', storedName, file.fileData, tenant?.name);
+  const url = saveLocalFile(partner?.partner_name, 'Folder Termination', storedName, file.fileData, tenant?.name);
   return { fileName: file.fileName, url };
 }
 
@@ -4306,27 +4326,27 @@ function terminationWriteError(res: express.Response, code: string) {
 
 app.post("/api/contracts", async (req: express.Request, res: express.Response) => {
   const {
-    nomor_kontrak,
-    judul_kontrak,
+    contract_number,
+    contract_title,
     partner_id,
-    jenis_dokumen,
+    document_type,
     parent_contract_id,
-    parent_contract_nomor,
-    kategori_kerjasama,
-    tanggal_mulai,
-    tanggal_berakhir,
+    parent_contract_number,
+    cooperation_categories,
+    start_date,
+    end_date,
     currency,
-    nilai_kontrak,
-    nilai_kontrak_usd: req_usd,
+    contract_value,
+    contract_value_usd: req_usd,
     auto_renewal,
-    notice_period_hari,
+    notice_period_days,
     notice_type_required,
     status_approval,
     status,
-    pic_internal,
+    internal_pic,
     internal_notes,
-    field_yang_berubah,
-    ringkasan_perubahan,
+    changed_fields,
+    change_summary,
     fileName,
     fileData,
     userEmail,
@@ -4334,11 +4354,11 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
     userRole,
   } = req.body;
   if (
-    !nomor_kontrak ||
-    !judul_kontrak ||
+    !contract_number ||
+    !contract_title ||
     !partner_id ||
-    !tanggal_mulai ||
-    !tanggal_berakhir
+    !start_date ||
+    !end_date
   ) {
     return res
       .status(400)
@@ -4347,7 +4367,7 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
           "Nomor Kontrak, Judul, Partner, dan Tanggal Mula/Selesai wajib diisi.",
       });
   }
-  if (new Date(tanggal_berakhir) <= new Date(tanggal_mulai)) {
+  if (new Date(end_date) <= new Date(start_date)) {
     return res
       .status(400)
       .json({ error: "Tanggal Berakhir harus setelah Tanggal Mulai." });
@@ -4362,14 +4382,14 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
   const existingContractDup = db.contracts.find(
     (c) =>
       isMatchingOrg(c.organizationId, requestTenantId) &&
-      String(c.nomor_kontrak || "").trim().toLowerCase() ===
-      nomor_kontrak.trim().toLowerCase(),
+      String(c.contract_number || "").trim().toLowerCase() ===
+      contract_number.trim().toLowerCase(),
   );
   if (existingContractDup) {
     return res
       .status(400)
       .json({
-        error: `Nomor Kontrak '${nomor_kontrak}' sudah terdaftar dalam sistem.`,
+        error: `Nomor Kontrak '${contract_number}' sudah terdaftar dalam sistem.`,
       });
   }
   const targetOrgId = getRequestTenantId(req);
@@ -4380,7 +4400,7 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
     req.headers["x-google-access-token"] || req.body.accessToken,
   );
   const cur = normalizeCurrencyCode(currency, tenantDefaultCurrency(targetOrgId));
-  const amt = Number(nilai_kontrak) || 0;
+  const amt = Number(contract_value) || 0;
   let total_usd = req_usd;
   if (total_usd === void 0 || total_usd === null || isNaN(Number(total_usd))) {
     if (cur === "USD") {
@@ -4394,7 +4414,7 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
           sheetId,
           token,
           cur,
-          tanggal_mulai,
+          start_date,
         );
       } catch (e) {
         console.error("Failed fetching historical rate for contract:", e);
@@ -4403,21 +4423,21 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
     }
   }
   const targetFileName = formatContractFileName({
-    partnerName: partner?.nama_partner,
-    documentType: jenis_dokumen || "Master Agreement",
-    contractNumber: nomor_kontrak,
-    startDate: tanggal_mulai,
-    rawFileName: fileName || `${nomor_kontrak}.pdf`,
+    partnerName: partner?.partner_name,
+    documentType: document_type || "Master Agreement",
+    contractNumber: contract_number,
+    startDate: start_date,
+    rawFileName: fileName || `${contract_number}.pdf`,
   });
-  let link_file_kontrak = "";
+  let contract_file_link = "";
   if (
     fileData &&
     typeof fileData === "string" &&
     fileData.includes("base64,")
   ) {
-    if (!link_file_kontrak) {
-      link_file_kontrak = saveLocalFile(
-        partner?.nama_partner,
+    if (!contract_file_link) {
+      contract_file_link = saveLocalFile(
+        partner?.partner_name,
         "Folder Contract",
         targetFileName,
         fileData,
@@ -4436,53 +4456,53 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
   }
   const lifecycleDraft: any = {
     organizationId: targetOrgId,
-    tanggal_mulai,
-    tanggal_berakhir,
+    start_date,
+    end_date,
     auto_renewal: lifecycleMode !== 'terminated' && Boolean(auto_renewal),
     lifecycle_mode: lifecycleMode,
     termination_date: lifecycleMode === 'terminated' ? req.body.termination_date : null,
   };
   rollForwardAutoRenewal(lifecycleDraft);
-  const finalTanggalBerakhir = lifecycleDraft.tanggal_berakhir;
+  const finalTanggalBerakhir = lifecycleDraft.end_date;
   const { status: finalStatus, daysRemaining: diffDays } = contractLifecycle(lifecycleDraft, getTenantSettings(targetOrgId));
   const terminationDocument = terminationFile ? await persistContractTerminationFile(req, { organizationId: targetOrgId, partner_id }, terminationFile) : undefined;
   const newContract = {
     contract_id: generateNextContractId(),
     organizationId: targetOrgId,
-    jenis_dokumen: jenis_dokumen || "Master Agreement",
+    document_type: document_type || "Master Agreement",
     parent_contract_id:
-      jenis_dokumen === "Agreement Addendum" ? parent_contract_id : void 0,
-    parent_contract_nomor:
-      jenis_dokumen === "Agreement Addendum" ? parent_contract_nomor : void 0,
-    nomor_kontrak,
-    judul_kontrak,
+      document_type === "Agreement Addendum" ? parent_contract_id : void 0,
+    parent_contract_number:
+      document_type === "Agreement Addendum" ? parent_contract_number : void 0,
+    contract_number,
+    contract_title,
     partner_id,
-    kategori_kerjasama: Array.isArray(kategori_kerjasama)
-      ? kategori_kerjasama
+    cooperation_categories: Array.isArray(cooperation_categories)
+      ? cooperation_categories
       : ["Umum"],
-    tanggal_mulai,
-    tanggal_berakhir: finalTanggalBerakhir,
+    start_date,
+    end_date: finalTanggalBerakhir,
     currency: cur,
-    nilai_kontrak: amt,
-    nilai_kontrak_usd: Number(total_usd),
+    contract_value: amt,
+    contract_value_usd: Number(total_usd),
     auto_renewal: lifecycleDraft.auto_renewal,
     lifecycle_mode: lifecycleMode,
     termination_date: lifecycleDraft.termination_date,
     termination_reason: String(req.body.termination_reason || '').trim().slice(0, 10000),
     termination_document: terminationDocument,
-    notice_period_hari: Number(notice_period_hari) || 30,
+    notice_period_days: Number(notice_period_days) || 30,
     notice_type_required: notice_type_required || "Termination",
     status: finalStatus,
     status_approval: normalizeApprovalStatus(status_approval),
-    pic_internal: pic_internal || "Legal Team",
+    internal_pic: internal_pic || "Legal Team",
     internal_notes: internal_notes ? String(internal_notes).trim() : void 0,
-    link_file_kontrak,
+    contract_file_link,
     fileName: targetFileName,
-    field_yang_berubah: Array.isArray(field_yang_berubah)
-      ? field_yang_berubah
+    changed_fields: Array.isArray(changed_fields)
+      ? changed_fields
       : void 0,
-    ringkasan_perubahan: ringkasan_perubahan || void 0,
-    sisa_hari: diffDays,
+    change_summary: change_summary || void 0,
+    days_remaining: diffDays,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -4496,7 +4516,7 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
     userRole || "Legal",
     "CREATE",
     "CONTRACT",
-    `Membuat Kontrak Baru '${nomor_kontrak}' (${judul_kontrak}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`,
+    `Membuat Kontrak Baru '${contract_number}' (${contract_title}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`,
     req,
   );
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
@@ -4536,8 +4556,8 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
   if (updated.lifecycle_mode === 'terminated') updated.auto_renewal = false;
   const cur = normalizeCurrencyCode(updated.currency || existing.currency, tenantDefaultCurrency(existing.organizationId));
   updated.currency = cur;
-  const amt = Number(updated.nilai_kontrak) || 0;
-  let total_usd = updates.nilai_kontrak_usd;
+  const amt = Number(updated.contract_value) || 0;
+  let total_usd = updates.contract_value_usd;
   if (total_usd === void 0 || total_usd === null || isNaN(Number(total_usd))) {
     if (cur === "USD") {
       total_usd = amt;
@@ -4547,7 +4567,7 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
         const token = await resolveActiveGoogleToken(
           req.headers["x-google-access-token"] || req.body.accessToken,
         );
-        const startDate = updated.tanggal_mulai || existing.tanggal_mulai;
+        const startDate = updated.start_date || existing.start_date;
         rate = await getHistoricalExchangeRate(
           db.googleConfig.spreadsheetId,
           token,
@@ -4561,28 +4581,28 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
     }
   }
   updated.currency = cur;
-  updated.nilai_kontrak = amt;
-  updated.nilai_kontrak_usd = Number(total_usd);
+  updated.contract_value = amt;
+  updated.contract_value_usd = Number(total_usd);
   if (
-    updated.tanggal_mulai &&
-    updated.tanggal_berakhir &&
-    new Date(updated.tanggal_berakhir) <= new Date(updated.tanggal_mulai)
+    updated.start_date &&
+    updated.end_date &&
+    new Date(updated.end_date) <= new Date(updated.start_date)
   ) {
     return res
       .status(400)
       .json({ error: "Tanggal Berakhir harus setelah Tanggal Mulai." });
   }
-  if (updated.nomor_kontrak) {
+  if (updated.contract_number) {
     const dup = db.contracts.find(
       (c) =>
-        c.nomor_kontrak.trim().toLowerCase() ===
-          updated.nomor_kontrak.trim().toLowerCase() && c.contract_id !== id,
+        c.contract_number.trim().toLowerCase() ===
+          updated.contract_number.trim().toLowerCase() && c.contract_id !== id,
     );
     if (dup) {
       return res
         .status(400)
         .json({
-          error: `Nomor Kontrak '${updated.nomor_kontrak}' sudah digunakan oleh kontrak lain.`,
+          error: `Nomor Kontrak '${updated.contract_number}' sudah digunakan oleh kontrak lain.`,
         });
     }
   }
@@ -4595,20 +4615,20 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
       (p) => p.partner_id === updated.partner_id,
     );
     const targetFileName = formatContractFileName({
-      partnerName: partner?.nama_partner,
-      documentType: updated.jenis_dokumen || "Master Agreement",
-      contractNumber: updated.nomor_kontrak,
-      startDate: updated.tanggal_mulai,
+      partnerName: partner?.partner_name,
+      documentType: updated.document_type || "Master Agreement",
+      contractNumber: updated.contract_number,
+      startDate: updated.start_date,
       rawFileName:
-        fileName || updated.fileName || `${updated.nomor_kontrak}.pdf`,
+        fileName || updated.fileName || `${updated.contract_number}.pdf`,
     });
     const token = await resolveActiveGoogleToken(
       req.headers["x-google-access-token"] || req.body.accessToken,
     );
-    let link_file_kontrak = "";
-    if (!link_file_kontrak) {
-      link_file_kontrak = saveLocalFile(
-        partner?.nama_partner,
+    let contract_file_link = "";
+    if (!contract_file_link) {
+      contract_file_link = saveLocalFile(
+        partner?.partner_name,
         "Folder Contract",
         targetFileName,
         fileData,
@@ -4623,7 +4643,7 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
         req,
       );
     }
-    updated.link_file_kontrak = link_file_kontrak;
+    updated.contract_file_link = contract_file_link;
     updated.fileName = targetFileName;
   }
   if (terminationFile) updated.termination_document = await persistContractTerminationFile(req, updated, terminationFile);
@@ -4631,7 +4651,7 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
   updated.status_approval = normalizeApprovalStatus(updated.status_approval);
   rollForwardAutoRenewal(updated);
   const lifecycle = contractLifecycle(updated, getTenantSettings(updated.organizationId));
-  updated.sisa_hari = lifecycle.daysRemaining ?? updated.sisa_hari;
+  updated.days_remaining = lifecycle.daysRemaining ?? updated.days_remaining;
   updated.status = lifecycle.status;
   updated.organizationId = existing.organizationId;
   const writeDenial = assertRecordWritable(req, "contract", updated);
@@ -4644,7 +4664,7 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
     userRole || "Legal",
     "UPDATE",
     "CONTRACT",
-    `Memperbarui data Kontrak '${updated.nomor_kontrak}'`,
+    `Memperbarui data Kontrak '${updated.contract_number}'`,
     req,
   );
   await triggerAutoPushToGoogleSheet(req);
@@ -4668,7 +4688,7 @@ app.delete("/api/contracts/:id", async (req: express.Request, res: express.Respo
     userRole || "Admin",
     "DELETE",
     "CONTRACT",
-    `Menghapus Kontrak '${ctr.nomor_kontrak}' (${ctr.judul_kontrak})`,
+    `Menghapus Kontrak '${ctr.contract_number}' (${ctr.contract_title})`,
     req,
   );
   await triggerAutoPushToGoogleSheet(req);
@@ -4678,19 +4698,19 @@ app.get("/api/ios", (req: express.Request, res: express.Response) => {
   const iosList = scopedRecords(req, "io", db.ios);
   const result = iosList.map((io) => {
     const c = db.contracts.find((ctr) => ctr.contract_id === io.contract_id && ctr.organizationId === io.organizationId);
-    const cur = normalizeCurrencyCode(io.currency || io.mata_uang, tenantDefaultCurrency(io.organizationId));
-    const amt = Number(io.nilai_io) || 0;
+    const cur = normalizeCurrencyCode(io.currency, tenantDefaultCurrency(io.organizationId));
+    const amt = Number(io.io_value) || 0;
     const usdVal =
-      io.nilai_io_usd !== void 0 && io.nilai_io_usd !== null
-        ? io.nilai_io_usd
+      io.io_value_usd !== void 0 && io.io_value_usd !== null
+        ? io.io_value_usd
         : cur === "USD"
           ? amt
           : convertToUsdWithFallback(amt, cur);
     return {
       ...io,
       currency: cur,
-      nilai_io_usd: usdVal,
-      contract_nomor: c ? c.nomor_kontrak : io.contract_nomor || "-",
+      io_value_usd: usdVal,
+      contract_number: c ? c.contract_number : io.contract_number || "-",
     };
   });
   res.json(result);
@@ -4720,16 +4740,16 @@ app.post("/api/ios/parse", upload.single("file") as any, async (req: express.Req
     const startTime = Date.now();
     const prompt = `You are an expert commercial-document analyst for ${ctx.organizationName} (${ctx.industryName}). The document is a ${profile.label} or a similar order/schedule issued under a master agreement (it may also be a purchase order, order form, statement of work, insertion order or service order). Extract:
 
-1. "nomor_io": the document's reference number; "-" if it has none.
-2. "judul_io": the order, campaign, project or engagement title.
-3. "nama_partner": the counterparty's full legal name (not ${ctx.organizationName}).
-4. "contract_nomor": the reference number of the master agreement it refers to, if any.
-5. "kanal_media": the ${profile.channelLabel.toLowerCase()} this document covers (e.g. ${profile.channelPlaceholder.replace(/^e\.g\. /, "")}); "-" if not stated.
+1. "io_number": the document's reference number; "-" if it has none.
+2. "io_title": the order, campaign, project or engagement title.
+3. "partner_name": the counterparty's full legal name (not ${ctx.organizationName}).
+4. "contract_number": the reference number of the master agreement it refers to, if any.
+5. "media_channel": the ${profile.channelLabel.toLowerCase()} this document covers (e.g. ${profile.channelPlaceholder.replace(/^e\.g\. /, "")}); "-" if not stated.
 6. "pricing_model": one of ${profile.pricingModels.map((m) => `"${m}"`).join(", ")} — or the closest short label used in the document.
-7. "tanggal_mulai": the start date as ISO 8601 "YYYY-MM-DD"; "-" if not separately stated.
-8. "tanggal_berakhir": the end date as "YYYY-MM-DD". If only a duration is given, end date = start date + duration − 1 day. "-" if unknown.
-9. "durasi_campaign": the duration as short text (e.g. "3 months", "14 days").
-10. "nilai_io": the total committed value as a plain number; 0 when the value is variable or uncapped.
+7. "start_date": the start date as ISO 8601 "YYYY-MM-DD"; "-" if not separately stated.
+8. "end_date": the end date as "YYYY-MM-DD". If only a duration is given, end date = start date + duration − 1 day. "-" if unknown.
+9. "campaign_duration": the duration as short text (e.g. "3 months", "14 days").
+10. "io_value": the total committed value as a plain number; 0 when the value is variable or uncapped.
 11. "currency": the ISO 4217 code of the value; "${ctx.defaultCurrency}" if none is stated.
 12. "deliverables": a structured Markdown summary in ${ctx.responseLanguage}. STRICT RULES: never use the comma character (,) — use "and", "or", parentheses or hyphens — and do not add citation markers. Use these sections (translate headings into ${ctx.responseLanguage}):
    # ${profile.label.toUpperCase()} SUMMARY
@@ -4757,16 +4777,16 @@ Return strictly one valid JSON object matching the schema.`;
           {
             type: Type.OBJECT,
             properties: {
-              nomor_io: { type: Type.STRING },
-              judul_io: { type: Type.STRING },
-              nama_partner: { type: Type.STRING },
-              contract_nomor: { type: Type.STRING },
-              kanal_media: { type: Type.STRING },
+              io_number: { type: Type.STRING },
+              io_title: { type: Type.STRING },
+              partner_name: { type: Type.STRING },
+              contract_number: { type: Type.STRING },
+              media_channel: { type: Type.STRING },
               pricing_model: { type: Type.STRING },
-              tanggal_mulai: { type: Type.STRING },
-              tanggal_berakhir: { type: Type.STRING },
-              durasi_campaign: { type: Type.STRING },
-              nilai_io: { type: Type.NUMBER },
+              start_date: { type: Type.STRING },
+              end_date: { type: Type.STRING },
+              campaign_duration: { type: Type.STRING },
+              io_value: { type: Type.NUMBER },
               currency: { type: Type.STRING },
               deliverables: { type: Type.STRING },
             },
@@ -4777,35 +4797,35 @@ Return strictly one valid JSON object matching the schema.`;
     });
     const parsedData = JSON.parse((response as any).text);
     extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
-    if (parsedData.tanggal_mulai) {
-      parsedData.tanggal_mulai = normalizeParsedDate(parsedData.tanggal_mulai);
+    if (parsedData.start_date) {
+      parsedData.start_date = normalizeParsedDate(parsedData.start_date);
     }
-    if (parsedData.tanggal_berakhir) {
-      parsedData.tanggal_berakhir = normalizeParsedDate(
-        parsedData.tanggal_berakhir,
+    if (parsedData.end_date) {
+      parsedData.end_date = normalizeParsedDate(
+        parsedData.end_date,
       );
     }
     if (
-      parsedData.tanggal_mulai &&
-      (!parsedData.tanggal_berakhir ||
-        parsedData.tanggal_berakhir === parsedData.tanggal_mulai ||
-        new Date(parsedData.tanggal_berakhir) <=
-          new Date(parsedData.tanggal_mulai))
+      parsedData.start_date &&
+      (!parsedData.end_date ||
+        parsedData.end_date === parsedData.start_date ||
+        new Date(parsedData.end_date) <=
+          new Date(parsedData.start_date))
     ) {
       const computedEnd = computeContractEndDateFromDuration(
-        parsedData.tanggal_mulai,
-        parsedData.durasi_campaign || "",
+        parsedData.start_date,
+        parsedData.campaign_duration || "",
       );
       if (computedEnd) {
-        parsedData.tanggal_berakhir = computedEnd;
+        parsedData.end_date = computedEnd;
       }
     }
     if (
-      parsedData.nilai_io === null ||
-      parsedData.nilai_io === void 0 ||
-      isNaN(parsedData.nilai_io)
+      parsedData.io_value === null ||
+      parsedData.io_value === void 0 ||
+      isNaN(parsedData.io_value)
     ) {
-      parsedData.nilai_io = 0;
+      parsedData.io_value = 0;
     }
     if (parsedData.deliverables) {
       parsedData.deliverables = String(parsedData.deliverables)
@@ -4836,19 +4856,19 @@ Return strictly one valid JSON object matching the schema.`;
 app.post("/api/ios", async (req: express.Request, res: express.Response) => {
   const {
     contract_id,
-    nomor_io,
-    judul_io,
+    io_number,
+    io_title,
     partner_id,
-    kanal_media,
-    tanggal_mulai,
-    tanggal_berakhir,
+    media_channel,
+    start_date,
+    end_date,
     pricing_model,
     charging_type,
     currency,
-    nilai_io,
-    nilai_io_usd: req_usd,
+    io_value,
+    io_value_usd: req_usd,
     deliverables,
-    notice_period_hari,
+    notice_period_days,
     notice_type_required,
     fileName,
     fileData,
@@ -4857,11 +4877,11 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
     userRole,
   } = req.body;
   if (
-    !nomor_io ||
-    !judul_io ||
+    !io_number ||
+    !io_title ||
     !partner_id ||
-    !tanggal_mulai ||
-    !tanggal_berakhir ||
+    !start_date ||
+    !end_date ||
     !pricing_model ||
     !charging_type
   ) {
@@ -4872,19 +4892,19 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
           "Nomor IO, Judul, Partner, Tanggal, Pricing Model, & Charging Type wajib diisi.",
       });
   }
-  if (new Date(tanggal_berakhir) <= new Date(tanggal_mulai)) {
+  if (new Date(end_date) <= new Date(start_date)) {
     return res
       .status(400)
       .json({ error: "Tanggal Berakhir harus setelah Tanggal Mulai." });
   }
   const ioTenantId = getRequestTenantId(req);
   const existingIODup = db.ios.find(
-    (i) => isMatchingOrg(i.organizationId, ioTenantId) && String(i.nomor_io || "").trim().toLowerCase() === nomor_io.trim().toLowerCase(),
+    (i) => isMatchingOrg(i.organizationId, ioTenantId) && String(i.io_number || "").trim().toLowerCase() === io_number.trim().toLowerCase(),
   );
   if (existingIODup) {
     return res
       .status(400)
-      .json({ error: `Nomor IO '${nomor_io}' sudah terdaftar dalam sistem.` });
+      .json({ error: `Nomor IO '${io_number}' sudah terdaftar dalam sistem.` });
   }
   const targetOrgId = getRequestTenantId(req);
   const targetTenant = findTenant(targetOrgId);
@@ -4895,7 +4915,7 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
     req.headers["x-google-access-token"] || req.body.accessToken,
   );
   const cur = normalizeCurrencyCode(currency, tenantDefaultCurrency(targetOrgId));
-  const amt = Number(nilai_io) || 0;
+  const amt = Number(io_value) || 0;
   let total_usd = req_usd;
   if (total_usd === void 0 || total_usd === null || isNaN(Number(total_usd))) {
     if (cur === "USD") {
@@ -4909,7 +4929,7 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
           sheetId,
           token,
           cur,
-          tanggal_mulai,
+          start_date,
         );
       } catch (e) {
         console.error("Failed fetching historical rate for IO:", e);
@@ -4918,21 +4938,21 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
     }
   }
   const targetFileName = formatIOFileName({
-    partnerName: partner?.nama_partner,
-    mediaChannel: kanal_media || "Digital Channel",
-    ioNumber: nomor_io,
-    startDate: tanggal_mulai,
-    rawFileName: fileName || `${nomor_io}.pdf`,
+    partnerName: partner?.partner_name,
+    mediaChannel: media_channel || "Digital Channel",
+    ioNumber: io_number,
+    startDate: start_date,
+    rawFileName: fileName || `${io_number}.pdf`,
   });
-  let link_file_io = "";
+  let io_file_link = "";
   if (
     fileData &&
     typeof fileData === "string" &&
     fileData.includes("base64,")
   ) {
-    if (!link_file_io) {
-      link_file_io = saveLocalFile(
-        partner?.nama_partner,
+    if (!io_file_link) {
+      io_file_link = saveLocalFile(
+        partner?.partner_name,
         "Folder IO",
         targetFileName,
         fileData,
@@ -4949,31 +4969,30 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
       );
     }
   }
-  const { status, daysRemaining: diffDays } = computeLifecycle(targetOrgId, tanggal_berakhir, "Active", false);
+  const { status, daysRemaining: diffDays } = computeLifecycle(targetOrgId, end_date, "Active", false);
   const newIO = {
     io_id: generateNextIOId(),
     organizationId: targetOrgId,
     contract_id: contract_id || void 0,
-    contract_nomor: contract ? contract.nomor_kontrak : "-",
-    nomor_io,
-    judul_io,
+    contract_number: contract ? contract.contract_number : "-",
+    io_number,
+    io_title,
     partner_id,
-    kanal_media: kanal_media || "",
-    tanggal_mulai,
-    tanggal_berakhir,
+    media_channel: media_channel || "",
+    start_date,
+    end_date,
     pricing_model,
     charging_type,
     currency: cur,
-    mata_uang: cur,
-    nilai_io: amt,
-    nilai_io_usd: Number(total_usd),
+    io_value: amt,
+    io_value_usd: Number(total_usd),
     deliverables: deliverables || "-",
-    notice_period_hari: Number(notice_period_hari) || 14,
+    notice_period_days: Number(notice_period_days) || 14,
     notice_type_required: notice_type_required || "Termination",
     status,
-    link_file_io,
+    io_file_link,
     fileName: targetFileName,
-    sisa_hari: diffDays,
+    days_remaining: diffDays,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -4987,7 +5006,7 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
     userRole || "Business Owner",
     "CREATE",
     "IO",
-    `Membuat dokumen komersial baru '${nomor_io}' (${judul_io}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`,
+    `Membuat dokumen komersial baru '${io_number}' (${io_title}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`,
     req,
   );
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
@@ -5009,9 +5028,9 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
   };
   const cur = normalizeCurrencyCode(updated.currency || existing.currency, tenantDefaultCurrency(existing.organizationId));
   updated.currency = cur;
-  updated.mata_uang = cur;
-  const amt = Number(updated.nilai_io) || 0;
-  let total_usd = updates.nilai_io_usd;
+  updated.currency = cur;
+  const amt = Number(updated.io_value) || 0;
+  let total_usd = updates.io_value_usd;
   if (total_usd === void 0 || total_usd === null || isNaN(Number(total_usd))) {
     if (cur === "USD") {
       total_usd = amt;
@@ -5021,7 +5040,7 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
         const token = await resolveActiveGoogleToken(
           req.headers["x-google-access-token"] || req.body.accessToken,
         );
-        const startDate = updated.tanggal_mulai || existing.tanggal_mulai;
+        const startDate = updated.start_date || existing.start_date;
         rate = await getHistoricalExchangeRate(
           db.googleConfig.spreadsheetId,
           token,
@@ -5035,8 +5054,8 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
     }
   }
   updated.currency = cur;
-  updated.nilai_io = amt;
-  updated.nilai_io_usd = Number(total_usd);
+  updated.io_value = amt;
+  updated.io_value_usd = Number(total_usd);
   if (
     updates.fileData &&
     typeof updates.fileData === "string" &&
@@ -5048,20 +5067,20 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
       (p) => p.partner_id === updated.partner_id,
     );
     const targetFileName = formatIOFileName({
-      partnerName: partner?.nama_partner,
-      mediaChannel: updated.kanal_media || "Digital Channel",
-      ioNumber: updated.nomor_io,
-      startDate: updated.tanggal_mulai,
+      partnerName: partner?.partner_name,
+      mediaChannel: updated.media_channel || "Digital Channel",
+      ioNumber: updated.io_number,
+      startDate: updated.start_date,
       rawFileName:
-        updates.fileName || updated.fileName || `${updated.nomor_io}.pdf`,
+        updates.fileName || updated.fileName || `${updated.io_number}.pdf`,
     });
     const token = await resolveActiveGoogleToken(
       req.headers["x-google-access-token"] || req.body.accessToken,
     );
-    let link_file_io = "";
-    if (!link_file_io) {
-      link_file_io = saveLocalFile(
-        partner?.nama_partner,
+    let io_file_link = "";
+    if (!io_file_link) {
+      io_file_link = saveLocalFile(
+        partner?.partner_name,
         "Folder IO",
         targetFileName,
         fileData,
@@ -5076,35 +5095,35 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
         req,
       );
     }
-    updated.link_file_io = link_file_io;
+    updated.io_file_link = io_file_link;
     updated.fileName = targetFileName;
   }
   if (
-    updated.tanggal_mulai &&
-    updated.tanggal_berakhir &&
-    new Date(updated.tanggal_berakhir) <= new Date(updated.tanggal_mulai)
+    updated.start_date &&
+    updated.end_date &&
+    new Date(updated.end_date) <= new Date(updated.start_date)
   ) {
     return res
       .status(400)
       .json({ error: "Tanggal Berakhir harus setelah Tanggal Mulai." });
   }
-  if (updated.nomor_io) {
+  if (updated.io_number) {
     const dup = db.ios.find(
       (i) =>
         isMatchingOrg(i.organizationId, updated.organizationId) &&
-        String(i.nomor_io || "").trim().toLowerCase() ===
-          updated.nomor_io.trim().toLowerCase() && i.io_id !== id,
+        String(i.io_number || "").trim().toLowerCase() ===
+          updated.io_number.trim().toLowerCase() && i.io_id !== id,
     );
     if (dup) {
       return res
         .status(400)
         .json({
-          error: `Nomor IO '${updated.nomor_io}' sudah digunakan oleh IO lain.`,
+          error: `Nomor IO '${updated.io_number}' sudah digunakan oleh IO lain.`,
         });
     }
   }
-  const ioLifecycle = computeLifecycle(updated.organizationId, updated.tanggal_berakhir, updated.status, false);
-  updated.sisa_hari = ioLifecycle.daysRemaining ?? updated.sisa_hari;
+  const ioLifecycle = computeLifecycle(updated.organizationId, updated.end_date, updated.status, false);
+  updated.days_remaining = ioLifecycle.daysRemaining ?? updated.days_remaining;
   updated.status = ioLifecycle.status;
   updated.organizationId = existing.organizationId;
   const writeDenial = assertRecordWritable(req, "io", updated);
@@ -5117,7 +5136,7 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
     userRole || "Business Owner",
     "UPDATE",
     "IO",
-    `Memperbarui data Insertion Order '${updated.nomor_io}'`,
+    `Memperbarui data Insertion Order '${updated.io_number}'`,
     req,
   );
   await triggerAutoPushToGoogleSheet(req);
@@ -5138,7 +5157,7 @@ app.delete("/api/ios/:id", async (req: express.Request, res: express.Response) =
     userRole || "Admin",
     "DELETE",
     "IO",
-    `Menghapus Insertion Order '${item.nomor_io}' (${item.judul_io})`,
+    `Menghapus Insertion Order '${item.io_number}' (${item.io_title})`,
     req,
   );
   await triggerAutoPushToGoogleSheet(req);
@@ -5476,7 +5495,7 @@ function readPlatformConfiguration() {
   const g = db.googleConfig || {};
   const b = { ...DEFAULT_BRANDING, ...(db.branding || {}) };
   return {
-    uiTexts: { overrides: (g.uiTextOverrides || { ID: {}, EN: {}, ZH: {} }) as UITextOverrides },
+    uiTexts: { overrides: withCurrentUiTextKeys(g.uiTextOverrides || { ID: {}, EN: {}, ZH: {} }) as UITextOverrides },
     branding: { appName: b.appName, logoUrl: b.logoUrl, primaryColor: b.primaryColor, footerText: b.footerText, loginHeadline: b.loginHeadline },
     google: {
       driveFolderId: g.driveFolderId || "",
@@ -5619,8 +5638,8 @@ function onOrganizationChanged(organizationId: string) {
   refreshTenantProjection();
   (db.partners || []).forEach((p: any) => {
     if (p.organizationId !== organizationId) return;
-    p.daftar_dokumen_dd = normalizePartnerDocuments(p);
-    p.status_dd = computeDueDiligenceStatus(p.daftar_dokumen_dd);
+    p.dd_documents = normalizePartnerDocuments(p);
+    p.status_dd = computeDueDiligenceStatus(p.dd_documents);
   });
   recalculateStatuses();
   saveDb();
@@ -6123,7 +6142,7 @@ const bulkBool = (value: unknown) => /^(1|true|ya|yes|y)$/i.test(String(value ??
 const BULK_PRICING_MODELS = ["CPM", "CPC", "CPA", "Fixed", "Retainer", "Hourly", "Milestone", "Commission", "Subscription"];
 const BULK_NOTICE_TYPES = ["Termination", "Extension", "Both", "None"];
 const BULK_ENUMS = {
-  jenis_dokumen: ["Master Agreement", "Agreement Addendum"],
+  document_type: ["Master Agreement", "Agreement Addendum"],
   status_approval: ["Draft", "Review", "Signed", "Active"],
   charging_type: ["Prepaid", "Postpaid", "Milestone-based"],
   obligation_target: ["Sangat baik", "Baik", "Kurang baik", "Met", "Not met"],
@@ -6177,17 +6196,17 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         failed.push({ rowIndex, identifier: `Baris ${rowIndex}`, message: invalidDates.get(i)! });
         continue;
       }
-      const name = (row.nama_partner || "").trim();
+      const name = (row.partner_name || "").trim();
       if (!name) {
         failed.push({
           rowIndex,
           identifier: `Baris ${rowIndex}`,
-          message: "Kolom nama_partner wajib diisi.",
+          message: "Kolom partner_name wajib diisi.",
         });
         continue;
       }
       const exists = db.partners.find(
-        (p) => inTenant(p) && inTenant(p) && p.nama_partner?.toLowerCase() === name.toLowerCase(),
+        (p) => inTenant(p) && inTenant(p) && p.partner_name?.toLowerCase() === name.toLowerCase(),
       );
       if (exists) {
         skipped.push({
@@ -6207,7 +6226,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         ).trim();
         let internalPic = (
           row.internal_pic ||
-          row.pic_internal ||
+          row.internal_pic ||
           row.picInternal ||
           ""
         ).trim();
@@ -6222,25 +6241,24 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           continue;
         }
         const fullKontakPic =
-          row.kontak_pic ||
-          (row.email_pic || row.telepon_pic
-            ? `${(row.email_pic || "").trim()} / ${(row.telepon_pic || "").trim()}`
+          row.pic_contact ||
+          (row.pic_email || row.pic_phone
+            ? `${(row.pic_email || "").trim()} / ${(row.pic_phone || "").trim()}`
             : "");
         const newPartner = {
           partner_id: generateNextPartnerId(),
-          nama_partner: name,
+          partner_name: name,
           codename: partnerChannel,
           partner_channel: partnerChannel,
-          pic_internal: internalPic,
           internal_pic: internalPic,
-          jenis_partner: row.jenis_partner || "Vendor",
-          nama_pic: row.nama_pic || "",
-          email_pic: row.email_pic || "",
-          telepon_pic: row.telepon_pic || "",
-          alamat_pic: row.alamat_pic || "",
-          kontak_pic: fullKontakPic,
+          partner_type: row.partner_type || "Vendor",
+          pic_name: row.pic_name || "",
+          pic_email: row.pic_email || "",
+          pic_phone: row.pic_phone || "",
+          pic_address: row.pic_address || "",
+          pic_contact: fullKontakPic,
           organizationId: tenantId,
-          country: sanitizeCountryCode(row.country) || (row.badan_hukum === "BHI" ? "ID" : ""),
+          country: sanitizeCountryCode(row.country) || (row.legal_status_flag === "BHI" ? "ID" : ""),
           entity_type: String(row.entity_type || "").slice(0, 120),
           identifiers: sanitizeIdentifiers(
             bulkSplitList(row.identifiers).map((pair) => {
@@ -6249,14 +6267,14 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
             }),
           ),
           status_dd: "Incomplete",
-          catatan: row.catatan || "",
+          notes: row.notes || "",
           tags: sanitizePartnerTags(row.tags),
-          daftar_dokumen_dd: [],
+          dd_documents: [],
           created_at: now,
           updated_at: now,
         };
-        newPartner.daftar_dokumen_dd = normalizePartnerDocuments(newPartner);
-        newPartner.status_dd = computeDueDiligenceStatus(newPartner.daftar_dokumen_dd);
+        newPartner.dd_documents = normalizePartnerDocuments(newPartner);
+        newPartner.status_dd = computeDueDiligenceStatus(newPartner.dd_documents);
         db.partners.push(newPartner);
         succeeded.push({
           rowIndex,
@@ -6279,17 +6297,17 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         failed.push({ rowIndex, identifier: `Baris ${rowIndex}`, message: invalidDates.get(i)! });
         continue;
       }
-      const nomor = (row.nomor_kontrak || "").trim();
+      const nomor = (row.contract_number || "").trim();
       if (!nomor) {
         failed.push({
           rowIndex,
           identifier: `Baris ${rowIndex}`,
-          message: "Kolom nomor_kontrak wajib diisi.",
+          message: "Kolom contract_number wajib diisi.",
         });
         continue;
       }
       const exists = db.contracts.find(
-        (c) => inTenant(c) && c.nomor_kontrak?.toLowerCase() === nomor.toLowerCase(),
+        (c) => inTenant(c) && c.contract_number?.toLowerCase() === nomor.toLowerCase(),
       );
       if (exists) {
         skipped.push({
@@ -6299,20 +6317,20 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         });
         continue;
       }
-      const partnerNama = (row.partner_nama || "").trim();
+      const partnerNama = (row.partner_name || "").trim();
       const partner = db.partners.find(
-        (p) => inTenant(p) && p.nama_partner?.toLowerCase() === partnerNama.toLowerCase(),
+        (p) => inTenant(p) && p.partner_name?.toLowerCase() === partnerNama.toLowerCase(),
       );
       if (!partner) {
         failed.push({ rowIndex, identifier: nomor, message: `Partner "${partnerNama}" tidak ditemukan. Impor partner lebih dulu atau samakan nama persis dengan data Partner.` });
         continue;
       }
       try {
-        const kategori = bulkSplitList(row.kategori_kerjasama);
-        const jenisDokumen = pickEnum(row.jenis_dokumen, BULK_ENUMS.jenis_dokumen);
+        const kategori = bulkSplitList(row.cooperation_categories);
+        const jenisDokumen = pickEnum(row.document_type, BULK_ENUMS.document_type);
         const statusApproval = pickEnum(row.status_approval, BULK_ENUMS.status_approval);
         const noticeType = pickEnum(row.notice_type_required, BULK_NOTICE_TYPES);
-        const invalid = jenisDokumen === null ? `jenis_dokumen harus salah satu dari: ${BULK_ENUMS.jenis_dokumen.join(", ")}.`
+        const invalid = jenisDokumen === null ? `document_type harus salah satu dari: ${BULK_ENUMS.document_type.join(", ")}.`
           : statusApproval === null ? `status_approval harus salah satu dari: ${BULK_ENUMS.status_approval.join(", ")}.`
           : noticeType === null ? `notice_type_required harus salah satu dari: ${BULK_NOTICE_TYPES.join(", ")}.`
           : "";
@@ -6320,21 +6338,21 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           failed.push({ rowIndex, identifier: nomor, message: invalid });
           continue;
         }
-        const parentNomor = (row.parent_contract_nomor || "").trim();
+        const parentNomor = (row.parent_contract_number || "").trim();
         const parentContract = parentNomor
-          ? db.contracts.find((c) => inTenant(c) && c.nomor_kontrak?.toLowerCase() === parentNomor.toLowerCase())
+          ? db.contracts.find((c) => inTenant(c) && c.contract_number?.toLowerCase() === parentNomor.toLowerCase())
           : null;
         if (parentNomor && !parentContract) {
           failed.push({ rowIndex, identifier: nomor, message: `Kontrak induk "${parentNomor}" tidak ditemukan. Impor kontrak induk lebih dulu.` });
           continue;
         }
-        let contractPic = (row.pic_internal || row.internal_pic || "").trim();
+        let contractPic = (row.internal_pic || "").trim();
         if (forceDept) {
           contractPic = defDept;
         } else if (!contractPic && defDept) {
           contractPic = defDept;
-        } else if (!contractPic && partner?.pic_internal) {
-          contractPic = partner.pic_internal;
+        } else if (!contractPic && partner?.internal_pic) {
+          contractPic = partner.internal_pic;
         }
         if (contractPic && !scopeOf(req).teamOf(contractPic)) {
           failed.push({ rowIndex, identifier: nomor, message: `Department "${contractPic}" does not exist in this organization.` });
@@ -6343,20 +6361,20 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         const newContract = {
           contract_id: generateNextContractId(),
           organizationId: tenantId,
-          nomor_kontrak: nomor,
-          judul_kontrak: row.judul_kontrak || nomor,
+          contract_number: nomor,
+          contract_title: row.contract_title || nomor,
           partner_id: partner.partner_id,
-          jenis_dokumen: jenisDokumen || "Master Agreement",
-          ...(parentContract ? { parent_contract_id: parentContract.contract_id, parent_contract_nomor: parentContract.nomor_kontrak } : {}),
-          kategori_kerjasama: kategori,
-          tanggal_mulai: row.tanggal_mulai || "",
-          tanggal_berakhir: row.tanggal_berakhir || "",
+          document_type: jenisDokumen || "Master Agreement",
+          ...(parentContract ? { parent_contract_id: parentContract.contract_id, parent_contract_number: parentContract.contract_number } : {}),
+          cooperation_categories: kategori,
+          start_date: row.start_date || "",
+          end_date: row.end_date || "",
           currency: normalizeCurrencyCode(row.currency, tenantCurrency),
-          nilai_kontrak: bulkNumber(row.nilai_kontrak),
+          contract_value: bulkNumber(row.contract_value),
           auto_renewal: bulkBool(row.auto_renewal),
-          notice_period_hari: parseInt(row.notice_period_hari) || 30,
+          notice_period_days: parseInt(row.notice_period_days) || 30,
           notice_type_required: noticeType || "Both",
-          pic_internal: contractPic,
+          internal_pic: contractPic,
           internal_notes: row.internal_notes || "",
           status: "Active",
           status_approval: statusApproval || "Signed",
@@ -6385,17 +6403,17 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         failed.push({ rowIndex, identifier: `Baris ${rowIndex}`, message: invalidDates.get(i)! });
         continue;
       }
-      const nomor = (row.nomor_io || "").trim();
+      const nomor = (row.io_number || "").trim();
       if (!nomor) {
         failed.push({
           rowIndex,
           identifier: `Baris ${rowIndex}`,
-          message: "Kolom nomor_io wajib diisi.",
+          message: "Kolom io_number wajib diisi.",
         });
         continue;
       }
       const exists = db.ios.find(
-        (io) => inTenant(io) && io.nomor_io?.toLowerCase() === nomor.toLowerCase(),
+        (io) => inTenant(io) && io.io_number?.toLowerCase() === nomor.toLowerCase(),
       );
       if (exists) {
         skipped.push({
@@ -6405,17 +6423,17 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         });
         continue;
       }
-      const partnerNama = (row.partner_nama || "").trim();
+      const partnerNama = (row.partner_name || "").trim();
       const partner = db.partners.find(
-        (p) => inTenant(p) && p.nama_partner?.toLowerCase() === partnerNama.toLowerCase(),
+        (p) => inTenant(p) && p.partner_name?.toLowerCase() === partnerNama.toLowerCase(),
       );
       if (!partner) {
         failed.push({ rowIndex, identifier: nomor, message: `Partner "${partnerNama}" tidak ditemukan. Impor partner lebih dulu atau samakan nama persis dengan data Partner.` });
         continue;
       }
-      const contractNomor = (row.contract_nomor || "").trim();
+      const contractNomor = (row.contract_number || "").trim();
       const contract = db.contracts.find(
-        (c) => inTenant(c) && c.nomor_kontrak?.toLowerCase() === contractNomor.toLowerCase(),
+        (c) => inTenant(c) && c.contract_number?.toLowerCase() === contractNomor.toLowerCase(),
       );
       const chargingType = pickEnum(row.charging_type, BULK_ENUMS.charging_type);
       const noticeTypeIo = pickEnum(row.notice_type_required, BULK_NOTICE_TYPES);
@@ -6433,20 +6451,20 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         const newIO = {
           io_id: generateNextIOId(),
           organizationId: tenantId,
-          nomor_io: nomor,
-          judul_io: row.judul_io || nomor,
+          io_number: nomor,
+          io_title: row.io_title || nomor,
           partner_id: partner.partner_id,
           contract_id: contract?.contract_id || "",
-          kanal_media: row.kanal_media || "",
-          tanggal_mulai: row.tanggal_mulai || "",
-          tanggal_berakhir: row.tanggal_berakhir || "",
+          media_channel: row.media_channel || "",
+          start_date: row.start_date || "",
+          end_date: row.end_date || "",
           // Standard models are normalised ("cpm" -> "CPM"); anything else is kept as a custom model.
           pricing_model: pickEnum(row.pricing_model, BULK_PRICING_MODELS) || String(row.pricing_model || "").trim() || "Fixed",
           charging_type: chargingType || "Prepaid",
           currency: normalizeCurrencyCode(row.currency, tenantCurrency),
-          nilai_io: bulkNumber(row.nilai_io),
+          io_value: bulkNumber(row.io_value),
           deliverables: row.deliverables || "",
-          notice_period_hari: parseInt(row.notice_period_hari) || 14,
+          notice_period_days: parseInt(row.notice_period_days) || 14,
           notice_type_required: noticeTypeIo || "Termination",
           internal_notes: row.internal_notes || "",
           status: "Active",
@@ -6501,7 +6519,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         continue;
       }
       const partner = db.partners.find(
-        (p) => inTenant(p) && p.nama_partner?.toLowerCase() === supplierName.toLowerCase(),
+        (p) => inTenant(p) && p.partner_name?.toLowerCase() === supplierName.toLowerCase(),
       );
       const picks = {
         obligation_target: pickEnum(row.obligation_target, BULK_ENUMS.obligation_target),
@@ -6585,7 +6603,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         continue;
       }
       const partner = db.partners.find(
-        (p) => inTenant(p) && p.nama_partner?.toLowerCase() === vendorName.toLowerCase(),
+        (p) => inTenant(p) && p.partner_name?.toLowerCase() === vendorName.toLowerCase(),
       );
       try {
         const invoiceMonth = normalizeSpendingMonths(row.invoice_month);
@@ -6800,7 +6818,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
     const chatScope = scopeOf(req);
     const ctxForChat = orgContextOf(req);
     const visibleTo = (kind: RecordKind) => (row: any) => recordVisible(ctxForChat, chatScope, kind, row);
-    const partnerNameOf = (id: string) => db.partners.find((p) => p.partner_id === id && p.organizationId === tenantId)?.nama_partner || "";
+    const partnerNameOf = (id: string) => db.partners.find((p) => p.partner_id === id && p.organizationId === tenantId)?.partner_name || "";
     /*
      * Privacy by design (PRD §3.4.1, §5.1): only the active tenant's records
      * are sent, and direct identifiers — phone numbers, e-mail addresses,
@@ -6811,74 +6829,74 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
       organization: { name: ctx.organizationName, country: ctx.countryName, industry: ctx.industryName },
       partners: readBusinessRows(sqliteDb, 'partners', tenantId).filter(visibleTo("partner")).map((p: any) => ({
         partner_id: p.partner_id || p.id,
-        name: p.nama_partner,
+        name: p.partner_name,
         codename: p.codename || p.partner_channel || "",
-        type: p.jenis_partner || "Vendor",
+        type: p.partner_type || "Vendor",
         country: p.country || "",
         entity_type: p.entity_type || "",
         dd_status: p.status_dd,
-        dd_verified_at: p.tanggal_dd_diverifikasi || "",
-        internal_owner: p.pic_internal || p.internal_pic || "",
-        contact_name: p.nama_pic || "",
+        dd_verified_at: p.dd_verified_date || "",
+        internal_owner: p.internal_pic || "",
+        contact_name: p.pic_name || "",
         categories: p.tags || [],
-        internal_notes: p.catatan || p.internal_notes || p.notes || "",
-        dd_documents: Array.isArray(p.daftar_dokumen_dd)
-          ? p.daftar_dokumen_dd.map((d: any) => ({
-              name: d.nama,
+        internal_notes: p.notes || p.internal_notes || p.notes || "",
+        dd_documents: Array.isArray(p.dd_documents)
+          ? p.dd_documents.map((d: any) => ({
+              name: d.name,
               status: d.status,
-              required: d.wajib,
-              expires_at: d.tanggalKadaluarsa || "",
+              required: d.required,
+              expires_at: d.expiryDate || "",
             }))
           : [],
       })),
       contracts: readBusinessRows(sqliteDb, 'contracts', tenantId).filter(visibleTo("contract")).map((c: any) => ({
         contract_id: c.contract_id || c.id,
-        reference: c.nomor_kontrak,
-        title: c.judul_kontrak,
+        reference: c.contract_number,
+        title: c.contract_title,
         counterparty: partnerNameOf(c.partner_id),
         partner_id: c.partner_id || "",
-        document_type: c.jenis_dokumen || "Master Agreement",
-        parent_reference: c.parent_contract_nomor || c.parent_nomor || "",
-        categories: c.kategori_kerjasama || [],
-        start_date: c.tanggal_mulai,
-        end_date: c.tanggal_berakhir,
+        document_type: c.document_type || "Master Agreement",
+        parent_reference: c.parent_contract_number || c.parent_number || "",
+        categories: c.cooperation_categories || [],
+        start_date: c.start_date,
+        end_date: c.end_date,
         currency: c.currency,
-        value: c.nilai_kontrak || 0,
-        value_usd: c.nilai_kontrak_usd || 0,
+        value: c.contract_value || 0,
+        value_usd: c.contract_value_usd || 0,
         auto_renewal: Boolean(c.auto_renewal),
-        notice_period_days: c.notice_period_hari || c.notice_period_days || 30,
+        notice_period_days: c.notice_period_days || 30,
         notice_type: c.notice_type_required || "Termination",
         status: c.status,
         approval_status: c.status_approval,
-        internal_owner: c.pic_internal || "",
-        internal_notes: c.internal_notes || c.notes || c.catatan || "",
-        change_summary: c.ringkasan_perubahan || "",
-        changed_fields: c.field_yang_berubah || [],
-        days_remaining: c.sisa_hari,
+        internal_owner: c.internal_pic || "",
+        internal_notes: c.internal_notes || c.notes || "",
+        change_summary: c.change_summary || "",
+        changed_fields: c.changed_fields || [],
+        days_remaining: c.days_remaining,
       })),
       commercial_documents: readBusinessRows(sqliteDb, 'insertion_orders', tenantId).filter(visibleTo("io")).map((i: any) => {
-        const endDateStr = i.tanggal_berakhir || i.tanggal_selesai || i.period_end || "";
+        const endDateStr = i.end_date || i.completion_date || i.period_end || "";
         const lifecycle = computeLifecycle(i.organizationId, endDateStr, i.status);
         return {
           id: i.io_id || i.id,
-          reference: i.nomor_io,
-          title: i.judul_io,
+          reference: i.io_number,
+          title: i.io_title,
           counterparty: partnerNameOf(i.partner_id),
           partner_id: i.partner_id || "",
-          contract_reference: i.contract_nomor || "",
-          scope: i.kanal_media || i.channel || "",
-          start_date: i.tanggal_mulai || i.period_start || "",
+          contract_reference: i.contract_number || "",
+          scope: i.media_channel || i.channel || "",
+          start_date: i.start_date || i.period_start || "",
           end_date: endDateStr,
           pricing_model: i.pricing_model || "",
           charging_type: i.charging_type || "",
-          payment_scheme: i.skema_pembayaran || i.model_pembayaran || "",
+          payment_scheme: i.payment_scheme || i.pricing_model || "",
           currency: i.currency,
-          value: i.nilai_io || i.total_nominal || 0,
-          value_usd: i.nilai_io_usd || 0,
+          value: i.io_value || i.total_nominal || 0,
+          value_usd: i.io_value_usd || 0,
           deliverables: i.deliverables || "",
-          notice_period_days: i.notice_period_hari || i.notice_period_days || 14,
+          notice_period_days: i.notice_period_days || 14,
           status: lifecycle.status,
-          internal_notes: i.internal_notes || i.notes || i.catatan || "",
+          internal_notes: i.internal_notes || i.notes || "",
           days_remaining: lifecycle.daysRemaining,
         };
       }),
@@ -6907,7 +6925,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
         pricing: e.pricing,
         calculated_score: e.calculated_score,
         final_evaluation: e.final_evaluation,
-        internal_notes: e.notes || e.catatan || "",
+        internal_notes: e.notes || "",
       })),
     };
     const moduleNote = settings.modules.commercialDocuments
@@ -7160,7 +7178,7 @@ app.use("/api", createOrganizationAdminRouter({
   departmentReferenced: (organizationId: string, department: { id: string; name: string }) => {
     const key = normalizeDepartmentName(department.name);
     return ["partners", "contracts"].some((collection) => (db[collection] || []).some((row: any) =>
-      row?.organizationId === organizationId && normalizeDepartmentName(row.pic_internal || row.internal_pic) === key));
+      row?.organizationId === organizationId && normalizeDepartmentName(row.internal_pic) === key));
   },
   inviteUrl: (req: express.Request, token: string) => {
     const base = getPublicBaseUrl() || `${req.protocol}://${req.get("host")}`;

@@ -36,7 +36,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
   onSave,
 }) => {
   const { t } = useLanguage();
-  const partnerName = (id?: string) => partners.find((p) => p.partner_id === id)?.nama_partner;
+  const partnerName = (id?: string) => partners.find((p) => p.partner_id === id)?.partner_name;
   const isInitialIO = initialParent && 'io_id' in initialParent;
   const [parentType, setParentType] = useState<'Contract' | 'IO'>(isInitialIO ? 'IO' : 'Contract');
   const [parentId, setParentId] = useState<string>(
@@ -86,20 +86,20 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
       }
       if (result.success && result.data) {
         const parsed = result.data;
-        if (parsed.nomor_kontrak) setNomorAddendum(parsed.nomor_kontrak);
-        if (parsed.tanggal_mulai) setTanggalAddendum(parsed.tanggal_mulai);
-        if (parsed.ringkasan_perubahan) setRingkasanPerubahan(parsed.ringkasan_perubahan);
-        if (Array.isArray(parsed.field_yang_berubah) && parsed.field_yang_berubah.length > 0) {
-          setSelectedFields(parsed.field_yang_berubah);
+        if (parsed.contract_number) setNomorAddendum(parsed.contract_number);
+        if (parsed.start_date) setTanggalAddendum(parsed.start_date);
+        if (parsed.change_summary) setRingkasanPerubahan(parsed.change_summary);
+        if (Array.isArray(parsed.changed_fields) && parsed.changed_fields.length > 0) {
+          setSelectedFields(parsed.changed_fields);
         }
 
         // Match parent contract if available
-        if (parsed.nomor_kontrak_induk) {
-          const rawInduk = parsed.nomor_kontrak_induk.toLowerCase().trim();
+        if (parsed.parent_contract_number) {
+          const rawInduk = parsed.parent_contract_number.toLowerCase().trim();
           const matchedContract = contracts.find(c =>
-            c.nomor_kontrak && (
-              c.nomor_kontrak.toLowerCase().includes(rawInduk) ||
-              rawInduk.includes(c.nomor_kontrak.toLowerCase())
+            c.contract_number && (
+              c.contract_number.toLowerCase().includes(rawInduk) ||
+              rawInduk.includes(c.contract_number.toLowerCase())
             )
           );
           if (matchedContract) {
@@ -181,7 +181,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
         const parentIO = ios.find((i) => i.io_id === parentId);
         finalFileName = formatIOFileName({
           partnerName: partnerName(parentIO?.partner_id),
-          mediaChannel: parentIO?.kanal_media || 'Addendum',
+          mediaChannel: parentIO?.media_channel || 'Addendum',
           ioNumber: nomorAddendum.trim(),
           startDate: tanggalAddendum,
           rawFileName: fileName,
@@ -192,10 +192,10 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
     await onSave({
       parent_type: parentType,
       parent_id: parentId,
-      nomor_addendum: nomorAddendum.trim(),
-      tanggal_addendum: tanggalAddendum,
-      field_yang_berubah: selectedFields,
-      ringkasan_perubahan: ringkasanPerubahan.trim(),
+      addendum_number: nomorAddendum.trim(),
+      addendum_date: tanggalAddendum,
+      changed_fields: selectedFields,
+      change_summary: ringkasanPerubahan.trim(),
       fileName: finalFileName,
       fileData,
     });
@@ -247,12 +247,12 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                   {parentType === 'Contract'
                     ? contracts.map((c) => (
                         <option key={c.contract_id} value={c.contract_id}>
-                          {c.nomor_kontrak} ({partnerName(c.partner_id)})
+                          {c.contract_number} ({partnerName(c.partner_id)})
                         </option>
                       ))
                     : ios.map((i) => (
                         <option key={i.io_id} value={i.io_id}>
-                          {i.nomor_io} ({partnerName(i.partner_id)})
+                          {i.io_number} ({partnerName(i.partner_id)})
                         </option>
                       ))}
                 </AlphabeticalSelect>
@@ -261,7 +261,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
               <Field>
-                <FieldLabel>{t('form.contract.nomor_addendum', 'Nomor Addendum *')}</FieldLabel>
+                <FieldLabel>{t('form.contract.addendum_number', 'Nomor Addendum *')}</FieldLabel>
                 <Input
                   type="text"
                   required
@@ -272,7 +272,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
               </Field>
 
               <Field>
-                <FieldLabel>{t('amendments.tanggal_addendum', 'Tanggal Addendum *')}</FieldLabel>
+                <FieldLabel>{t('amendments.addendum_date', 'Tanggal Addendum *')}</FieldLabel>
                 <DateInput
                   required
                   value={tanggalAddendum}

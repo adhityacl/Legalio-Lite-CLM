@@ -1,4 +1,5 @@
 import { ModalFrame } from './ui/modal-frame';
+import { BulkSelectionBar } from './ui/bulk-selection-bar';
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { FilterSummary } from './ui/filter-summary';
@@ -10,7 +11,7 @@ import { useTenantSettings } from '../context/TenantSettingsContext';
 import { getCountryPack, localizeName } from '@legalio/shared/policy';
 
 /** Country of incorporation, falling back to the legacy BHI flag (BHI = Indonesia). */
-const partnerCountry = (p: Partner): string => p.country ?? (p.badan_hukum === 'BHI' ? 'ID' : '');
+const partnerCountry = (p: Partner): string => p.country ?? (p.legal_status_flag === 'BHI' ? 'ID' : '');
 import { Partner, Contract, DDDokumenItem, PartnerEvaluation } from '@legalio/types';
 import {
   MoreHorizontal,
@@ -83,6 +84,7 @@ interface PartnersViewProps {
   onAddPartner: () => void;
   onEditPartner: (partner: Partner) => void;
   onDeletePartner: (id: string, name: string) => void;
+  onDeletePartners: (ids: string[]) => Promise<void>;
   onUploadDDDoc?: (partnerId: string, docName: string) => void;
 }
 
@@ -97,6 +99,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   onAddPartner,
   onEditPartner,
   onDeletePartner,
+  onDeletePartners,
   onUploadDDDoc,
 }) => {
   const { hasPermission } = usePermissions();
@@ -133,9 +136,9 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   // Key order is both the Toggle Kolom menu order and the table's column order.
   const DEFAULT_PARTNER_COLUMNS = {
-    nama_partner: true,
+    partner_name: true,
     channel: false,
-    badan_hukum: true,
+    legal_status_flag: true,
     kategori: false,
     pic: true,
     email: false,
@@ -192,11 +195,11 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
     const pCountry = partnerCountry(p);
 
     const matchSearch =
-      p.nama_partner.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.partner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.codename && p.codename.toLowerCase().includes(searchTerm.toLowerCase())) ||
       countryLabel(pCountry).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      [p.nama_pic, p.email_pic, p.telepon_pic].some((value) => value?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.pic_internal && p.pic_internal.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      [p.pic_name, p.pic_email, p.pic_phone].some((value) => value?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (p.internal_pic && p.internal_pic.toLowerCase().includes(searchTerm.toLowerCase())) ||
       p.partner_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       partnerTags.some((t) => t.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -213,7 +216,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
     const matchDepartment =
       selectedDepartment === 'ALL' ||
-      Boolean(p.pic_internal && p.pic_internal.toLowerCase() === selectedDepartment.toLowerCase());
+      Boolean(p.internal_pic && p.internal_pic.toLowerCase() === selectedDepartment.toLowerCase());
 
     return matchSearch && matchStatus && matchBadanHukum && matchPartnerStatus && matchDepartment;
   });
@@ -231,8 +234,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
           valB = (b.codename || b.partner_id || '').toLowerCase();
           break;
         case 'name':
-          valA = (a.nama_partner || '').toLowerCase();
-          valB = (b.nama_partner || '').toLowerCase();
+          valA = (a.partner_name || '').toLowerCase();
+          valB = (b.partner_name || '').toLowerCase();
           break;
         case 'tags':
           valA = getValidPartnerTags(a.tags).join(', ').toLowerCase();
@@ -243,8 +246,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
           valB = getPartnerStatus(b.partner_id).toLowerCase();
           break;
         case 'pic':
-          valA = (a.nama_pic || '').toLowerCase();
-          valB = (b.nama_pic || '').toLowerCase();
+          valA = (a.pic_name || '').toLowerCase();
+          valB = (b.pic_name || '').toLowerCase();
           break;
         case 'status_dd':
           valA = (a.status_dd || '').toLowerCase();
@@ -329,8 +332,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
     ];
 
     const rows = currentPartners.map((p) => {
-      const documents = p.daftar_dokumen_dd.filter((d) => !isTerminationNoticeDocument(d));
-      const wajibDocs = documents.filter((d) => d.wajib);
+      const documents = p.dd_documents.filter((d) => !isTerminationNoticeDocument(d));
+      const wajibDocs = documents.filter((d) => d.required);
       const adaWajib = wajibDocs.filter((d) => d.status === 'Available');
       const totalDocs = documents.length || 1;
       const adaDocs = documents.filter((d) => d.status === 'Available').length;
@@ -344,19 +347,19 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
       return [
         p.partner_id,
-        `"${(p.nama_partner || '').replace(/"/g, '""')}"`,
+        `"${(p.partner_name || '').replace(/"/g, '""')}"`,
         `"${pStatus}"`,
         `${activeContractsCount}`,
         `"${partnerCountry(p)}"`,
         `"${pTags.replace(/"/g, '""')}"`,
-        `"${([p.nama_pic, p.email_pic, p.telepon_pic].filter(Boolean).join(' / ')).replace(/"/g, '""')}"`,
+        `"${([p.pic_name, p.pic_email, p.pic_phone].filter(Boolean).join(' / ')).replace(/"/g, '""')}"`,
         `"${(p.status_dd || '').replace(/"/g, '""')}"`,
         `${progress}%`,
         `${wajibDocs.length > 0 ? adaWajib.length : adaDocs}`,
         `${wajibDocs.length > 0 ? wajibDocs.length : totalDocs}`,
-        p.tanggal_dd_diverifikasi || '-',
-        `"${(p.link_folder_dd || '').replace(/"/g, '""')}"`,
-        `"${(p.catatan || '').replace(/"/g, '""')}"`,
+        p.dd_verified_date || '-',
+        `"${(p.dd_folder_link || '').replace(/"/g, '""')}"`,
+        `"${(p.notes || '').replace(/"/g, '""')}"`,
       ];
     });
 
@@ -518,9 +521,9 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               <TableViewMenu title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
                 {Object.keys(visibleColumns).map((col) => {
                   let label = col;
-                  if (col === 'nama_partner') label = t('partners.col_name', 'Nama Partner');
+                  if (col === 'partner_name') label = t('partners.col_name', 'Nama Partner');
                   else if (col === 'channel') label = t('partners.col_channel', 'Nama Channel');
-                  else if (col === 'badan_hukum') label = t('partners.col_entity', 'Badan Hukum');
+                  else if (col === 'legal_status_flag') label = t('partners.col_entity', 'Badan Hukum');
                   else if (col === 'kategori') label = t('partners.col_category', 'Kategori Kerjasama');
                   else if (col === 'pic') label = t('partners.col_pic', 'PIC Partner');
                   else if (col === 'email') label = t('partners.col_email', 'Email');
@@ -536,6 +539,14 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
           </div>
         </Card>
 
+          {canDeletePartner(user) && (
+            <BulkSelectionBar
+              count={selectedRows.length}
+              noun={t('bulk.noun_partner', 'partner')}
+              onDelete={async () => { await onDeletePartners(selectedRows); setSelectedRows([]); }}
+            />
+          )}
+
           {/* Partners List: TABLE VIEW */}
           <Card className="overflow-hidden">
               <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_dd'), value: selectedDDStatus, active: selectedDDStatus !== 'ALL' }, { label: t('ui.filter_country'), value: selectedBadanHukum, active: selectedBadanHukum !== 'ALL' }, { label: t('ui.filter_status'), value: selectedPartnerStatus, active: selectedPartnerStatus !== 'ALL' }, { label: t('ui.filter_department'), value: selectedDepartment, active: selectedDepartment !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedDDStatus('ALL'); setSelectedBadanHukum('ALL'); setSelectedPartnerStatus('ALL'); setSelectedDepartment('ALL'); }} />
@@ -549,9 +560,9 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                           <Checkbox checked={selectedRows.length > 0 && selectedRows.length === currentPartners.length} aria-label={t('partners.select_all', 'Pilih semua partner')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                         </div>
                       </TableColumnHeader>
-                      {visibleColumns.nama_partner && renderSortHeader(t('partners.col_name', 'Nama Partner'), 'name')}
+                      {visibleColumns.partner_name && renderSortHeader(t('partners.col_name', 'Nama Partner'), 'name')}
                       {visibleColumns.channel && renderSortHeader(t('partners.col_channel', 'Nama Channel'), 'channel')}
-                      {visibleColumns.badan_hukum && <TableColumnHeader scope="col">{t('partners.col_entity', 'Badan Hukum')}</TableColumnHeader>}
+                      {visibleColumns.legal_status_flag && <TableColumnHeader scope="col">{t('partners.col_entity', 'Badan Hukum')}</TableColumnHeader>}
                       {visibleColumns.kategori && renderSortHeader(t('partners.col_category', 'Kategori Kerjasama'), 'tags')}
                       {visibleColumns.pic && renderSortHeader(t('partners.col_pic', 'PIC Partner'), 'pic')}
                       {visibleColumns.email && <TableColumnHeader scope="col">{t('partners.col_email', 'Email')}</TableColumnHeader>}
@@ -576,14 +587,14 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                           <TableRow key={partner.partner_id}>
                             <TableCell>
                               <div className="flex items-center justify-start">
-                                <Checkbox checked={selectedRows.includes(partner.partner_id)} aria-label={t('partners.pilih', 'Pilih {nama_partner}', { nama_partner: partner.nama_partner })} onCheckedChange={() => handleSelectRow(partner.partner_id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
+                                <Checkbox checked={selectedRows.includes(partner.partner_id)} aria-label={t('partners.pilih', 'Pilih {partner_name}', { partner_name: partner.partner_name })} onCheckedChange={() => handleSelectRow(partner.partner_id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                               </div>
                             </TableCell>
 
                             {/* 1. Nama Partner */}
-                            {visibleColumns.nama_partner && (
+                            {visibleColumns.partner_name && (
                               <TableCell>
-                                {partner.nama_partner}
+                                {partner.partner_name}
                               </TableCell>
                             )}
 
@@ -594,7 +605,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                             )}
 
                             {/* 2. Country */}
-                            {visibleColumns.badan_hukum && (
+                            {visibleColumns.legal_status_flag && (
                               <TableCell>
                                 <Badge tone={statusTone(partnerCountry(partner) === homeCountry ? 'BHI' : 'BHA')}>
                                   {partnerCountry(partner) || '—'}
@@ -619,15 +630,15 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                             {/* 3. PIC Partner */}
                             {visibleColumns.pic && (
                               <TableCell>
-                                {partner.nama_pic || '-'}
+                                {partner.pic_name || '-'}
                               </TableCell>
                             )}
 
                             {visibleColumns.email && (
                               <TableCell className="whitespace-nowrap">
-                                {partner.email_pic ? (
-                                  <Button asChild variant="link"><a href={`mailto:${partner.email_pic}`} >
-                                    {partner.email_pic}
+                                {partner.pic_email ? (
+                                  <Button asChild variant="link"><a href={`mailto:${partner.pic_email}`} >
+                                    {partner.pic_email}
                                   </a></Button>
                                 ) : (
                                   '—'
@@ -637,9 +648,9 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
                             {visibleColumns.telepon && (
                               <TableCell className="whitespace-nowrap">
-                                {partner.telepon_pic ? (
-                                  <Button asChild variant="link"><a href={`tel:${partner.telepon_pic.replace(/[^\d+]/g, '')}`} >
-                                    {partner.telepon_pic}
+                                {partner.pic_phone ? (
+                                  <Button asChild variant="link"><a href={`tel:${partner.pic_phone.replace(/[^\d+]/g, '')}`} >
+                                    {partner.pic_phone}
                                   </a></Button>
                                 ) : (
                                   '—'
@@ -700,7 +711,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                           {
                                             label: t('io.action_delete', 'Hapus'),
                                             icon: <Trash2 className="w-g13 h-g13" />,
-                                            onClick: () => onDeletePartner(partner.partner_id, partner.nama_partner),
+                                            onClick: () => onDeletePartner(partner.partner_id, partner.partner_name),
                                             variant: 'danger' as const,
                                             dividerBefore: true,
                                           },
@@ -739,10 +750,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               <div>
                 <DialogTitle className="flex items-center gap-g8">
                   <Building2 className="w-g21 h-g21 text-accent-foreground" />
-                  <span>{selectedPartnerDetail.nama_partner}</span>
+                  <span>{selectedPartnerDetail.partner_name}</span>
                 </DialogTitle>
                 <Text size="xs" tone="muted" className="mt-g2">
-                  {t('partners.status_dd', 'Status DD:')} <strong className="text-foreground">{selectedPartnerDetail.status_dd}</strong> {t('partners.pic', '• PIC: {nama_pic}', { nama_pic: selectedPartnerDetail.nama_pic || '-' })}
+                  {t('partners.status_dd', 'Status DD:')} <strong className="text-foreground">{selectedPartnerDetail.status_dd}</strong> {t('partners.pic', '• PIC: {pic_name}', { pic_name: selectedPartnerDetail.pic_name || '-' })}
                 </Text>
               </div>
 
@@ -756,14 +767,14 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
             <div className="p-g21 sm:p-g21 overflow-y-auto space-y-g13 text-xs flex-1">
               {/* Due Diligence Narrative Profile */}
-              {selectedPartnerDetail.catatan && (
+              {selectedPartnerDetail.notes && (
                 <Card className="p-g13 space-y-g5">
                   <Heading as="h4" size="xs" weight="bold" className="text-accent-foreground flex items-center gap-g5">
                     <ShieldCheck className="w-g16 h-g16 text-accent-foreground" />
                     <span>{t('partners.profil_due_diligence_operasional_vendor_senior', 'Profil Due Diligence & Operasional Vendor (Senior Risk Analyst)')}</span>
                   </Heading>
                   <Text size="xs" weight="medium" className="leading-relaxed">
-                    {selectedPartnerDetail.catatan}
+                    {selectedPartnerDetail.notes}
                   </Text>
                 </Card>
               )}
@@ -779,26 +790,26 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   </Text>
                 </div>
 
-                {(selectedPartnerDetail.daftar_dokumen_dd || []).filter((doc) => !isTerminationNoticeDocument(doc)).map((doc) => {
+                {(selectedPartnerDetail.dd_documents || []).filter((doc) => !isTerminationNoticeDocument(doc)).map((doc) => {
                   const displayName = localizeDueDiligenceDocument(doc, policy.dueDiligenceChecklist, language);
                   const docFiles = doc.files && doc.files.length > 0
                     ? doc.files
                     : doc.linkDrive
                     ? [
                         {
-                          id: 'legacy_' + doc.nama,
-                          fileName: `${doc.nama}.pdf`,
+                          id: 'legacy_' + doc.name,
+                          fileName: `${doc.name}.pdf`,
                           linkDrive: doc.linkDrive,
                           uploadedAt: doc.uploadedAt || '',
                           year: doc.uploadedAt ? new Date(doc.uploadedAt).getFullYear().toString() : '',
-                          tanggalKadaluarsa: doc.tanggalKadaluarsa,
+                          expiryDate: doc.expiryDate,
                         },
                       ]
                     : [];
 
                   return (
                     <Card
-                      key={doc.nama}
+                      key={doc.name}
                       className="p-g13 sm:p-g13 space-y-g13"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-g13">
@@ -806,7 +817,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                           <Text as="span" size="xs" weight="bold">{displayName}</Text>
 
                           {/* Wajib / Opsional Pill Badge (Refined) */}
-                          {doc.wajib ? (
+                          {doc.required ? (
                             <Badge tone="danger" className="uppercase">{t('settings.region.dd_required', 'Wajib')}</Badge>
                           ) : (
                             <Badge tone="neutral" className="uppercase">{t('contract_creator.optional_badge', 'Opsional')}</Badge>
@@ -832,7 +843,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                             onClick={() => {
                               setUploadModalState({
                                 partner: selectedPartnerDetail,
-                                docName: doc.nama,
+                                docName: doc.name,
                               });
                             }}
                           >
@@ -853,7 +864,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                               <div className="flex items-center gap-g8 min-w-0">
                                 <FileText className="w-g13 h-g13 text-accent-foreground shrink-0" />
                                 <Text as="span" size="xs" weight="medium" truncate>
-                                  {f.fileName || `${doc.nama}.pdf`}
+                                  {f.fileName || `${doc.name}.pdf`}
                                 </Text>
                               </div>
 
@@ -871,7 +882,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                 {isLegal && (
                                   <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm"
                                     type="button"
-                                    onClick={() => handleDeleteDDFile(selectedPartnerDetail.partner_id, doc.nama, f.id, displayName)}
+                                    onClick={() => handleDeleteDDFile(selectedPartnerDetail.partner_id, doc.name, f.id, displayName)}
                                     className="text-destructive" aria-label={t('partners.hapus_file_ini', 'Hapus file ini')}
                                   >
                                     <Trash2 className="w-g13 h-g13" />

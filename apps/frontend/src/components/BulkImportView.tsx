@@ -18,6 +18,7 @@ import { useTenantSettings, type TenantPolicyView } from '../context/TenantSetti
 import { downloadCsv, parseCSV } from '../lib/csv';
 import { Partner, Contract, InsertionOrder } from '@legalio/types';
 import { BULK_DATE_FIELDS, bulkDate, bulkDateAmbiguous } from '@legalio/shared/bulkParse';
+import { LEGACY_FIELD_NAMES, renameLegacyKeys } from '@legalio/shared/fieldNames';
 
 import { Button } from '@legalio/ui-components/button';
 import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
@@ -81,8 +82,8 @@ function buildTemplates(policy: TenantPolicyView): Record<ImportType, ImportTemp
   return {
     partners: {
       headers: [
-        'nama_partner', 'partner_channel', 'internal_pic', 'jenis_partner', 'nama_pic', 'email_pic',
-        'telepon_pic', 'alamat_pic', 'country', 'entity_type', 'identifiers', 'catatan', 'tags',
+        'partner_name', 'partner_channel', 'internal_pic', 'partner_type', 'pic_name', 'pic_email',
+        'pic_phone', 'pic_address', 'country', 'entity_type', 'identifiers', 'notes', 'tags',
       ],
       example: [
         partnerName, category, 'Procurement', 'Vendor', contactName, 'contact@contoh.example.com',
@@ -91,9 +92,9 @@ function buildTemplates(policy: TenantPolicyView): Record<ImportType, ImportTemp
     },
     contracts: {
       headers: [
-        'nomor_kontrak', 'judul_kontrak', 'partner_nama', 'jenis_dokumen', 'parent_contract_nomor', 'kategori_kerjasama',
-        'tanggal_mulai', 'tanggal_berakhir', 'currency', 'nilai_kontrak', 'auto_renewal', 'status_approval',
-        'notice_period_hari', 'notice_type_required', 'pic_internal', 'internal_notes',
+        'contract_number', 'contract_title', 'partner_name', 'document_type', 'parent_contract_number', 'cooperation_categories',
+        'start_date', 'end_date', 'currency', 'contract_value', 'auto_renewal', 'status_approval',
+        'notice_period_days', 'notice_type_required', 'internal_pic', 'internal_notes',
       ],
       example: [
         'MSA/2026/001', 'Master Services Agreement', partnerName, 'Master Agreement', '', category,
@@ -102,9 +103,9 @@ function buildTemplates(policy: TenantPolicyView): Record<ImportType, ImportTemp
     },
     ios: {
       headers: [
-        'nomor_io', 'judul_io', 'partner_nama', 'contract_nomor', 'kanal_media',
-        'tanggal_mulai', 'tanggal_berakhir', 'pricing_model', 'charging_type', 'currency',
-        'nilai_io', 'deliverables', 'notice_period_hari', 'notice_type_required', 'internal_notes',
+        'io_number', 'io_title', 'partner_name', 'contract_number', 'media_channel',
+        'start_date', 'end_date', 'pricing_model', 'charging_type', 'currency',
+        'io_value', 'deliverables', 'notice_period_days', 'notice_type_required', 'internal_notes',
       ],
       example: [
         'BMD/IO/2026/001', `${orderLabel} 2026`, partnerName, 'MSA/2026/001', 'Managed service',
@@ -224,8 +225,9 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
         setParsedRows(null);
         return;
       }
-      setParsedHeaders(result.headers);
-      setParsedRows(result.rows);
+      // CSV files made from the old Indonesian template still import: their headers are mapped to the English names.
+      setParsedHeaders(result.headers.map(header => LEGACY_FIELD_NAMES[header] ?? header));
+      setParsedRows(result.rows.map(row => renameLegacyKeys(row)));
     };
     reader.readAsText(file);
   }, [t]);

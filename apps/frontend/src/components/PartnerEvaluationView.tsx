@@ -1,4 +1,6 @@
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
+import { BulkSelectionBar } from './ui/bulk-selection-bar';
+import { deleteRecords } from '../lib/bulkDelete';
 import { downloadCsv } from '../lib/csv';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { ModalFrame } from './ui/modal-frame';
@@ -309,12 +311,12 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
       }
     });
     contracts.forEach((c) => {
-      if (c.tanggal_mulai) {
-        const yr = c.tanggal_mulai.split('-')[0];
+      if (c.start_date) {
+        const yr = c.start_date.split('-')[0];
         if (yr && yr.length === 4) yrSet.add(yr);
       }
-      if (c.tanggal_berakhir && !c.tanggal_berakhir.toLowerCase().includes('unlimited')) {
-        const yr = c.tanggal_berakhir.split('-')[0];
+      if (c.end_date && !c.end_date.toLowerCase().includes('unlimited')) {
+        const yr = c.end_date.split('-')[0];
         if (yr && yr.length === 4) yrSet.add(yr);
       }
     });
@@ -331,14 +333,14 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
       if (partnerContracts.length > 0) {
         return partnerContracts.some((c) => {
           let startYr = 2023;
-          if (c.tanggal_mulai) {
-            const yr = parseInt(c.tanggal_mulai.split('-')[0], 10);
+          if (c.start_date) {
+            const yr = parseInt(c.start_date.split('-')[0], 10);
             if (!isNaN(yr)) startYr = yr;
           }
 
-          const endStr = (c.tanggal_berakhir || '').toLowerCase().trim();
+          const endStr = (c.end_date || '').toLowerCase().trim();
           const isUnlimited =
-            !c.tanggal_berakhir ||
+            !c.end_date ||
             endStr === '' ||
             endStr.includes('unlimited') ||
             endStr.includes('tanpa batas') ||
@@ -346,8 +348,8 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
             c.auto_renewal;
 
           let endYr = Infinity;
-          if (!isUnlimited && c.tanggal_berakhir) {
-            const parsedEnd = parseInt(c.tanggal_berakhir.split('-')[0], 10);
+          if (!isUnlimited && c.end_date) {
+            const parsedEnd = parseInt(c.end_date.split('-')[0], 10);
             if (!isNaN(parsedEnd)) {
               endYr = parsedEnd;
             }
@@ -358,8 +360,8 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
             } else if (c.updated_at) {
               const termYr = parseInt(c.updated_at.split('-')[0], 10);
               if (!isNaN(termYr)) endYr = termYr;
-            } else if (c.tanggal_berakhir) {
-              const parsedEnd = parseInt(c.tanggal_berakhir.split('-')[0], 10);
+            } else if (c.end_date) {
+              const parsedEnd = parseInt(c.end_date.split('-')[0], 10);
               if (!isNaN(parsedEnd)) endYr = parsedEnd;
             }
           }
@@ -387,14 +389,14 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
     const unEvaluatedItems: PartnerEvaluation[] = targetPartnersList
       .filter((p) => {
         const hasById = evaluatedPartnerIds.has(p.partner_id);
-        const hasByName = evaluatedPartnerNames.has(p.nama_partner.toLowerCase());
+        const hasByName = evaluatedPartnerNames.has(p.partner_name.toLowerCase());
         return !hasById && !hasByName;
       })
       .map((p) => ({
         id: `NOT_REVIEWED_${p.partner_id}_${selectedYear}`,
         review_date: `${selectedYear}`,
         partner_id: p.partner_id,
-        supplier_name: p.nama_partner,
+        supplier_name: p.partner_name,
         obligation_target: 'Kurang baik',
         incident_frequency: 'Frequent',
         communication: 'Kurang baik',
@@ -543,6 +545,24 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
       } catch (err) {
         console.warn(err);
       }
+    }
+  };
+
+  const handleBulkDelete = async (ids: string[]) => {
+    if (!canDeleteEvaluation) return;
+    // Rows for partners without a review are placeholders, not records.
+    const targets = ids.filter(id => id && !id.startsWith('NOT_REVIEWED'));
+    if (targets.length === 0) return;
+    const ok = await confirmDialog({
+      description: t('bulk.confirm_delete', 'Hapus {count} {noun} terpilih? Tindakan ini tidak dapat dibatalkan.', { count: targets.length, noun: t('bulk.noun_evaluation', 'evaluasi') }),
+      tone: 'danger',
+      confirmLabel: t('io.action_delete', 'Hapus'),
+    });
+    if (!ok) return;
+    const failed = await deleteRecords('/api/partner-evaluations', targets, { userEmail, userName, userRole });
+    onRefreshData();
+    if (failed.length > 0) {
+      showAlert({ title: t('bulk.delete_failed_title', 'Sebagian gagal dihapus'), description: t('bulk.delete_failed_message', '{failed} dari {total} gagal dihapus.', { failed: failed.length, total: targets.length }), variant: 'destructive' });
     }
   };
 
@@ -725,6 +745,13 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
       </div>
     </Card>
 
+      {canDeleteEvaluation && (
+        <BulkSelectionBar
+          count={selectedRows.filter(id => id && !id.startsWith('NOT_REVIEWED')).length}
+          noun={t('bulk.noun_evaluation', 'evaluasi')}
+          onDelete={async () => { await handleBulkDelete(selectedRows); setSelectedRows([]); }}
+        />
+      )}
       <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_year'), value: selectedYear, active: selectedYear !== String(new Date().getFullYear()) }, { label: t('ui.filter_decision'), value: selectedEvaluationFilter, active: selectedEvaluationFilter !== 'ALL' }, { label: t('ui.filter_target'), value: selectedObligationTarget, active: selectedObligationTarget !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedYear(String(new Date().getFullYear())); setSelectedEvaluationFilter('ALL'); setSelectedObligationTarget('ALL'); }} />
         <Text size="xs" tone="muted" className="px-g13 py-g8 md:hidden">{t('ui.scroll_table')}</Text>
@@ -975,7 +1002,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                           value={formData.supplier_name}
                           onChange={(e) => {
                             const selectedPartnerName = e.target.value;
-                            const found = partners.find((p) => p.nama_partner === selectedPartnerName);
+                            const found = partners.find((p) => p.partner_name === selectedPartnerName);
                             setFormData({
                               ...formData,
                               supplier_name: selectedPartnerName,
@@ -988,8 +1015,8 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
                             {t('eval.select_partner_ph')}
                           </option>
                           {partners.map((p) => (
-                            <option key={p.partner_id} value={p.nama_partner}>
-                              {p.nama_partner} ({p.partner_id} - {p.jenis_partner})
+                            <option key={p.partner_id} value={p.partner_name}>
+                              {p.partner_name} ({p.partner_id} - {p.partner_type})
                             </option>
                           ))}
                         </AlphabeticalSelect>

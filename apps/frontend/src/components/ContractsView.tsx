@@ -1,4 +1,5 @@
 import { ModalFrame } from './ui/modal-frame';
+import { BulkSelectionBar } from './ui/bulk-selection-bar';
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { formatBusinessDate } from '../lib/displayDate';
@@ -65,6 +66,7 @@ interface ContractsViewProps {
   onAddContract: () => void;
   onEditContract: (contract: Contract) => void;
   onDeleteContract: (contractId: string) => void;
+  onDeleteContracts: (ids: string[]) => Promise<void>;
   onOpenAddendumModal: (contract: Contract) => void;
   onUpdateContractData?: (updatedContract: Contract) => void;
   openDocumentId?: string;
@@ -78,6 +80,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
   onAddContract,
   onEditContract,
   onDeleteContract,
+  onDeleteContracts,
   onOpenAddendumModal,
   onUpdateContractData,
   openDocumentId,
@@ -101,7 +104,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
   const [redliningContract, setRedliningContract] = useState<Contract | null>(null);
 
   // Categories list
-  const allCategories = useMemo(() => Array.from(new Set(contracts.flatMap(c => c.kategori_kerjasama || []))), [contracts]);
+  const allCategories = useMemo(() => Array.from(new Set(contracts.flatMap(c => c.cooperation_categories || []))), [contracts]);
   const partnersById = useMemo(() => new Map(partners.map(partner => [partner.partner_id, partner])), [partners]);
 
   // Filter logic
@@ -111,18 +114,18 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
       return false;
     }
 
-    const jenis = c.jenis_dokumen || 'Master Agreement';
+    const jenis = c.document_type || 'Master Agreement';
     const matchJenis = selectedJenisDokumen === 'ALL' || jenis === selectedJenisDokumen;
 
     const matchSearch =
-      c.nomor_kontrak.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.judul_kontrak.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (partnersById.get(c.partner_id)?.nama_partner || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.pic_internal.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (c.parent_contract_nomor && c.parent_contract_nomor.toLowerCase().includes(searchTerm.toLowerCase()));
+      c.contract_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.contract_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (partnersById.get(c.partner_id)?.partner_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.internal_pic.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c.parent_contract_number && c.parent_contract_number.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchCategory =
-      selectedCategory === 'ALL' || (c.kategori_kerjasama && c.kategori_kerjasama.includes(selectedCategory));
+      selectedCategory === 'ALL' || (c.cooperation_categories && c.cooperation_categories.includes(selectedCategory));
 
     const matchStatus = selectedStatus === 'ALL' || c.status === selectedStatus;
 
@@ -135,14 +138,14 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const DEFAULT_CONTRACT_COLUMNS = {
-    jenis_dokumen: false,
-    nomor_kontrak: true,
-    judul_kontrak: true,
+    document_type: false,
+    contract_number: true,
+    contract_title: true,
     partner: true,
     kategori: false,
     nilai: true,
-    tanggal_mulai: false,
-    tanggal_selesai: false,
+    start_date: false,
+    completion_date: false,
     status: true,
     file: false,
   };
@@ -182,36 +185,36 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
       let valA: any = '';
       let valB: any = '';
 
-      const getPartnerName = (c: Contract) => partnersById.get(c.partner_id)?.nama_partner || '';
+      const getPartnerName = (c: Contract) => partnersById.get(c.partner_id)?.partner_name || '';
 
       switch (sortField) {
         case 'no':
-          valA = a.nomor_kontrak;
-          valB = b.nomor_kontrak;
+          valA = a.contract_number;
+          valB = b.contract_number;
           break;
         case 'partner':
           valA = getPartnerName(a);
           valB = getPartnerName(b);
           break;
         case 'doc_type':
-          valA = `${a.jenis_dokumen || ''}_${(a.kategori_kerjasama || []).join(', ')}`;
-          valB = `${b.jenis_dokumen || ''}_${(b.kategori_kerjasama || []).join(', ')}`;
+          valA = `${a.document_type || ''}_${(a.cooperation_categories || []).join(', ')}`;
+          valB = `${b.document_type || ''}_${(b.cooperation_categories || []).join(', ')}`;
           break;
         case 'value':
-          valA = a.nilai_kontrak_usd ?? a.nilai_kontrak;
-          valB = b.nilai_kontrak_usd ?? b.nilai_kontrak;
+          valA = a.contract_value_usd ?? a.contract_value;
+          valB = b.contract_value_usd ?? b.contract_value;
           break;
         case 'duration':
-          valA = a.tanggal_selesai || a.tanggal_mulai || '';
-          valB = b.tanggal_selesai || b.tanggal_mulai || '';
+          valA = a.completion_date || a.start_date || '';
+          valB = b.completion_date || b.start_date || '';
           break;
         case 'status':
           valA = a.status || '';
           valB = b.status || '';
           break;
         case 'document':
-          valA = a.link_file_kontrak || '';
-          valB = b.link_file_kontrak || '';
+          valA = a.contract_file_link || '';
+          valB = b.contract_file_link || '';
           break;
         default:
           return 0;
@@ -297,25 +300,25 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
     const rows = currentContracts.map((c) => {
       const partnerObj = partnersById.get(c.partner_id);
-      const partnerName = partnerObj?.nama_partner || '-';
+      const partnerName = partnerObj?.partner_name || '-';
       return [
-        c.jenis_dokumen || 'Master Agreement',
-        c.nomor_kontrak,
-        c.judul_kontrak,
-        c.parent_contract_nomor || '-',
+        c.document_type || 'Master Agreement',
+        c.contract_number,
+        c.contract_title,
+        c.parent_contract_number || '-',
         partnerName,
-        (c.kategori_kerjasama || []).join('; '),
-        c.tanggal_mulai,
-        c.tanggal_selesai,
+        (c.cooperation_categories || []).join('; '),
+        c.start_date,
+        c.completion_date,
         c.currency || '',
-        c.nilai_kontrak,
-        c.nilai_kontrak_usd ?? convertToUsdWithFallback(c.nilai_kontrak, c.currency || 'USD'),
+        c.contract_value,
+        c.contract_value_usd ?? convertToUsdWithFallback(c.contract_value, c.currency || 'USD'),
         c.status,
-        c.sisa_hari !== undefined ? c.sisa_hari : '',
-        c.pic_internal,
-        c.notice_period_hari,
+        c.days_remaining !== undefined ? c.days_remaining : '',
+        c.internal_pic,
+        c.notice_period_days,
         c.notice_type_required,
-        c.link_file_kontrak || '',
+        c.contract_file_link || '',
       ];
     });
 
@@ -434,14 +437,14 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
           <TableViewMenu title={t('io.view_settings', 'Pengaturan Tampilan Kolom')} label={t('io.view', 'View')}>
             {Object.keys(visibleColumns).map((col) => {
               let label = col;
-              if (col === 'jenis_dokumen') label = t('contracts.col_doc_type', 'Jenis Dokumen');
-              else if (col === 'nomor_kontrak') label = t('contracts.col_no', 'Nomor Kontrak');
-              else if (col === 'judul_kontrak') label = t('contracts.col_title', 'Judul Kontrak');
+              if (col === 'document_type') label = t('contracts.col_doc_type', 'Jenis Dokumen');
+              else if (col === 'contract_number') label = t('contracts.col_no', 'Nomor Kontrak');
+              else if (col === 'contract_title') label = t('contracts.col_title', 'Judul Kontrak');
               else if (col === 'partner') label = t('contracts.col_partner', 'Partner');
               else if (col === 'kategori') label = t('contracts.col_category', 'Kategori');
               else if (col === 'nilai') label = t('contracts.col_value', 'Nilai Kontrak');
-              else if (col === 'tanggal_mulai') label = t('contracts.col_start_date', 'Tanggal Mulai');
-              else if (col === 'tanggal_selesai') label = t('contracts.col_end_date', 'Tanggal Selesai');
+              else if (col === 'start_date') label = t('contracts.col_start_date', 'Tanggal Mulai');
+              else if (col === 'completion_date') label = t('contracts.col_end_date', 'Tanggal Selesai');
               else if (col === 'status') label = t('contracts.col_status', 'Status');
               else if (col === 'file') label = t('contracts.col_document', 'File Dokumen');
 
@@ -454,6 +457,13 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
     </Card>
 
       {/* Contracts Data Table */}
+      {canDeletePartner(user) && (
+        <BulkSelectionBar
+          count={selectedRows.length}
+          noun={t('bulk.noun_contract', 'kontrak')}
+          onDelete={async () => { await onDeleteContracts(selectedRows); setSelectedRows([]); }}
+        />
+      )}
       <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_type'), value: selectedJenisDokumen, active: selectedJenisDokumen !== 'ALL' }, { label: t('ui.filter_category'), value: selectedCategory, active: selectedCategory !== 'ALL' }, { label: t('ui.filter_status'), value: selectedStatus, active: selectedStatus !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedJenisDokumen('ALL'); setSelectedCategory('ALL'); setSelectedStatus('ALL'); }} />
         <Text size="xs" tone="muted" className="px-g13 py-g8 md:hidden">{t('ui.scroll_table')}</Text>
@@ -466,9 +476,9 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                     <Checkbox checked={selectedRows.length > 0 && selectedRows.length === currentContracts.length} aria-label={t('contracts.select_all', 'Pilih semua kontrak')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
                 </TableColumnHeader>
-                {visibleColumns.jenis_dokumen && renderSortHeader(t('contracts.col_doc_type', 'Jenis'), 'doc_type')}
-                {visibleColumns.nomor_kontrak && renderSortHeader(t('contracts.col_no', 'Agreement No.'), 'no')}
-                {visibleColumns.judul_kontrak && (
+                {visibleColumns.document_type && renderSortHeader(t('contracts.col_doc_type', 'Jenis'), 'doc_type')}
+                {visibleColumns.contract_number && renderSortHeader(t('contracts.col_no', 'Agreement No.'), 'no')}
+                {visibleColumns.contract_title && (
                   <TableColumnHeader scope="col">{t('contracts.col_title', 'Judul')}</TableColumnHeader>
                 )}
                 {visibleColumns.partner && renderSortHeader(t('contracts.col_partner', 'Partner'), 'partner')}
@@ -476,10 +486,10 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                   <TableColumnHeader scope="col">{t('contracts.col_category', 'Kategori')}</TableColumnHeader>
                 )}
                 {visibleColumns.nilai && renderSortHeader(t('contracts.col_value', 'Nilai'), 'value')}
-                {visibleColumns.tanggal_mulai && (
+                {visibleColumns.start_date && (
                   <TableColumnHeader scope="col">{t('contracts.col_start_date', 'Tanggal Mulai')}</TableColumnHeader>
                 )}
-                {visibleColumns.tanggal_selesai && (
+                {visibleColumns.completion_date && (
                   <TableColumnHeader scope="col">{t('contracts.col_end_date', 'Tanggal Selesai')}</TableColumnHeader>
                 )}
                 {visibleColumns.status && renderSortHeader(t('contracts.col_status', 'Status'), 'status')}
@@ -496,9 +506,9 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                 <TableEmptyState colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} />
               ) : (
                 currentContracts.map((ctr) => {
-                  const isAddendum = ctr.jenis_dokumen === 'Agreement Addendum';
+                  const isAddendum = ctr.document_type === 'Agreement Addendum';
                   const childAddendums = contracts.filter(
-                    (c) => c.jenis_dokumen === 'Agreement Addendum' && c.parent_contract_id === ctr.contract_id
+                    (c) => c.document_type === 'Agreement Addendum' && c.parent_contract_id === ctr.contract_id
                   );
                   const ctrIOs = ios.filter((i) => i.contract_id === ctr.contract_id);
 
@@ -506,12 +516,12 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                     <TableRow key={ctr.contract_id}>
                       <TableCell>
                         <div className="flex items-center justify-start">
-                          <Checkbox checked={selectedRows.includes(ctr.contract_id)} aria-label={t('contracts.pilih_kontrak', 'Pilih kontrak {nomor_kontrak}', { nomor_kontrak: ctr.nomor_kontrak })} onCheckedChange={() => handleSelectRow(ctr.contract_id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
+                          <Checkbox checked={selectedRows.includes(ctr.contract_id)} aria-label={t('contracts.pilih_kontrak', 'Pilih kontrak {contract_number}', { contract_number: ctr.contract_number })} onCheckedChange={() => handleSelectRow(ctr.contract_id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                         </div>
                       </TableCell>
 
                       {/* Jenis Dokumen */}
-                      {visibleColumns.jenis_dokumen && (
+                      {visibleColumns.document_type && (
                         <TableCell>
                           {isAddendum ? (
                             <Badge tone={statusTone('Addendum')}>
@@ -525,28 +535,28 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                         </TableCell>
                       )}
                       {/* Nomor Kontrak */}
-                      {visibleColumns.nomor_kontrak && (
+                      {visibleColumns.contract_number && (
                         <TableCell>
-                          {ctr.nomor_kontrak}
+                          {ctr.contract_number}
                         </TableCell>
                       )}
                       {/* Judul Kontrak */}
-                      {visibleColumns.judul_kontrak && (
+                      {visibleColumns.contract_title && (
                         <TableCell className="max-w-g233">
-                          <Tooltip><TooltipTrigger asChild><span className="block truncate">{ctr.judul_kontrak}</span></TooltipTrigger><TooltipBody>{ctr.judul_kontrak}</TooltipBody></Tooltip>
+                          <Tooltip><TooltipTrigger asChild><span className="block truncate">{ctr.contract_title}</span></TooltipTrigger><TooltipBody>{ctr.contract_title}</TooltipBody></Tooltip>
                         </TableCell>
                       )}
 
                       {/* 2. Partner */}
                       {visibleColumns.partner && (
-                        <TableCell>{partnersById.get(ctr.partner_id)?.nama_partner || '-'}</TableCell>
+                        <TableCell>{partnersById.get(ctr.partner_id)?.partner_name || '-'}</TableCell>
                       )}
 
                       {/* Kategori */}
                       {visibleColumns.kategori && (
                         <TableCell>
                           <div className="flex flex-wrap gap-g3">
-                            {(ctr.kategori_kerjasama || []).map((cat) => (
+                            {(ctr.cooperation_categories || []).map((cat) => (
                               <Badge
                                 key={cat}
                                 tone={statusTone('Neutral')}
@@ -560,20 +570,20 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                       {/* Nilai */}
                       {visibleColumns.nilai && (
                         <TableCell className="text-right whitespace-nowrap tabular-nums">
-                          {formatMoney(ctr.nilai_kontrak, ctr.currency)}
+                          {formatMoney(ctr.contract_value, ctr.currency)}
                         </TableCell>
                       )}
 
                       {/* Tanggal Mulai */}
-                      {visibleColumns.tanggal_mulai && (
+                      {visibleColumns.start_date && (
                         <TableCell className="whitespace-nowrap">
-                          {formatBusinessDate(ctr.tanggal_mulai)}
+                          {formatBusinessDate(ctr.start_date)}
                         </TableCell>
                       )}
                       {/* Tanggal Selesai */}
-                      {visibleColumns.tanggal_selesai && (
+                      {visibleColumns.completion_date && (
                         <TableCell className="whitespace-nowrap">
-                          {formatBusinessDate(ctr.tanggal_berakhir)}
+                          {formatBusinessDate(ctr.end_date)}
                         </TableCell>
                       )}
 
@@ -592,8 +602,8 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                       {/* File */}
                       {visibleColumns.file && (
                         <TableCell>
-                          {ctr.link_file_kontrak ? (
-                            <Button asChild variant="link"><a href={ctr.link_file_kontrak}
+                          {ctr.contract_file_link ? (
+                            <Button asChild variant="link"><a href={ctr.contract_file_link}
                               target="_blank"
                               rel="noopener noreferrer"
                               
@@ -674,9 +684,9 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               <div>
                 <DialogTitle className="flex items-center gap-g8">
                   <FileText className="w-g21 h-g21 text-accent-foreground" />
-                  <span>{detailContract.nomor_kontrak}</span>
+                  <span>{detailContract.contract_number}</span>
                 </DialogTitle>
-                <Text size="xs" tone="muted" className="mt-g2">{detailContract.judul_kontrak}</Text>
+                <Text size="xs" tone="muted" className="mt-g2">{detailContract.contract_title}</Text>
               </div>
 
               <Button variant="secondary" size="icon-sm" aria-label={t('common.close', 'Tutup')}
@@ -691,24 +701,24 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               <ContractEndingSummary contract={detailContract} />
               <Card className="grid grid-cols-2 gap-g13 p-g13 bg-background">
                 <div>
-                  <span className="text-muted-foreground block">{t('contracts.jenis_dokumen', 'Jenis Dokumen:')}</span>
+                  <span className="text-muted-foreground block">{t('contracts.document_type', 'Jenis Dokumen:')}</span>
                   <span className="font-bold text-foreground">
-                    {detailContract.jenis_dokumen || t('contracts.master_agreement', 'Master Agreement')}
+                    {detailContract.document_type || t('contracts.master_agreement', 'Master Agreement')}
                   </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block">{t('contracts.partner', 'Partner:')}</span>
                   <span className="font-bold text-foreground">
-                    {partnersById.get(detailContract.partner_id)?.nama_partner || '-'}
+                    {partnersById.get(detailContract.partner_id)?.partner_name || '-'}
                   </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block">{t('hierarchy.commercial_value', 'Nilai Komersial:')}</span>
                   <span className="font-bold text-accent-foreground">
-                    {formatMoney(detailContract.nilai_kontrak, detailContract.currency)}
+                    {formatMoney(detailContract.contract_value, detailContract.currency)}
                     {(detailContract.currency || 'USD') !== 'USD' && (
                       <Text as="span" size="xs" tone="muted" className="font-mono ml-g5">
-                        (≈ {formatMoney(detailContract.nilai_kontrak_usd, 'USD')})
+                        (≈ {formatMoney(detailContract.contract_value_usd, 'USD')})
                       </Text>
                     )}
                   </span>
@@ -716,7 +726,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                 <div>
                   <span className="text-muted-foreground block">{t('contracts.kewajiban_notice_period', 'Kewajiban Notice Period:')}</span>
                   <span className="font-semibold text-foreground">
-                    {detailContract.notice_period_hari || 0} {t('contracts.hari', 'Hari (')}{detailContract.notice_type_required || '-'})
+                    {detailContract.notice_period_days || 0} {t('contracts.hari', 'Hari (')}{detailContract.notice_type_required || '-'})
                   </span>
                 </div>
                 <div>
@@ -725,11 +735,11 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                     {detailContract.auto_renewal ? t('contracts.ya_auto_renewal', 'Ya (Auto Renewal)') : t('contracts.tidak_manual_notice', 'Tidak (Manual Notice)')}
                   </span>
                 </div>
-                {detailContract.jenis_dokumen === 'Agreement Addendum' && detailContract.parent_contract_nomor && (
+                {detailContract.document_type === 'Agreement Addendum' && detailContract.parent_contract_number && (
                   <div>
                     <span className="text-muted-foreground block">{t('contracts.master_agreement_induk', 'Master Agreement Induk:')}</span>
                     <span className="font-bold text-status-special font-mono">
-                      {detailContract.parent_contract_nomor}
+                      {detailContract.parent_contract_number}
                     </span>
                   </div>
                 )}
@@ -747,14 +757,14 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               </Card>
 
               {/* Child Agreement Addendums */}
-              {detailContract.jenis_dokumen !== 'Agreement Addendum' && (
+              {detailContract.document_type !== 'Agreement Addendum' && (
                 <div>
                   <Heading as="h4" size="xs" weight="bold" className="text-status-special mb-g8 uppercase tracking-wider flex items-center gap-g5">
                     <Link2 className="w-g16 h-g16 text-status-special" />
                     <span>{t('contract.addendum_list', 'Daftar Agreement Addendum Turunan')}</span>
                   </Heading>
                   {contracts.filter(
-                    (c) => c.jenis_dokumen === 'Agreement Addendum' && c.parent_contract_id === detailContract.contract_id
+                    (c) => c.document_type === 'Agreement Addendum' && c.parent_contract_id === detailContract.contract_id
                   ).length === 0 ? (
                     <Card className="p-g13 text-muted-foreground text-center text-xs">
                       {t('contracts.belum_ada_agreement_addendum_turunan_untuk', 'Belum ada Agreement Addendum turunan untuk kontrak induk ini.')}
@@ -763,7 +773,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                     <div className="space-y-g8">
                       {contracts
                         .filter(
-                          (c) => c.jenis_dokumen === 'Agreement Addendum' && c.parent_contract_id === detailContract.contract_id
+                          (c) => c.document_type === 'Agreement Addendum' && c.parent_contract_id === detailContract.contract_id
                         )
                         .map((add) => (
                           <div
@@ -772,21 +782,21 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                           >
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-g8 flex-wrap">
-                                <span className="font-bold text-status-special block font-mono text-xs tracking-tight">{add.nomor_kontrak}</span>
+                                <span className="font-bold text-status-special block font-mono text-xs tracking-tight">{add.contract_number}</span>
                                 {add.status && (
                                   <Badge tone="special">{add.status}</Badge>
                                 )}
                               </div>
-                              <Text as="span" size="xs" truncate className="block mt-g2">{add.judul_kontrak}</Text>
+                              <Text as="span" size="xs" truncate className="block mt-g2">{add.contract_title}</Text>
                               <Text as="span" size="xs" tone="muted" className="block mt-g2">
                                 {t('contracts.validity', 'Validity:')}{' '}
-                                {formatBusinessDate(add.tanggal_mulai)}{' '}
+                                {formatBusinessDate(add.start_date)}{' '}
                                 -{' '}
-                                {formatBusinessDate(add.tanggal_berakhir)}
+                                {formatBusinessDate(add.end_date)}
                               </Text>
                             </div>
-                            {add.link_file_kontrak && (
-                              <Button asChild variant="outline" size="sm" className="shrink-0"><a href={add.link_file_kontrak}
+                            {add.contract_file_link && (
+                              <Button asChild variant="outline" size="sm" className="shrink-0"><a href={add.contract_file_link}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 
@@ -810,7 +820,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                 </Heading>
 
                 {contracts.filter(
-                  (a) => a.jenis_dokumen === 'Agreement Addendum' && a.parent_contract_id === detailContract.contract_id
+                  (a) => a.document_type === 'Agreement Addendum' && a.parent_contract_id === detailContract.contract_id
                 ).length === 0 ? (
                   <Card className="p-g13 text-muted-foreground text-center">
                     {t('contracts.belum_ada_addendum_amendment_tercatat_untuk', 'Belum ada addendum/amendment tercatat untuk kontrak ini.')}
@@ -818,21 +828,21 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                 ) : (
                   <div className="space-y-g13 relative border-l-2 border-status-special-border ml-g13 pl-g13 pt-g3">
                     {contracts
-                      .filter((a) => a.jenis_dokumen === 'Agreement Addendum' && a.parent_contract_id === detailContract.contract_id)
+                      .filter((a) => a.document_type === 'Agreement Addendum' && a.parent_contract_id === detailContract.contract_id)
                       .map((add) => {
-                        const fieldsChanged = Array.isArray(add.field_yang_berubah)
-                          ? add.field_yang_berubah
-                          : typeof add.field_yang_berubah === 'string' && (add.field_yang_berubah as string).trim().length > 0
-                          ? (add.field_yang_berubah as string).split(',').map((s) => s.trim())
+                        const fieldsChanged = Array.isArray(add.changed_fields)
+                          ? add.changed_fields
+                          : typeof add.changed_fields === 'string' && (add.changed_fields as string).trim().length > 0
+                          ? (add.changed_fields as string).split(',').map((s) => s.trim())
                           : [];
 
                         return (
                           <Card key={add.contract_id} className="relative p-g13">
                             <BadgeDot className="size-g13 absolute -left-g26 top-g16 text-status-special border-2 border-card" />
                             <div className="flex items-center justify-between mb-g5">
-                              <span className="font-bold text-status-special text-xs font-mono">{add.nomor_kontrak}</span>
+                              <span className="font-bold text-status-special text-xs font-mono">{add.contract_number}</span>
                               <Text as="span" size="xs" tone="muted" className="font-mono">
-                                {formatBusinessDate(add.tanggal_mulai)}
+                                {formatBusinessDate(add.start_date)}
                               </Text>
                             </div>
                             {fieldsChanged.length > 0 && (
@@ -842,9 +852,9 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                                 ))}
                               </div>
                             )}
-                            {add.ringkasan_perubahan && (
+                            {add.change_summary && (
                               <Card asChild><Text size="xs" className="leading-relaxed p-g8 font-mono whitespace-pre-wrap">
-                                {add.ringkasan_perubahan}
+                                {add.change_summary}
                               </Text></Card>
                             )}
                           </Card>
@@ -872,11 +882,11 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                       .map((io) => (
                         <Card key={io.io_id} className="p-g13 flex items-center justify-between gap-g13">
                           <div>
-                            <div className="font-bold text-foreground text-xs font-mono">{io.nomor_io}</div>
-                            <div className="text-xs text-muted-foreground mt-g2">{io.judul_io}</div>
+                            <div className="font-bold text-foreground text-xs font-mono">{io.io_number}</div>
+                            <div className="text-xs text-muted-foreground mt-g2">{io.io_title}</div>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="font-bold text-status-success text-xs">{formatMoney(Number(io.nilai_io) || 0, io.currency || io.mata_uang)}</div>
+                            <div className="font-bold text-status-success text-xs">{formatMoney(Number(io.io_value) || 0, io.currency)}</div>
                             <div className="text-xs text-muted-foreground mt-g2">{io.pricing_model || 'Fixed'} • {io.charging_type || '-'}</div>
                           </div>
                         </Card>
@@ -901,7 +911,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
       <ContractRedliningModal
         isOpen={Boolean(redliningContract)}
         contract={redliningContract}
-        partnerName={partnersById.get(redliningContract?.partner_id || '')?.nama_partner}
+        partnerName={partnersById.get(redliningContract?.partner_id || '')?.partner_name}
         onClose={() => setRedliningContract(null)}
         onUpdateContract={(updatedContract) => {
           setRedliningContract(updatedContract);

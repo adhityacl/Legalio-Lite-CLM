@@ -146,11 +146,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   };
 
-  // Available Cooperation Categories directly and exclusively from Contracts (c.kategori_kerjasama)
+  // Available Cooperation Categories directly and exclusively from Contracts (c.cooperation_categories)
   const categoryOptions = useMemo(() => {
     const catSet = new Set<string>();
     (scopedContracts || []).forEach((c) => {
-      (c.kategori_kerjasama || []).forEach((cat) => {
+      (c.cooperation_categories || []).forEach((cat) => {
         if (cat && cat.trim()) catSet.add(cat.trim());
       });
     });
@@ -171,9 +171,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const spendingChart = useMemo(() => buildSpendingSeries(
     scopedSpendings, spendingFilterYear, spendingCategoryFilter,
     row => {
-      const partner = scopedPartners.find(p => p.partner_id === row.vendor_id || p.nama_partner === row.vendor_name);
+      const partner = scopedPartners.find(p => p.partner_id === row.vendor_id || p.partner_name === row.vendor_name);
       const categories = scopedContracts.filter(c => c.partner_id === partner?.partner_id)
-        .flatMap(c => c.kategori_kerjasama || []);
+        .flatMap(c => c.cooperation_categories || []);
       return categories.length ? categories : [t('ui.other')];
     }, toViewCurrency, t('ui.other'),
   ), [scopedSpendings, scopedPartners, scopedContracts, spendingFilterYear, spendingCategoryFilter, viewCurrency, localCurrency, language]);
@@ -189,27 +189,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const activeIOs = scopedIOs.filter((i) => i.status === 'Active' || i.status === 'Expiring');
   const expiringContracts = scopedContracts.filter((c) => c.status === 'Expiring');
   const expiringIOs = scopedIOs.filter((i) => i.status === 'Expiring');
-  const partnerNameById = new Map((partners || []).map((p) => [p.partner_id, p.nama_partner]));
+  const partnerNameById = new Map((partners || []).map((p) => [p.partner_id, p.partner_name]));
   const expiredContracts = scopedContracts.filter((c) => c.status === 'Expired');
   const requiringActionDocuments = [
     ...expiringContracts.map((contract) => ({
       id: contract.contract_id,
-      name: contract.judul_kontrak,
-      type: contract.jenis_dokumen === 'Agreement Addendum'
+      name: contract.contract_title,
+      type: contract.document_type === 'Agreement Addendum'
         ? t('contracts.agreement_addendum', 'Agreement Addendum')
         : t('contracts.master_agreement', 'Master Agreement'),
       partner: partnerNameById.get(contract.partner_id) || '—',
-      endDate: contract.tanggal_berakhir,
-      remainingDays: contract.sisa_hari,
+      endDate: contract.end_date,
+      remainingDays: contract.days_remaining,
       onOpen: () => onSelectContract(contract),
     })),
     ...expiringIOs.map((io) => ({
       id: io.io_id,
-      name: io.judul_io,
+      name: io.io_title,
       type: t('dashboard.insertion_orders', 'IO / SO / SOW'),
       partner: partnerNameById.get(io.partner_id) || '—',
-      endDate: io.tanggal_berakhir || io.tanggal_selesai || '',
-      remainingDays: io.sisa_hari,
+      endDate: io.end_date || io.completion_date || '',
+      remainingDays: io.days_remaining,
       onOpen: () => onNavigateTab('ios'),
     })),
   ].sort((a, b) => Date.parse(a.endDate) - Date.parse(b.endDate)).slice(0, 5);

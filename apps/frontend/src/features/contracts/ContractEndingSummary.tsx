@@ -15,7 +15,7 @@ export function ContractEndingSummary({ contract }: { contract: Contract }) {
   if (!contract.termination_date && !contract.termination_document && !contract.termination_reason) return null;
   return <Card asChild><section aria-label={t('termination.details')} className="space-y-g13 p-g21">
     <Heading as="h3" size="xs" weight="bold">{t(contract.termination_date ? 'termination.details' : 'termination.expired_details')}</Heading>
-    <Text size="sm"><Text as="strong" size="sm">{t(contract.termination_date ? 'termination.date' : 'termination.end_date')}: </Text>{formatBusinessDate(contract.termination_date || contract.tanggal_berakhir)}</Text>
+    <Text size="sm"><Text as="strong" size="sm">{t(contract.termination_date ? 'termination.date' : 'termination.end_date')}: </Text>{formatBusinessDate(contract.termination_date || contract.end_date)}</Text>
     {contract.termination_reason && <Text size="sm" className="whitespace-pre-wrap break-words"><Text as="strong" size="sm">{t('termination.reason')}: </Text>{contract.termination_reason}</Text>}
     {contract.termination_document && <Button type="button" variant="outline" className="max-w-full" onClick={async () => {
       try { await openTerminationDocument(contract.termination_document!); setError(false); } catch { setError(true); }

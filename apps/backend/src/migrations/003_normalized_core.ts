@@ -1,3 +1,4 @@
+import { renameLegacyKeys } from '@legalio/shared/fieldNames';
 import { indexConfiguration } from '../indexedConfiguration';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,7 +15,7 @@ export function migrateNormalizedCore(db: Database.Database, backupPath?: string
   for (const entity of ENTITIES) {
     const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(entity.table);
     data[entity.collection] = exists ? (db.prepare(`SELECT id, organizationId, payload FROM "${entity.table}" ORDER BY rowid`).all() as any[]).map(record => {
-      const row = JSON.parse(record.payload);
+      const row = renameLegacyKeys(JSON.parse(record.payload));
       if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error(`Invalid record in ${entity.table}: ${record.id}`);
       // The domain key wins over the buggy legacy generic id (notably IO -> contract_id).
       row[entity.key] = row[entity.key] || record.id;

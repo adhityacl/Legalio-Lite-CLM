@@ -20,7 +20,7 @@ export const bulkNumber = (value: unknown): number => {
 };
 
 /** Import columns holding calendar dates. */
-export const BULK_DATE_FIELDS = ["tanggal_mulai", "tanggal_berakhir", "invoice_date", "review_date"];
+export const BULK_DATE_FIELDS = ["start_date", "end_date", "invoice_date", "review_date"];
 
 /**
  * True for DD/MM/YYYY-style text whose day and month are both 12 or less and differ ("03/04/2026"):

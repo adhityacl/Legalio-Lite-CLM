@@ -1,7 +1,7 @@
 /**
  * Department ownership of operational records (tenant-boundaries PRD §4.4, §4.5.3).
  *
- * Legacy records name their department in `pic_internal` (partner) and
+ * Legacy records name their department in `internal_pic` (partner) and
  * inherit it through their governing partner/contract. The owning
  * department is the team in the SAME organization whose name matches
  * exactly after trimming, collapsing whitespace and case folding — never a
@@ -38,7 +38,7 @@ export function createOrganizationScope(db: Database.Database, organizationId: s
   const contracts = collections.contracts.filter(owned);
   const ios = collections.ios.filter(owned);
   const partnerById = new Map(partners.filter((p) => p.partner_id).map((p) => [p.partner_id, p]));
-  const partnerByName = new Map(partners.filter((p) => p.nama_partner).map((p) => [lower(p.nama_partner), p]));
+  const partnerByName = new Map(partners.filter((p) => p.partner_name).map((p) => [lower(p.partner_name), p]));
   const contractById = new Map(contracts.filter((c) => c.contract_id).map((c) => [c.contract_id, c]));
   const ioById = new Map(ios.filter((i) => i.io_id).map((i) => [i.io_id, i]));
 
@@ -48,11 +48,11 @@ export function createOrganizationScope(db: Database.Database, organizationId: s
   };
   const partnerFor = (id: unknown, name: unknown) =>
     (id ? partnerById.get(String(id)) : undefined) || (name ? partnerByName.get(lower(name)) : undefined);
-  const partnerDepartment = (partner: any): string | null => (partner ? teamOf(partner.pic_internal || partner.internal_pic) : null);
+  const partnerDepartment = (partner: any): string | null => (partner ? teamOf(partner.internal_pic) : null);
 
   function contractDepartment(contract: any): string | null {
-    const partner = partnerFor(contract.partner_id, contract.nama_partner);
-    return partnerDepartment(partner) ?? teamOf(contract.pic_internal);
+    const partner = partnerFor(contract.partner_id, contract.partner_name);
+    return partnerDepartment(partner) ?? teamOf(contract.internal_pic);
   }
 
   function departmentOf(kind: RecordKind, record: any): string | null {
@@ -63,7 +63,7 @@ export function createOrganizationScope(db: Database.Database, organizationId: s
       case 'contract':
         return contractDepartment(record);
       case 'io': {
-        const partner = partnerFor(record.partner_id, record.nama_partner);
+        const partner = partnerFor(record.partner_id, record.partner_name);
         if (partner) return partnerDepartment(partner);
         const contract = record.contract_id ? contractById.get(record.contract_id) : undefined;
         return contract ? contractDepartment(contract) : null;

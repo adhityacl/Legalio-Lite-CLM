@@ -151,12 +151,12 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
                 ) : notifications.slice(0, 8).map(notif => (
                   <Button key={notif.notif_id} variant="ghost" onClick={openNotifications} className="h-auto w-full flex-col items-stretch gap-g3 whitespace-normal py-g13 text-start">
                     <span className="flex items-center justify-between gap-g8">
-                      <Badge tone="danger">{notif.jenis_notifikasi}</Badge>
+                      <Badge tone="danger">{notif.notification_type}</Badge>
                       <Text as="span" size="xs" tone="muted">
-                        {new Date(notif.tanggal_terkirim).toLocaleDateString(getActiveFormattingLocale(), { day: 'numeric', month: 'short' })}
+                        {new Date(notif.sent_at).toLocaleDateString(getActiveFormattingLocale(), { day: 'numeric', month: 'short' })}
                       </Text>
                     </span>
-                    <Text as="span" size="sm" weight="semibold" lineClamp={1}>{notif.parent_nomor ? `${notif.parent_nomor} : ` : ''}{notif.parent_judul}</Text>
+                    <Text as="span" size="sm" weight="semibold" lineClamp={1}>{notif.parent_number ? `${notif.parent_number} : ` : ''}{notif.parent_title}</Text>
                     <Text as="span" size="xs" tone="muted" lineClamp={2}>{notificationMessage(notif, t)}</Text>
                   </Button>
                 ))}

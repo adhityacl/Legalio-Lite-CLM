@@ -5,7 +5,7 @@ import {
 
 /** Translate the checklist label without changing the stored upload identifier or filename. */
 export function localizeDueDiligenceDocument(
-  document: { key?: string; nama: string },
+  document: { key?: string; name: string },
   checklist: DueDiligenceRequirement[],
   language: UiLanguage,
 ): string {
@@ -19,15 +19,15 @@ export function localizeDueDiligenceDocument(
   const keyMatches = document.key ? requirements.filter(item => item.key === document.key) : [];
   const requirement = document.key
     ? checklist.find(item => item.key === document.key)
-      || keyMatches.find(item => matchesRequirement(item, { nama: document.nama }))
+      || keyMatches.find(item => matchesRequirement(item, { name: document.name }))
       || keyMatches[0]
     : requirements.find(item => matchesRequirement(item, document));
-  return requirement ? localize(requirement.label, language) : document.nama;
+  return requirement ? localize(requirement.label, language) : document.name;
 }
 
 /** Termination evidence belongs to contract status, not the partner checklist. */
-export function isTerminationNoticeDocument(document: { key?: string; nama?: string }): boolean {
+export function isTerminationNoticeDocument(document: { key?: string; name?: string }): boolean {
   if (document.key === 'termination_notice') return true;
-  const name = (document.nama || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const name = (document.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
   return ['termination notice', 'surat pemberitahuan pengakhiran', '终止通知'].includes(name);
 }

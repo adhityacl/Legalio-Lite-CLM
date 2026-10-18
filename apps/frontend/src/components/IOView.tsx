@@ -1,4 +1,5 @@
 import { ModalFrame } from './ui/modal-frame';
+import { BulkSelectionBar } from './ui/bulk-selection-bar';
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { formatBusinessDate } from '../lib/displayDate';
@@ -59,6 +60,7 @@ interface IOViewProps {
   onAddIO: () => void;
   onEditIO: (io: InsertionOrder) => void;
   onDeleteIO: (ioId: string) => void;
+  onDeleteIOs: (ids: string[]) => Promise<void>;
   openDocumentId?: string;
   onDocumentOpened?: () => void;
 }
@@ -70,6 +72,7 @@ export const IOView: React.FC<IOViewProps> = ({
   onAddIO,
   onEditIO,
   onDeleteIO,
+  onDeleteIOs,
   openDocumentId,
   onDocumentOpened,
 }) => {
@@ -112,10 +115,10 @@ export const IOView: React.FC<IOViewProps> = ({
     partner: true,
     kanal: true,
     nilai: true,
-    model_pembayaran: false,
-    skema_pembayaran: false,
-    tanggal_mulai: false,
-    tanggal_selesai: false,
+    pricing_model: false,
+    payment_scheme: false,
+    start_date: false,
+    completion_date: false,
     status: false,
     file: false,
   };
@@ -139,7 +142,7 @@ export const IOView: React.FC<IOViewProps> = ({
     [ios],
   );
 
-  const partnerNameOf = (id: string) => partners.find((p) => p.partner_id === id)?.nama_partner || '';
+  const partnerNameOf = (id: string) => partners.find((p) => p.partner_id === id)?.partner_name || '';
 
   // Filtering Logic
   const filteredIOs = useMemo(() => {
@@ -151,14 +154,14 @@ export const IOView: React.FC<IOViewProps> = ({
 
       const matchSearch =
         searchTerm === '' ||
-        i.nomor_io.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        i.judul_io.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        i.io_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        i.io_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         partnerNameOf(i.partner_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (i.kanal_media && i.kanal_media.toLowerCase().includes(searchTerm.toLowerCase()));
+        (i.media_channel && i.media_channel.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchStatus = selectedStatus === 'ALL' || i.status === selectedStatus;
-      const matchPricing = selectedPricingModel === 'ALL' || (i.pricing_model || i.model_pembayaran) === selectedPricingModel;
-      const matchCharging = selectedChargingType === 'ALL' || (i.charging_type || i.skema_pembayaran) === selectedChargingType;
+      const matchPricing = selectedPricingModel === 'ALL' || (i.pricing_model) === selectedPricingModel;
+      const matchCharging = selectedChargingType === 'ALL' || (i.charging_type || i.payment_scheme) === selectedChargingType;
 
       return matchSearch && matchStatus && matchPricing && matchCharging;
     });
@@ -174,28 +177,28 @@ export const IOView: React.FC<IOViewProps> = ({
 
       switch (sortField) {
         case 'no':
-          valA = a.nomor_io || '';
-          valB = b.nomor_io || '';
+          valA = a.io_number || '';
+          valB = b.io_number || '';
           break;
         case 'judul':
-          valA = a.judul_io || '';
-          valB = b.judul_io || '';
+          valA = a.io_title || '';
+          valB = b.io_title || '';
           break;
         case 'partner':
           valA = partnerNameOf(a.partner_id);
           valB = partnerNameOf(b.partner_id);
           break;
         case 'pricing':
-          valA = a.pricing_model || a.model_pembayaran || '';
-          valB = b.pricing_model || b.model_pembayaran || '';
+          valA = a.pricing_model || '';
+          valB = b.pricing_model || '';
           break;
         case 'value':
-          valA = a.nilai_io || 0;
-          valB = b.nilai_io || 0;
+          valA = a.io_value || 0;
+          valB = b.io_value || 0;
           break;
         case 'duration':
-          valA = a.tanggal_berakhir || a.tanggal_selesai || a.tanggal_mulai || '';
-          valB = b.tanggal_berakhir || b.tanggal_selesai || b.tanggal_mulai || '';
+          valA = a.end_date || a.completion_date || a.start_date || '';
+          valB = b.end_date || b.completion_date || b.start_date || '';
           break;
         case 'status':
           valA = a.status || '';
@@ -320,20 +323,20 @@ export const IOView: React.FC<IOViewProps> = ({
 
     const rows = dataToExport.map((i) => {
       return [
-        i.nomor_io,
-        i.judul_io,
+        i.io_number,
+        i.io_title,
         i.contract_id || '-',
         partnerNameOf(i.partner_id) || '-',
-        i.kanal_media || '-',
-        i.model_pembayaran || '-',
-        i.skema_pembayaran || '-',
-        i.tanggal_mulai,
-        i.tanggal_berakhir || i.tanggal_selesai || '-',
-        i.currency || i.mata_uang || '',
-        i.nilai_io,
+        i.media_channel || '-',
+        i.pricing_model || '-',
+        i.payment_scheme || '-',
+        i.start_date,
+        i.end_date || i.completion_date || '-',
+        i.currency || '',
+        i.io_value,
         i.status,
         i.deliverables || '-',
-        i.link_file_io || '',
+        i.io_file_link || '',
       ];
     });
 
@@ -465,10 +468,10 @@ export const IOView: React.FC<IOViewProps> = ({
               else if (col === 'partner') label = t('io.col_partner', 'Partner');
               else if (col === 'kanal') label = t('io.col_channel', 'Kanal Media');
               else if (col === 'nilai') label = t('io.col_value', 'Nilai Order');
-              else if (col === 'model_pembayaran') label = t('io.col_pricing_model', 'Model Pembayaran');
-              else if (col === 'skema_pembayaran') label = t('io.col_charging_type', 'Skema Pembayaran');
-              else if (col === 'tanggal_mulai') label = t('io.col_start_date', 'Tanggal Mulai');
-              else if (col === 'tanggal_selesai') label = t('io.col_end_date', 'Tanggal Selesai');
+              else if (col === 'pricing_model') label = t('io.col_pricing_model', 'Model Pembayaran');
+              else if (col === 'payment_scheme') label = t('io.col_charging_type', 'Skema Pembayaran');
+              else if (col === 'start_date') label = t('io.col_start_date', 'Tanggal Mulai');
+              else if (col === 'completion_date') label = t('io.col_end_date', 'Tanggal Selesai');
               else if (col === 'status') label = t('io.col_status', 'Status');
               else if (col === 'file') label = t('io.col_document', 'File PDF');
 
@@ -481,6 +484,13 @@ export const IOView: React.FC<IOViewProps> = ({
       </Card>
 
       {/* DataTable Container */}
+      {canDeletePartner(user) && (
+        <BulkSelectionBar
+          count={selectedRowIds.size}
+          noun={t('bulk.noun_io', 'IO')}
+          onDelete={async () => { await onDeleteIOs([...selectedRowIds]); setSelectedRowIds(new Set()); }}
+        />
+      )}
       <Card className="overflow-hidden">
         <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_status'), value: selectedStatus, active: selectedStatus !== 'ALL' }, { label: t('ui.filter_pricing'), value: selectedPricingModel, active: selectedPricingModel !== 'ALL' }, { label: t('ui.filter_charging'), value: selectedChargingType, active: selectedChargingType !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedStatus('ALL'); setSelectedPricingModel('ALL'); setSelectedChargingType('ALL'); }} />
         <Text size="xs" tone="muted" className="px-g13 py-g8 md:hidden">{t('ui.scroll_table')}</Text>
@@ -501,22 +511,22 @@ export const IOView: React.FC<IOViewProps> = ({
                     <span>{t('io.col_channel', 'Kanal Media')}</span>
                   </TableColumnHeader>
                 )}
-                {visibleColumns.model_pembayaran && (
+                {visibleColumns.pricing_model && (
                   <TableColumnHeader scope="col">
                     <span>{t('io.col_pricing_model', 'Model')}</span>
                   </TableColumnHeader>
                 )}
-                {visibleColumns.skema_pembayaran && (
+                {visibleColumns.payment_scheme && (
                   <TableColumnHeader scope="col">
                     <span>{t('io.col_charging_type', 'Skema')}</span>
                   </TableColumnHeader>
                 )}
-                {visibleColumns.tanggal_mulai && (
+                {visibleColumns.start_date && (
                   <TableColumnHeader scope="col">
                     <span>{t('io.col_start_date', 'Tgl Mulai')}</span>
                   </TableColumnHeader>
                 )}
-                {visibleColumns.tanggal_selesai && (
+                {visibleColumns.completion_date && (
                   <TableColumnHeader scope="col">
                     <span>{t('io.col_end_date', 'Tgl Selesai')}</span>
                   </TableColumnHeader>
@@ -550,13 +560,13 @@ export const IOView: React.FC<IOViewProps> = ({
  {/* Checkbox */}
  <TableCell>
                         <div className="flex items-center justify-start">
-                          <Checkbox checked={isSelected} aria-label={t('io.pilih_io', 'Pilih IO {nomor_io}', { nomor_io: io.nomor_io })} onCheckedChange={() => handleSelectRow(io.io_id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
+                          <Checkbox checked={isSelected} aria-label={t('io.pilih_io', 'Pilih IO {io_number}', { io_number: io.io_number })} onCheckedChange={() => handleSelectRow(io.io_id)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                         </div>
                       </TableCell>
                       {/* Nomor IO */}
                       {visibleColumns.nomor && (
                         <TableCell className="whitespace-nowrap">
-                          {io.nomor_io}
+                          {io.io_number}
                         </TableCell>
                       )}
                       {/* Judul IO */}
@@ -566,8 +576,8 @@ export const IOView: React.FC<IOViewProps> = ({
                             onClick={() => setDetailIO(io)}
                             className="block cursor-pointer truncate hover:text-accent-foreground"
                           >
-                            {io.judul_io}
-                          </span></TooltipTrigger><TooltipBody>{io.judul_io}</TooltipBody></Tooltip>
+                            {io.io_title}
+                          </span></TooltipTrigger><TooltipBody>{io.io_title}</TooltipBody></Tooltip>
                         </TableCell>
                       )}
                       {/* Partner */}
@@ -579,37 +589,37 @@ export const IOView: React.FC<IOViewProps> = ({
                       {/* Kanal */}
                       {visibleColumns.kanal && (
                         <TableCell>
-                          {io.kanal_media || '-'}
+                          {io.media_channel || '-'}
                         </TableCell>
                       )}
                       {/* Model Pembayaran */}
-                      {visibleColumns.model_pembayaran && (
+                      {visibleColumns.pricing_model && (
                         <TableCell className="whitespace-nowrap">
-                          {io.pricing_model || io.model_pembayaran || '-'}
+                          {io.pricing_model || '-'}
                         </TableCell>
                       )}
                       {/* Skema */}
-                      {visibleColumns.skema_pembayaran && (
+                      {visibleColumns.payment_scheme && (
                         <TableCell>
-                          {io.skema_pembayaran || io.charging_type || '-'}
+                          {io.payment_scheme || io.charging_type || '-'}
                         </TableCell>
                       )}
                       {/* Tanggal Mulai */}
-                      {visibleColumns.tanggal_mulai && (
+                      {visibleColumns.start_date && (
                         <TableCell className="whitespace-nowrap">
-                          {formatBusinessDate(io.tanggal_mulai)}
+                          {formatBusinessDate(io.start_date)}
                         </TableCell>
                       )}
                       {/* Tanggal Selesai */}
-                      {visibleColumns.tanggal_selesai && (
+                      {visibleColumns.completion_date && (
                         <TableCell className="whitespace-nowrap">
-                          {formatBusinessDate(io.tanggal_berakhir || io.tanggal_selesai)}
+                          {formatBusinessDate(io.end_date || io.completion_date)}
                         </TableCell>
                       )}
                       {/* Nilai IO */}
                       {visibleColumns.nilai && (
                         <TableCell className="text-right whitespace-nowrap tabular-nums">
-                          {formatMoney(io.nilai_io, io.mata_uang)}
+                          {formatMoney(io.io_value, io.currency)}
                         </TableCell>
                       )}
                       {/* Status */}
@@ -629,8 +639,8 @@ export const IOView: React.FC<IOViewProps> = ({
                       {/* File */}
                       {visibleColumns.file && (
                         <TableCell>
-                          {io.link_file_io ? (
-                            <Button asChild variant="link"><a href={io.link_file_io}
+                          {io.io_file_link ? (
+                            <Button asChild variant="link"><a href={io.io_file_link}
                               target="_blank"
                               rel="noopener noreferrer"
                               
@@ -704,9 +714,9 @@ export const IOView: React.FC<IOViewProps> = ({
               <div>
                 <DialogTitle className="flex items-center gap-g8">
                   <FileSpreadsheet className="w-g21 h-g21 text-accent-foreground" />
-                  <span>{detailIO.nomor_io}</span>
+                  <span>{detailIO.io_number}</span>
                 </DialogTitle>
-                <Text size="xs" tone="muted" className="mt-g2">{detailIO.judul_io}</Text>
+                <Text size="xs" tone="muted" className="mt-g2">{detailIO.io_title}</Text>
               </div>
               <Button variant="secondary" size="icon-sm" aria-label={t('common.close', 'Tutup')}
                 type="button"
@@ -724,18 +734,18 @@ export const IOView: React.FC<IOViewProps> = ({
                 </div>
                 <div>
                   <Text as="span" size="xs" weight="medium" tone="muted" className="block">{t('io.detail_channel_label', 'Kanal Media Placement:')}</Text>
-                  <Text as="span" size="xs" weight="bold">{detailIO.kanal_media || '-'}</Text>
+                  <Text as="span" size="xs" weight="bold">{detailIO.media_channel || '-'}</Text>
                 </div>
                 <div>
                   <Text as="span" size="xs" weight="medium" tone="muted" className="block">{t('io.detail_total_value_label', 'Nilai Total IO:')}</Text>
                   <Text as="span" size="xs" weight="bold" tone="primary" className="font-mono">
-                    {formatMoney(detailIO.nilai_io, detailIO.mata_uang)}
+                    {formatMoney(detailIO.io_value, detailIO.currency)}
                   </Text>
                 </div>
                 <div>
                   <Text as="span" size="xs" weight="medium" tone="muted" className="block">{t('io.detail_pricing_scheme_label', 'Model Pembayaran & Skema:')}</Text>
                   <Text as="span" size="xs" weight="bold">
-                    {detailIO.pricing_model || detailIO.model_pembayaran || '-'} • {detailIO.charging_type || detailIO.skema_pembayaran || '-'}
+                    {detailIO.pricing_model || '-'} • {detailIO.charging_type || detailIO.payment_scheme || '-'}
                   </Text>
                 </div>
               </Card>
@@ -747,11 +757,11 @@ export const IOView: React.FC<IOViewProps> = ({
                 </Card>
               </section>
 
-              {detailIO.link_file_io && (
+              {detailIO.io_file_link && (
                 <div className="pt-g13 border-t border-border">
                   <Button variant="outline" size="sm"
                     type="button"
-                    onClick={() => window.open(detailIO.link_file_io, '_blank')}
+                    onClick={() => window.open(detailIO.io_file_link, '_blank')}
                     className="w-full"
                   >
                     <ExternalLink className="w-g16 h-g16" />

@@ -233,10 +233,10 @@ function normalizeName(value: string): string {
 /** Does a stored document (by key or legacy display name) satisfy a requirement? */
 export function matchesRequirement(
   requirement: DueDiligenceRequirement,
-  stored: { key?: string; nama?: string },
+  stored: { key?: string; name?: string },
 ): boolean {
   if (stored.key && stored.key === requirement.key) return true;
-  const name = normalizeName(String(stored.nama || ''));
+  const name = normalizeName(String(stored.name || ''));
   if (!name) return false;
   const candidates = [requirement.label.en, requirement.label.id, localize(requirement.label, 'ZH'), ...(requirement.aliases || [])]
     .filter(Boolean)

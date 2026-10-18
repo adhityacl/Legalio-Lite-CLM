@@ -38,9 +38,9 @@ export const IOModal: React.FC<IOModalProps> = ({
   const { t, language } = useLanguage();
 
   const [contractId, setContractId] = useState(ioToEdit?.contract_id || '');
-  const [nomorIO, setNomorIO] = useState(ioToEdit?.nomor_io || '');
+  const [nomorIO, setNomorIO] = useState(ioToEdit?.io_number || '');
   const [partnerId, setPartnerId] = useState(ioToEdit?.partner_id || (partners[0]?.partner_id || ''));
-  const [kanalMedia, setKanalMedia] = useState(ioToEdit?.kanal_media || 'Digital Banner & Social Media');
+  const [kanalMedia, setKanalMedia] = useState(ioToEdit?.media_channel || 'Digital Banner & Social Media');
 
   // Filter contracts based on selected partner
   const availableContracts = React.useMemo(() => {
@@ -67,11 +67,11 @@ export const IOModal: React.FC<IOModalProps> = ({
       }
     }
   };
-  const [tanggalMulai, setTanggalMulai] = useState(ioToEdit?.tanggal_mulai || '2026-08-01');
-  const [tanggalBerakhir, setTanggalBerakhir] = useState(ioToEdit?.tanggal_berakhir || '2026-11-30');
+  const [tanggalMulai, setTanggalMulai] = useState(ioToEdit?.start_date || '2026-08-01');
+  const [tanggalBerakhir, setTanggalBerakhir] = useState(ioToEdit?.end_date || '2026-11-30');
   const tenantCurrency = useTenantSettings().policy.settings.defaultCurrency;
   const [currency, setCurrency] = useState<string>(ioToEdit?.currency || tenantCurrency);
-  const [nilaiIO, setNilaiIO] = useState<number>(ioToEdit?.nilai_io ?? 0);
+  const [nilaiIO, setNilaiIO] = useState<number>(ioToEdit?.io_value ?? 0);
   const [historicalRate, setHistoricalRate] = useState<number>(() => getDefaultUsdRate(ioToEdit?.currency || tenantCurrency));
 
   useEffect(() => {
@@ -94,7 +94,7 @@ export const IOModal: React.FC<IOModalProps> = ({
 
   const getVendorName = (pId: string) => {
     const p = partners.find((item) => item.partner_id === pId);
-    return p ? p.nama_partner : 'Vendor';
+    return p ? p.partner_name : 'Vendor';
   };
 
   const generateAutoTitle = (pId: string, kanal: string, tglMulai: string) => {
@@ -103,12 +103,12 @@ export const IOModal: React.FC<IOModalProps> = ({
     return `${vendorName}_IO_${kanalStr}_${tglMulai}`;
   };
 
-  const [isAutoTitle, setIsAutoTitle] = useState(!ioToEdit?.judul_io);
+  const [isAutoTitle, setIsAutoTitle] = useState(!ioToEdit?.io_title);
   const [judulIO, setJudulIO] = useState(() => {
-    if (ioToEdit?.judul_io) return ioToEdit.judul_io;
+    if (ioToEdit?.io_title) return ioToEdit.io_title;
     const initialPartnerId = ioToEdit?.partner_id || (partners[0]?.partner_id || '');
-    const initialKanal = ioToEdit?.kanal_media || 'Digital Banner & Social Media';
-    const initialStartDate = ioToEdit?.tanggal_mulai || '2026-08-01';
+    const initialKanal = ioToEdit?.media_channel || 'Digital Banner & Social Media';
+    const initialStartDate = ioToEdit?.start_date || '2026-08-01';
     return generateAutoTitle(initialPartnerId, initialKanal, initialStartDate);
   });
 
@@ -135,7 +135,7 @@ export const IOModal: React.FC<IOModalProps> = ({
   const [deliverables, setDeliverables] = useState(
     ioToEdit?.deliverables || 'Guaranteed 5.000.000 Impressions banner 300x250 + 2x Native Advertorial Article'
   );
-  const [noticePeriodHari, setNoticePeriodHari] = useState(ioToEdit?.notice_period_hari || 14);
+  const [noticePeriodHari, setNoticePeriodHari] = useState(ioToEdit?.notice_period_days || 14);
 
   const [fileName, setFileName] = useState(ioToEdit?.fileName || '');
   const [rawFileName, setRawFileName] = useState(ioToEdit?.fileName || '');
@@ -170,7 +170,7 @@ export const IOModal: React.FC<IOModalProps> = ({
       setRawFileName(file.name);
       const selectedPartner = partners.find((p) => p.partner_id === partnerId);
       const autoRenamed = formatIOFileName({
-        partnerName: selectedPartner?.nama_partner,
+        partnerName: selectedPartner?.partner_name,
         mediaChannel: kanalMedia.trim(),
         ioNumber: nomorIO.trim(),
         startDate: tanggalMulai,
@@ -222,9 +222,9 @@ export const IOModal: React.FC<IOModalProps> = ({
       }
       if (result.success && result.data) {
         const parsed = result.data;
-        if (parsed.nomor_io) setNomorIO(parsed.nomor_io);
-        if (parsed.judul_io) setJudulIO(parsed.judul_io);
-        if (parsed.kanal_media) setKanalMedia(parsed.kanal_media);
+        if (parsed.io_number) setNomorIO(parsed.io_number);
+        if (parsed.io_title) setJudulIO(parsed.io_title);
+        if (parsed.media_channel) setKanalMedia(parsed.media_channel);
         
         if (parsed.pricing_model) {
           const matched = STANDARD_PRICING_MODELS.find(m => m.toLowerCase() === parsed.pricing_model.toLowerCase());
@@ -236,19 +236,19 @@ export const IOModal: React.FC<IOModalProps> = ({
           }
         }
         
-        if (parsed.tanggal_mulai) setTanggalMulai(parsed.tanggal_mulai);
-        if (parsed.tanggal_berakhir) setTanggalBerakhir(parsed.tanggal_berakhir);
-        if (parsed.nilai_io !== undefined && parsed.nilai_io !== null) setNilaiIO(Number(parsed.nilai_io) || 0);
+        if (parsed.start_date) setTanggalMulai(parsed.start_date);
+        if (parsed.end_date) setTanggalBerakhir(parsed.end_date);
+        if (parsed.io_value !== undefined && parsed.io_value !== null) setNilaiIO(Number(parsed.io_value) || 0);
         if (parsed.deliverables) setDeliverables(parsed.deliverables);
 
         // Match partner
-        if (parsed.nama_partner) {
-          const rawP = parsed.nama_partner.toLowerCase().trim();
+        if (parsed.partner_name) {
+          const rawP = parsed.partner_name.toLowerCase().trim();
           const cleanP = rawP.replace(/^(pt|cv|ltd|co\.|inc)\s+/i, '').replace(/[\.,]/g, '').trim();
           const matchedPartner = partners.find(p => {
-            const cleanTarget = p.nama_partner.toLowerCase().replace(/^(pt|cv|ltd|co\.|inc)\s+/i, '').replace(/[\.,]/g, '').trim();
-            return p.nama_partner.toLowerCase().includes(rawP) ||
-                   rawP.includes(p.nama_partner.toLowerCase()) ||
+            const cleanTarget = p.partner_name.toLowerCase().replace(/^(pt|cv|ltd|co\.|inc)\s+/i, '').replace(/[\.,]/g, '').trim();
+            return p.partner_name.toLowerCase().includes(rawP) ||
+                   rawP.includes(p.partner_name.toLowerCase()) ||
                    cleanTarget.includes(cleanP) ||
                    cleanP.includes(cleanTarget);
           });
@@ -258,12 +258,12 @@ export const IOModal: React.FC<IOModalProps> = ({
         }
 
         // Match contract
-        if (parsed.contract_nomor) {
-          const rawCtr = parsed.contract_nomor.toLowerCase().trim();
+        if (parsed.contract_number) {
+          const rawCtr = parsed.contract_number.toLowerCase().trim();
           const matchedContract = contracts.find(c =>
-            c.nomor_kontrak && (
-              c.nomor_kontrak.toLowerCase().includes(rawCtr) ||
-              rawCtr.includes(c.nomor_kontrak.toLowerCase())
+            c.contract_number && (
+              c.contract_number.toLowerCase().includes(rawCtr) ||
+              rawCtr.includes(c.contract_number.toLowerCase())
             )
           );
           if (matchedContract) {
@@ -291,7 +291,7 @@ export const IOModal: React.FC<IOModalProps> = ({
     setError(null);
 
     if (!nomorIO.trim()) {
-      setError(t('form.io.nomor_io', 'Nomor IO wajib diisi.'));
+      setError(t('form.io.io_number', 'Nomor IO wajib diisi.'));
       return;
     }
     if (!judulIO.trim()) {
@@ -303,7 +303,7 @@ export const IOModal: React.FC<IOModalProps> = ({
       return;
     }
     if (!kanalMedia.trim()) {
-      setError(t('form.io.kanal_media', 'Kanal Media / Placement wajib diisi.'));
+      setError(t('form.io.media_channel', 'Kanal Media / Placement wajib diisi.'));
       return;
     }
     if (!tanggalMulai || !tanggalBerakhir) {
@@ -315,7 +315,7 @@ export const IOModal: React.FC<IOModalProps> = ({
       return;
     }
     if (nilaiIO === undefined || nilaiIO === null || isNaN(Number(nilaiIO))) {
-      setError(t('form.io.nilai_io', 'Nilai IO wajib diisi.'));
+      setError(t('form.io.io_value', 'Nilai IO wajib diisi.'));
       return;
     }
     if (!effectivePricingModel) {
@@ -334,7 +334,7 @@ export const IOModal: React.FC<IOModalProps> = ({
       let finalFileName = fileName;
       if (fileName) {
         finalFileName = formatIOFileName({
-          partnerName: selectedPartner?.nama_partner,
+          partnerName: selectedPartner?.partner_name,
           mediaChannel: kanalMedia.trim(),
           ioNumber: nomorIO.trim(),
           startDate: tanggalMulai,
@@ -344,20 +344,20 @@ export const IOModal: React.FC<IOModalProps> = ({
 
       await onSave({
         contract_id: contractId || undefined,
-        nomor_io: nomorIO.trim(),
-        judul_io: judulIO.trim(),
+        io_number: nomorIO.trim(),
+        io_title: judulIO.trim(),
         partner_id: partnerId,
-        kanal_media: kanalMedia.trim(),
-        tanggal_mulai: tanggalMulai,
-        tanggal_berakhir: tanggalBerakhir,
-        tanggal_selesai: tanggalBerakhir,
+        media_channel: kanalMedia.trim(),
+        start_date: tanggalMulai,
+        end_date: tanggalBerakhir,
+        completion_date: tanggalBerakhir,
         pricing_model: effectivePricingModel,
         charging_type: chargingType,
         currency,
-        nilai_io: Number(nilaiIO),
-        nilai_io_usd: estimatedUsd,
+        io_value: Number(nilaiIO),
+        io_value_usd: estimatedUsd,
         deliverables: deliverables.trim(),
-        notice_period_hari: Number(noticePeriodHari),
+        notice_period_days: Number(noticePeriodHari),
         notice_type_required: 'Termination',
         fileName: finalFileName,
         fileData,
@@ -402,7 +402,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                   <option value="">{t('io.pilih_partner_vendor', '-- Pilih Partner / Vendor --')}</option>
                   {partners.map((p) => (
                     <option key={p.partner_id} value={p.partner_id}>
-                      {p.nama_partner}
+                      {p.partner_name}
                     </option>
                   ))}
                 </AlphabeticalSelect>
@@ -420,7 +420,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                   <option value="">{t('so.form.parent_ph', 'Choose parent contract')}</option>
                   {availableContracts.map((c) => (
                     <option key={c.contract_id} value={c.contract_id}>
-                      {c.nomor_kontrak} ({(c.judul_kontrak || '').slice(0, 30)}...)
+                      {c.contract_number} ({(c.contract_title || '').slice(0, 30)}...)
                     </option>
                   ))}
                 </AlphabeticalSelect>

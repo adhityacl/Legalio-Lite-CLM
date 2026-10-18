@@ -5,8 +5,8 @@ import type { Contract, PartnerSpending } from '@legalio/types';
 export function contractTotalInCurrency(contracts: Contract[], currency: string): number {
   return contracts.reduce((sum, contract) => {
     const source = contract.currency || currency;
-    if (source === currency) return sum + Number(contract.nilai_kontrak || 0);
-    const usd = contract.nilai_kontrak_usd ?? convertToUsdWithFallback(contract.nilai_kontrak, source);
+    if (source === currency) return sum + Number(contract.contract_value || 0);
+    const usd = contract.contract_value_usd ?? convertToUsdWithFallback(contract.contract_value, source);
     return sum + usd / (getDefaultUsdRate(currency) || 1);
   }, 0);
 }

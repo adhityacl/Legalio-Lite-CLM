@@ -1145,11 +1145,11 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
   const handleApplyPartner = (partner: Partner) => {
     setSelectedPartnerId(partner.partner_id);
     const p = partner as any;
-    const pName = partner?.nama_partner || 'Mitra';
-    const pAddress = p?.alamat_pic || p?.alamat || '';
-    const pPic = p?.nama_pic || p?.pic_name || partner?.nama_pic || 'Direktur';
+    const pName = partner?.partner_name || 'Mitra';
+    const pAddress = p?.pic_address || p?.alamat || '';
+    const pPic = p?.pic_name || partner?.pic_name || 'Direktur';
     const pPosition = p?.pic_position || 'Direktur Utama';
-    const pEmail = p?.email_pic || p?.email || 'legal@mitra.co.id';
+    const pEmail = p?.pic_email || p?.email || 'legal@mitra.co.id';
 
     const updated = {
       ...fieldValues,
@@ -1312,19 +1312,19 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
       const p1Pic = fieldValues.firstPartyPic || 'Achmad Indrawan';
 
       const newContractPayload: Partial<Contract> = {
-        judul_kontrak: docTitle,
-        nomor_kontrak: contractNumber,
+        contract_title: docTitle,
+        contract_number: contractNumber,
         partner_id: selectedPartnerId || (partners[0] ? partners[0].partner_id : 'PTR-DEFAULT'),
-        tanggal_mulai: '2026-09-19',
-        tanggal_berakhir: '2027-09-18',
+        start_date: '2026-09-19',
+        end_date: '2027-09-18',
         status: 'Active',
-        jenis_dokumen: 'Master Agreement',
-        kategori_kerjasama: ['Perjanjian Kerjasama', 'General Cooperation'],
-        nilai_kontrak: 100000000,
+        document_type: 'Master Agreement',
+        cooperation_categories: ['Perjanjian Kerjasama', 'General Cooperation'],
+        contract_value: 100000000,
         auto_renewal: true,
-        notice_period_hari: 30,
+        notice_period_days: 30,
         notice_type_required: 'Both',
-        pic_internal: p1Pic,
+        internal_pic: p1Pic,
         internal_notes: `Cooperation agreement between ${p1Name} and ${pName}, generated from the built-in template (governing law: ${jurisdictionFromSettings(policy.settings).governingLaw.en}).`,
       };
 
@@ -1928,14 +1928,14 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                           <option value="">{t('contract_creator.partners.select_placeholder', 'Select Partner')}</option>
                           {partners.map((p) => (
                             <option key={p.partner_id} value={p.partner_id}>
-                              {p.nama_partner} ({p.partner_id})
+                              {p.partner_name} ({p.partner_id})
                             </option>
                           ))}
                         </AlphabeticalSelect>
 
                         {selectedPartner && (
                           <Card size="sm" className="border-status-success-border bg-status-success-soft p-g13">
-                            <Text weight="semibold">{selectedPartner.nama_partner}</Text>
+                            <Text weight="semibold">{selectedPartner.partner_name}</Text>
                             <div className="mt-g8 flex flex-wrap gap-g5" aria-label={t('contract_creator.parties.registered_record', 'Registered partner record')}>
                               <Badge>{selectedPartner.partner_id}</Badge>
                               {selectedPartner.entity_type && (

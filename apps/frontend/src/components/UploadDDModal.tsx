@@ -48,8 +48,8 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
   const { policy } = useTenantSettings();
   const confirmDialog = useConfirm();
 
-  const existingDoc: DDDokumenItem | undefined = (partner.daftar_dokumen_dd || []).find((d) => d.nama === docName);
-  const displayName = localizeDueDiligenceDocument(existingDoc || { nama: docName }, policy.dueDiligenceChecklist, language);
+  const existingDoc: DDDokumenItem | undefined = (partner.dd_documents || []).find((d) => d.name === docName);
+  const displayName = localizeDueDiligenceDocument(existingDoc || { name: docName }, policy.dueDiligenceChecklist, language);
 
   // Normalize existing files
   const existingFiles: DDFileItem[] = existingDoc?.files && existingDoc.files.length > 0
@@ -62,14 +62,14 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
           linkDrive: existingDoc.linkDrive,
           uploadedAt: existingDoc.uploadedAt || new Date().toISOString(),
           year: existingDoc.uploadedAt ? new Date(existingDoc.uploadedAt).getFullYear().toString() : new Date().getFullYear().toString(),
-          tanggalKadaluarsa: existingDoc.tanggalKadaluarsa,
+          expiryDate: existingDoc.expiryDate,
         },
       ]
     : [];
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileBase64, setFileBase64] = useState<string>('');
-  const [tanggalKadaluarsa, setTanggalKadaluarsa] = useState<string>(existingDoc?.tanggalKadaluarsa || '');
+  const [expiryDate, setTanggalKadaluarsa] = useState<string>(existingDoc?.expiryDate || '');
   const [tahunDokumen, setTahunDokumen] = useState<string>(new Date().getFullYear().toString());
   const [isUploading, setIsUploading] = useState(false);
   const [isDeletingFileId, setIsDeletingFileId] = useState<string | null>(null);
@@ -137,10 +137,10 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
     setError(null);
 
     try {
-      const docDate = tanggalKadaluarsa || (tahunDokumen ? `${tahunDokumen}-01-01` : new Date().toISOString());
+      const docDate = expiryDate || (tahunDokumen ? `${tahunDokumen}-01-01` : new Date().toISOString());
       const nextSequence = existingFiles.length + 1;
       const finalFileName = formatDueDiligenceFileName({
-        vendorName: partner.nama_partner,
+        vendorName: partner.partner_name,
         documentName: docName,
         documentDate: docDate,
         sequence: nextSequence,
@@ -151,7 +151,7 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
         docName,
         fileName: finalFileName,
         fileData: fileBase64,
-        tanggalKadaluarsa: tanggalKadaluarsa.trim(),
+        expiryDate: expiryDate.trim(),
         userEmail: userEmail || 'user@app',
         userName: userName || 'User',
         userRole: userRole || 'Legal',
@@ -196,7 +196,7 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
                 </Text>
                 <Text as="span" size="xs" tone="muted">•</Text>
                 <Text as="span" size="xs" weight="medium" tone="muted" truncate>
-                  {partner.nama_partner}
+                  {partner.partner_name}
                 </Text>
               </div>
             </div>
@@ -230,7 +230,7 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
                         <Text size="xs" tone="muted">
                           {f.year ? t('dd_upload.tahun', 'Tahun {year} • ', { year: f.year }) : ''}
                           {t('dd_upload.diunggah', 'Diunggah:')} {f.uploadedAt ? new Date(f.uploadedAt).toLocaleDateString(getActiveFormattingLocale()) : '-'}
-                          {f.tanggalKadaluarsa ? t('dd_upload.exp', ' • Exp: {tanggalKadaluarsa}', { tanggalKadaluarsa: f.tanggalKadaluarsa }) : ''}
+                          {f.expiryDate ? t('dd_upload.exp', ' • Exp: {expiryDate}', { expiryDate: f.expiryDate }) : ''}
                         </Text>
                       </div>
                     </div>
@@ -306,7 +306,7 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
                 </span>
               </FieldLabel>
               <DateInput
-                value={tanggalKadaluarsa}
+                value={expiryDate}
                 onChange={setTanggalKadaluarsa}
                 focusColor="emerald"
               />

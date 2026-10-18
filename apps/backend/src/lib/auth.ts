@@ -13,6 +13,7 @@ import Database from "better-sqlite3";
 import { applyPendingRestore, migrateLegacyDatabaseFilename } from '../sqliteBackups';
 import { AUTH_DB_PATH, APP_DATA_DIR } from "../runtimePaths";
 import { getPublicBaseUrl, loadInstallationSettings } from '../installationSettings';
+import { renameLegacyKeys } from '@legalio/shared/fieldNames';
 
 const googleClientId = (process.env.GOOGLE_CLIENT_ID || "").trim();
 const googleClientSecret = (process.env.GOOGLE_CLIENT_SECRET || "").trim();
@@ -323,7 +324,7 @@ export function initializeCoreDataSchema() {
 }
 
 export function hydrateCoreDataFromJson(data: any) {
-  synchronizeCoreData(sqliteDb, data);
+  synchronizeCoreData(sqliteDb, renameLegacyKeys(data));
 }
 
 export function loadCoreDataFromSqlite() {

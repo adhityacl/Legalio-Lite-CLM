@@ -7,16 +7,16 @@ const fields = (names: string, kind: FieldKind = 'text'): Field[] => names.split
 const dates = fields('created_at updated_at');
 const lifecycle = [...fields('lifecycle_mode termination_date termination_reason'), ...fields('termination_document', 'json')];
 export const ENTITIES: EntitySchema[] = [
-  { table: 'partners', key: 'partner_id', collection: 'partners', search: ['nama_partner', 'codename', 'jenis_partner', 'catatan'], fields: [
-    ...fields('nama_partner country entity_type jenis_partner nama_pic email_pic telepon_pic alamat_pic pic_internal codename status_dd link_folder_dd tanggal_dd_diverifikasi catatan'), ...dates,
+  { table: 'partners', key: 'partner_id', collection: 'partners', search: ['partner_name', 'codename', 'partner_type', 'notes'], fields: [
+    ...fields('partner_name country entity_type partner_type pic_name pic_email pic_phone pic_address internal_pic codename status_dd dd_folder_link dd_verified_date notes'), ...dates,
   ] },
-  { table: 'contracts', key: 'contract_id', collection: 'contracts', search: ['nomor_kontrak', 'judul_kontrak', 'internal_notes', 'ringkasan_perubahan'], fields: [
-    ...fields('jenis_dokumen parent_contract_id nomor_kontrak judul_kontrak partner_id tanggal_mulai tanggal_berakhir tanggal_selesai currency notice_type_required status status_approval pic_internal link_file_kontrak fileName internal_notes ringkasan_perubahan redline_analyzed_at'),
-    ...fields('nilai_kontrak nilai_kontrak_usd', 'money'), ...fields('notice_period_hari', 'number'), ...fields('auto_renewal', 'boolean'), ...fields('redline_analysis field_yang_berubah', 'json'), ...lifecycle, ...dates,
+  { table: 'contracts', key: 'contract_id', collection: 'contracts', search: ['contract_number', 'contract_title', 'internal_notes', 'change_summary'], fields: [
+    ...fields('document_type parent_contract_id contract_number contract_title partner_id start_date end_date completion_date currency notice_type_required status status_approval internal_pic contract_file_link fileName internal_notes change_summary redline_analyzed_at'),
+    ...fields('contract_value contract_value_usd', 'money'), ...fields('notice_period_days', 'number'), ...fields('auto_renewal', 'boolean'), ...fields('redline_analysis changed_fields', 'json'), ...lifecycle, ...dates,
   ] },
-  { table: 'insertion_orders', key: 'io_id', collection: 'ios', search: ['nomor_io', 'judul_io', 'kanal_media', 'deliverables', 'internal_notes'], fields: [
-    ...fields('contract_id nomor_io judul_io partner_id kanal_media tanggal_mulai tanggal_berakhir tanggal_selesai pricing_model charging_type skema_pembayaran currency deliverables notice_type_required status internal_notes link_file_io fileName'),
-    ...fields('nilai_io nilai_io_usd', 'money'), ...fields('notice_period_hari', 'number'), ...dates,
+  { table: 'insertion_orders', key: 'io_id', collection: 'ios', search: ['io_number', 'io_title', 'media_channel', 'deliverables', 'internal_notes'], fields: [
+    ...fields('contract_id io_number io_title partner_id media_channel start_date end_date completion_date pricing_model charging_type payment_scheme currency deliverables notice_type_required status internal_notes io_file_link fileName'),
+    ...fields('io_value io_value_usd', 'money'), ...fields('notice_period_days', 'number'), ...dates,
   ] },
   { table: 'spendings', key: 'id', collection: 'spendings', search: ['vendor_name', 'invoice_number', 'invoice_title', 'invoice_description'], fields: [
     ...fields('vendor_id vendor_name invoice_number invoice_date invoice_title invoice_description currency payment_status bank_name bank_account_number bank_account_holder_name invoice_file_url invoice_file_name billing_file_url billing_file_name folder_link'),
@@ -27,8 +27,8 @@ export const ENTITIES: EntitySchema[] = [
     ...fields('sla_score calculated_score total_score', 'number'), ...dates,
   ] },
   { table: 'notifications', key: 'notif_id', collection: 'notifications', search: [], fields: [
-    ...fields('parent_type parent_id parent_nomor parent_judul jenis_notifikasi tanggal_terkirim penerima pesan'),
-    ...fields('status_terkirim is_read', 'boolean'), ...fields('pesan_params', 'json'),
+    ...fields('parent_type parent_id parent_number parent_title notification_type sent_at recipient message'),
+    ...fields('is_sent is_read', 'boolean'), ...fields('message_params', 'json'),
   ] },
   { table: 'activity_logs', key: 'id', collection: 'activityLogs', search: [], fields: [
     ...fields('timestamp userEmail userName role actionType module description ipAddress userAgent'),

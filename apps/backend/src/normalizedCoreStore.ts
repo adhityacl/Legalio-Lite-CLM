@@ -59,15 +59,15 @@ export function createNormalizedCoreSchema(db: DB) {
     db.exec(`CREATE INDEX IF NOT EXISTS ${q('idx_v3_' + entity.table + '_org_order')} ON ${q(entity.table)}(organization_id, record_position, ${q(entity.key)})`);
   }
   db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_v3_partners_name ON partners(organization_id, nama_partner COLLATE NOCASE, partner_id);
-    CREATE INDEX IF NOT EXISTS idx_v3_partners_owner ON partners(organization_id, pic_internal, partner_id);
+    CREATE INDEX IF NOT EXISTS idx_v3_partners_name ON partners(organization_id, partner_name COLLATE NOCASE, partner_id);
+    CREATE INDEX IF NOT EXISTS idx_v3_partners_owner ON partners(organization_id, internal_pic, partner_id);
     CREATE INDEX IF NOT EXISTS idx_v3_contracts_partner ON contracts(organization_id, partner_id);
-    CREATE INDEX IF NOT EXISTS idx_v3_contracts_expiry ON contracts(organization_id, tanggal_berakhir, contract_id);
+    CREATE INDEX IF NOT EXISTS idx_v3_contracts_expiry ON contracts(organization_id, end_date, contract_id);
     CREATE INDEX IF NOT EXISTS idx_v3_contracts_risk ON contracts(organization_id, risk_level, risk_score);
-    CREATE INDEX IF NOT EXISTS idx_v3_contracts_reference ON contracts(organization_id, nomor_kontrak);
+    CREATE INDEX IF NOT EXISTS idx_v3_contracts_reference ON contracts(organization_id, contract_number);
     CREATE INDEX IF NOT EXISTS idx_v3_ios_contract ON insertion_orders(organization_id, contract_id, io_id);
     CREATE INDEX IF NOT EXISTS idx_v3_ios_partner ON insertion_orders(organization_id, partner_id);
-    CREATE INDEX IF NOT EXISTS idx_v3_ios_expiry ON insertion_orders(organization_id, tanggal_berakhir, io_id);
+    CREATE INDEX IF NOT EXISTS idx_v3_ios_expiry ON insertion_orders(organization_id, end_date, io_id);
     CREATE INDEX IF NOT EXISTS idx_v3_spendings_vendor_date ON spendings(organization_id, vendor_id, invoice_date, id);
     CREATE INDEX IF NOT EXISTS idx_v3_spendings_invoice ON spendings(organization_id, invoice_number);
     CREATE INDEX IF NOT EXISTS idx_v3_evaluations_partner_date ON evaluations(organization_id, partner_id, review_date, id);
@@ -87,13 +87,13 @@ export function createNormalizedCoreSchema(db: DB) {
     CREATE INDEX IF NOT EXISTS idx_v3_identifier_value ON partner_identifiers(scheme, value, partner_id);
     CREATE TABLE IF NOT EXISTS partner_dd_requirements (
       partner_id TEXT NOT NULL REFERENCES partners(partner_id) ON DELETE CASCADE, position INTEGER NOT NULL,
-      key TEXT, nama TEXT, wajib INTEGER CHECK(wajib IN (0,1)), expires INTEGER CHECK(expires IN (0,1)), status TEXT,
-      nomor_dokumen TEXT, tanggal_kadaluarsa TEXT, link_drive TEXT, file_id TEXT, file_size TEXT, uploaded_at TEXT,
+      key TEXT, name TEXT, required INTEGER CHECK(required IN (0,1)), expires INTEGER CHECK(expires IN (0,1)), status TEXT,
+      document_number TEXT, expiry_date TEXT, link_drive TEXT, file_id TEXT, file_size TEXT, uploaded_at TEXT,
       extra_json TEXT NOT NULL CHECK(json_valid(extra_json)), PRIMARY KEY(partner_id, position));
-    CREATE INDEX IF NOT EXISTS idx_v3_dd_expiry ON partner_dd_requirements(tanggal_kadaluarsa, partner_id);
+    CREATE INDEX IF NOT EXISTS idx_v3_dd_expiry ON partner_dd_requirements(expiry_date, partner_id);
     CREATE TABLE IF NOT EXISTS partner_dd_files (
       partner_id TEXT NOT NULL, requirement_position INTEGER NOT NULL, position INTEGER NOT NULL,
-      id TEXT, file_name TEXT, link_drive TEXT, file_size TEXT, uploaded_at TEXT, year TEXT, tanggal_kadaluarsa TEXT,
+      id TEXT, file_name TEXT, link_drive TEXT, file_size TEXT, uploaded_at TEXT, year TEXT, expiry_date TEXT,
       extra_json TEXT NOT NULL CHECK(json_valid(extra_json)), PRIMARY KEY(partner_id, requirement_position, position),
       FOREIGN KEY(partner_id, requirement_position) REFERENCES partner_dd_requirements(partner_id, position) ON DELETE CASCADE);
     CREATE TABLE IF NOT EXISTS spending_allocations (
@@ -109,13 +109,13 @@ export function createNormalizedCoreSchema(db: DB) {
       rowid INTEGER PRIMARY KEY, organization_id TEXT NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL,
       title TEXT NOT NULL, body TEXT NOT NULL, UNIQUE(entity_type, entity_id));
     CREATE VIEW IF NOT EXISTS v_partner_summary AS
-      SELECT p.partner_id,p.organization_id,p.nama_partner,p.country,p.entity_type,p.jenis_partner,p.pic_internal,p.status_dd,p.catatan,
+      SELECT p.partner_id,p.organization_id,p.partner_name,p.country,p.entity_type,p.partner_type,p.internal_pic,p.status_dd,p.notes,
         (SELECT count(*) FROM contracts c WHERE c.organization_id=p.organization_id AND c.partner_id=p.partner_id) AS contract_count
       FROM partners p;
     CREATE VIEW IF NOT EXISTS v_contract_summary AS
-      SELECT c.contract_id,c.organization_id,c.partner_id,p.nama_partner,c.nomor_kontrak,c.judul_kontrak,c.parent_contract_id,
-        parent.nomor_kontrak AS parent_contract_nomor,c.tanggal_mulai,c.tanggal_berakhir,c.currency,c.nilai_kontrak_minor,c.nilai_kontrak_scale,
-        c.status,c.status_approval,c.pic_internal,c.internal_notes,c.risk_level,c.risk_score
+      SELECT c.contract_id,c.organization_id,c.partner_id,p.partner_name,c.contract_number,c.contract_title,c.parent_contract_id,
+        parent.contract_number AS parent_contract_number,c.start_date,c.end_date,c.currency,c.contract_value_minor,c.contract_value_scale,
+        c.status,c.status_approval,c.internal_pic,c.internal_notes,c.risk_level,c.risk_score
       FROM contracts c JOIN partners p ON p.partner_id=c.partner_id AND p.organization_id=c.organization_id
       LEFT JOIN contracts parent ON parent.contract_id=c.parent_contract_id AND parent.organization_id=c.organization_id;
     CREATE INDEX IF NOT EXISTS idx_v3_search_org ON search_records(organization_id, entity_type, entity_id);
@@ -135,11 +135,9 @@ function canonicalize(entity: EntitySchema, input: Row): Row {
   if (entity.table === 'partners') {
     migratePartnerContact(row);
     if (row.codename === undefined && row.partner_channel !== undefined) row.codename = row.partner_channel;
-    if (row.pic_internal === undefined && row.internal_pic !== undefined) row.pic_internal = row.internal_pic;
     // Preserve legacy aliases in extra_json until every older client is retired.
   }
   if (entity.table === 'insertion_orders') {
-    if (row.currency === undefined && row.mata_uang !== undefined) row.currency = row.mata_uang;
 
   }
   // Human-readable names/references remain snapshots until the read adapter can join them.
@@ -147,8 +145,8 @@ function canonicalize(entity: EntitySchema, input: Row): Row {
 }
 const apiField = (api: string, sql = api, kind: Field['kind'] = 'text'): Field => ({ api, sql, kind });
 const identifierFields = ['scheme','value','country'].map(api => apiField(api));
-const ddFields = [apiField('key'), apiField('nama'), apiField('wajib','wajib','boolean'), apiField('expires','expires','boolean'), apiField('status'), apiField('nomorDokumen','nomor_dokumen'), apiField('tanggalKadaluarsa','tanggal_kadaluarsa'), apiField('linkDrive','link_drive'), apiField('fileId','file_id'), apiField('fileSize','file_size'), apiField('uploadedAt','uploaded_at')];
-const fileFields = [apiField('id'), apiField('fileName','file_name'), apiField('linkDrive','link_drive'), apiField('fileSize','file_size'), apiField('uploadedAt','uploaded_at'), apiField('year'), apiField('tanggalKadaluarsa','tanggal_kadaluarsa')];
+const ddFields = [apiField('key'), apiField('name'), apiField('required','required','boolean'), apiField('expires','expires','boolean'), apiField('status'), apiField('documentNumber','document_number'), apiField('expiryDate','expiry_date'), apiField('linkDrive','link_drive'), apiField('fileId','file_id'), apiField('fileSize','file_size'), apiField('uploadedAt','uploaded_at')];
+const fileFields = [apiField('id'), apiField('fileName','file_name'), apiField('linkDrive','link_drive'), apiField('fileSize','file_size'), apiField('uploadedAt','uploaded_at'), apiField('year'), apiField('expiryDate','expiry_date')];
 function encodeFields(row: Row, fields: Field[], omitted: string[] = []) {
   const known = new Set([...fields.map(field => field.api), ...omitted]);
   const extra: Row = Object.fromEntries(Object.entries(row).filter(([key, value]) => !known.has(key) || value === null));
@@ -196,8 +194,8 @@ function writeChildren(db: DB, entity: EntitySchema, row: Row) {
   if (entity.table === 'partners') {
     replaceList('partner_categories','partner_id',row.tags || [], value => ({ category: value }));
     replaceList('partner_identifiers','partner_id',row.identifiers || [], value => encodeFields(value,identifierFields));
-    replaceList('partner_dd_requirements','partner_id',row.daftar_dokumen_dd || [], value => encodeFields(arrayMarkers(value,['files']),ddFields));
-    (row.daftar_dokumen_dd || []).forEach((requirement: Row, index: number) => {
+    replaceList('partner_dd_requirements','partner_id',row.dd_documents || [], value => encodeFields(arrayMarkers(value,['files']),ddFields));
+    (row.dd_documents || []).forEach((requirement: Row, index: number) => {
       (requirement.files || []).forEach((file: Row, position: number) => {
         const values = { partner_id: id, requirement_position: index, position, ...encodeFields(file,fileFields) };
         const columns = Object.keys(values);
@@ -205,7 +203,7 @@ function writeChildren(db: DB, entity: EntitySchema, row: Row) {
       });
     });
   }
-  if (entity.table === 'contracts') replaceList('contract_categories','contract_id',row.kategori_kerjasama || [], value => ({ category: value }));
+  if (entity.table === 'contracts') replaceList('contract_categories','contract_id',row.cooperation_categories || [], value => ({ category: value }));
   if (entity.table === 'spendings') {
     replaceList('spending_allocations','spending_id',row.month_allocations || [], value => ({ month: value.month, amount_minor: decimalParts(value.amount).minor, amount_scale: decimalParts(value.amount).scale, extra_json: JSON.stringify(Object.fromEntries(Object.entries(value).filter(([key]) => !['month','amount'].includes(key)))) }));
     replaceList('spending_reporting_months','spending_id',row.invoice_month || [], value => ({ month: value }));
@@ -217,15 +215,15 @@ function childArrays(db: DB, entity: EntitySchema, row: Row) {
   if (entity.table === 'partners') {
     assign('tags',list('partner_categories','partner_id').map(record => record.category));
     assign('identifiers',list('partner_identifiers','partner_id').map(record => decodeFields(record,identifierFields)));
-    assign('daftar_dokumen_dd',list('partner_dd_requirements','partner_id').map(record => {
+    assign('dd_documents',list('partner_dd_requirements','partner_id').map(record => {
       const requirement = decodeFields(record,ddFields);
       const files = prep(db, 'SELECT * FROM partner_dd_files WHERE partner_id = ? AND requirement_position = ? ORDER BY position').safeIntegers().all(row.partner_id, record.position) as Row[];
       if (files.length || 'files' in requirement) requirement.files = files.map(file => decodeFields(file,fileFields));
       return requirement;
     }));
-    if (!('kontak_pic' in row) && (row.email_pic || row.telepon_pic)) row.kontak_pic = [row.email_pic,row.telepon_pic].filter(Boolean).join(' / ');
+    if (!('pic_contact' in row) && (row.pic_email || row.pic_phone)) row.pic_contact = [row.pic_email,row.pic_phone].filter(Boolean).join(' / ');
   }
-  if (entity.table === 'contracts') assign('kategori_kerjasama',list('contract_categories','contract_id').map(record => record.category));
+  if (entity.table === 'contracts') assign('cooperation_categories',list('contract_categories','contract_id').map(record => record.category));
   if (entity.table === 'spendings') {
     assign('month_allocations',list('spending_allocations','spending_id').map(record => ({ ...JSON.parse(record.extra_json), month: record.month, amount: Number(`${record.amount_minor}e-${record.amount_scale}`) })));
     assign('invoice_month',list('spending_reporting_months','spending_id').map(record => record.month));
@@ -280,7 +278,7 @@ export function synchronizeBusinessRows(db: DB, data: Row) {
         seen.add(id);
         written.set(fingerprint,id);
         const old = readBusinessRows(db,entity.table,undefined,[id])[0];
-        const markerKeys = entity.table === 'partners' ? ['tags','identifiers','daftar_dokumen_dd'] : entity.table === 'contracts' ? ['kategori_kerjasama'] : entity.table === 'spendings' ? ['month_allocations','invoice_month'] : [];
+        const markerKeys = entity.table === 'partners' ? ['tags','identifiers','dd_documents'] : entity.table === 'contracts' ? ['cooperation_categories'] : entity.table === 'spendings' ? ['month_allocations','invoice_month'] : [];
         const values = { [entity.key]: id, organization_id: row.organizationId ?? null, record_position: position, ...encodeFields(arrayMarkers(row,markerKeys), entity.fields, [entity.key,'organizationId']) };
         upsert(db,entity.table,[entity.key],values);
         // Only replace child rows when their values actually change.

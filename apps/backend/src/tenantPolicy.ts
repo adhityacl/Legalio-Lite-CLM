@@ -115,8 +115,8 @@ export function normalizePartnerDocuments(partner: any): any[] {
   const settings = getTenantSettings(partner?.organizationId);
   const language = settings.language;
   const checklist = checklistForPartner(partner);
-  const existing: any[] = (Array.isArray(partner?.daftar_dokumen_dd) ? partner.daftar_dokumen_dd : [])
-    .filter((d: any) => d && !EXCLUDED_FROM_DD.test(String(d.nama || '')));
+  const existing: any[] = (Array.isArray(partner?.dd_documents) ? partner.dd_documents : [])
+    .filter((d: any) => d && !EXCLUDED_FROM_DD.test(String(d.name || '')));
   const used = new Set<any>();
 
   const normalizeDoc = (doc: any) => {
@@ -124,10 +124,10 @@ export function normalizePartnerDocuments(partner: any): any[] {
     if (files.length === 0 && doc.linkDrive) {
       files = [{
         id: `legacy_${Math.random().toString(36).slice(2, 9)}`,
-        fileName: `${doc.nama || 'document'}.pdf`,
+        fileName: `${doc.name || 'document'}.pdf`,
         linkDrive: doc.linkDrive,
         uploadedAt: doc.uploadedAt || new Date().toISOString(),
-        tanggalKadaluarsa: doc.tanggalKadaluarsa,
+        expiryDate: doc.expiryDate,
       }];
     }
     return { ...doc, files, status: normalizeDocumentStatus(doc.status) };
@@ -140,8 +140,8 @@ export function normalizePartnerDocuments(partner: any): any[] {
     return {
       ...base,
       key: req.key,
-      nama: localize(req.label, language),
-      wajib: req.required,
+      name: localize(req.label, language),
+      required: req.required,
       ...(req.expires ? { expires: true } : {}),
     };
   });
@@ -151,9 +151,9 @@ export function normalizePartnerDocuments(partner: any): any[] {
     const doc = normalizeDoc(extra);
     // Empty placeholders from an older checklist carry no evidence; drop them.
     // Anything with a file, link, number or expiry date is kept.
-    const hasEvidence = doc.files.length > 0 || doc.linkDrive || doc.nomorDokumen || doc.tanggalKadaluarsa || doc.status !== 'Missing';
+    const hasEvidence = doc.files.length > 0 || doc.linkDrive || doc.documentNumber || doc.expiryDate || doc.status !== 'Missing';
     if (!hasEvidence) continue;
-    result.push({ ...doc, wajib: false });
+    result.push({ ...doc, required: false });
   }
   return result;
 }
@@ -162,7 +162,7 @@ export function normalizePartnerDocuments(partner: any): any[] {
 export function computeDueDiligenceStatus(documents: any[]): DueDiligenceStatus {
   const docs = Array.isArray(documents) ? documents.filter((doc) => !isTerminationNoticeDocument(doc)) : [];
   if (docs.some((d) => normalizeDocumentStatus(d.status) === 'Expired')) return 'Expired';
-  const required = docs.filter((d) => d.wajib);
+  const required = docs.filter((d) => d.required);
   if (required.length === 0) {
     return docs.length > 0 && docs.every((d) => normalizeDocumentStatus(d.status) === 'Available') ? 'Complete' : 'Incomplete';
   }

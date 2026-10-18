@@ -13,7 +13,7 @@ import { AdminSessionsTab } from './admin/AdminSessionsTab';
 import { AdminOrganizationsTab } from './admin/AdminOrganizationsTab';
 import { AdminApiKeysTab } from './admin/AdminApiKeysTab';
 import { PlatformUsersTab, type PlatformUser } from './admin/PlatformUsersTab';
-import { CreateOrganizationModal, DeleteOrganizationModal, EditOrganizationModal, GenerateApiKeyModal } from './admin/AdminModals';
+import { CreateOrganizationModal, DeleteOrganizationModal, EditOrganizationModal, GenerateApiKeyModal, ResetOrganizationModal } from './admin/AdminModals';
 
 import { Button } from '@legalio/ui-components/button';
 import { Alert, AlertActions, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
@@ -73,6 +73,7 @@ export const AdminUsersView: React.FC<{ initialTab?: SystemSubmenu; onManageOrga
   const [isCreateOrgOpen, setIsCreateOrgOpen] = useState(false);
   const [orgForEdit, setOrgForEdit] = useState<ConsoleOrganization | null>(null);
   const [orgForDelete, setOrgForDelete] = useState<ConsoleOrganization | null>(null);
+  const [orgForReset, setOrgForReset] = useState<ConsoleOrganization | null>(null);
   const [isCreateApiKeyOpen, setIsCreateApiKeyOpen] = useState(false);
   const showAlert = useAlertToast();
   const configurationSection = CONFIGURATION_SECTIONS[activeTab as ConsoleConfigurationSection];
@@ -222,9 +223,14 @@ export const AdminUsersView: React.FC<{ initialTab?: SystemSubmenu; onManageOrga
           } }), `${t('admin.toast.org', 'Organization')} "${data.name}" ${t('admin.toast.created_success', 'successfully created.')}`);
           window.dispatchEvent(new CustomEvent('organization-updated'));
         }} />
-      <EditOrganizationModal org={orgForEdit} isOpen={Boolean(orgForEdit)} onClose={() => setOrgForEdit(null)} onDelete={(org) => setOrgForDelete(org)}
+      <EditOrganizationModal org={orgForEdit} isOpen={Boolean(orgForEdit)} onClose={() => setOrgForEdit(null)} onDelete={(org) => setOrgForDelete(org)} onReset={(org) => setOrgForReset(org)}
         onSubmit={async (orgId, data) => {
           await act(() => consoleApi(`/organizations/${orgId}`, { method: 'PUT', body: { name: data.name, slug: data.slug, expectedVersion: orgForEdit?.version, profile: { logoUrl: data.logo || '' } } }), `${t('admin.toast.org', 'Organisasi')} "${data.name}" ${t('admin.toast.updated_success', 'berhasil diperbarui.')}`);
+          window.dispatchEvent(new CustomEvent('organization-updated'));
+        }} />
+      <ResetOrganizationModal isOpen={Boolean(orgForReset)} org={orgForReset} onClose={() => setOrgForReset(null)}
+        onConfirm={async (org, confirm) => {
+          await act(() => consoleApi(`/organizations/${org.id}/reset`, { method: 'POST', body: { confirm } }), `${t('admin.toast.org', 'Organisasi')} "${org.name}" ${t('admin.toast.org_reset_success', 'berhasil direset.')}`);
           window.dispatchEvent(new CustomEvent('organization-updated'));
         }} />
       <DeleteOrganizationModal isOpen={Boolean(orgForDelete)} org={orgForDelete} isActive={false} onClose={() => setOrgForDelete(null)}

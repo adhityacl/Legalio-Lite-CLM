@@ -74,7 +74,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   const typeOptions = useMemo(() => {
     const types = new Set<string>();
     notifications.forEach((n) => {
-      if (n.jenis_notifikasi) types.add(n.jenis_notifikasi);
+      if (n.notification_type) types.add(n.notification_type);
     });
     return Array.from(types).sort();
   }, [notifications]);
@@ -147,14 +147,14 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
     // Type filter
     if (filterType !== 'ALL') {
-      list = list.filter((n) => n.jenis_notifikasi === filterType);
+      list = list.filter((n) => n.notification_type === filterType);
     }
 
     // Time range filter
     if (filterTimeRange !== 'ALL') {
       const now = new Date().getTime();
       list = list.filter((n) => {
-        const notifTime = new Date(n.tanggal_terkirim).getTime();
+        const notifTime = new Date(n.sent_at).getTime();
         const diffMs = now - notifTime;
         if (filterTimeRange === 'TODAY') return diffMs <= 24 * 60 * 60 * 1000;
         if (filterTimeRange === '7_DAYS') return diffMs <= 7 * 24 * 60 * 60 * 1000;
@@ -168,18 +168,18 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       const q = searchTerm.toLowerCase();
       list = list.filter(
         (n) =>
-          (n.pesan && notificationMessage(n, t).toLowerCase().includes(q)) ||
-          (n.parent_nomor && n.parent_nomor.toLowerCase().includes(q)) ||
-          (n.parent_judul && n.parent_judul.toLowerCase().includes(q)) ||
-          (n.jenis_notifikasi && n.jenis_notifikasi.toLowerCase().includes(q)) ||
-          (n.penerima && n.penerima.toLowerCase().includes(q))
+          (n.message && notificationMessage(n, t).toLowerCase().includes(q)) ||
+          (n.parent_number && n.parent_number.toLowerCase().includes(q)) ||
+          (n.parent_title && n.parent_title.toLowerCase().includes(q)) ||
+          (n.notification_type && n.notification_type.toLowerCase().includes(q)) ||
+          (n.recipient && n.recipient.toLowerCase().includes(q))
       );
     }
 
     // Sort by created time
     list.sort((a, b) => {
-      const timeA = new Date(a.tanggal_terkirim).getTime();
-      const timeB = new Date(b.tanggal_terkirim).getTime();
+      const timeA = new Date(a.sent_at).getTime();
+      const timeB = new Date(b.sent_at).getTime();
       return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
     });
 
@@ -445,7 +445,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                       {/* Created Time */}
                       {visibleColumns.time && (
                         <TableCell className="whitespace-nowrap">
-                          {formatDateTime(notif.tanggal_terkirim)}
+                          {formatDateTime(notif.sent_at)}
                         </TableCell>
                       )}
 
@@ -454,10 +454,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                         <TableCell className="whitespace-nowrap">
                           <Badge
                             tone={statusTone(
- notif.jenis_notifikasi
+ notif.notification_type
  )}
                           >
-                            {notif.jenis_notifikasi}
+                            {notif.notification_type}
                           </Badge>
                         </TableCell>
                       )}
@@ -466,11 +466,11 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                       {visibleColumns.subject && (
                         <TableCell className="whitespace-nowrap">
                           <span className="font-medium">
-                            {notif.parent_nomor || notif.parent_id}
+                            {notif.parent_number || notif.parent_id}
                           </span>
-                          {notif.parent_judul && (
+                          {notif.parent_title && (
                             <span className="text-muted-foreground ml-g5">
-                              • {notif.parent_judul}
+                              • {notif.parent_title}
                             </span>
                           )}
                         </TableCell>
@@ -488,7 +488,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                       {/* Recipient */}
                       {visibleColumns.recipient && (
                         <TableCell className="whitespace-nowrap">
-                          {notif.penerima}
+                          {notif.recipient}
                         </TableCell>
                       )}
 

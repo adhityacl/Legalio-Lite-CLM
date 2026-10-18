@@ -49,9 +49,9 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
   const { t } = useLanguage();
 
   const getInitialEmailPic = () => {
-    if (partnerToEdit?.email_pic) return partnerToEdit.email_pic;
-    if (partnerToEdit?.kontak_pic) {
-      const parts = partnerToEdit.kontak_pic.split(/[/|]/);
+    if (partnerToEdit?.pic_email) return partnerToEdit.pic_email;
+    if (partnerToEdit?.pic_contact) {
+      const parts = partnerToEdit.pic_contact.split(/[/|]/);
       const emailPart = parts.find((p) => p.includes('@'));
       if (emailPart) return emailPart.trim();
     }
@@ -59,9 +59,9 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
   };
 
   const getInitialTeleponPic = () => {
-    if (partnerToEdit?.telepon_pic) return partnerToEdit.telepon_pic;
-    if (partnerToEdit?.kontak_pic) {
-      const parts = partnerToEdit.kontak_pic.split(/[/|]/);
+    if (partnerToEdit?.pic_phone) return partnerToEdit.pic_phone;
+    if (partnerToEdit?.pic_contact) {
+      const parts = partnerToEdit.pic_contact.split(/[/|]/);
       const phonePart = parts.find((p) => !p.includes('@') && /\d/.test(p));
       if (phonePart) return phonePart.trim();
     }
@@ -74,35 +74,35 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
   const userDept = user?.department || 'Commercial & Marketing';
   const { departments: ENTERPRISE_DEPARTMENTS } = useDepartments();
 
-  const [namaPartner, setNamaPartner] = useState(partnerToEdit?.nama_partner || '');
+  const [namaPartner, setNamaPartner] = useState(partnerToEdit?.partner_name || '');
   const [codename, setCodename] = useState(partnerToEdit?.codename || '');
   const { policy } = useTenantSettings();
   // New partners default to the organization's own country.
   const [country, setCountry] = useState<string>(
-    partnerToEdit ? (partnerToEdit.country ?? (partnerToEdit.badan_hukum === 'BHI' ? 'ID' : '')) : (policy.settings.countryCode === 'INTL' ? '' : policy.settings.countryCode),
+    partnerToEdit ? (partnerToEdit.country ?? (partnerToEdit.legal_status_flag === 'BHI' ? 'ID' : '')) : (policy.settings.countryCode === 'INTL' ? '' : policy.settings.countryCode),
   );
   const [entityType, setEntityType] = useState(partnerToEdit?.entity_type || '');
   const [identifiers, setIdentifiers] = useState<PartyIdentifier[]>(partnerToEdit?.identifiers || []);
-  const [picInternal, setPicInternal] = useState(partnerToEdit?.pic_internal || userDept);
+  const [picInternal, setPicInternal] = useState(partnerToEdit?.internal_pic || userDept);
   
   // Update custom dept flag dynamically when departments load
   React.useEffect(() => {
-    if (partnerToEdit?.pic_internal) {
-      setIsCustomDept(!ENTERPRISE_DEPARTMENTS.includes(partnerToEdit.pic_internal));
+    if (partnerToEdit?.internal_pic) {
+      setIsCustomDept(!ENTERPRISE_DEPARTMENTS.includes(partnerToEdit.internal_pic));
     }
-  }, [ENTERPRISE_DEPARTMENTS, partnerToEdit?.pic_internal]);
+  }, [ENTERPRISE_DEPARTMENTS, partnerToEdit?.internal_pic]);
 
   const [isCustomDept, setIsCustomDept] = useState<boolean>(() => {
-    if (partnerToEdit?.pic_internal) {
-      return !ENTERPRISE_DEPARTMENTS.includes(partnerToEdit.pic_internal);
+    if (partnerToEdit?.internal_pic) {
+      return !ENTERPRISE_DEPARTMENTS.includes(partnerToEdit.internal_pic);
     }
     return false;
   });
-  const [namaPic, setNamaPic] = useState(partnerToEdit?.nama_pic || '');
+  const [namaPic, setNamaPic] = useState(partnerToEdit?.pic_name || '');
   const [emailPic, setEmailPic] = useState(getInitialEmailPic);
   const [teleponPic, setTeleponPic] = useState(getInitialTeleponPic);
-  const [alamatPic, setAlamatPic] = useState(partnerToEdit?.alamat_pic || '');
-  const [catatan, setCatatan] = useState(partnerToEdit?.catatan || '');
+  const [alamatPic, setAlamatPic] = useState(partnerToEdit?.pic_address || '');
+  const [notes, setNotes] = useState(partnerToEdit?.notes || '');
   const [tags, setTags] = useState<string[]>(
     partnerToEdit?.tags && partnerToEdit.tags.length > 0 ? partnerToEdit.tags : []
   );
@@ -134,7 +134,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nama_partner: namaPartner.trim(),
+          partner_name: namaPartner.trim(),
           country,
           entity_type: entityType,
           tags: tags,
@@ -146,7 +146,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
         throw new Error(result.error || t('partners.gagal_menghasilkan_ringkasan_due_diligence_ai', 'Gagal menghasilkan ringkasan Due Diligence AI.'));
       }
       if (result.success && result.notes) {
-        setCatatan(result.notes);
+        setNotes(result.notes);
       }
     } catch (err: any) {
       setError(err.message || t('partners.error_generating_due_diligence_notes', 'Error generating Due Diligence notes'));
@@ -207,14 +207,14 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
       }
       if (result.success && result.data) {
         const parsed = result.data;
-        if (parsed.nama_partner) setNamaPartner(parsed.nama_partner);
+        if (parsed.partner_name) setNamaPartner(parsed.partner_name);
         if (typeof parsed.country === 'string' && /^[A-Z]{2}$/.test(parsed.country)) setCountry(parsed.country);
         if (parsed.entity_type) setEntityType(parsed.entity_type);
-        if (parsed.nama_pic) setNamaPic(parsed.nama_pic);
-        if (parsed.email_pic) setEmailPic(parsed.email_pic);
-        if (parsed.telepon_pic) setTeleponPic(parsed.telepon_pic);
-        if (parsed.alamat_pic) setAlamatPic(parsed.alamat_pic);
-        if (parsed.notes && parsed.notes !== '-') setCatatan(parsed.notes);
+        if (parsed.pic_name) setNamaPic(parsed.pic_name);
+        if (parsed.pic_email) setEmailPic(parsed.pic_email);
+        if (parsed.pic_phone) setTeleponPic(parsed.pic_phone);
+        if (parsed.pic_address) setAlamatPic(parsed.pic_address);
+        if (parsed.notes && parsed.notes !== '-') setNotes(parsed.notes);
       }
     } catch (err: any) {
       setError(err.message || t('partners.error_parsing_document', 'Error parsing document'));
@@ -272,19 +272,19 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
     const kontakString = `${emailPic.trim()} / ${teleponPic.trim()}`;
 
     await onSave({
-      nama_partner: namaPartner.trim(),
+      partner_name: namaPartner.trim(),
       codename: codename.trim(),
       country,
       entity_type: entityType.trim(),
       identifiers: identifiers.filter((i) => i.value.trim()).map((i) => ({ ...i, value: i.value.trim() })),
-      jenis_partner: partnerToEdit?.jenis_partner || 'Vendor',
-      nama_pic: namaPic.trim(),
-      email_pic: emailPic.trim(),
-      telepon_pic: teleponPic.trim(),
-      alamat_pic: alamatPic.trim(),
-      kontak_pic: kontakString,
-      pic_internal: picInternal.trim(),
-      catatan: catatan.trim(),
+      partner_type: partnerToEdit?.partner_type || 'Vendor',
+      pic_name: namaPic.trim(),
+      pic_email: emailPic.trim(),
+      pic_phone: teleponPic.trim(),
+      pic_address: alamatPic.trim(),
+      pic_contact: kontakString,
+      internal_pic: picInternal.trim(),
+      notes: notes.trim(),
       tags,
     });
 
@@ -396,19 +396,19 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
             <FormSection step={2} title={t('form.partner.contact_section_title', 'PIC Contact Information')}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
                 <Field>
-                  <FieldLabel htmlFor="PartnerModal-field-4">{t('form.partner.nama_pic', 'PIC Name *')}</FieldLabel>
+                  <FieldLabel htmlFor="PartnerModal-field-4">{t('form.partner.pic_name', 'PIC Name *')}</FieldLabel>
                   <Input id="PartnerModal-field-4" type="text" required placeholder={t('form.partner.nama_pic_placeholder', 'e.g. Andi Hermawan')} value={namaPic} onChange={(e) => setNamaPic(e.target.value)} className="w-full" />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="PartnerModal-field-5">{t('form.partner.email_pic', 'PIC Email *')}</FieldLabel>
+                  <FieldLabel htmlFor="PartnerModal-field-5">{t('form.partner.pic_email', 'PIC Email *')}</FieldLabel>
                   <Input id="PartnerModal-field-5" type="email" required placeholder={t('form.partner.email_pic_placeholder', 'e.g. andi@telkomsel.co.id')} value={emailPic} onChange={(e) => setEmailPic(e.target.value)} className="w-full" />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="PartnerModal-field-6">{t('form.partner.telepon_pic', 'Contact phone *')}</FieldLabel>
+                  <FieldLabel htmlFor="PartnerModal-field-6">{t('form.partner.pic_phone', 'Contact phone *')}</FieldLabel>
                   <Input id="PartnerModal-field-6" type="text" required placeholder={t('form.partner.telepon_pic_placeholder', '+65 6123 4567')} value={teleponPic} onChange={(e) => setTeleponPic(e.target.value)} className="w-full" />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="PartnerModal-field-7">{t('form.partner.alamat_pic', 'PIC Address *')}</FieldLabel>
+                  <FieldLabel htmlFor="PartnerModal-field-7">{t('form.partner.pic_address', 'PIC Address *')}</FieldLabel>
                   <Input id="PartnerModal-field-7" type="text" required placeholder={t('form.partner.alamat_pic_placeholder', 'Jl. Jend. Sudirman Kav 52–53...')} value={alamatPic} onChange={(e) => setAlamatPic(e.target.value)} className="w-full" />
                 </Field>
               </div>
@@ -416,7 +416,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
 
             <FormSection step={3} title={t('form.partner.section_category_notes', 'Category & Notes')}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
-                <SuggestTagsInput className="h-full" controlClassName="flex-1 content-start" id="PartnerModal-field-8" label={t('form.partner.kategori_kerjasama', 'Partnership Category *')} value={tags} onValueChange={handleTagsChange} options={savedTemplates}
+                <SuggestTagsInput className="h-full" controlClassName="flex-1 content-start" id="PartnerModal-field-8" label={t('form.partner.cooperation_categories', 'Partnership Category *')} value={tags} onValueChange={handleTagsChange} options={savedTemplates}
                   placeholder={t('form.partner.tag_placeholder', 'Advertising, IT, Logistics')} clearLabel={t('common.clear', 'Clear all')} />
                 <Field className="h-full">
                   <FieldLabel htmlFor="PartnerModal-field-9">{t('form.partner.notes_label', 'Internal Notes')}</FieldLabel>
@@ -424,8 +424,8 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                     <Textarea id="PartnerModal-field-9"
                       rows={3}
                       placeholder={t('partners.format_1_paragraf_narrative_analyst_nama', 'One-paragraph analyst narrative...')}
-                      value={catatan}
-                      onChange={(e) => setCatatan(e.target.value)}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
                       className="h-full w-full pb-g42"
                     />
                     <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm"

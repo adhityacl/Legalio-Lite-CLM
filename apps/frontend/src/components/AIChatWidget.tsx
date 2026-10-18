@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, X, Send, User, Loader2, RotateCcw, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { AiIcon } from './icons/AiIcon';
 import { useLanguage } from '../context/LanguageContext';
 
 import { Button } from '@legalio/ui-components/button';
@@ -190,7 +189,7 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
 
   const isInitialOnly = messages.length === 1 && (messages[0].id === 'welcome' || messages[0].id.startsWith('welcome-'));
 
-  const assistantAvatar = <Avatar size="sm"><AvatarFallback className="bg-accent text-accent-foreground"><AiIcon size={14} /></AvatarFallback></Avatar>;
+  const assistantAvatar = <Avatar size="sm"><AvatarFallback className="bg-transparent"><img src="/icon-192.png" alt="" aria-hidden="true" className="size-g21 object-contain" /></AvatarFallback></Avatar>;
   const closeLabel = t('ai_chat.tutup_ai_assistant', 'Tutup AI Assistant');
   const openLabel = t('ai_chat.buka_asisten_ai_silegal', 'Buka Asisten AI Legalio');
 
@@ -209,7 +208,7 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
         <PopoverContent data-testid="ai-chat-panel"
           className="flex h-g610 max-h-(--available-height) w-g377 max-w-full max-w-none flex-col overflow-hidden p-0 ">
           <PopoverHeader className="flex items-center justify-between gap-g8 border-b border-border p-g13">
-            <PopoverTitle className="flex items-center gap-g8"><AiIcon size={18} className="text-accent-foreground" />{t('ai_chat.silegal_ai', 'Legalio AI')}</PopoverTitle>
+            <PopoverTitle className="flex items-center gap-g8"><img src="/icon-192.png" alt="" aria-hidden="true" className="size-g21 object-contain" />{t('ai_chat.silegal_ai', 'Legalio AI')}</PopoverTitle>
             <div className="flex items-center gap-g3">
               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" onClick={handleResetSession}
                 aria-label={t('ai_chat.reset_sesi_percakapan_hapus_konteks', 'Reset Sesi Percakapan (Hapus Konteks)')}>

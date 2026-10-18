@@ -138,6 +138,7 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['POST', '/api/auth-console/organizations', platform('platform.organization.create')],
   ['PUT', '/api/auth-console/organizations/:id', platform('platform.organization.update')],
   ['DELETE', '/api/auth-console/organizations/:id', platform('platform.organization.delete')],
+  ['POST', '/api/auth-console/organizations/:id/reset', platform('platform.application.reset')],
   ['GET', '/api/auth-console/api-keys', platform('platform.apikey.read')],
   ['POST', '/api/auth-console/api-keys', platform('platform.apikey.create')],
   ['POST', '/api/auth-console/api-keys/:id/revoke', platform('platform.apikey.revoke')],

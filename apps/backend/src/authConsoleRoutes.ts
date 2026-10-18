@@ -15,7 +15,9 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { buildMatrix, isPlatformRole } from './rbac';
 import { RequestDenied, accessibleOrganizations, resolveIdentity, sendError, type Identity } from './identity';
-import { AUTH_DB_PATH } from './runtimePaths';
+import { APP_DATA_DIR, AUTH_DB_PATH, UPLOADS_DIR } from './runtimePaths';
+import path from 'node:path';
+import { resetOrganizationData } from './organizationReset';
 import { isDemoAccountEmail } from './demoAccounts';
 import { ApiError, appendAudit, patchOrganizationSettings, readOrganizationSettings } from './organizationSettingsStore';
 import { assertAdminsRemainWithout, assertSuperusersRemainWithout, auditActorFor, previewInvitation, acceptInvitation } from './organizationAdminRoutes';
@@ -521,6 +523,30 @@ authConsoleRouter.put('/organizations/:id', platformHandler((req, res, identity)
   })();
   organizationChangedRef?.(current.organizationId);
   res.json({ success: true, organization: readOrganizationSettings(sqliteDb, current.organizationId) });
+}));
+
+/** Empties the organization's business data (a superuser tool); the organization itself, members and settings stay. */
+authConsoleRouter.post('/organizations/:id/reset', platformHandler((req, res, identity) => {
+  const id = req.params.id;
+  readOrganizationSettings(sqliteDb, id); // 404 for unknown IDs
+  if (!globalDbRef || !saveDbFnRef) throw new ApiError(503, 'NOT_READY', 'Business data is not ready.');
+  const organization = sqliteDb.prepare('SELECT slug FROM organization WHERE id = ?').get(id) as { slug?: string } | undefined;
+  const confirmation = String(req.body?.confirm ?? '').trim().toLowerCase();
+  if (!organization?.slug || confirmation !== organization.slug.toLowerCase()) throw bad('Type the organization slug to confirm the reset.');
+  const result = resetOrganizationData({
+    db: sqliteDb,
+    memory: globalDbRef,
+    organizationId: id,
+    uploadsDir: UPLOADS_DIR,
+    save: saveDbFnRef,
+    backupPath: path.join(APP_DATA_DIR, 'backups', `before-organization-reset-${id}-${Date.now()}.db`),
+  });
+  appendAudit(sqliteDb, auditActorFor(req, identity), {
+    organizationId: id, action: 'organization.reset', targetType: 'organization', targetId: id, outcome: 'success',
+    changedFields: Object.keys(result.removed).filter(key => result.removed[key] > 0),
+  });
+  organizationChangedRef?.(id);
+  res.json({ success: true, ...result });
 }));
 
 authConsoleRouter.delete('/organizations/:id', platformHandler((req, res, identity) => {

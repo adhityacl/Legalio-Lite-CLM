@@ -5,7 +5,7 @@ import type { ContractLifecycleFields } from '@legalio/types/lifecycle';
 export type { ContractLifecycleFields } from '@legalio/types/lifecycle';
 
 type LifecycleRecord = ContractLifecycleFields & {
-  status?: ContractStatus; tanggal_berakhir?: string; auto_renewal?: boolean;
+  status?: ContractStatus; end_date?: string; auto_renewal?: boolean;
 };
 
 export function contractLifecycleMode(record: LifecycleRecord): 'normal' | 'terminated' {
@@ -17,7 +17,7 @@ export function contractLifecycle(record: LifecycleRecord, settings: Pick<Tenant
   const terminationDays = daysUntil(record.termination_date, settings.timezone, now);
   // Preserve legacy terminated records that predate explicit termination dates.
   const effective = terminated && (terminationDays === null || terminationDays <= 0);
-  const daysRemaining = daysUntil(effective && record.termination_date ? record.termination_date : record.tanggal_berakhir, settings.timezone, now);
+  const daysRemaining = daysUntil(effective && record.termination_date ? record.termination_date : record.end_date, settings.timezone, now);
   const status = effective ? 'Terminated' : deriveContractStatus({ current: 'Active', daysRemaining,
     expiryWarningDays: settings.expiryWarningDays, autoRenewal: !terminated && record.auto_renewal });
   return { status: status as ContractStatus, daysRemaining, scheduled: terminated && !effective };
@@ -31,11 +31,11 @@ export function isBusinessDate(value: unknown): value is string {
 }
 
 /** Shared by form and API. End date remains independent from a termination date. */
-export function validateContractTermination(record: LifecycleRecord & { tanggal_mulai?: string }): string | null {
+export function validateContractTermination(record: LifecycleRecord & { start_date?: string }): string | null {
   if (record.lifecycle_mode !== undefined && !['normal', 'terminated'].includes(record.lifecycle_mode)) return 'termination.invalid_mode';
   if (contractLifecycleMode(record) !== 'terminated') return null;
   if (!isBusinessDate(record.termination_date)) return 'termination.date_required';
-  if (record.tanggal_mulai && record.termination_date < record.tanggal_mulai) return 'termination.before_start';
-  if (record.tanggal_berakhir && record.termination_date > record.tanggal_berakhir) return 'termination.after_end';
+  if (record.start_date && record.termination_date < record.start_date) return 'termination.before_start';
+  if (record.end_date && record.termination_date > record.end_date) return 'termination.after_end';
   return null;
 }

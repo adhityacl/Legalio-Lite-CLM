@@ -1,6 +1,6 @@
 /** Real HTTP + Chromium check, isolated from the development database and external services. */
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
@@ -56,7 +56,7 @@ try{
  assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name GLOB '_legacy_003_*'").get() as any).n,0);
  assert.equal((sql.prepare('SELECT COUNT(*) AS n FROM insertion_orders WHERE io_id IS NULL').get() as any).n,0);
  const browsed=await call('/api/auth-console/sqlite/table-data?table=partners');
- assert.ok(browsed.columns.some((c:any)=>c.name==='nama_partner'));
+ assert.ok(browsed.columns.some((c:any)=>c.name==='partner_name'));
  assert.ok(browsed.rows.every((row:any)=>row.partner_id));
  const tableList=await call('/api/auth-console/sqlite/tables');
  assert.equal(tableList.tables.some((table:any)=>table.name.startsWith('_legacy_003_')),false);
@@ -76,8 +76,8 @@ try{
  checks.push('Mailer catalog, authentication, validation, persistence and concurrent update protection');
  checks.push('legacy migration, authenticated API reload and SQLite browser');
  for (const direction of ['asc', 'desc']) {
-  const sorted = await call(`/api/auth-console/sqlite/table-data?table=partners&sort=nama_partner&direction=${direction}&limit=5&offset=5`);
-  const expected = sql.prepare(`SELECT partner_id FROM partners ORDER BY nama_partner ${direction}, partner_id LIMIT 5 OFFSET 5`).all() as any[];
+  const sorted = await call(`/api/auth-console/sqlite/table-data?table=partners&sort=partner_name&direction=${direction}&limit=5&offset=5`);
+  const expected = sql.prepare(`SELECT partner_id FROM partners ORDER BY partner_name ${direction}, partner_id LIMIT 5 OFFSET 5`).all() as any[];
   assert.deepEqual(sorted.rows.map((row:any)=>row.partner_id), expected.map(row=>row.partner_id));
  }
  await call('/api/auth-console/sqlite/table-data?table=partners&sort=missing', {status:400});
@@ -90,17 +90,17 @@ try{
  assert.ok(sessionsBrowser.rows.every((row:any)=>row.token==='[redacted]'));
  checks.push('SQLite explorer server-side sorting, stable pagination, validation and credential protection');
 
- const partner=(await call('/api/partners',{method:'POST',org,body:{nama_partner:'E2E Indexed Orchard',country:'ID',nama_pic:'Test Contact',email_pic:'private-index@example.com',telepon_pic:'+62123456',pic_internal:owner.name,tags:['Supplier']}})).partner;
+ const partner=(await call('/api/partners',{method:'POST',org,body:{partner_name:'E2E Indexed Orchard',country:'ID',pic_name:'Test Contact',pic_email:'private-index@example.com',pic_phone:'+62123456',internal_pic:owner.name,tags:['Supplier']}})).partner;
  assert.ok(partner.partner_id);assert.equal('pic_partner' in partner,false);
- const contract=(await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,nomor_kontrak:'E2E-CTR-001',judul_kontrak:'E2E Agreement',tanggal_mulai:'2026-01-01',tanggal_berakhir:'2099-12-31',currency:'USD',nilai_kontrak:123.45,status_approval:'Signed',auto_renewal:false,pic_internal:owner.name}})).contract;
+ const contract=(await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,contract_number:'E2E-CTR-001',contract_title:'E2E Agreement',start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',contract_value:123.45,status_approval:'Signed',auto_renewal:false,internal_pic:owner.name}})).contract;
  assert.ok(contract.contract_id);
  const ios=[];
- for(let i=1;i<=2;i++)ios.push((await call('/api/ios',{method:'POST',org,body:{partner_id:partner.partner_id,contract_id:contract.contract_id,nomor_io:`E2E-IO-${i}`,judul_io:`E2E Order ${i}`,tanggal_mulai:'2026-01-01',tanggal_berakhir:'2099-12-31',currency:'USD',nilai_io:0.29,kanal_media:'Digital',pricing_model:'Fixed',charging_type:'Postpaid'}})).io);
+ for(let i=1;i<=2;i++)ios.push((await call('/api/ios',{method:'POST',org,body:{partner_id:partner.partner_id,contract_id:contract.contract_id,io_number:`E2E-IO-${i}`,io_title:`E2E Order ${i}`,start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',io_value:0.29,media_channel:'Digital',pricing_model:'Fixed',charging_type:'Postpaid'}})).io);
  assert.ok(ios.every(io=>io?.io_id));assert.notEqual(ios[0].io_id,ios[1].io_id);
  assert.equal((sql.prepare('SELECT COUNT(*) AS n FROM insertion_orders WHERE contract_id=?').get(contract.contract_id) as any).n,2);
  checks.push('partner and contract CRUD; two IOs in one contract');
  const editableRow=(await call(`/api/auth-console/sqlite/table-data?table=partners&search=${partner.partner_id}`)).rows.find((row:any)=>row.partner_id===partner.partner_id);
- const editBody={table:'partners',key:partner.partner_id,original:editableRow,changes:{catatan:'ExplorerSearchProof',nama_pic:null}};
+ const editBody={table:'partners',key:partner.partner_id,original:editableRow,changes:{notes:'ExplorerSearchProof',pic_name:null}};
  await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody,token:'',status:401});
  const ordinaryToken=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'admin@example.com',password},token:''})).token;
  await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody,token:ordinaryToken,status:403});
@@ -114,38 +114,38 @@ try{
  sql.exec("CREATE TRIGGER fail_explorer_audit BEFORE INSERT ON audit_log WHEN NEW.action='platform.database.row.update' BEGIN SELECT RAISE(ABORT,'injected failure'); END");
  await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody,status:409});
  sql.exec('DROP TRIGGER fail_explorer_audit');
- assert.equal((sql.prepare('SELECT catatan FROM partners WHERE partner_id=?').get(partner.partner_id) as any).catatan,editableRow.catatan);
+ assert.equal((sql.prepare('SELECT notes FROM partners WHERE partner_id=?').get(partner.partner_id) as any).notes,editableRow.notes);
  await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody});
  await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody,status:409});
  assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='platform.database.row.update'").get() as any).n,auditBefore+1);
- assert.equal((await call('/api/partners',{org})).find((row:any)=>row.partner_id===partner.partner_id).nama_pic,null);
+ assert.equal((await call('/api/partners',{org})).find((row:any)=>row.partner_id===partner.partner_id).pic_name,null);
  assert.ok((await call('/api/search?q=ExplorerSearchProof',{org})).results.some((hit:any)=>hit.entity_id===partner.partner_id));
- await call(`/api/partners/${partner.partner_id}`,{method:'PUT',org,body:{telepon_pic:'+62123456'}});
+ await call(`/api/partners/${partner.partner_id}`,{method:'PUT',org,body:{pic_phone:'+62123456'}});
  const persistedEdit=(await call('/api/partners',{org})).find((row:any)=>row.partner_id===partner.partner_id);
- assert.equal(persistedEdit.catatan,'ExplorerSearchProof');assert.equal(persistedEdit.nama_pic,null);
+ assert.equal(persistedEdit.notes,'ExplorerSearchProof');assert.equal(persistedEdit.pic_name,null);
  const contractRow=(await call(`/api/auth-console/sqlite/table-data?table=contracts&search=${contract.contract_id}`)).rows.find((row:any)=>row.contract_id===contract.contract_id);
- for(const changes of [{auto_renewal:2},{notice_period_hari:'not-a-number'},{redline_analysis:'{invalid-json'},{risk_level:'Low'},{nilai_kontrak_minor:100}]) {
+ for(const changes of [{auto_renewal:2},{notice_period_days:'not-a-number'},{redline_analysis:'{invalid-json'},{risk_level:'Low'},{contract_value_minor:100}]) {
   await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:{table:'contracts',key:contract.contract_id,original:contractRow,changes},status:400});
  }
  checks.push('SQLite editor permissions, locked fields, audit rollback, stale-write rejection, NULL, search and in-memory persistence');
 
 
- const updatedContract=(await call(`/api/contracts/${contract.contract_id}`,{method:'PUT',org,body:{judul_kontrak:'E2E Agreement Updated',nilai_kontrak:456.78,currency:'USD'}})).contract;
- assert.equal(updatedContract.judul_kontrak,'E2E Agreement Updated');
- assert.equal((await call('/api/contracts',{org})).find((item:any)=>item.contract_id===contract.contract_id).nilai_kontrak,456.78);
- const thirdIo=(await call('/api/ios',{method:'POST',org,body:{partner_id:partner.partner_id,contract_id:contract.contract_id,nomor_io:'E2E-IO-DELETE',judul_io:'Temporary Order',tanggal_mulai:'2026-01-01',tanggal_berakhir:'2099-12-31',currency:'USD',nilai_io:1,kanal_media:'Digital',pricing_model:'Fixed',charging_type:'Postpaid'}})).io;
- const updatedIo=(await call(`/api/ios/${thirdIo.io_id}`,{method:'PUT',org,body:{judul_io:'Temporary Order Updated',nilai_io:2}})).io;
- assert.equal(updatedIo.judul_io,'Temporary Order Updated');
+ const updatedContract=(await call(`/api/contracts/${contract.contract_id}`,{method:'PUT',org,body:{contract_title:'E2E Agreement Updated',contract_value:456.78,currency:'USD'}})).contract;
+ assert.equal(updatedContract.contract_title,'E2E Agreement Updated');
+ assert.equal((await call('/api/contracts',{org})).find((item:any)=>item.contract_id===contract.contract_id).contract_value,456.78);
+ const thirdIo=(await call('/api/ios',{method:'POST',org,body:{partner_id:partner.partner_id,contract_id:contract.contract_id,io_number:'E2E-IO-DELETE',io_title:'Temporary Order',start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',io_value:1,media_channel:'Digital',pricing_model:'Fixed',charging_type:'Postpaid'}})).io;
+ const updatedIo=(await call(`/api/ios/${thirdIo.io_id}`,{method:'PUT',org,body:{io_title:'Temporary Order Updated',io_value:2}})).io;
+ assert.equal(updatedIo.io_title,'Temporary Order Updated');
  await call(`/api/ios/${thirdIo.io_id}`,{method:'DELETE',org});
  assert.equal((await call('/api/ios',{org})).some((item:any)=>item.io_id===thirdIo.io_id),false);
  checks.push('App contract and commercial-document create/read/update/delete');
 
- const spending=(await call('/api/partner-spendings',{method:'POST',org,body:{vendor_id:partner.partner_id,vendor_name:partner.nama_partner,invoice_number:'E2E-INV-001',invoice_date:'2026-10-01',invoice_month:['2026-10-31'],currency:'USD',total_amount:100}})).spending;
+ const spending=(await call('/api/partner-spendings',{method:'POST',org,body:{vendor_id:partner.partner_id,vendor_name:partner.partner_name,invoice_number:'E2E-INV-001',invoice_date:'2026-10-01',invoice_month:['2026-10-31'],currency:'USD',total_amount:100}})).spending;
  assert.equal((await call('/api/partner-spendings',{org})).some((item:any)=>item.id===spending.id),true);
  assert.equal((await call(`/api/partner-spendings/${spending.id}`,{method:'PUT',org,body:{invoice_title:'Updated invoice',total_amount:125}})).spending.total_amount,125);
  await call(`/api/partner-spendings/${spending.id}`,{method:'DELETE',org});
  assert.equal((await call('/api/partner-spendings',{org})).some((item:any)=>item.id===spending.id),false);
- const evaluation=(await call('/api/partner-evaluations',{method:'POST',org,body:{partner_id:partner.partner_id,supplier_name:partner.nama_partner,review_date:'2026-10-01',type_of_work:'Services',obligation_target:'Achieved',incident_frequency:'None',communication:'Good',pricing:'Competitive',final_evaluation:'Recommended'}})).evaluation;
+ const evaluation=(await call('/api/partner-evaluations',{method:'POST',org,body:{partner_id:partner.partner_id,supplier_name:partner.partner_name,review_date:'2026-10-01',type_of_work:'Services',obligation_target:'Achieved',incident_frequency:'None',communication:'Good',pricing:'Competitive',final_evaluation:'Recommended'}})).evaluation;
  assert.equal((await call('/api/partner-evaluations',{org})).some((item:any)=>item.id===evaluation.id),true);
  assert.equal((await call(`/api/partner-evaluations/${evaluation.id}`,{method:'PUT',org,body:{notes:'Updated evaluation'}})).evaluation.notes,'Updated evaluation');
  await call(`/api/partner-evaluations/${evaluation.id}`,{method:'DELETE',org});
@@ -246,50 +246,50 @@ try{
  await call(`/api/auth-console/users/${managedUser.id}`,{method:'DELETE'});
  assert.equal((await call('/api/auth-console/users')).users.some((item:any)=>[invitedUser.id,managedUser.id].includes(item.id)),false);
  checks.push('Sys temporary identities deleted after dependent records');
- const imported=await call('/api/bulk-import',{method:'POST',org,body:{type:'partners',rows:[{nama_partner:'E2E CSV Imported',internal_pic:owner.name,nama_pic:'CSV Contact',email_pic:'csv@example.com',telepon_pic:'+62111',pic_partner:'obsolete',tags:'Supplier'}]}});
+ const imported=await call('/api/bulk-import',{method:'POST',org,body:{type:'partners',rows:[{partner_name:'E2E CSV Imported',internal_pic:owner.name,pic_name:'CSV Contact',pic_email:'csv@example.com',pic_phone:'+62111',pic_partner:'obsolete',tags:'Supplier'}]}});
  assert.equal(imported.succeeded.length,1);
- const csvPartner=(await call('/api/partners',{org})).find((p:any)=>p.nama_partner==='E2E CSV Imported');assert.equal(csvPartner.nama_pic,'CSV Contact');assert.equal('pic_partner' in csvPartner,false);
+ const csvPartner=(await call('/api/partners',{org})).find((p:any)=>p.partner_name==='E2E CSV Imported');assert.equal(csvPartner.pic_name,'CSV Contact');assert.equal('pic_partner' in csvPartner,false);
  assert.equal((sql.prepare('PRAGMA table_info(partners)').all() as any[]).some(c=>c.name==='payload'),false);
  checks.push('CSV import into SQL columns without pic_partner');
  const contractImport=await call('/api/bulk-import',{method:'POST',org,body:{type:'contracts',userRole:'Forged',userEmail:'forged@example.com',rows:[
-  {nomor_kontrak:'E2E/IMP/001',judul_kontrak:'Known partner',partner_nama:'E2E CSV Imported',jenis_dokumen:'Master Agreement',tanggal_mulai:'2026-01-01',tanggal_berakhir:'2027-01-01',nilai_kontrak:'1000'},
-  {nomor_kontrak:'E2E/IMP/002',judul_kontrak:'Unknown partner',partner_nama:'No Such Partner',jenis_dokumen:'Master Agreement',tanggal_mulai:'2026-01-01',tanggal_berakhir:'2027-01-01',nilai_kontrak:'1000'}]}});
+  {contract_number:'E2E/IMP/001',contract_title:'Known partner',partner_name:'E2E CSV Imported',document_type:'Master Agreement',start_date:'2026-01-01',end_date:'2027-01-01',contract_value:'1000'},
+  {contract_number:'E2E/IMP/002',contract_title:'Unknown partner',partner_name:'No Such Partner',document_type:'Master Agreement',start_date:'2026-01-01',end_date:'2027-01-01',contract_value:'1000'}]}});
  assert.equal(contractImport.succeeded.length,1);assert.equal(contractImport.failed.length,1);assert.match(contractImport.failed[0].message,/Partner "No Such Partner"/);
- const importedContract=(await call('/api/contracts',{org})).find((c:any)=>c.nomor_kontrak==='E2E/IMP/001');assert.equal('partner_nama' in importedContract,false);assert.equal(importedContract.partner_id,csvPartner.partner_id);
- assert.equal((sql.prepare("SELECT count(*) n FROM contracts WHERE nomor_kontrak='E2E/IMP/002'").get() as any).n,0);
+ const importedContract=(await call('/api/contracts',{org})).find((c:any)=>c.contract_number==='E2E/IMP/001');assert.equal('partner_name' in importedContract,false);assert.equal(importedContract.partner_id,csvPartner.partner_id);
+ assert.equal((sql.prepare("SELECT count(*) n FROM contracts WHERE contract_number='E2E/IMP/002'").get() as any).n,0);
  checks.push('Contract import links partner and rejects unknown partner names');
  // Drive is backup only: an upload is always stored locally and the record keeps the local link.
- const uploaded=(await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,nomor_kontrak:'E2E-UPLOAD-001',judul_kontrak:'E2E Upload',tanggal_mulai:'2026-01-01',tanggal_berakhir:'2099-12-31',currency:'USD',nilai_kontrak:1,status_approval:'Signed',auto_renewal:false,pic_internal:owner.name,fileName:'e2e-upload.pdf',fileData:'data:application/pdf;base64,'+Buffer.from('%PDF-1.4 e2e').toString('base64')}})).contract;
- assert.match(uploaded.link_file_kontrak,/^\/uploads\//);
- assert.equal(readFileSync(path.join(directory,'uploads',...decodeURIComponent(uploaded.link_file_kontrak.slice('/uploads/'.length)).split('/')),'utf8'),'%PDF-1.4 e2e');
+ const uploaded=(await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,contract_number:'E2E-UPLOAD-001',contract_title:'E2E Upload',start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,internal_pic:owner.name,fileName:'e2e-upload.pdf',fileData:'data:application/pdf;base64,'+Buffer.from('%PDF-1.4 e2e').toString('base64')}})).contract;
+ assert.match(uploaded.contract_file_link,/^\/uploads\//);
+ assert.equal(readFileSync(path.join(directory,'uploads',...decodeURIComponent(uploaded.contract_file_link.slice('/uploads/'.length)).split('/')),'utf8'),'%PDF-1.4 e2e');
  const initContract=(await call('/api/init-data',{org})).contracts.find((c:any)=>c.contract_id===uploaded.contract_id);
- assert.equal('partner_nama' in initContract,false);assert.equal(initContract.partner_id,partner.partner_id);
+ assert.equal('partner_name' in initContract,false);assert.equal(initContract.partner_id,partner.partner_id);
  const driveBackup=await call('/api/google-integration/backup',{method:'POST',org});assert.equal(driveBackup.success,true);assert.equal(driveBackup.backedUpCount,0);
  await call('/api/google-integration/backup',{method:'POST',org,token:'',status:401});
  assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM schema_migrations WHERE id='005_status_indexes'").get() as any).n,1);
  assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='index' AND name LIKE 'idx_v5_%'").get() as any).n,3);
- checks.push('local-only upload with local link, no partner_nama alias, Drive backup endpoint authorization, status index migration');
+ checks.push('local-only upload with local link, no partner_name alias, Drive backup endpoint authorization, status index migration');
  // Six soon-to-expire contracts: the dashboard must show only the five nearest, with partner names.
  const extraContractIds=[uploaded.contract_id];
- for(let i=1;i<=6;i++) extraContractIds.push((await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,nomor_kontrak:`E2E-EXP-${i}`,judul_kontrak:`E2E Expiring ${i}`,tanggal_mulai:'2026-01-01',tanggal_berakhir:new Date(Date.now()+(5+i)*86400000).toISOString().slice(0,10),currency:'USD',nilai_kontrak:1,status_approval:'Signed',auto_renewal:false,pic_internal:owner.name}})).contract.contract_id);
+ for(let i=1;i<=6;i++) extraContractIds.push((await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,contract_number:`E2E-EXP-${i}`,contract_title:`E2E Expiring ${i}`,start_date:'2026-01-01',end_date:new Date(Date.now()+(5+i)*86400000).toISOString().slice(0,10),currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,internal_pic:owner.name}})).contract.contract_id);
  const editorToken=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'editor@example.com',password},token:''})).token;
- const hidden=(await call('/api/partners',{method:'POST',org,body:{nama_partner:'E2E Indexed Hidden',pic_internal:otherOwner.name,tags:['Supplier']}})).partner;
+ const hidden=(await call('/api/partners',{method:'POST',org,body:{partner_name:'E2E Indexed Hidden',internal_pic:otherOwner.name,tags:['Supplier']}})).partner;
  const found=await call('/api/search?q=E2E%20Indexed',{org,token:editorToken});assert.ok(found.results.some((hit:any)=>hit.entity_id===partner.partner_id));assert.equal(found.results.some((hit:any)=>hit.entity_id===hidden.partner_id),false);
  assert.equal((await call('/api/search?q=private-index@example.com',{org})).results.length,0);
  assert.equal((await call('/api/search?q=E2E',{org:otherOrg})).results.length,0);
  await call('/api/partners',{org:otherOrg,token:editorToken,status:404});
  checks.push('search organization/department authorization and contact exclusion');
- await call(`/api/partners/${partner.partner_id}`,{method:'PUT',org,body:{nama_partner:'E2E Renamed Orchard'}});
+ await call(`/api/partners/${partner.partner_id}`,{method:'PUT',org,body:{partner_name:'E2E Renamed Orchard'}});
  assert.equal((await call('/api/search?q=Renamed',{org})).results[0].entity_id,partner.partner_id);
  await call(`/api/ios/${ios[0].io_id}`,{method:'PUT',org,body:{contract_id:'missing-contract'},status:409});
  assert.equal((await call('/api/ios',{org})).find((io:any)=>io.io_id===ios[0].io_id).contract_id,contract.contract_id);
  checks.push('search update; failed write rollback; API stays available');
- await stop(server);server=run(['apps/backend/dist/server.cjs']);await waitFor(backendURL+'/api/health',server);
+ await stop(server);server=run(['--import','tsx','apps/backend/src/server.ts']);await waitFor(backendURL+'/api/health',server); // dev path (tsx, real ESM): the bundle hides initialisation-order bugs
  assert.equal((await call('/api/ios',{org})).filter((io:any)=>io.contract_id===contract.contract_id).length,2);
  assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name GLOB '_legacy_003_*'").get() as any).n,0);
  checks.push('persistence after backend restart');
  frontend=run(['../../node_modules/vite/bin/vite.js','--config','vite.config.ts','--host','127.0.0.1','--port',String(frontendPort)],path.join(repository,'apps/frontend'));await waitFor(frontendURL,frontend);
- browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+ browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage']});const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
  const errors:string[]=[];const failedAPI:string[]=[];page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.url().includes('/api/')&&r.status()>=500)failedAPI.push(`${r.status()} ${r.url()}`);});
  await page.goto(frontendURL+'/app');await expect(page.locator('#signin-email')).toBeVisible();
  await expect(page.getByText(/continue with google/i)).toHaveCount(0);
@@ -300,13 +300,44 @@ try{
  await expect(expiring.getByText('E2E Expiring 1')).toBeVisible({timeout:30000});
  assert.equal(await expiring.locator('tbody tr').count(),5);
  await expect(expiring.getByText('E2E Expiring 6')).toHaveCount(0);
- const currentName=(await call('/api/partners',{org})).find((p:any)=>p.partner_id===partner.partner_id).nama_partner;
+ const currentName=(await call('/api/partners',{org})).find((p:any)=>p.partner_id===partner.partner_id).partner_name;
  for(const row of await expiring.locator('tbody tr').all()) assert.equal((await row.locator('td').nth(3).innerText()).trim(),currentName);
  assert.equal(await page.getByRole('region',{name:'Latest Documents'}).locator('tbody tr').count(),5);
  await expect(page.locator('[aria-label^="Google Drive:"]')).toHaveCount(0);
  checks.push('Chromium sign-in without Google option, dashboard shows five nearest expiring documents with partner names, no sidebar Google dot');
  for(const id of extraContractIds) await call(`/api/contracts/${id}`,{method:'DELETE',org}); // keep the list pages below on their first page
  await page.screenshot({path:path.join(directory,'app-desktop.png'),fullPage:true});writeFileSync(path.join(directory,'browser.html'),await page.content());
+ // Bulk delete: every table with row selection shows a "Delete Selected" bar, confirms once, and deletes only the selection.
+ const bulkPartners:any[]=[];
+ for(const n of ['A','B']){
+  const created=(await call('/api/partners',{method:'POST',org,body:{partner_name:`E2E Bulk ${n}`,internal_pic:owner.name}})).partner;bulkPartners.push(created);
+  await call('/api/contracts',{method:'POST',org,body:{partner_id:created.partner_id,contract_number:`E2E-BULK-C-${n}`,contract_title:`E2E Bulk Contract ${n}`,start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,internal_pic:owner.name}});
+  await call('/api/ios',{method:'POST',org,body:{partner_id:created.partner_id,io_number:`E2E-BULK-IO-${n}`,io_title:`E2E Bulk IO ${n}`,start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',io_value:1,media_channel:'Digital',pricing_model:'Fixed',charging_type:'Postpaid'}});
+  await call('/api/partner-spendings',{method:'POST',org,body:{vendor_id:created.partner_id,vendor_name:created.partner_name,invoice_number:`E2E-BULK-INV-${n}`,invoice_date:'2026-10-01',invoice_month:['2026-10-31'],currency:'USD',total_amount:1}});
+  await call('/api/partner-evaluations',{method:'POST',org,body:{partner_id:created.partner_id,supplier_name:created.partner_name,review_date:'2026-10-01',type_of_work:'Services',obligation_target:'Achieved',incident_frequency:'None',communication:'Good',pricing:'Competitive',final_evaluation:'Recommended'}});
+ }
+ const remaining=async(path:string,field:string)=>(await call(path,{org})).filter((row:any)=>String(row[field]||'').includes('E2E Bulk')||String(row[field]||'').includes('E2E-BULK')).length;
+ const selectAllAndDelete=async(tab:string,path:string,field:string,count:number)=>{
+  await page.goto(frontendURL+`/app?tab=${tab}`);
+  await page.getByPlaceholder(/search|cari/i).first().fill('E2E Bulk');
+  await expect(page.locator('tbody tr',{hasText:/E2E[ -]Bulk|E2E-BULK/}).first()).toBeVisible({timeout:30000});
+  await page.locator('table thead').getByRole('checkbox').first().click({force:true});
+  const deleteSelected=page.getByRole('button',{name:/^(delete selected|hapus terpilih)$/i});
+  await expect(deleteSelected).toBeVisible();
+  await expect(deleteSelected.locator('xpath=ancestor::*[contains(@class,"flex-row")][1]')).toContainText(String(count));
+  await deleteSelected.click();
+  await page.getByRole('alertdialog').or(page.getByRole('dialog')).getByRole('button',{name:/^(delete|hapus)/i}).click();
+  await expect.poll(()=>remaining(path,field),{timeout:30000}).toBe(0);
+  await expect(deleteSelected).toHaveCount(0);
+ };
+ await selectAllAndDelete('partner-spending','/api/partner-spendings','invoice_number',2);
+ await selectAllAndDelete('partner-evaluation','/api/partner-evaluations','supplier_name',2);
+ await selectAllAndDelete('ios','/api/ios','io_number',2);
+ await selectAllAndDelete('contracts','/api/contracts','contract_number',2);
+ await selectAllAndDelete('partners','/api/partners','partner_name',2);
+ assert.equal(await remaining('/api/contracts','contract_number')+await remaining('/api/ios','io_number')+await remaining('/api/partners','partner_name'),0);
+ assert.ok((await call('/api/partners',{org})).some((p:any)=>p.partner_id===partner.partner_id),'unselected partners stay');
+ checks.push('Chromium bulk "Delete Selected" bar on partner, contract, IO, spending and evaluation tables confirms once and deletes only the selection');
  for (const [tab,text] of [['partners','E2E Renamed Orchard'],['contracts','E2E-CTR-001'],['ios','E2E-IO-1']]) {
   await page.goto(frontendURL+`/app?tab=${tab}`);
   await expect(page.getByText(text,{exact:true}).first()).toBeVisible({timeout:30000});
@@ -319,7 +350,7 @@ try{
  // Date preview: 03/04/2026 must be shown as 3 April, a US-style date rejected, and nothing is imported by looking.
  await page.goto(frontendURL+'/app?tab=bulk-import');
  await page.getByRole('tab',{name:/^(contract|kontrak)$/i}).click();
- await page.locator('input[type=file]').setInputFiles({name:'dates.csv',mimeType:'text/csv',buffer:Buffer.from('nomor_kontrak,partner_nama,tanggal_mulai,tanggal_berakhir\nPREVIEW-1,X,03/04/2026,2026-12-31\nPREVIEW-2,X,12/31/2026,not-a-date\n')});
+ await page.locator('input[type=file]').setInputFiles({name:'dates.csv',mimeType:'text/csv',buffer:Buffer.from('contract_number,partner_name,start_date,end_date\nPREVIEW-1,X,03/04/2026,2026-12-31\nPREVIEW-2,X,12/31/2026,not-a-date\n')});
  const datePreview=page.locator('#import-date-preview');
  await expect(datePreview).toBeVisible();
  await expect(datePreview.getByText(/april 3, 2026|3 april 2026/i)).toBeVisible();
@@ -327,25 +358,25 @@ try{
  assert.equal(await datePreview.locator('tbody tr').count()>=4,true);
  assert.match(await datePreview.locator('tbody tr').first().innerText(),/invalid|tidak valid|无效/i);
  await expect(datePreview.getByRole('note')).toBeVisible();
- assert.equal((await call('/api/contracts',{org})).some((c:any)=>String(c.nomor_kontrak).startsWith('PREVIEW-')),false);
+ assert.equal((await call('/api/contracts',{org})).some((c:any)=>String(c.contract_number).startsWith('PREVIEW-')),false);
  checks.push('Chromium CSV date preview shows how 03/04/2026 is read, flags invalid dates and imports nothing');
  await page.goto(frontendURL+'/app?tab=bulk-import');
- await expect(page.getByText('nama_partner',{exact:true})).toBeVisible();
+ await expect(page.getByText('partner_name',{exact:true})).toBeVisible();
  await expect(page.getByText('pic_partner',{exact:true})).toHaveCount(0);
  const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:/template/i}).click()]);
  const csvTemplate=readFileSync((await download.path())!,'utf8');
- const header=csvTemplate.split(/\r?\n/).find(line=>line.includes('nama_partner')) || '';
+ const header=csvTemplate.split(/\r?\n/).find(line=>line.includes('partner_name')) || '';
  assert.equal(header.includes('pic_partner'),false);
- assert.ok(header.includes('nama_pic'));
+ assert.ok(header.includes('pic_name'));
  await expect(page.getByText(/\(Excel/i)).toHaveCount(0);
  await page.locator('input[type=file]').setInputFiles({name:'spreadsheet.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from('PK\u0003\u0004 not a csv')});
  await expect(page.getByRole('alert')).toBeVisible();
- await page.locator('input[type=file]').setInputFiles({name:'browser-import.csv',mimeType:'text/csv',buffer:Buffer.from(`nama_partner,internal_pic,nama_pic,email_pic,telepon_pic,tags\nE2E Browser CSV,${owner.name},Browser Contact,browser@example.com,+62123,Supplier\n`)});
+ await page.locator('input[type=file]').setInputFiles({name:'browser-import.csv',mimeType:'text/csv',buffer:Buffer.from(`partner_name,internal_pic,pic_name,pic_email,pic_phone,tags\nE2E Browser CSV,${owner.name},Browser Contact,browser@example.com,+62123,Supplier\n`)});
  await expect(page.getByText('E2E Browser CSV',{exact:true})).toBeVisible();
  const [importResponse]=await Promise.all([page.waitForResponse(r=>r.url().includes('/api/bulk-import')&&r.request().method()==='POST'),page.getByRole('button',{name:/^(mulai import|start import)$/i}).click()]);
  assert.equal(importResponse.status(),200);
  assert.equal((await importResponse.json()).succeeded.length,1);
- assert.ok((await call('/api/partners',{org})).some((p:any)=>p.nama_partner==='E2E Browser CSV'));
+ assert.ok((await call('/api/partners',{org})).some((p:any)=>p.partner_name==='E2E Browser CSV'));
  await page.setViewportSize({width:390,height:844});
  await page.screenshot({path:path.join(directory,'import-mobile.png'),fullPage:true});
  await page.setViewportSize({width:1440,height:1000});
@@ -472,14 +503,14 @@ try{
  await tableNav.getByRole('button',{name:'partners',exact:true}).click();
  const grid=explorer.getByRole('table',{name:'partners',exact:true});
  await expect(grid).toBeVisible();
- await grid.getByRole('columnheader',{name:/nama_partner/}).getByRole('button').click();
- await expect(grid.getByRole('columnheader',{name:/nama_partner/})).toHaveAttribute('aria-sort','ascending');
- await grid.getByRole('columnheader',{name:/nama_partner/}).getByRole('button').click();
- await expect(grid.getByRole('columnheader',{name:/nama_partner/})).toHaveAttribute('aria-sort','descending');
+ await grid.getByRole('columnheader',{name:/partner_name/}).getByRole('button').click();
+ await expect(grid.getByRole('columnheader',{name:/partner_name/})).toHaveAttribute('aria-sort','ascending');
+ await grid.getByRole('columnheader',{name:/partner_name/}).getByRole('button').click();
+ await expect(grid.getByRole('columnheader',{name:/partner_name/})).toHaveAttribute('aria-sort','descending');
  await grid.getByRole('row').nth(1).getByRole('button').first().click();
  const detail=systemPage.locator('#sqlite-row-details');
  await expect(detail.locator('#sqlite-field-partner_id')).not.toHaveValue('');
- await detail.getByRole('textbox',{name:/Find a field|Cari field/}).fill('nama_partner');
+ await detail.getByRole('textbox',{name:/Find a field|Cari field/}).fill('partner_name');
  await expect(detail.locator('textarea')).toHaveCount(1);
  await detail.getByRole('textbox',{name:/Find a field|Cari field/}).fill('');
  await systemPage.context().grantPermissions(['clipboard-read','clipboard-write']);
@@ -487,7 +518,7 @@ try{
  const clipboard=await systemPage.evaluate<string>("navigator.clipboard.readText()");
  assert.ok(JSON.parse(clipboard).partner_id);
  const [pageExport]=await Promise.all([systemPage.waitForEvent('download'),explorer.getByRole('button',{name:/Export page CSV|Ekspor halaman CSV/}).click()]);
- const exported=readFileSync((await pageExport.path())!,'utf8');assert.ok(exported.includes('"partner_id"'));assert.ok(exported.includes('"nama_partner"'));
+ const exported=readFileSync((await pageExport.path())!,'utf8');assert.ok(exported.includes('"partner_id"'));assert.ok(exported.includes('"partner_name"'));
  await explorer.getByRole('button',{name:/^Structure$|^Struktur$/}).click();
  await expect(explorer.getByRole('columnheader',{name:/Constraints|Batasan/})).toBeVisible();
  await explorer.getByRole('button',{name:'Data',exact:true}).click();
@@ -496,21 +527,21 @@ try{
  await expect(grid.getByRole('row')).toHaveCount(2);
  await expect(grid.getByRole('button',{name:'E2E Browser CSV',exact:true})).toBeVisible();
  await grid.getByRole('button',{name:'E2E Browser CSV',exact:true}).click();
- await expect(detail.locator('#sqlite-field-nama_partner')).toHaveValue('E2E Browser CSV');
+ await expect(detail.locator('#sqlite-field-partner_name')).toHaveValue('E2E Browser CSV');
 
  await detail.getByRole('button',{name:/^Edit row$|^Edit baris$/}).click();
  await expect(detail.locator('#sqlite-field-partner_id')).toHaveAttribute('readonly','');
- await detail.locator('#sqlite-field-nama_partner').fill('Canceled database edit');
+ await detail.locator('#sqlite-field-partner_name').fill('Canceled database edit');
  await detail.getByRole('button',{name:/^Cancel$|^Batal$/}).click();
- await expect(detail.locator('#sqlite-field-nama_partner')).toHaveValue('E2E Browser CSV');
+ await expect(detail.locator('#sqlite-field-partner_name')).toHaveValue('E2E Browser CSV');
  await detail.getByRole('button',{name:/^Edit row$|^Edit baris$/}).click();
- await detail.locator('#sqlite-field-catatan').fill('Saved from explorer UI');
+ await detail.locator('#sqlite-field-notes').fill('Saved from explorer UI');
  await detail.getByRole('button',{name:/^Save$|^Simpan$/}).click();
  await expect(systemPage.getByRole('status').filter({hasText:/Changes saved|Perubahan disimpan/})).toBeVisible();
  await expect(grid.getByRole('button',{name:'E2E Browser CSV',exact:true})).toBeVisible();
  await grid.getByRole('button',{name:'E2E Browser CSV',exact:true}).click();
- await expect(detail.locator('#sqlite-field-catatan')).toHaveValue('Saved from explorer UI');
- assert.equal((await call('/api/partners',{org})).find((item:any)=>item.nama_partner==='E2E Browser CSV').catatan,'Saved from explorer UI');
+ await expect(detail.locator('#sqlite-field-notes')).toHaveValue('Saved from explorer UI');
+ assert.equal((await call('/api/partners',{org})).find((item:any)=>item.partner_name==='E2E Browser CSV').notes,'Saved from explorer UI');
  checks.push('Chromium row edit, locked identity, cancel, save and API persistence');
  await systemPage.screenshot({path:path.join(directory,'sys-database-explorer-desktop.png'),fullPage:true});
  await explorer.getByRole('textbox',{name:/^Find a table$|^Cari tabel$/}).fill('session');
@@ -536,6 +567,45 @@ try{
  assert.deepEqual(systemErrors,[]);assert.deepEqual(failedSystemAPI,[]);
  await systemPage.close();
  checks.push('Chromium all 15 Sys pages render without runtime or API 500 errors');
+ // Organization reset (superuser): empties one organization's business data; other organizations and the organization itself stay.
+ {
+  const readOnly=new Database(path.join(directory,'kaelyn.db'),{readonly:true});
+  const resetSlug=(readOnly.prepare('SELECT slug FROM organization WHERE id=?').get(otherOrg) as any).slug;readOnly.close();
+  const resetPartner=(await call('/api/partners',{method:'POST',org:otherOrg,body:{partner_name:'E2E Reset Partner'}})).partner;
+  const resetContract=(await call('/api/contracts',{method:'POST',org:otherOrg,body:{partner_id:resetPartner.partner_id,contract_number:'E2E-RESET-C1',contract_title:'Reset me',start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,fileName:'reset.pdf',fileData:'data:application/pdf;base64,'+Buffer.from('%PDF-1.4 reset').toString('base64')}})).contract;
+  const resetFile=path.join(directory,'uploads',...decodeURIComponent(resetContract.contract_file_link.slice('/uploads/'.length)).split('/'));
+  assert.ok(existsSync(resetFile));
+  const partnersElsewhere=(await call('/api/partners',{org})).length;const contractsElsewhere=(await call('/api/contracts',{org})).length;
+  const resetRoute=`/api/auth-console/organizations/${otherOrg}/reset`;
+  await call(resetRoute,{method:'POST',body:{confirm:'not-the-slug'},status:400});
+  await call(resetRoute,{method:'POST',body:{confirm:resetSlug},token:(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'admin@example.com',password},token:''})).token,status:403});
+  assert.ok((await call('/api/partners',{org:otherOrg})).some((p:any)=>p.partner_id===resetPartner.partner_id),'a refused reset deletes nothing');
+  // Through the real console (a fresh page: the earlier one is closed): the button stays disabled until the slug is typed.
+  const orgPage=await browser!.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+  await orgPage.goto(backendURL+'/sys?tab=admin-system-organizations');
+  await orgPage.locator('#signin-email').fill('root@example.com');await orgPage.locator('#signin-password').fill(password);await orgPage.locator('button[type=submit]').click();
+  await expect(orgPage.locator('#signin-email')).toHaveCount(0,{timeout:30000});
+  await orgPage.goto(backendURL+'/sys?tab=admin-system-organizations');
+  await orgPage.getByRole('button',{name:/^Edit: Other Organization$/}).click();
+  await orgPage.getByRole('button',{name:/reset (organization|organisasi)/i}).click();
+  const confirmReset=orgPage.getByRole('button',{name:/reset (permanently|permanen)/i});
+  await expect(confirmReset).toBeDisabled();
+  await orgPage.locator('#reset-org-confirm').fill(resetSlug);
+  await expect(confirmReset).toBeEnabled();
+  await confirmReset.click();
+  await expect.poll(async()=>(await call('/api/partners',{org:otherOrg})).length,{timeout:30000}).toBe(0);
+  assert.equal((await call('/api/contracts',{org:otherOrg})).length,0);
+  assert.equal(existsSync(resetFile),false,'its own uploaded file is removed');
+  assert.equal((await call('/api/partners',{org})).length,partnersElsewhere);
+  assert.equal((await call('/api/contracts',{org})).length,contractsElsewhere);
+  const after=new Database(path.join(directory,'kaelyn.db'),{readonly:true});
+  assert.equal((after.prepare('SELECT COUNT(*) AS n FROM organization WHERE id=?').get(otherOrg) as any).n,1,'the organization itself stays');
+  assert.equal((after.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='organization.reset' AND tenant_id=?").get(otherOrg) as any).n,1);
+  after.close();
+  assert.equal(readdirSync(path.join(directory,'backups')).filter(file=>file.startsWith('before-organization-reset-')).length,1);
+  await orgPage.close();
+  checks.push('Chromium superuser organization reset: refused without the slug or without platform rights, empties only that organization and its files, keeps the organization, audited and backed up');
+ }
  await call(`/api/contracts/${contract.contract_id}`,{method:'DELETE',org});assert.equal((await call('/api/ios',{org})).find((io:any)=>io.io_id===ios[0].io_id).contract_id,null);
  await call(`/api/partners/${partner.partner_id}`,{method:'DELETE',org});assert.equal((await call('/api/search?q=Renamed',{org})).results.length,0);
  assert.deepEqual(sql.prepare('PRAGMA foreign_key_check').all(),[]);assert.equal((sql.prepare('PRAGMA integrity_check').get() as any).integrity_check,'ok');sql.close();checks.push('deletion/detachment and final SQLite integrity');
@@ -592,7 +662,7 @@ try{
  for(const key of ['geminiApiKey','smtpHost','smtpUser','smtpPassword','smtpEnabled'])assert.equal(afterProvider[key],keptProvider[key],key);
  assert.equal((resetSql.prepare("SELECT COUNT(*) AS n FROM member WHERE userId LIKE 'e2e-%'").get() as any).n,0);
  checks.push('Chromium reset to ITS / International / General clears business/editor/cache/legacy data and keeps accounts/providers');
- const afterResetPartner=(await call('/api/partners',{method:'POST',org:emptyOrg,body:{nama_partner:'Writable After Reset'}})).partner;
+ const afterResetPartner=(await call('/api/partners',{method:'POST',org:emptyOrg,body:{partner_name:'Writable After Reset'}})).partner;
  assert.ok(afterResetPartner.partner_id);assert.equal((await call('/api/partners',{org:emptyOrg})).length,1);
  const demoReset=await call('/api/admin/reset-database',{method:'POST',body:{confirmKeyword:'RESET NOW',mode:'demo'}});
  assert.equal((await call('/api/init-data',{org:demoReset.defaultOrgId})).partners.length,dataset.partners.length);
@@ -634,4 +704,4 @@ try{
  } finally {persisted.close();}
  checks.push('normal startup after empty reset ignores stale JSON, preserves organization/accounts, serves /sys and keeps all business tables empty');
  const report={passed:checks.length,checks,directory};writeFileSync(path.join(directory,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
-}catch(error){const failedPage=browser?.contexts()[0]?.pages()[0];if(failedPage){await failedPage.screenshot({path:path.join(directory,'failure.png'),fullPage:true}).catch(()=>{});writeFileSync(path.join(directory,'failure.html'),await failedPage.content());}console.error(`E2E artifacts: ${directory}`);throw error;}finally{writeFileSync(path.join(directory,'servers.log'),logs.join(''));await browser?.close();await stop(frontend);await stop(server);}
+}catch(error){console.error("E2E failure:",error);const failedPage=browser?.contexts()[0]?.pages()[0];if(failedPage){await failedPage.screenshot({path:path.join(directory,"failure.png"),fullPage:true}).catch(()=>{});try{writeFileSync(path.join(directory,"failure.html"),await failedPage.content());}catch{/* a crashed page has no content; the error above is the cause */}}console.error(`E2E artifacts: ${directory}`);throw error;}finally{writeFileSync(path.join(directory,'servers.log'),logs.join(''));await browser?.close();await stop(frontend);await stop(server);}

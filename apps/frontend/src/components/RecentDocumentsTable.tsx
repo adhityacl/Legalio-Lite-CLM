@@ -24,19 +24,19 @@ export function RecentDocumentsTable({ contracts, ios, partners, onNavigate }: {
     const now = new Date();
     const cutoff = new Date(now);
     cutoff.setMonth(cutoff.getMonth() - 3);
-    const partnerNameById = new Map(partners.map(p => [p.partner_id, p.nama_partner]));
+    const partnerNameById = new Map(partners.map(p => [p.partner_id, p.partner_name]));
     return [
       ...contracts.map(contract => ({
         id: contract.contract_id,
-        title: contract.judul_kontrak,
-        type: contract.jenis_dokumen === 'Agreement Addendum'
+        title: contract.contract_title,
+        type: contract.document_type === 'Agreement Addendum'
           ? t('contracts.agreement_addendum', 'Agreement Addendum')
           : t('contracts.master_agreement', 'Master Agreement'),
         partner: partnerNameById.get(contract.partner_id) || '—', status: contract.status,
         createdAt: contract.created_at, tab: 'contracts' as const,
       })),
       ...ios.map(io => ({
-        id: io.io_id, title: io.judul_io,
+        id: io.io_id, title: io.io_title,
         type: t('dashboard.insertion_orders', 'IO / SO / SOW'),
         partner: partnerNameById.get(io.partner_id) || '—', status: io.status,
         createdAt: io.created_at, tab: 'ios' as const,

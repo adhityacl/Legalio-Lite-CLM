@@ -12,8 +12,8 @@ export function addStatusIndexes(db: Database.Database) {
   if (db.prepare('SELECT 1 FROM schema_migrations WHERE id = ?').get(MIGRATION)) return { applied: false };
   db.transaction(() => {
     db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_v5_contracts_status ON contracts(organization_id, status, tanggal_berakhir);
-      CREATE INDEX IF NOT EXISTS idx_v5_ios_status ON insertion_orders(organization_id, status, tanggal_berakhir);
+      CREATE INDEX IF NOT EXISTS idx_v5_contracts_status ON contracts(organization_id, status, end_date);
+      CREATE INDEX IF NOT EXISTS idx_v5_ios_status ON insertion_orders(organization_id, status, end_date);
       CREATE INDEX IF NOT EXISTS idx_v5_spendings_payment ON spendings(organization_id, payment_status, invoice_date);
     `);
     db.prepare('INSERT INTO schema_migrations (id, appliedAt, summary) VALUES (?, ?, ?)')

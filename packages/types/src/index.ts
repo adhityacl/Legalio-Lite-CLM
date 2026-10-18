@@ -41,18 +41,18 @@ export interface DDFileItem {
   fileSize?: string;
   uploadedAt: string;
   year?: string;
-  tanggalKadaluarsa?: string;
+  expiryDate?: string;
 }
 
 export interface DDDokumenItem {
   /** Stable requirement key from the policy pack (absent for ad-hoc items). */
   key?: string;
-  nama: string;
-  wajib: boolean;
+  name: string;
+  required: boolean;
   expires?: boolean;
   status: DocumentEvidenceStatus;
-  nomorDokumen?: string;
-  tanggalKadaluarsa?: string;
+  documentNumber?: string;
+  expiryDate?: string;
   linkDrive?: string;
   fileId?: string;
   fileSize?: string;
@@ -72,28 +72,27 @@ export interface PartyIdentifier {
 export interface Partner {
   partner_id: string;
   organizationId?: string;
-  nama_partner: string;
+  partner_name: string;
   /** ISO 3166-1 alpha-2 country of incorporation ('' when unknown). */
   country?: string;
   /** Legal form as registered, e.g. "Private Limited (Pte. Ltd.)". */
   entity_type?: string;
   identifiers?: PartyIdentifier[];
-  jenis_partner?: PartnerJenis;
-  nama_pic?: string;
-  email_pic?: string;
-  telepon_pic?: string;
-  alamat_pic?: string;
-  kontak_pic?: string;
-  pic_internal?: string;
+  partner_type?: PartnerJenis;
+  pic_name?: string;
+  pic_email?: string;
+  pic_phone?: string;
+  pic_address?: string;
+  pic_contact?: string;
   internal_pic?: string;
   codename?: string;
   partner_channel?: string;
-  badan_hukum?: BadanHukum | string;
+  legal_status_flag?: BadanHukum | string;
   status_dd: StatusDD;
-  link_folder_dd?: string;
-  daftar_dokumen_dd: DDDokumenItem[];
-  tanggal_dd_diverifikasi?: string;
-  catatan?: string;
+  dd_folder_link?: string;
+  dd_documents: DDDokumenItem[];
+  dd_verified_date?: string;
+  notes?: string;
   tags?: string[];
   created_at: string;
   updated_at: string;
@@ -104,41 +103,41 @@ export type JenisDokumenContract = 'Master Agreement' | 'Agreement Addendum';
 export interface Contract extends ContractLifecycleFields {
   contract_id: string;
   organizationId?: string;
-  jenis_dokumen?: JenisDokumenContract;
+  document_type?: JenisDokumenContract;
   parent_contract_id?: string;
-  parent_contract_nomor?: string;
-  nomor_kontrak: string;
-  judul_kontrak: string;
+  parent_contract_number?: string;
+  contract_number: string;
+  contract_title: string;
   partner_id: string;
-  kategori_kerjasama: string[]; // Advertising, Content, Distribusi, Supplier, dll
-  tanggal_mulai: string;
-  tanggal_berakhir: string;
-  tanggal_selesai?: string;
+  cooperation_categories: string[]; // Advertising, Content, Distribusi, Supplier, dll
+  start_date: string;
+  end_date: string;
+  completion_date?: string;
   currency?: string;
-  nilai_kontrak: number;
-  nilai_kontrak_usd?: number;
+  contract_value: number;
+  contract_value_usd?: number;
   auto_renewal: boolean;
-  notice_period_hari: number;
+  notice_period_days: number;
   notice_type_required: NoticeType;
   status: ContractStatus;
   status_approval: ApprovalStatus;
-  pic_internal: string;
-  link_file_kontrak?: string;
+  internal_pic: string;
+  contract_file_link?: string;
   fileName?: string;
   internal_notes?: string;
-  field_yang_berubah?: string[];
-  ringkasan_perubahan?: string;
-  sisa_hari?: number;
+  changed_fields?: string[];
+  change_summary?: string;
+  days_remaining?: number;
   redline_analysis?: RedlineAnalysisData;
   redline_analyzed_at?: string;
   // Legacy amendment helper properties
   addendum_id?: string;
-  nomor_addendum?: string;
+  addendum_number?: string;
   parent_type?: string;
-  parent_nomor?: string;
+  parent_number?: string;
   parent_id?: string;
-  tanggal_addendum?: string;
-  link_file_addendum?: string;
+  addendum_date?: string;
+  addendum_file_link?: string;
   created_at: string;
   updated_at: string;
 }
@@ -147,32 +146,29 @@ export interface InsertionOrder {
   io_id: string;
   organizationId?: string;
   contract_id?: string; // Boleh kosong jika IO berdiri sendiri
-  contract_nomor?: string; // helper
-  nomor_io: string;
-  judul_io: string;
+  contract_number?: string; // helper
+  io_number: string;
+  io_title: string;
   partner_id: string;
-  kanal_media: string;
-  tanggal_mulai: string;
-  tanggal_berakhir: string;
-  tanggal_selesai?: string;
+  media_channel: string;
+  start_date: string;
+  end_date: string;
+  completion_date?: string;
   pricing_model: PricingModel;
-  model_pembayaran?: string;
-  skema_pembayaran?: string;
+  payment_scheme?: string;
   charging_type: ChargingType;
   currency?: string;
-  mata_uang?: string;
-  nilai_io: number;
-  nilai_io_usd?: number;
+  io_value: number;
+  io_value_usd?: number;
   deliverables: string;
-  notice_period_hari: number;
-  notice_period_days?: number;
+  notice_period_days: number;
   notice_type_required: NoticeType;
   status: ContractStatus;
   internal_notes?: string;
   notes?: string;
-  link_file_io?: string;
+  io_file_link?: string;
   fileName?: string;
-  sisa_hari?: number;
+  days_remaining?: number;
   created_at: string;
   updated_at: string;
 }
@@ -181,16 +177,16 @@ export interface NotificationLog {
   organizationId?: string;
   parent_type: 'Contract' | 'IO';
   parent_id: string;
-  parent_nomor?: string;
-  parent_judul?: string;
+  parent_number?: string;
+  parent_title?: string;
   /** e.g. "Reminder 30d", "Manual", "Status Change" (legacy: "Reminder H-30"). */
-  jenis_notifikasi: string;
-  tanggal_terkirim: string;
-  status_terkirim: boolean;
-  penerima: string;
-  pesan: string;
-  /** Structured reminder data so the UI can localize `pesan` (absent on older rows). */
-  pesan_params?: {
+  notification_type: string;
+  sent_at: string;
+  is_sent: boolean;
+  recipient: string;
+  message: string;
+  /** Structured reminder data so the UI can localize `message` (absent on older rows). */
+  message_params?: {
     kind: 'contract' | 'commercial';
     daysRemaining: number;
     noticeType?: string;

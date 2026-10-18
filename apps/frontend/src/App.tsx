@@ -45,6 +45,7 @@ import {
 } from '@legalio/types';
 import { getCachedAccessToken, invalidateGoogleToken } from './lib/googleAuthService';
 import { getAuthHeaders } from './lib/apiFetch';
+import { deleteRecords } from './lib/bulkDelete';
 import { useWorkspaceData } from './features/workspace/useWorkspaceData';
 import { buildWorkspaceSearchResults, type WorkspaceSearchResult } from '@legalio/platform-console/lib/workspaceSearch';
 import { AIChatLauncher } from './components/AIChatLauncher';
@@ -182,6 +183,25 @@ const MainApp: React.FC = () => {
     const variant = ({ success: 'success', warning: 'warning', error: 'destructive', info: 'default' } as const)[toast.type];
     showAlert({ title: toast.title, description: toast.message, variant });
   };
+
+  // One confirmation for the whole selection; the server refresh below replaces optimistic updates.
+  const handleBulkDelete = async (path: string, ids: string[], confirmation: string) => {
+    if (ids.length === 0) return;
+    const ok = await confirmDialog({ description: confirmation, tone: 'danger', confirmLabel: t('io.action_delete', 'Hapus') });
+    if (!ok) return;
+    await cancelPendingLoad();
+    const failed = await deleteRecords(path, ids, { userEmail: user.email, userName: user.name, userRole: user.role });
+    loadAllData();
+    if (failed.length > 0) {
+      showToast({
+        type: 'error',
+        title: t('bulk.delete_failed_title', 'Sebagian gagal dihapus'),
+        message: t('bulk.delete_failed_message', '{failed} dari {total} gagal dihapus.', { failed: failed.length, total: ids.length }),
+      });
+    }
+  };
+  const bulkConfirmation = (count: number, nounKey: string, nounFallback: string) =>
+    t('bulk.confirm_delete', 'Hapus {count} {noun} terpilih? Tindakan ini tidak dapat dibatalkan.', { count, noun: t(nounKey, nounFallback) });
 
   // Contract CRUD Handlers (Optimistic UI)
   const handleSaveContract = async (contractData: any) => {
@@ -715,6 +735,7 @@ const MainApp: React.FC = () => {
                     setShowContractModal(true);
                   }}
                   onDeleteContract={handleDeleteContract}
+                  onDeleteContracts={(ids) => handleBulkDelete('/api/contracts', ids, bulkConfirmation(ids.length, 'bulk.noun_contract', 'kontrak'))}
                   onOpenAddendumModal={(ctr) => {
                     setAmendmentParent(ctr);
                     setShowAmendmentModal(true);
@@ -757,6 +778,7 @@ const MainApp: React.FC = () => {
                     setShowIOModal(true);
                   }}
                   onDeleteIO={handleDeleteIO}
+                  onDeleteIOs={(ids) => handleBulkDelete('/api/ios', ids, bulkConfirmation(ids.length, 'bulk.noun_io', 'IO'))}
                 />
               )}
 
@@ -778,6 +800,7 @@ const MainApp: React.FC = () => {
                     setShowPartnerModal(true);
                   }}
                   onDeletePartner={handleDeletePartner}
+                  onDeletePartners={(ids) => handleBulkDelete('/api/partners', ids, t('bulk.confirm_delete_partners', 'Hapus {count} partner terpilih? Kontrak, IO, adendum & notifikasi terkait ikut terhapus.', { count: ids.length }))}
                   onUploadDDDoc={handleUploadDDDoc}
                 />
               )}

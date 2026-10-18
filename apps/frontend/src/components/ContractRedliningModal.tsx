@@ -225,7 +225,7 @@ export const ContractRedliningModal: React.FC<ContractRedliningModalProps> = ({
     if (!analysis) return;
     const reportText = `
 === LAPORAN AI CONTRACT RISK & REDLINING ===
-Kontrak: ${contract.nomor_kontrak} - ${contract.judul_kontrak}
+Kontrak: ${contract.contract_number} - ${contract.contract_title}
 Partner: ${partnerName || '-'}
 Skor Risiko: ${analysis.overallRiskScore}/100 (${analysis.riskLevel})
 
@@ -283,7 +283,7 @@ ${analysis.analyzedClauses
                 )}
               </div>
               <Text size="xs" tone="muted" className="mt-g2">
-                <span className="font-semibold text-foreground">{contract.nomor_kontrak}</span> • {contract.judul_kontrak} ({partnerName || t('redline.vendor', 'Vendor')})
+                <span className="font-semibold text-foreground">{contract.contract_number}</span> • {contract.contract_title} ({partnerName || t('redline.vendor', 'Vendor')})
               </Text>
             </div>
           </div>

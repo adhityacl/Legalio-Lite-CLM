@@ -58,15 +58,15 @@ export function buildDocumentCalendarEvents(
     const io = documentKind === 'io' ? record as InsertionOrder : undefined;
     const documentId = contract ? contract.contract_id : io!.io_id;
     if (!documentId) return;
-    const title = (contract ? contract.judul_kontrak || contract.nomor_kontrak : io!.judul_io || io!.nomor_io) || documentId;
+    const title = (contract ? contract.contract_title || contract.contract_number : io!.io_title || io!.io_number) || documentId;
     const add = (type: EventType, date: Date | null, projected = false) => {
       if (date) events.push({ id: `${documentKind}:${documentId}:${type}`, type, date: calendarDateKey(date), title, documentId, documentKind, projected });
     };
-    add('contract_start', parseCalendarDate(record.tanggal_mulai));
-    const end = parseCalendarDate(record.tanggal_berakhir || record.tanggal_selesai);
+    add('contract_start', parseCalendarDate(record.start_date));
+    const end = parseCalendarDate(record.end_date || record.completion_date);
     add('contract_end', end);
     if (contract && contractLifecycleMode(contract) === 'terminated') add('termination', parseCalendarDate(contract.termination_date));
-    const noticeDays = Number(record.notice_period_hari ?? io?.notice_period_days);
+    const noticeDays = Number(record.notice_period_days ?? io?.notice_period_days);
     if (end && Number.isInteger(noticeDays) && noticeDays > 0 && ['Termination', 'Both'].includes(record.notice_type_required)) {
       add('cancellation_notice', subDays(end, noticeDays));
     }

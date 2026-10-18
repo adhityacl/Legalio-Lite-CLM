@@ -325,24 +325,24 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
               const rowSpan = auditFlatMode || auditSortConfig ? 1 : (row.contractRowSpan || 1);
 
               if (!row.contract) return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>-</TableCell>;
-              if (colId === 'contractNo') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.nomor_kontrak}</TableCell>;
-              if (colId === 'contractTitle') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.judul_kontrak}</TableCell>;
+              if (colId === 'contractNo') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.contract_number}</TableCell>;
+              if (colId === 'contractTitle') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.contract_title}</TableCell>;
               if (colId === 'contractStatus') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} whitespace-nowrap`}>{renderStatusBadge(row.contract.status)}</TableCell>;
-              if (colId === 'contractStartDate') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{formatDate(row.contract.tanggal_mulai)}</TableCell>;
-              if (colId === 'contractEndDate') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{formatDate(row.contract.tanggal_berakhir)}</TableCell>;
+              if (colId === 'contractStartDate') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{formatDate(row.contract.start_date)}</TableCell>;
+              if (colId === 'contractEndDate') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{formatDate(row.contract.end_date)}</TableCell>;
               if (colId === 'contractDuration') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contractDuration || '-'}</TableCell>;
               if (colId === 'contractValue') {
-                  const cUsd = row.contract.nilai_kontrak_usd !== undefined && row.contract.nilai_kontrak_usd !== null && !isNaN(Number(row.contract.nilai_kontrak_usd))
-                     ? Number(row.contract.nilai_kontrak_usd)
-                     : convertToUsdWithFallback(Number(row.contract.nilai_kontrak) || 0, row.contract.currency || 'USD');
+                  const cUsd = row.contract.contract_value_usd !== undefined && row.contract.contract_value_usd !== null && !isNaN(Number(row.contract.contract_value_usd))
+                     ? Number(row.contract.contract_value_usd)
+                     : convertToUsdWithFallback(Number(row.contract.contract_value) || 0, row.contract.currency || 'USD');
                   return <TableCell key={colId} rowSpan={rowSpan} className={`${className} whitespace-nowrap text-right`}>{cUsd ? t('hierarchy.us', 'US$ {value}', { value: cUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }) : '-'}</TableCell>;
                }
-              if (colId === 'contractKategori') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.kategori_kerjasama?.join(', ') || '-'}</TableCell>;
+              if (colId === 'contractKategori') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.cooperation_categories?.join(', ') || '-'}</TableCell>;
               if (colId === 'contractAutoRenewal') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.auto_renewal ? t('common.yes', 'Ya') : t('common.no', 'Tidak')}</TableCell>;
-              if (colId === 'contractNoticePeriod') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.notice_period_hari || '-'}</TableCell>;
+              if (colId === 'contractNoticePeriod') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.notice_period_days || '-'}</TableCell>;
               if (colId === 'contractStatusApproval') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.status_approval || '-'}</TableCell>;
               if (colId === 'contractInternalNotes') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.contract.internal_notes || '-'}</TableCell>;
-              if (colId === 'contractLink') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.contract.link_file_kontrak ? <Button asChild variant="link"><a href={row.contract.link_file_kontrak} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'contractLink') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.contract.contract_file_link ? <Button asChild variant="link"><a href={row.contract.contract_file_link} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
            }
 
            // IO Group (Grouped)
@@ -351,23 +351,23 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
               const rowSpan = auditFlatMode || auditSortConfig ? 1 : (row.ioRowSpan || 1);
 
               if (!row.io) return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>-</TableCell>;
-              if (colId === 'ioNo') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.io.nomor_io}</TableCell>;
-              if (colId === 'ioTitle') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.io.judul_io}</TableCell>;
+              if (colId === 'ioNo') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.io.io_number}</TableCell>;
+              if (colId === 'ioTitle') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.io.io_title}</TableCell>;
               if (colId === 'ioStatus') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} whitespace-nowrap`}>{renderStatusBadge(row.io.status)}</TableCell>;
-              if (colId === 'ioChannel') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.io.kanal_media || '-'}</TableCell>;
-              if (colId === 'ioStartDate') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{formatDate(row.io.tanggal_mulai)}</TableCell>;
-              if (colId === 'ioEndDate') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{formatDate(row.io.tanggal_berakhir)}</TableCell>;
+              if (colId === 'ioChannel') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.io.media_channel || '-'}</TableCell>;
+              if (colId === 'ioStartDate') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{formatDate(row.io.start_date)}</TableCell>;
+              if (colId === 'ioEndDate') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{formatDate(row.io.end_date)}</TableCell>;
               if (colId === 'ioDuration') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.ioDuration || '-'}</TableCell>;
               if (colId === 'ioPricingModel') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.io.pricing_model || '-'}</TableCell>;
               if (colId === 'ioChargingType') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.io.charging_type || '-'}</TableCell>;
               if (colId === 'ioDeliverables') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} `}>{row.io.deliverables || '-'}</TableCell>;
               if (colId === 'ioValue') {
-                  const ioUsd = row.io.nilai_io_usd !== undefined && row.io.nilai_io_usd !== null && !isNaN(Number(row.io.nilai_io_usd))
-                     ? Number(row.io.nilai_io_usd)
-                     : convertToUsdWithFallback(Number(row.io.nilai_io) || 0, row.io.currency || 'USD');
+                  const ioUsd = row.io.io_value_usd !== undefined && row.io.io_value_usd !== null && !isNaN(Number(row.io.io_value_usd))
+                     ? Number(row.io.io_value_usd)
+                     : convertToUsdWithFallback(Number(row.io.io_value) || 0, row.io.currency || 'USD');
                   return <TableCell key={colId} rowSpan={rowSpan} className={`${className} whitespace-nowrap text-right`}>{ioUsd ? t('hierarchy.us', 'US$ {value}', { value: ioUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }) : '-'}</TableCell>;
                }
-              if (colId === 'ioLink') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.io.link_file_io ? <Button asChild variant="link"><a href={row.io.link_file_io} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
+              if (colId === 'ioLink') return <TableCell key={colId} rowSpan={rowSpan} className={`${className} text-center`}>{row.io.io_file_link ? <Button asChild variant="link"><a href={row.io.io_file_link} target="_blank" rel="noreferrer" >{t('hierarchy.link', 'Link')}</a></Button> : '-'}</TableCell>;
            }
 
            return <TableCell key={colId} className={className}>-</TableCell>;
@@ -380,11 +380,11 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
         partners.forEach(p => {
            const pContracts = contracts.filter(c => c.partner_id === p.partner_id);
            const pIos = ios.filter(io => io.partner_id === p.partner_id);
-           const pEvals = evaluations.filter(e => e.partner_id === p.partner_id || e.supplier_name.toLowerCase() === p.nama_partner.toLowerCase());
-           const pSpends = spendings.filter(s => s.vendor_id === p.partner_id || s.vendor_name.toLowerCase() === p.nama_partner.toLowerCase());
+           const pEvals = evaluations.filter(e => e.partner_id === p.partner_id || e.supplier_name.toLowerCase() === p.partner_name.toLowerCase());
+           const pSpends = spendings.filter(s => s.vendor_id === p.partner_id || s.vendor_name.toLowerCase() === p.partner_name.toLowerCase());
 
-           const allStartDates = [...pContracts.map(c => c.tanggal_mulai), ...pIos.map(i => i.tanggal_mulai)].filter(Boolean);
-           const allEndDates = [...pContracts.map(c => c.tanggal_berakhir), ...pIos.map(i => i.tanggal_berakhir)].filter(Boolean);
+           const allStartDates = [...pContracts.map(c => c.start_date), ...pIos.map(i => i.start_date)].filter(Boolean);
+           const allEndDates = [...pContracts.map(c => c.end_date), ...pIos.map(i => i.end_date)].filter(Boolean);
            allStartDates.sort();
            allEndDates.sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime());
 
@@ -396,7 +396,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
 
            if (pContracts.length > 0) {
               const hasActiveContracts = pContracts.some(c => c.status && c.status.toLowerCase() === 'aktif');
-              const sortedContracts = [...pContracts].sort((a, b) => new Date(b.tanggal_berakhir || '').getTime() - new Date(a.tanggal_berakhir || '').getTime());
+              const sortedContracts = [...pContracts].sort((a, b) => new Date(b.end_date || '').getTime() - new Date(a.end_date || '').getTime());
               const lastContract = sortedContracts[0];
               const isLastTerminated = lastContract && lastContract.status && lastContract.status.toLowerCase() === 'terminated';
               if (!hasActiveContracts && isLastTerminated) {
@@ -406,10 +406,10 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
            }
 
            // Match by policy-pack requirement key first, then by legacy name.
-           const getDDLink = (nama: string, keys: string[] = []) => {
-              const docs = p.daftar_dokumen_dd || [];
+           const getDDLink = (name: string, keys: string[] = []) => {
+              const docs = p.dd_documents || [];
               const doc = docs.find(d => d.key && keys.includes(d.key) && (d.linkDrive || d.files?.length))
-                || docs.find(d => d.nama.toLowerCase() === nama.toLowerCase() || d.nama.includes(nama));
+                || docs.find(d => d.name.toLowerCase() === name.toLowerCase() || d.name.includes(name));
               return doc?.linkDrive || doc?.files?.[0]?.linkDrive || '';
            };
 
@@ -419,12 +419,12 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
            } else {
               pContracts.forEach(c => {
                  const cIos = pIos.filter(io => io.contract_id === c.contract_id);
-                 const contractDuration = calculateDuration(c.tanggal_mulai, c.tanggal_berakhir);
+                 const contractDuration = calculateDuration(c.start_date, c.end_date);
                  if (cIos.length === 0) {
                     cioRows.push({ contract: c, contractDuration, io: null, ioDuration: null });
                  } else {
                     cIos.forEach(io => {
-                       const ioDuration = calculateDuration(io.tanggal_mulai, io.tanggal_berakhir);
+                       const ioDuration = calculateDuration(io.start_date, io.end_date);
                        cioRows.push({ contract: c, contractDuration, io: io, ioDuration });
                     });
                  }
@@ -432,7 +432,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
               // orphan IOs
               const orphanIos = pIos.filter(io => !io.contract_id || !pContracts.find(c => c.contract_id === io.contract_id));
               orphanIos.forEach(io => {
-                 const ioDuration = calculateDuration(io.tanggal_mulai, io.tanggal_berakhir);
+                 const ioDuration = calculateDuration(io.start_date, io.end_date);
                  cioRows.push({ contract: null, contractDuration: null, io: io, ioDuration });
               });
            }
@@ -451,8 +451,8 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
               const sp = pSpends[i] || null;
 
               baseRows.push({
-                 vendorName: p.nama_partner, vendorType: p.jenis_partner, vendorChannelName: (p.tags && p.tags.length > 0) ? p.tags.join(', ') : '-', vendorCodename: p.codename || '-', vendorStart, vendorEnd, vendorDuration, vendorActive, vendorTerminated,
-                 vendorPicName: p.nama_pic, vendorPicEmail: p.email_pic, vendorPicPhone: p.telepon_pic, vendorPicAlamat: p.alamat_pic, vendorPicInternal: p.pic_internal, vendorBadanHukum: p.country ?? (p.badan_hukum === 'BHI' ? 'ID' : ''), vendorStatusDD: p.status_dd,
+                 vendorName: p.partner_name, vendorType: p.partner_type, vendorChannelName: (p.tags && p.tags.length > 0) ? p.tags.join(', ') : '-', vendorCodename: p.codename || '-', vendorStart, vendorEnd, vendorDuration, vendorActive, vendorTerminated,
+                 vendorPicName: p.pic_name, vendorPicEmail: p.pic_email, vendorPicPhone: p.pic_phone, vendorPicAlamat: p.pic_address, vendorPicInternal: p.internal_pic, vendorBadanHukum: p.country ?? (p.legal_status_flag === 'BHI' ? 'ID' : ''), vendorStatusDD: p.status_dd,
                  vendorLinkNDA: getDDLink('NDA', ['nda']),
                  vendorLinkCOR: getDDLink('COR', ['id_cor']),
                  vendorLinkDGT: getDDLink('DGT', ['id_dgt']),
@@ -476,8 +476,8 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
           const q = searchQuery.toLowerCase();
           baseRows = baseRows.filter(r =>
             (r.vendorName || '').toLowerCase().includes(q) ||
-            (r.contract?.judul_kontrak || '').toLowerCase().includes(q) ||
-            (r.io?.judul_io || '').toLowerCase().includes(q)
+            (r.contract?.contract_title || '').toLowerCase().includes(q) ||
+            (r.io?.io_title || '').toLowerCase().includes(q)
           );
         }
 
@@ -500,20 +500,20 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
                 case 'spendInvDate': return row.spending?.invoice_date || '';
                 case 'spendAmount': return row.spending?.total_amount_usd !== undefined && row.spending?.total_amount_usd !== null ? Number(row.spending.total_amount_usd) : convertToUsdWithFallback(Number(row.spending?.total_amount) || 0, row.spending?.currency || 'USD');
 
-                case 'contractNo': return row.contract?.nomor_kontrak || '';
-                case 'contractTitle': return row.contract?.judul_kontrak || '';
+                case 'contractNo': return row.contract?.contract_number || '';
+                case 'contractTitle': return row.contract?.contract_title || '';
                 case 'contractStatus': return row.contract?.status || '';
-                case 'contractStartDate': return row.contract?.tanggal_mulai || '';
-                case 'contractEndDate': return row.contract?.tanggal_berakhir || '';
-                case 'contractValue': return row.contract?.nilai_kontrak_usd !== undefined && row.contract?.nilai_kontrak_usd !== null && !isNaN(Number(row.contract.nilai_kontrak_usd)) ? Number(row.contract.nilai_kontrak_usd) : convertToUsdWithFallback(Number(row.contract?.nilai_kontrak) || 0, row.contract?.currency || 'USD');
+                case 'contractStartDate': return row.contract?.start_date || '';
+                case 'contractEndDate': return row.contract?.end_date || '';
+                case 'contractValue': return row.contract?.contract_value_usd !== undefined && row.contract?.contract_value_usd !== null && !isNaN(Number(row.contract.contract_value_usd)) ? Number(row.contract.contract_value_usd) : convertToUsdWithFallback(Number(row.contract?.contract_value) || 0, row.contract?.currency || 'USD');
 
-                case 'ioNo': return row.io?.nomor_io || '';
-                case 'ioTitle': return row.io?.judul_io || '';
+                case 'ioNo': return row.io?.io_number || '';
+                case 'ioTitle': return row.io?.io_title || '';
                 case 'ioStatus': return row.io?.status || '';
-                case 'ioChannel': return row.io?.kanal_media || '';
-                case 'ioStartDate': return row.io?.tanggal_mulai || '';
-                case 'ioEndDate': return row.io?.tanggal_berakhir || '';
-                case 'ioValue': return row.io?.nilai_io_usd !== undefined && row.io?.nilai_io_usd !== null && !isNaN(Number(row.io.nilai_io_usd)) ? Number(row.io.nilai_io_usd) : convertToUsdWithFallback(Number(row.io?.nilai_io) || 0, row.io?.currency || 'USD');
+                case 'ioChannel': return row.io?.media_channel || '';
+                case 'ioStartDate': return row.io?.start_date || '';
+                case 'ioEndDate': return row.io?.end_date || '';
+                case 'ioValue': return row.io?.io_value_usd !== undefined && row.io?.io_value_usd !== null && !isNaN(Number(row.io.io_value_usd)) ? Number(row.io.io_value_usd) : convertToUsdWithFallback(Number(row.io?.io_value) || 0, row.io?.currency || 'USD');
                 default: return '';
               }
             };
@@ -636,32 +636,32 @@ const exportToCSV = () => {
               spendInvoiceLink: row.spending?.invoice_file_url || '',
               spendBillingLink: row.spending?.billing_file_url || '',
 
-              contractNo: row.contract?.nomor_kontrak || '',
-              contractTitle: row.contract?.judul_kontrak || '',
+              contractNo: row.contract?.contract_number || '',
+              contractTitle: row.contract?.contract_title || '',
               contractStatus: row.contract?.status || '',
-              contractStartDate: formatDate(row.contract?.tanggal_mulai),
-              contractEndDate: formatDate(row.contract?.tanggal_berakhir),
+              contractStartDate: formatDate(row.contract?.start_date),
+              contractEndDate: formatDate(row.contract?.end_date),
               contractDuration: row.contractDuration || '',
-              contractValue: row.contract ? (row.contract.nilai_kontrak_usd !== undefined && row.contract.nilai_kontrak_usd !== null && !isNaN(Number(row.contract.nilai_kontrak_usd)) ? row.contract.nilai_kontrak_usd : convertToUsdWithFallback(row.contract.nilai_kontrak || 0, row.contract.currency || 'USD')).toString() : '',
-              contractKategori: row.contract?.kategori_kerjasama || '',
+              contractValue: row.contract ? (row.contract.contract_value_usd !== undefined && row.contract.contract_value_usd !== null && !isNaN(Number(row.contract.contract_value_usd)) ? row.contract.contract_value_usd : convertToUsdWithFallback(row.contract.contract_value || 0, row.contract.currency || 'USD')).toString() : '',
+              contractKategori: row.contract?.cooperation_categories || '',
               contractAutoRenewal: row.contract?.auto_renewal ? 'Ya' : 'Tidak',
               contractNoticePeriod: (row.contract?.notice_period_days || '').toString(),
               contractStatusApproval: row.contract?.status_approval || '',
               contractInternalNotes: row.contract?.internal_notes || '',
-              contractLink: row.contract?.link_file_kontrak || '',
+              contractLink: row.contract?.contract_file_link || '',
 
-              ioNo: row.io?.nomor_io || '',
-              ioTitle: row.io?.judul_io || '',
+              ioNo: row.io?.io_number || '',
+              ioTitle: row.io?.io_title || '',
               ioStatus: row.io?.status || '',
-              ioChannel: row.io?.kanal_media || '',
-              ioStartDate: formatDate(row.io?.tanggal_mulai),
-              ioEndDate: formatDate(row.io?.tanggal_berakhir),
+              ioChannel: row.io?.media_channel || '',
+              ioStartDate: formatDate(row.io?.start_date),
+              ioEndDate: formatDate(row.io?.end_date),
               ioDuration: row.ioDuration || '',
               ioPricingModel: row.io?.pricing_model || '',
               ioChargingType: row.io?.charging_type || '',
               ioDeliverables: row.io?.deliverables || '',
-              ioValue: row.io ? (row.io.nilai_io_usd !== undefined && row.io.nilai_io_usd !== null && !isNaN(Number(row.io.nilai_io_usd)) ? row.io.nilai_io_usd : convertToUsdWithFallback(row.io.nilai_io || 0, row.io.currency || 'USD')).toString() : '',
-              ioLink: row.io?.link_file_io || '',
+              ioValue: row.io ? (row.io.io_value_usd !== undefined && row.io.io_value_usd !== null && !isNaN(Number(row.io.io_value_usd)) ? row.io.io_value_usd : convertToUsdWithFallback(row.io.io_value || 0, row.io.currency || 'USD')).toString() : '',
+              ioLink: row.io?.io_file_link || '',
             };
             return columns.filter(c => auditVisibleCols[c.id]).map(c => rowData[c.id]);
           });
