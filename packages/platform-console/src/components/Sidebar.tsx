@@ -22,8 +22,6 @@ import {
 } from 'lucide-react';
 import { AiIcon } from './icons/AiIcon';
 import { useLanguage } from '../context/LanguageContext';
-import { GoogleSheetsConfig } from '@legalio/types';
-import { isGoogleTokenValid, getGoogleTokenRemainingMinutes } from '../lib/googleAuthService';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { usePermissions } from '../lib/permissions';
 import { useTenantSettings } from '../context/TenantSettingsContext';
@@ -66,7 +64,6 @@ export interface AppNavigationProps {
   setActiveTab: (tab: string) => void;
   unresolvedNotifsCount: number;
   expiringContractsCount: number;
-  googleConfig?: GoogleSheetsConfig;
   lastSyncTimestamp?: number;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
@@ -134,7 +131,7 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
     ]),
     systemGroup('system-google', t('sys.nav_google', 'Google'), Globe2, [
       systemLeaf('google', t('settings.google_auth_title', 'Google Workspace Account Authentication'), Globe2),
-      systemLeaf('google-drive', t('settings.penyimpanan_file_dokumen_google_drive', 'Document File Storage (Google Drive)'), FileText),
+      systemLeaf('google-drive', t('settings.penyimpanan_file_dokumen_google_drive', 'Document Backup (Google Drive)'), FileText),
       systemLeaf('google-credentials', t('google_setup.settings_title', 'Google Cloud Credentials'), Settings),
     ]),
     systemGroup('system-database', t('sys.nav_database', 'Database'), Database, [
@@ -270,21 +267,9 @@ function NavigationGroups({ sections, onNavigate, rail }: { sections: NavSection
   );
 }
 
-function StatusFooter({ googleConfig }: { googleConfig?: GoogleSheetsConfig }) {
-  const { t } = useLanguage();
-  // Google OAuth Drive storage status.
-  const hasToken = typeof window !== 'undefined' && Boolean(localStorage.getItem('google_access_token'));
-  const minutes = getGoogleTokenRemainingMinutes();
-  const [tone, tooltip] = !googleConfig?.isConnected
-    ? ['bg-muted-foreground', 'Google Drive: Belum Dikonfigurasi (Unggahan file disimpan lokal)']
-    : !hasToken || !isGoogleTokenValid() || minutes <= 0
-    ? ['bg-status-danger', 'Google Drive: Sesi Google kadaluarsa atau belum terhubung']
-    : minutes <= 10
-    ? ['bg-status-warning', `Google Drive: Token akan kadaluarsa (Sisa ~${minutes} menit)`]
-    : ['bg-status-success', `Google Drive: Terhubung & Siap (Sisa ~${minutes} menit)`];
+function StatusFooter() {
   return (
     <div className="flex items-center justify-between gap-g8 px-g8 text-xs text-muted-foreground">
-      <Tooltip><TooltipTrigger asChild><span data-sidebar-icon role="img" aria-label={tooltip} className={`size-g8 shrink-0 rounded-full ${tone}`} /></TooltipTrigger><TooltipBody>{tooltip}</TooltipBody></Tooltip>
       <SidebarLabel>{new Date().getFullYear()} ACL</SidebarLabel>
     </div>
   );
@@ -385,7 +370,7 @@ export function AppShell({ navigation, header, children, className, searchResult
   const { t } = useLanguage();
   const desktop = useIsDesktop();
   const sections = useNavigation(navigation);
-  const { setActiveTab, isMobileOpen = false, onCloseMobile, googleConfig } = navigation;
+  const { setActiveTab, isMobileOpen = false, onCloseMobile } = navigation;
   const navigate = (tab: string) => { setActiveTab(tab); onCloseMobile?.(); };
   const switcher = (
     <WorkspaceSwitcher isCollapsed={false} onNavigateToSettings={() => navigate('settings')} />
@@ -403,7 +388,7 @@ export function AppShell({ navigation, header, children, className, searchResult
             <SidebarContent>
               <NavigationGroups sections={sections} onNavigate={navigate} rail />
             </SidebarContent>
-            <SidebarFooter><StatusFooter googleConfig={googleConfig} /></SidebarFooter>
+            <SidebarFooter><StatusFooter /></SidebarFooter>
           </>}
         </SidebarPanel>
         <SidebarResizeTrigger aria-label={t('nav.resize_menu', 'Ubah lebar menu')} className="hidden md:flex" />
@@ -428,7 +413,7 @@ export function AppShell({ navigation, header, children, className, searchResult
                   <NavigationGroups sections={sections} onNavigate={navigate} rail={false} />
                 </nav>
               </DrawerBody>
-              <DrawerFooter><StatusFooter googleConfig={googleConfig} /></DrawerFooter>
+              <DrawerFooter><StatusFooter /></DrawerFooter>
             </DrawerContent>
           </DrawerPositioner>
         </Drawer>

@@ -240,7 +240,6 @@ function contractRow(c: Row): Row {
   return {
     organizationId: ORG,
     jenis_dokumen: 'Master Agreement',
-    partner_nama: partner.name,
     currency: 'IDR',
     notice_type_required: 'Termination',
     status: 'Active',
@@ -316,7 +315,6 @@ function ioRow(io: Row): Row {
     organizationId: ORG,
     contract_nomor: contract.nomor_kontrak,
     partner_id: contract.partner_id,
-    partner_nama: PARTNERS.find((p) => p.id === contract.partner_id)!.name,
     currency: 'IDR',
     mata_uang: 'IDR',
     notice_type_required: 'Termination',

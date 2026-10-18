@@ -255,7 +255,7 @@ try{
   {nomor_kontrak:'E2E/IMP/001',judul_kontrak:'Known partner',partner_nama:'E2E CSV Imported',jenis_dokumen:'Master Agreement',tanggal_mulai:'2026-01-01',tanggal_berakhir:'2027-01-01',nilai_kontrak:'1000'},
   {nomor_kontrak:'E2E/IMP/002',judul_kontrak:'Unknown partner',partner_nama:'No Such Partner',jenis_dokumen:'Master Agreement',tanggal_mulai:'2026-01-01',tanggal_berakhir:'2027-01-01',nilai_kontrak:'1000'}]}});
  assert.equal(contractImport.succeeded.length,1);assert.equal(contractImport.failed.length,1);assert.match(contractImport.failed[0].message,/Partner "No Such Partner"/);
- const importedContract=(await call('/api/contracts',{org})).find((c:any)=>c.nomor_kontrak==='E2E/IMP/001');assert.equal(importedContract.partner_nama,'E2E CSV Imported');assert.equal(importedContract.partner_id,csvPartner.partner_id);
+ const importedContract=(await call('/api/contracts',{org})).find((c:any)=>c.nomor_kontrak==='E2E/IMP/001');assert.equal('partner_nama' in importedContract,false);assert.equal(importedContract.partner_id,csvPartner.partner_id);
  assert.equal((sql.prepare("SELECT count(*) n FROM contracts WHERE nomor_kontrak='E2E/IMP/002'").get() as any).n,0);
  checks.push('Contract import links partner and rejects unknown partner names');
  const editorToken=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'editor@example.com',password},token:''})).token;

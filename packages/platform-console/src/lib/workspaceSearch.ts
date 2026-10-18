@@ -39,16 +39,16 @@ export function buildWorkspaceSearchResults(data: SearchData, user: UserSession 
     ...data.contracts.filter(record => inScope(record) && canViewContract(record, data.partners, user)).map(record => ({
       kind: 'contract' as const, recordId: record.contract_id, tab: 'contracts' as const,
       label: title(record.nomor_kontrak, record.judul_kontrak),
-      description: vendor(record.partner_id, record.partner_nama),
-      keywords: title('contract', record.partner_nama),
+      description: vendor(record.partner_id),
+      keywords: title('contract', vendor(record.partner_id)),
     })),
     ...data.ios.filter(record => inScope(record) && canViewIO(record, data.partners, user)).map(record => {
       const contract = contracts.get(record.contract_id || '') || contractNumbers.get(record.contract_nomor || '');
       return {
         kind: 'io' as const, recordId: record.io_id, tab: 'ios' as const,
         label: title(record.nomor_io, record.judul_io),
-        description: vendor(record.partner_id, record.partner_nama) || vendor(contract?.partner_id, contract?.partner_nama),
-        keywords: title('io service order so sow', record.partner_nama, record.contract_nomor),
+        description: vendor(record.partner_id) || vendor(contract?.partner_id),
+        keywords: title('io service order so sow', vendor(record.partner_id), record.contract_nomor),
       };
     }),
     ...data.spendings.filter(record => inScope(record) && canViewSpending(record, data.partners, user)).map(record => ({

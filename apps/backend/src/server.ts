@@ -444,6 +444,7 @@ function saveLocalFile(
       ? base64Data.split("base64,")[1]
       : base64Data;
     fs.writeFileSync(filePath, Buffer.from(cleanContent, "base64"));
+    scheduleDriveBackup();
     return `/uploads/${encodeURIComponent(cleanOrg)}/${encodeURIComponent(cleanVendor)}/${encodeURIComponent(category)}/${safeFileName}`;
   } catch (err) {
     console.error("Error saving local file in hierarchical subfolder:", err);
@@ -479,229 +480,80 @@ function getMimeType(fileName) {
   if (ext === "csv") return "text/csv";
   return "application/pdf";
 }
-async function migrateLocalFilesToGoogleDrive(token) {
+// Kept beside (not inside) the uploads dir so it is never served as an upload.
+const DRIVE_BACKUP_INDEX = `${uploadsDir}.drive-backup.json`;
+let driveBackupRunning = false;
+let driveBackupTimer: NodeJS.Timeout | null = null;
+/**
+ * Mirrors the local uploads tree (Org/Partner/Category) to Drive under the master root.
+ * Local files stay the source of truth: links and files are never touched here.
+ * shortcut: a file edited in place is uploaded again as a new Drive file, no version replace.
+ */
+async function backupLocalFilesToGoogleDrive(token?) {
+  const rootId = sanitizeParentFolderId(db.googleConfig?.driveFolderId);
   const activeToken = await resolveActiveGoogleToken(token);
-  if (!activeToken) return { migratedCount: 0 };
-  let migratedCount = 0;
-  const getDiskPath = __name((url) => {
-    if (!url || typeof url !== "string" || !url.includes("/uploads/"))
-      return null;
+  if (driveBackupRunning || !activeToken || !rootId) return { backedUpCount: 0, failedCount: 0 };
+  driveBackupRunning = true;
+  let backedUpCount = 0;
+  let failedCount = 0;
+  let done: Record<string, string> = {};
+  try {
+    done = JSON.parse(fs.readFileSync(DRIVE_BACKUP_INDEX, "utf8"));
+  } catch (_) {}
+  const folderIds = new Map<string, string>();
+  const folderFor = async (names: string[]) => {
+    let parent = rootId;
+    for (const name of names) {
+      const key = `${parent}/${name}`;
+      if (!folderIds.has(key)) folderIds.set(key, (await getOrCreateDriveFolder(name, parent, activeToken)).id);
+      parent = folderIds.get(key)!;
+    }
+    return parent;
+  };
+  const walk = (dir: string, rel: string[]): string[][] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.name.startsWith(".") ? [] : e.isDirectory() ? walk(path.join(dir, e.name), [...rel, e.name]) : [[...rel, e.name]],
+    );
+  try {
+    for (const parts of walk(uploadsDir, [])) {
+      const key = parts.join("/");
+      const full = path.join(uploadsDir, ...parts);
+      const stamp = String(fs.statSync(full).mtimeMs);
+      if (done[key] === stamp) continue;
+      try {
+        const driveUrl = await uploadFileToDrive(
+          parts[parts.length - 1],
+          fs.readFileSync(full).toString("base64"),
+          getMimeType(full),
+          await folderFor(parts.slice(0, -1)),
+          activeToken,
+        );
+        if (!driveUrl?.includes("google.com")) throw new Error("Respon URL Drive tidak valid");
+        done[key] = stamp;
+        backedUpCount++;
+      } catch (err) {
+        failedCount++;
+        console.warn(`[Drive Backup] Gagal mencadangkan '${key}':`, err?.message);
+      }
+    }
+  } finally {
+    driveBackupRunning = false;
     try {
-      const rawRel = url.substring(
-        url.indexOf("/uploads/") + "/uploads/".length,
-      );
-      const decodedRel = decodeURIComponent(rawRel);
-      const fullPath = path.join(uploadsDir, decodedRel);
-      if (fs.existsSync(fullPath)) return fullPath;
-    } catch (e) {
-      console.error("Error resolving disk path for upload URL:", url, e);
-    }
-    return null;
-  }, "getDiskPath");
-  const getMimeType2 = __name((fileName) => {
-    const ext = fileName.toLowerCase().split(".").pop();
-    if (ext === "png") return "image/png";
-    if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
-    if (ext === "docx")
-      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    if (ext === "xlsx")
-      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-    return "application/pdf";
-  }, "getMimeType");
-  for (const c of db.contracts || []) {
-    const diskPath = getDiskPath(c.link_file_kontrak);
-    if (diskPath) {
-      try {
-        const partner = db.partners.find((p) => p.partner_id === c.partner_id);
-        const fileName = c.fileName || path.basename(diskPath);
-        const base64 = fs.readFileSync(diskPath).toString("base64");
-        const catFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder Contract",
-          activeToken,
-        );
-        const driveUrl = await uploadFileToDrive(
-          fileName,
-          base64,
-          getMimeType2(fileName),
-          catFolderId,
-          activeToken,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          c.link_file_kontrak = driveUrl;
-          try {
-            fs.unlinkSync(diskPath);
-          } catch (_) {}
-          migratedCount++;
-        }
-      } catch (err) {
-        console.error(
-          `Failed to migrate contract file ${c.contract_id} to Drive:`,
-          err,
-        );
-      }
+      fs.writeFileSync(DRIVE_BACKUP_INDEX, JSON.stringify(done));
+    } catch (err) {
+      console.warn("[Drive Backup] Gagal menyimpan indeks backup:", err?.message);
     }
   }
-  for (const io of db.ios || []) {
-    const partner = db.partners.find((p) => p.partner_id === io.partner_id);
-    const ioDiskPath = getDiskPath(io.link_file_io);
-    if (ioDiskPath) {
-      try {
-        const fileName = io.fileName || path.basename(ioDiskPath);
-        const base64 = fs.readFileSync(ioDiskPath).toString("base64");
-        const catFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder IO",
-          activeToken,
-        );
-        const driveUrl = await uploadFileToDrive(
-          fileName,
-          base64,
-          getMimeType2(fileName),
-          catFolderId,
-          activeToken,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          io.link_file_io = driveUrl;
-          try {
-            fs.unlinkSync(ioDiskPath);
-          } catch (_) {}
-          migratedCount++;
-        }
-      } catch (err) {
-        console.error(`Failed to migrate IO file ${io.io_id} to Drive:`, err);
-      }
-    }
-  }
-  for (const partner of db.partners || []) {
-    for (const doc of partner.daftar_dokumen_dd || []) {
-      const diskPath = getDiskPath(doc.linkDrive);
-      if (diskPath) {
-        try {
-          const fileName = path.basename(diskPath);
-          const base64 = fs.readFileSync(diskPath).toString("base64");
-          const catFolderId = await getPartnerCategoryFolderId(
-            partner,
-            "Folder DD",
-            activeToken,
-          );
-          const driveUrl = await uploadFileToDrive(
-            fileName,
-            base64,
-            getMimeType2(fileName),
-            catFolderId,
-            activeToken,
-          );
-          if (
-            driveUrl &&
-            (driveUrl.includes("drive.google.com") ||
-              driveUrl.includes("google.com"))
-          ) {
-            doc.linkDrive = driveUrl;
-            try {
-              fs.unlinkSync(diskPath);
-            } catch (_) {}
-            migratedCount++;
-          }
-        } catch (err) {
-          console.error(
-            `Failed to migrate DD doc ${doc.nama} for partner ${partner.nama_partner} to Drive:`,
-            err,
-          );
-        }
-      }
-    }
-  }
-  for (const sp of db.spendings || []) {
-    const partner = db.partners.find(
-      (p) => p.nama_partner?.toLowerCase() === sp.vendor_name?.toLowerCase(),
-    );
-    const invDiskPath = getDiskPath(sp.invoice_file_url);
-    if (invDiskPath) {
-      try {
-        const fileName = sp.invoice_file_name || path.basename(invDiskPath);
-        const base64 = fs.readFileSync(invDiskPath).toString("base64");
-        const catFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder Invoice & Billing",
-          activeToken,
-        );
-        const driveUrl = await uploadFileToDrive(
-          fileName,
-          base64,
-          getMimeType2(fileName),
-          catFolderId,
-          activeToken,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          sp.invoice_file_url = driveUrl;
-          try {
-            fs.unlinkSync(invDiskPath);
-          } catch (_) {}
-          migratedCount++;
-        }
-      } catch (err) {
-        console.error(
-          `Failed to migrate spending invoice file ${sp.id} to Drive:`,
-          err,
-        );
-      }
-    }
-    const billDiskPath = getDiskPath(sp.billing_file_url);
-    if (billDiskPath) {
-      try {
-        const fileName = sp.billing_file_name || path.basename(billDiskPath);
-        const base64 = fs.readFileSync(billDiskPath).toString("base64");
-        const catFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder Invoice & Billing",
-          activeToken,
-        );
-        const driveUrl = await uploadFileToDrive(
-          fileName,
-          base64,
-          getMimeType2(fileName),
-          catFolderId,
-          activeToken,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          sp.billing_file_url = driveUrl;
-          try {
-            fs.unlinkSync(billDiskPath);
-          } catch (_) {}
-          migratedCount++;
-        }
-      } catch (err) {
-        console.error(
-          `Failed to migrate spending billing file ${sp.id} to Drive:`,
-          err,
-        );
-      }
-    }
-  }
-  if (migratedCount > 0) {
-    saveDb();
-    console.log(
-      `[Drive Migration] Successfully migrated ${migratedCount} temporary local files to Google Drive.`,
-    );
-  }
-  return { migratedCount };
+  if (backedUpCount) console.log(`[Drive Backup] ${backedUpCount} file dicadangkan ke Google Drive.`);
+  return { backedUpCount, failedCount };
+}
+/** Debounced so a burst of uploads triggers one sweep. */
+function scheduleDriveBackup() {
+  if (IS_TEST_MODE) return;
+  if (driveBackupTimer) clearTimeout(driveBackupTimer);
+  driveBackupTimer = setTimeout(() => {
+    backupLocalFilesToGoogleDrive().catch((e) => console.warn("[Drive Backup]", e?.message));
+  }, 5000);
 }
 /** Exact canonical ownership. Records without an organization belong to nobody (PRD §14.3). */
 function isMatchingOrg(entityOrgId, targetTenantId) {
@@ -824,7 +676,7 @@ async function ensureAllPartnersFolders(token?: string, targetTenantId?: string)
     }
   }
   if (activeToken) {
-    await migrateLocalFilesToGoogleDrive(activeToken);
+    await backupLocalFilesToGoogleDrive(activeToken);
   }
   return { localFoldersCreated, driveFoldersCreated };
 }
@@ -3266,41 +3118,6 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
       rawFileName: invoice_file.fileName,
     });
     invoice_file_name = targetInvoiceName;
-    if (token) {
-      try {
-        const categoryFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder Invoice & Billing",
-          token,
-          targetOrgId,
-        );
-        const driveUrl = await uploadFileToDrive(
-          targetInvoiceName,
-          invoice_file.fileData,
-          "application/pdf",
-          categoryFolderId,
-          token,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          invoice_file_url = driveUrl;
-          addActivityLog(
-            userEmail || "user@app",
-            userName || "User",
-            userRole || "Finance",
-            "UPLOAD_SUCCESS",
-            "PARTNER",
-            `Berhasil mengunggah file Invoice '${targetInvoiceName}' ke Google Drive`,
-            req,
-          );
-        }
-      } catch (err) {
-        console.warn("Drive upload invoice error:", err?.message);
-      }
-    }
     if (!invoice_file_url) {
       invoice_file_url = saveLocalFile(
         partner?.nama_partner || vendor_name,
@@ -3315,7 +3132,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
         userRole || "Finance",
         "UPLOAD_SUCCESS",
         "PARTNER",
-        `File Invoice '${targetInvoiceName}' disimpan di server lokal aplikasi (menunggu sesi Google Drive terhubung untuk auto-sync)`,
+        `File Invoice '${targetInvoiceName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
         req,
       );
     }
@@ -3329,41 +3146,6 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
       rawFileName: billing_file.fileName,
     });
     billing_file_name = targetBillingName;
-    if (token) {
-      try {
-        const categoryFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder Invoice & Billing",
-          token,
-          targetOrgId,
-        );
-        const driveUrl = await uploadFileToDrive(
-          targetBillingName,
-          billing_file.fileData,
-          "application/pdf",
-          categoryFolderId,
-          token,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          billing_file_url = driveUrl;
-          addActivityLog(
-            userEmail || "user@app",
-            userName || "User",
-            userRole || "Finance",
-            "UPLOAD_SUCCESS",
-            "PARTNER",
-            `Berhasil mengunggah file Billing '${targetBillingName}' ke Google Drive`,
-            req,
-          );
-        }
-      } catch (err) {
-        console.warn("Drive upload billing error:", err?.message);
-      }
-    }
     if (!billing_file_url) {
       billing_file_url = saveLocalFile(
         partner?.nama_partner || vendor_name,
@@ -3378,7 +3160,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
         userRole || "Finance",
         "UPLOAD_SUCCESS",
         "PARTNER",
-        `File Billing '${targetBillingName}' disimpan di server lokal aplikasi (menunggu sesi Google Drive terhubung untuk auto-sync)`,
+        `File Billing '${targetBillingName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
         req,
       );
     }
@@ -3510,40 +3292,6 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
     });
     updated.invoice_file_name = targetInvoiceName;
     let invoice_file_url = "";
-    if (token) {
-      try {
-        const categoryFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder Invoice & Billing",
-          token,
-        );
-        const driveUrl = await uploadFileToDrive(
-          targetInvoiceName,
-          invoice_file.fileData,
-          "application/pdf",
-          categoryFolderId,
-          token,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          invoice_file_url = driveUrl;
-          addActivityLog(
-            userEmail || "user@app",
-            userName || "User",
-            userRole || "Finance",
-            "UPLOAD_SUCCESS",
-            "PARTNER",
-            `Berhasil mengunggah ulang file Invoice '${targetInvoiceName}' ke Google Drive`,
-            req,
-          );
-        }
-      } catch (err) {
-        console.warn("Drive upload invoice edit error:", err?.message);
-      }
-    }
     if (!invoice_file_url) {
       invoice_file_url = saveLocalFile(
         partner?.nama_partner || updated.vendor_name,
@@ -3557,7 +3305,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
         userRole || "Finance",
         "UPLOAD_SUCCESS",
         "PARTNER",
-        `File Invoice '${targetInvoiceName}' disimpan di server lokal aplikasi (menunggu sesi Google Drive terhubung untuk auto-sync)`,
+        `File Invoice '${targetInvoiceName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
         req,
       );
     }
@@ -3574,40 +3322,6 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
     });
     updated.billing_file_name = targetBillingName;
     let billing_file_url = "";
-    if (token) {
-      try {
-        const categoryFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder Invoice & Billing",
-          token,
-        );
-        const driveUrl = await uploadFileToDrive(
-          targetBillingName,
-          billing_file.fileData,
-          "application/pdf",
-          categoryFolderId,
-          token,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          billing_file_url = driveUrl;
-          addActivityLog(
-            userEmail || "user@app",
-            userName || "User",
-            userRole || "Finance",
-            "UPLOAD_SUCCESS",
-            "PARTNER",
-            `Berhasil mengunggah ulang file Billing '${targetBillingName}' ke Google Drive`,
-            req,
-          );
-        }
-      } catch (err) {
-        console.warn("Drive upload billing edit error:", err?.message);
-      }
-    }
     if (!billing_file_url) {
       billing_file_url = saveLocalFile(
         partner?.nama_partner || updated.vendor_name,
@@ -3621,7 +3335,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
         userRole || "Finance",
         "UPLOAD_SUCCESS",
         "PARTNER",
-        `File Billing '${targetBillingName}' disimpan di server lokal aplikasi (menunggu sesi Google Drive terhubung untuk auto-sync)`,
+        `File Billing '${targetBillingName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
         req,
       );
     }
@@ -3706,70 +3420,22 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
     typeof fileData === "string" &&
     fileData.includes("base64,")
   ) {
-    if (token) {
-      try {
-        const categoryFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder DD",
-          token,
-        );
-        const mimeType = getMimeType(finalFileName);
-        const driveUrl = await uploadFileToDrive(
-          finalFileName,
-          fileData,
-          mimeType,
-          categoryFolderId,
-          token,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          driveLink = driveUrl;
-          addActivityLog(
-            userEmail || "user@app",
-            userName || "User",
-            userRole || "Legal",
-            "UPLOAD_SUCCESS",
-            "PARTNER",
-            `Berhasil mengunggah dokumen DD '${finalFileName}' untuk vendor '${partner.nama_partner}' ke Google Drive`,
-            req,
-          );
-        } else {
-          addActivityLog(
-            userEmail || "user@app",
-            userName || "User",
-            userRole || "Legal",
-            "UPLOAD_FAILED",
-            "PARTNER",
-            `Gagal mengunggah dokumen DD '${finalFileName}' untuk vendor '${partner.nama_partner}' ke Google Drive: Respon URL Drive tidak valid`,
-            req,
-          );
-        }
-      } catch (err) {
-        console.error("Drive upload DD doc error:", err);
-        addActivityLog(
-          userEmail || "user@app",
-          userName || "User",
-          userRole || "Legal",
-          "UPLOAD_FAILED",
-          "PARTNER",
-          `Gagal mengunggah dokumen DD '${finalFileName}' untuk vendor '${partner.nama_partner}' ke Google Drive: ${err?.message || "Error koneksi Google Drive"}`,
-          req,
-        );
-      }
-    } else {
-      addActivityLog(
-        userEmail || "user@app",
-        userName || "User",
-        userRole || "Legal",
-        "UPLOAD_FAILED",
-        "PARTNER",
-        `Gagal mengunggah dokumen DD '${finalFileName}' untuk vendor '${partner.nama_partner}' ke Google Drive: Token Google Drive tidak ditemukan (Sesi belum terhubung)`,
-        req,
-      );
-    }
+    driveLink = saveLocalFile(
+      partner.nama_partner,
+      "Folder DD",
+      finalFileName,
+      fileData,
+      findTenant(partner.organizationId)?.name,
+    );
+    addActivityLog(
+      userEmail || "user@app",
+      userName || "User",
+      userRole || "Legal",
+      "UPLOAD_SUCCESS",
+      "PARTNER",
+      `Dokumen DD '${finalFileName}' untuk vendor '${partner.nama_partner}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
+      req,
+    );
   }
   partner.daftar_dokumen_dd = partner.daftar_dokumen_dd.map((doc) => {
     if (doc.nama === docName) {
@@ -3792,8 +3458,7 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
       if (
         existingFiles.length === 0 &&
         doc.linkDrive &&
-        doc.linkDrive !== driveLink &&
-        doc.linkDrive.includes("drive.google.com")
+        doc.linkDrive !== driveLink
       ) {
         existingFiles.push({
           id: "dd_file_prev_" + Date.now(),
@@ -3984,7 +3649,6 @@ app.get("/api/contracts", (req: express.Request, res: express.Response) => {
   refreshContractLifecycles();
   const contractsList = scopedRecords(req, "contract", db.contracts);
   const result = contractsList.map((c) => {
-    const p = db.partners.find((part) => part.partner_id === c.partner_id && part.organizationId === c.organizationId);
     const cur = normalizeCurrencyCode(c.currency, tenantDefaultCurrency(c.organizationId));
     const amt = Number(c.nilai_kontrak) || 0;
     const usdVal =
@@ -3997,7 +3661,6 @@ app.get("/api/contracts", (req: express.Request, res: express.Response) => {
       ...c,
       currency: cur,
       nilai_kontrak_usd: usdVal,
-      partner_nama: p ? p.nama_partner : c.partner_nama || "Partner N/A",
     };
   });
   res.json(result);
@@ -4218,7 +3881,7 @@ Perform a risk and compliance analysis of the commercial contract below and prop
 Reference: ${contract.nomor_kontrak}
 Title: ${contract.judul_kontrak}
 Document type: ${contract.jenis_dokumen || "Master Agreement"}
-Counterparty: ${contract.partner_nama || partner?.nama_partner || "-"}${partner?.country ? ` (${getCountryPack(partner.country).name})` : ""}
+Counterparty: ${partner?.nama_partner || "-"}${partner?.country ? ` (${getCountryPack(partner.country).name})` : ""}
 Categories: ${(contract.kategori_kerjasama || []).join(", ") || "-"}
 Value: ${normalizeCurrencyCode(contract.currency, ctx.defaultCurrency)} ${Number(contract.nilai_kontrak || 0)}
 Term: ${contract.tanggal_mulai} to ${contract.tanggal_berakhir} (days remaining: ${contract.sisa_hari ?? "-"})
@@ -4608,16 +4271,7 @@ async function persistContractTerminationFile(req: express.Request, record: { or
   const partner = db.partners.find(p => p.partner_id === record.partner_id);
   const tenant = findTenant(record.organizationId);
   const storedName = `termination-${randomUUID()}.${file.extension}`;
-  const token = await resolveActiveGoogleToken(req.headers['x-google-access-token'] || req.body.accessToken);
-  let url = '';
-  if (token) {
-    try {
-      const folder = await getPartnerCategoryFolderId(partner, 'Folder Termination', token);
-      const uploaded = await uploadFileToDrive(storedName, file.fileData, file.mimeType, folder, token);
-      if (uploaded?.includes('google.com')) url = uploaded;
-    } catch (error) { console.warn('Termination document Drive upload failed; using private local storage.'); }
-  }
-  if (!url) url = saveLocalFile(partner?.nama_partner, 'Folder Termination', storedName, file.fileData, tenant?.name);
+  const url = saveLocalFile(partner?.nama_partner, 'Folder Termination', storedName, file.fileData, tenant?.name);
   return { fileName: file.fileName, url };
 }
 
@@ -4735,41 +4389,6 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
     typeof fileData === "string" &&
     fileData.includes("base64,")
   ) {
-    if (token) {
-      try {
-        const categoryFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder Contract",
-          token,
-          targetOrgId,
-        );
-        const driveUrl = await uploadFileToDrive(
-          targetFileName,
-          fileData,
-          "application/pdf",
-          categoryFolderId,
-          token,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          link_file_kontrak = driveUrl;
-          addActivityLog(
-            userEmail || "user@app",
-            userName || "User",
-            userRole || "Legal",
-            "UPLOAD_SUCCESS",
-            "CONTRACT",
-            `Berhasil mengunggah file Kontrak '${targetFileName}' ke Google Drive`,
-            req,
-          );
-        }
-      } catch (err) {
-        console.warn("Drive upload contract error:", err?.message);
-      }
-    }
     if (!link_file_kontrak) {
       link_file_kontrak = saveLocalFile(
         partner?.nama_partner,
@@ -4784,7 +4403,7 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
         userRole || "Legal",
         "UPLOAD_SUCCESS",
         "CONTRACT",
-        `File Kontrak '${targetFileName}' disimpan di server lokal aplikasi (menunggu sesi Google Drive terhubung untuk auto-sync)`,
+        `File Kontrak '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
         req,
       );
     }
@@ -4812,7 +4431,6 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
     nomor_kontrak,
     judul_kontrak,
     partner_id,
-    partner_nama: partner ? partner.nama_partner : "Partner",
     kategori_kerjasama: Array.isArray(kategori_kerjasama)
       ? kategori_kerjasama
       : ["Umum"],
@@ -4962,40 +4580,6 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
       req.headers["x-google-access-token"] || req.body.accessToken,
     );
     let link_file_kontrak = "";
-    if (token) {
-      try {
-        const categoryFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder Contract",
-          token,
-        );
-        const driveUrl = await uploadFileToDrive(
-          targetFileName,
-          fileData,
-          "application/pdf",
-          categoryFolderId,
-          token,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          link_file_kontrak = driveUrl;
-          addActivityLog(
-            userEmail || "user@app",
-            userName || "User",
-            userRole || "Legal",
-            "UPLOAD_SUCCESS",
-            "CONTRACT",
-            `Berhasil mengunggah ulang file Kontrak '${targetFileName}' ke Google Drive`,
-            req,
-          );
-        }
-      } catch (err) {
-        console.warn("Drive upload contract edit error:", err?.message);
-      }
-    }
     if (!link_file_kontrak) {
       link_file_kontrak = saveLocalFile(
         partner?.nama_partner,
@@ -5009,7 +4593,7 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
         userRole || "Legal",
         "UPLOAD_SUCCESS",
         "CONTRACT",
-        `File Kontrak '${targetFileName}' disimpan di server lokal aplikasi (menunggu sesi Google Drive terhubung untuk auto-sync)`,
+        `File Kontrak '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
         req,
       );
     }
@@ -5067,7 +4651,6 @@ app.delete("/api/contracts/:id", async (req: express.Request, res: express.Respo
 app.get("/api/ios", (req: express.Request, res: express.Response) => {
   const iosList = scopedRecords(req, "io", db.ios);
   const result = iosList.map((io) => {
-    const p = db.partners.find((part) => part.partner_id === io.partner_id && part.organizationId === io.organizationId);
     const c = db.contracts.find((ctr) => ctr.contract_id === io.contract_id && ctr.organizationId === io.organizationId);
     const cur = normalizeCurrencyCode(io.currency || io.mata_uang, tenantDefaultCurrency(io.organizationId));
     const amt = Number(io.nilai_io) || 0;
@@ -5081,7 +4664,6 @@ app.get("/api/ios", (req: express.Request, res: express.Response) => {
       ...io,
       currency: cur,
       nilai_io_usd: usdVal,
-      partner_nama: p ? p.nama_partner : io.partner_nama || "Partner",
       contract_nomor: c ? c.nomor_kontrak : io.contract_nomor || "-",
     };
   });
@@ -5321,41 +4903,6 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
     typeof fileData === "string" &&
     fileData.includes("base64,")
   ) {
-    if (token) {
-      try {
-        const categoryFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder IO",
-          token,
-          targetOrgId,
-        );
-        const driveUrl = await uploadFileToDrive(
-          targetFileName,
-          fileData,
-          "application/pdf",
-          categoryFolderId,
-          token,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          link_file_io = driveUrl;
-          addActivityLog(
-            userEmail || "user@app",
-            userName || "User",
-            userRole || "Business Owner",
-            "UPLOAD_SUCCESS",
-            "IO",
-            `Berhasil mengunggah file IO '${targetFileName}' ke Google Drive`,
-            req,
-          );
-        }
-      } catch (err) {
-        console.warn("Drive upload IO error:", err?.message);
-      }
-    }
     if (!link_file_io) {
       link_file_io = saveLocalFile(
         partner?.nama_partner,
@@ -5370,7 +4917,7 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
         userRole || "Business Owner",
         "UPLOAD_SUCCESS",
         "IO",
-        `File IO '${targetFileName}' disimpan di server lokal aplikasi (menunggu sesi Google Drive terhubung untuk auto-sync)`,
+        `File IO '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
         req,
       );
     }
@@ -5384,7 +4931,6 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
     nomor_io,
     judul_io,
     partner_id,
-    partner_nama: partner ? partner.nama_partner : "Partner",
     kanal_media: kanal_media || "",
     tanggal_mulai,
     tanggal_berakhir,
@@ -5486,40 +5032,6 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
       req.headers["x-google-access-token"] || req.body.accessToken,
     );
     let link_file_io = "";
-    if (token) {
-      try {
-        const categoryFolderId = await getPartnerCategoryFolderId(
-          partner,
-          "Folder IO",
-          token,
-        );
-        const driveUrl = await uploadFileToDrive(
-          targetFileName,
-          fileData,
-          "application/pdf",
-          categoryFolderId,
-          token,
-        );
-        if (
-          driveUrl &&
-          (driveUrl.includes("drive.google.com") ||
-            driveUrl.includes("google.com"))
-        ) {
-          link_file_io = driveUrl;
-          addActivityLog(
-            userEmail || "user@app",
-            userName || "User",
-            userRole || "Business Owner",
-            "UPLOAD_SUCCESS",
-            "IO",
-            `Berhasil mengunggah ulang file IO '${targetFileName}' ke Google Drive`,
-            req,
-          );
-        }
-      } catch (err) {
-        console.warn("Drive upload IO edit error:", err?.message);
-      }
-    }
     if (!link_file_io) {
       link_file_io = saveLocalFile(
         partner?.nama_partner,
@@ -5533,7 +5045,7 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
         userRole || "Business Owner",
         "UPLOAD_SUCCESS",
         "IO",
-        `File IO '${targetFileName}' disimpan di server lokal aplikasi (menunggu sesi Google Drive terhubung untuk auto-sync)`,
+        `File IO '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
         req,
       );
     }
@@ -5867,9 +5379,9 @@ app.post(
       db.googleConfig.lastSyncTime = new Date().toISOString();
       saveDb();
       if (token) {
-        migrateLocalFilesToGoogleDrive(token).catch((e) => {
+        backupLocalFilesToGoogleDrive(token).catch((e) => {
           console.warn(
-            "[Google Auth] Background migration error on connect:",
+            "[Google Auth] Background backup error on connect:",
             e?.message,
           );
         });
@@ -5890,6 +5402,12 @@ app.post(
     }
   },
 );
+app.post("/api/google-integration/backup", async (req: express.Request, res: express.Response) => {
+  if (!(await checkIsAdmin(req)).isAdmin) {
+    return res.status(403).json({ error: "Forbidden: only administrators can run the Google Drive backup." });
+  }
+  res.json({ success: true, ...(await backupLocalFilesToGoogleDrive(req.headers["x-google-access-token"] as string | undefined)) });
+});
 app.post(
   ["/api/google-integration/disconnect", "/api/auth/google/disconnect"],
   async (req: express.Request, res: express.Response) => {
@@ -6778,7 +6296,6 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           nomor_kontrak: nomor,
           judul_kontrak: row.judul_kontrak || nomor,
           partner_id: partner.partner_id,
-          partner_nama: partner.nama_partner,
           jenis_dokumen: jenisDokumen || "Master Agreement",
           ...(parentContract ? { parent_contract_id: parentContract.contract_id, parent_contract_nomor: parentContract.nomor_kontrak } : {}),
           kategori_kerjasama: kategori,
@@ -6865,7 +6382,6 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           nomor_io: nomor,
           judul_io: row.judul_io || nomor,
           partner_id: partner.partner_id,
-          partner_nama: partner.nama_partner,
           contract_id: contract?.contract_id || "",
           kanal_media: row.kanal_media || "",
           tanggal_mulai: row.tanggal_mulai || "",
@@ -7222,6 +6738,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
     const chatScope = scopeOf(req);
     const ctxForChat = orgContextOf(req);
     const visibleTo = (kind: RecordKind) => (row: any) => recordVisible(ctxForChat, chatScope, kind, row);
+    const partnerNameOf = (id: string) => db.partners.find((p) => p.partner_id === id && p.organizationId === tenantId)?.nama_partner || "";
     /*
      * Privacy by design (PRD §3.4.1, §5.1): only the active tenant's records
      * are sent, and direct identifiers — phone numbers, e-mail addresses,
@@ -7256,7 +6773,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
         contract_id: c.contract_id || c.id,
         reference: c.nomor_kontrak,
         title: c.judul_kontrak,
-        counterparty: c.partner_nama || c.nama_partner || "",
+        counterparty: partnerNameOf(c.partner_id),
         partner_id: c.partner_id || "",
         document_type: c.jenis_dokumen || "Master Agreement",
         parent_reference: c.parent_contract_nomor || c.parent_nomor || "",
@@ -7284,7 +6801,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
           id: i.io_id || i.id,
           reference: i.nomor_io,
           title: i.judul_io,
-          counterparty: i.partner_nama || i.nama_partner || "",
+          counterparty: partnerNameOf(i.partner_id),
           partner_id: i.partner_id || "",
           contract_reference: i.contract_nomor || "",
           scope: i.kanal_media || i.channel || "",

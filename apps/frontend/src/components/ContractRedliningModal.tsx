@@ -34,6 +34,7 @@ import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
 interface ContractRedliningModalProps {
   isOpen: boolean;
   contract: Contract | null;
+  partnerName?: string;
   onClose: () => void;
   onUpdateContract?: (updated: Contract) => void;
 }
@@ -41,6 +42,7 @@ interface ContractRedliningModalProps {
 export const ContractRedliningModal: React.FC<ContractRedliningModalProps> = ({
   isOpen,
   contract,
+  partnerName,
   onClose,
   onUpdateContract,
 }) => {
@@ -224,7 +226,7 @@ export const ContractRedliningModal: React.FC<ContractRedliningModalProps> = ({
     const reportText = `
 === LAPORAN AI CONTRACT RISK & REDLINING ===
 Kontrak: ${contract.nomor_kontrak} - ${contract.judul_kontrak}
-Partner: ${contract.partner_nama}
+Partner: ${partnerName || '-'}
 Skor Risiko: ${analysis.overallRiskScore}/100 (${analysis.riskLevel})
 
 --- RINGKASAN EKSEKUTIF ---
@@ -281,7 +283,7 @@ ${analysis.analyzedClauses
                 )}
               </div>
               <Text size="xs" tone="muted" className="mt-g2">
-                <span className="font-semibold text-foreground">{contract.nomor_kontrak}</span> • {contract.judul_kontrak} ({contract.partner_nama || t('redline.vendor', 'Vendor')})
+                <span className="font-semibold text-foreground">{contract.nomor_kontrak}</span> • {contract.judul_kontrak} ({partnerName || t('redline.vendor', 'Vendor')})
               </Text>
             </div>
           </div>

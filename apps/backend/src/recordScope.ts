@@ -51,7 +51,7 @@ export function createOrganizationScope(db: Database.Database, organizationId: s
   const partnerDepartment = (partner: any): string | null => (partner ? teamOf(partner.pic_internal || partner.internal_pic) : null);
 
   function contractDepartment(contract: any): string | null {
-    const partner = partnerFor(contract.partner_id, contract.partner_nama || contract.nama_partner);
+    const partner = partnerFor(contract.partner_id, contract.nama_partner);
     return partnerDepartment(partner) ?? teamOf(contract.pic_internal);
   }
 
@@ -63,7 +63,7 @@ export function createOrganizationScope(db: Database.Database, organizationId: s
       case 'contract':
         return contractDepartment(record);
       case 'io': {
-        const partner = partnerFor(record.partner_id, record.partner_nama || record.nama_partner);
+        const partner = partnerFor(record.partner_id, record.nama_partner);
         if (partner) return partnerDepartment(partner);
         const contract = record.contract_id ? contractById.get(record.contract_id) : undefined;
         return contract ? contractDepartment(contract) : null;

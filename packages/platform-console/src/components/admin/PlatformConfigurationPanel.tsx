@@ -210,6 +210,19 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  const [backupState, setBackupState] = useState<{ running: boolean; message: string }>({ running: false, message: '' });
+  const handleBackupNow = async () => {
+    setBackupState({ running: true, message: '' });
+    try {
+      const res = await fetch('/api/google-integration/backup', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Backup gagal.');
+      setBackupState({ running: false, message: `${data.backedUpCount} file dicadangkan${data.failedCount ? `, ${data.failedCount} gagal` : ''}.` });
+    } catch (err: any) {
+      setBackupState({ running: false, message: err?.message || 'Backup gagal.' });
+    }
+  };
+
   const handleCopyLink = (text: string, key: string) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
@@ -861,7 +874,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
   const sections: Array<{ id: PlatformConfigurationSection; label: string }> = [
     { id: 'google', label: t('settings.google_auth_title', 'Google Workspace Account Authentication') },
-    { id: 'google-drive', label: t('settings.penyimpanan_file_dokumen_google_drive', 'Document File Storage (Google Drive)') },
+    { id: 'google-drive', label: t('settings.penyimpanan_file_dokumen_google_drive', 'Document Backup (Google Drive)') },
     { id: 'google-credentials', label: t('google_setup.settings_title', 'Google Cloud Credentials') },
     { id: 'database', label: t('sqlite.sqlite_database', 'SQLite Database') },
     { id: 'ai', label: t('sys.nav_ai', 'AI Model') },
@@ -969,7 +982,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                     <div className="space-y-g3">
                       <CardTitle className="flex items-center gap-g8">
                         <Folder className="w-g21 h-g21 text-accent-foreground" />
-                        <span>{t('settings.penyimpanan_file_dokumen_google_drive', 'Penyimpanan File Dokumen (Google Drive)')}</span>
+                        <span>{t('settings.penyimpanan_file_dokumen_google_drive', 'Backup Dokumen (Google Drive)')}</span>
                       </CardTitle>
                     </div>
                     <div className="flex flex-wrap items-center gap-g8 shrink-0">
@@ -983,6 +996,19 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           <AlertCircle className="size-g13 text-status-warning" />
                           <span>{t('settings.not_configured', 'Belum Dikonfigurasi')}</span>
                         </Badge>
+                      )}
+                      {isAdmin && driveFolderId && (
+                        <Button
+                          id="btn-backup-now"
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={backupState.running}
+                          onClick={handleBackupNow}
+                          className="shrink-0"
+                        >
+                          <span>{backupState.running ? 'Mencadangkan...' : backupState.message || 'Backup Sekarang'}</span>
+                        </Button>
                       )}
                       {isAdmin && !isEditUnlocked && (
                         <Button

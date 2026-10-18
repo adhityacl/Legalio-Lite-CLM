@@ -2214,7 +2214,7 @@ export const ZH_TRANSLATIONS: Record<string, string> = {
   'settings.org_folder_label': '组织文件夹',
   'settings.org_open_folder': '打开',
   'settings.password_atau_16_digit_app_password': '密码或 16 位应用专用密码',
-  'settings.penyimpanan_file_dokumen_google_drive': '文档文件存储（Google Drive）',
+  'settings.penyimpanan_file_dokumen_google_drive': '文档备份（Google Drive）',
   'settings.performa_ekstraksi_stabil_dan_seimbang_untuk': '提取性能稳定均衡，适合标准合同解析。',
   'settings.pick_folder_btn': '选择文件夹',
   'settings.picker_folder': '文件夹',

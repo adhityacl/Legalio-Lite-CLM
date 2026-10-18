@@ -602,7 +602,6 @@ const MainApp: React.FC = () => {
           setActiveTab,
           unresolvedNotifsCount: unreadNotifsCount,
           expiringContractsCount,
-          googleConfig,
           lastSyncTimestamp,
           isMobileOpen: isMobileMenuOpen,
           onCloseMobile: () => setIsMobileMenuOpen(false),
@@ -873,6 +872,7 @@ const MainApp: React.FC = () => {
           initialParent={amendmentParent}
           contracts={contracts}
           ios={ios}
+          partners={partners}
           onClose={() => setShowAmendmentModal(false)}
           onSave={handleSaveAmendment}
         />

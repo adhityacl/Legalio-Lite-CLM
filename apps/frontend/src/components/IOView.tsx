@@ -139,6 +139,8 @@ export const IOView: React.FC<IOViewProps> = ({
     [ios],
   );
 
+  const partnerNameOf = (id: string) => partners.find((p) => p.partner_id === id)?.nama_partner || '';
+
   // Filtering Logic
   const filteredIOs = useMemo(() => {
     return ios.filter((i) => {
@@ -151,7 +153,7 @@ export const IOView: React.FC<IOViewProps> = ({
         searchTerm === '' ||
         i.nomor_io.toLowerCase().includes(searchTerm.toLowerCase()) ||
         i.judul_io.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (i.partner_nama && i.partner_nama.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        partnerNameOf(i.partner_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
         (i.kanal_media && i.kanal_media.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchStatus = selectedStatus === 'ALL' || i.status === selectedStatus;
@@ -180,8 +182,8 @@ export const IOView: React.FC<IOViewProps> = ({
           valB = b.judul_io || '';
           break;
         case 'partner':
-          valA = a.partner_nama || '';
-          valB = b.partner_nama || '';
+          valA = partnerNameOf(a.partner_id);
+          valB = partnerNameOf(b.partner_id);
           break;
         case 'pricing':
           valA = a.pricing_model || a.model_pembayaran || '';
@@ -321,7 +323,7 @@ export const IOView: React.FC<IOViewProps> = ({
         i.nomor_io,
         i.judul_io,
         i.contract_id || '-',
-        i.partner_nama || '-',
+        partnerNameOf(i.partner_id) || '-',
         i.kanal_media || '-',
         i.model_pembayaran || '-',
         i.skema_pembayaran || '-',
@@ -571,7 +573,7 @@ export const IOView: React.FC<IOViewProps> = ({
                       {/* Partner */}
                       {visibleColumns.partner && (
                         <TableCell>
-                          {io.partner_nama || '-'}
+                          {partnerNameOf(io.partner_id) || '-'}
                         </TableCell>
                       )}
                       {/* Kanal */}
@@ -718,7 +720,7 @@ export const IOView: React.FC<IOViewProps> = ({
               <Card className="grid grid-cols-1 sm:grid-cols-2 gap-g13 p-g13 bg-background">
                 <div>
                   <Text as="span" size="xs" weight="medium" tone="muted" className="block">{t('io.detail_partner_label', 'Partner / Vendor:')}</Text>
-                  <Text as="span" size="xs" weight="bold">{detailIO.partner_nama || '-'}</Text>
+                  <Text as="span" size="xs" weight="bold">{partnerNameOf(detailIO.partner_id) || '-'}</Text>
                 </div>
                 <div>
                   <Text as="span" size="xs" weight="medium" tone="muted" className="block">{t('io.detail_channel_label', 'Kanal Media Placement:')}</Text>

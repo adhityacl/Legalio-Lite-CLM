@@ -5,7 +5,7 @@ import { buildWorkspaceSearchResults, matchesWorkspaceSearch } from './workspace
 
 test('vendor search links all record types, respects workspace and viewer visibility, and keeps aliases', () => {
   const partner = { partner_id: 'p1', organizationId: 'org1', nama_partner: 'PT Ácme Digital' } as Partner;
-  const contract = { contract_id: 'c1', organizationId: 'org1', partner_id: 'p1', partner_nama: 'Legacy Acme', nomor_kontrak: 'CTR-1', judul_kontrak: 'Services', status_approval: 'Signed' } as Contract;
+  const contract = { contract_id: 'c1', organizationId: 'org1', partner_id: 'p1', nomor_kontrak: 'CTR-1', judul_kontrak: 'Services', status_approval: 'Signed' } as Contract;
   const data: Parameters<typeof buildWorkspaceSearchResults>[0] = {
     organizationId: 'org1',
     partners: [partner, { ...partner, organizationId: 'org2', nama_partner: 'Private Vendor' }],

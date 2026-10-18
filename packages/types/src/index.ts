@@ -110,7 +110,6 @@ export interface Contract extends ContractLifecycleFields {
   nomor_kontrak: string;
   judul_kontrak: string;
   partner_id: string;
-  partner_nama?: string; // helper
   kategori_kerjasama: string[]; // Advertising, Content, Distribusi, Supplier, dll
   tanggal_mulai: string;
   tanggal_berakhir: string;
@@ -152,7 +151,6 @@ export interface InsertionOrder {
   nomor_io: string;
   judul_io: string;
   partner_id: string;
-  partner_nama?: string;
   kanal_media: string;
   tanggal_mulai: string;
   tanggal_berakhir: string;

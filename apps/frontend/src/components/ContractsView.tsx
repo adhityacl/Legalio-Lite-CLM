@@ -117,7 +117,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
     const matchSearch =
       c.nomor_kontrak.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.judul_kontrak.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (c.partner_nama && c.partner_nama.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (partnersById.get(c.partner_id)?.nama_partner || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.pic_internal.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (c.parent_contract_nomor && c.parent_contract_nomor.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -127,7 +127,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
     const matchStatus = selectedStatus === 'ALL' || c.status === selectedStatus;
 
     return matchJenis && matchSearch && matchCategory && matchStatus;
-  }), [contracts, partners, user, selectedJenisDokumen, selectedCategory, selectedStatus, searchTerm]);
+  }), [contracts, partners, partnersById, user, selectedJenisDokumen, selectedCategory, selectedStatus, searchTerm]);
 
   type SortField = 'no' | 'partner' | 'doc_type' | 'value' | 'duration' | 'status' | 'document';
   type SortOrder = 'asc' | 'desc';
@@ -182,10 +182,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
       let valA: any = '';
       let valB: any = '';
 
-      const getPartnerName = (c: Contract) => {
-        const partnerObj = partnersById.get(c.partner_id);
-        return c.partner_nama || partnerObj?.nama_partner || '';
-      };
+      const getPartnerName = (c: Contract) => partnersById.get(c.partner_id)?.nama_partner || '';
 
       switch (sortField) {
         case 'no':
@@ -300,7 +297,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
     const rows = currentContracts.map((c) => {
       const partnerObj = partnersById.get(c.partner_id);
-      const partnerName = c.partner_nama || partnerObj?.nama_partner || '-';
+      const partnerName = partnerObj?.nama_partner || '-';
       return [
         c.jenis_dokumen || 'Master Agreement',
         c.nomor_kontrak,
@@ -542,7 +539,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
                       {/* 2. Partner */}
                       {visibleColumns.partner && (
-                        <TableCell>{ctr.partner_nama || partnersById.get(ctr.partner_id)?.nama_partner || '-'}</TableCell>
+                        <TableCell>{partnersById.get(ctr.partner_id)?.nama_partner || '-'}</TableCell>
                       )}
 
                       {/* Kategori */}
@@ -702,7 +699,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                 <div>
                   <span className="text-muted-foreground block">{t('contracts.partner', 'Partner:')}</span>
                   <span className="font-bold text-foreground">
-                    {detailContract.partner_nama || partnersById.get(detailContract.partner_id)?.nama_partner || '-'}
+                    {partnersById.get(detailContract.partner_id)?.nama_partner || '-'}
                   </span>
                 </div>
                 <div>
@@ -904,6 +901,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
       <ContractRedliningModal
         isOpen={Boolean(redliningContract)}
         contract={redliningContract}
+        partnerName={partnersById.get(redliningContract?.partner_id || '')?.nama_partner}
         onClose={() => setRedliningContract(null)}
         onUpdateContract={(updatedContract) => {
           setRedliningContract(updatedContract);

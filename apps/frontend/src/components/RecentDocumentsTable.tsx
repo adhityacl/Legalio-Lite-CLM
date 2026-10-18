@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { ArrowUpRight, FilePlus2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { CONTRACT_STATUS_LABEL_KEY } from '@legalio/types/domainStatus';
-import type { Contract, InsertionOrder } from '@legalio/types';
+import type { Contract, InsertionOrder, Partner } from '@legalio/types';
 import { TableCardHeader } from '@legalio/ui-components/blocks';
 import { Badge, statusTone } from '@legalio/ui-components/badge';
 import { TableEmptyState } from './ui/table-empty-state';
@@ -13,9 +13,10 @@ import { Heading } from '@legalio/ui-components/heading';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { Card } from '@legalio/ui-components/card';
-export function RecentDocumentsTable({ contracts, ios, onNavigate }: {
+export function RecentDocumentsTable({ contracts, ios, partners, onNavigate }: {
   contracts: Contract[];
   ios: InsertionOrder[];
+  partners: Partner[];
   onNavigate: (tab: 'contracts' | 'ios') => void;
 }) {
   const { t, language } = useLanguage();
@@ -23,6 +24,7 @@ export function RecentDocumentsTable({ contracts, ios, onNavigate }: {
     const now = new Date();
     const cutoff = new Date(now);
     cutoff.setMonth(cutoff.getMonth() - 3);
+    const partnerNameById = new Map(partners.map(p => [p.partner_id, p.nama_partner]));
     return [
       ...contracts.map(contract => ({
         id: contract.contract_id,
@@ -30,13 +32,13 @@ export function RecentDocumentsTable({ contracts, ios, onNavigate }: {
         type: contract.jenis_dokumen === 'Agreement Addendum'
           ? t('contracts.agreement_addendum', 'Agreement Addendum')
           : t('contracts.master_agreement', 'Master Agreement'),
-        partner: contract.partner_nama || '—', status: contract.status,
+        partner: partnerNameById.get(contract.partner_id) || '—', status: contract.status,
         createdAt: contract.created_at, tab: 'contracts' as const,
       })),
       ...ios.map(io => ({
         id: io.io_id, title: io.judul_io,
         type: t('dashboard.insertion_orders', 'IO / SO / SOW'),
-        partner: io.partner_nama || '—', status: io.status,
+        partner: partnerNameById.get(io.partner_id) || '—', status: io.status,
         createdAt: io.created_at, tab: 'ios' as const,
       })),
     ]
@@ -44,8 +46,9 @@ export function RecentDocumentsTable({ contracts, ios, onNavigate }: {
         const createdAt = Date.parse(record.createdAt);
         return Number.isFinite(createdAt) && createdAt >= cutoff.getTime() && createdAt <= now.getTime();
       })
-      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  }, [contracts, ios, t]);
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+      .slice(0, 5);
+  }, [contracts, ios, partners, t]);
 
   return (
     <Card asChild><section aria-label={t('ui.recent_documents')} className="overflow-hidden">

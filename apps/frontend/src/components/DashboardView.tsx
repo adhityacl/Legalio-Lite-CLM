@@ -189,6 +189,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const activeIOs = scopedIOs.filter((i) => i.status === 'Active' || i.status === 'Expiring');
   const expiringContracts = scopedContracts.filter((c) => c.status === 'Expiring');
   const expiringIOs = scopedIOs.filter((i) => i.status === 'Expiring');
+  const partnerNameById = new Map((partners || []).map((p) => [p.partner_id, p.nama_partner]));
   const expiredContracts = scopedContracts.filter((c) => c.status === 'Expired');
   const requiringActionDocuments = [
     ...expiringContracts.map((contract) => ({
@@ -197,7 +198,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       type: contract.jenis_dokumen === 'Agreement Addendum'
         ? t('contracts.agreement_addendum', 'Agreement Addendum')
         : t('contracts.master_agreement', 'Master Agreement'),
-      partner: contract.partner_nama || '—',
+      partner: partnerNameById.get(contract.partner_id) || '—',
       endDate: contract.tanggal_berakhir,
       remainingDays: contract.sisa_hari,
       onOpen: () => onSelectContract(contract),
@@ -206,12 +207,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       id: io.io_id,
       name: io.judul_io,
       type: t('dashboard.insertion_orders', 'IO / SO / SOW'),
-      partner: io.partner_nama || '—',
+      partner: partnerNameById.get(io.partner_id) || '—',
       endDate: io.tanggal_berakhir || io.tanggal_selesai || '',
       remainingDays: io.sisa_hari,
       onOpen: () => onNavigateTab('ios'),
     })),
-  ].sort((a, b) => Date.parse(a.endDate) - Date.parse(b.endDate));
+  ].sort((a, b) => Date.parse(a.endDate) - Date.parse(b.endDate)).slice(0, 5);
 
   // Partner Aktif = minimal 1 kontrak dengan status Active atau Expiring
   const activePartnersCount = scopedPartners.filter((p) =>
@@ -323,7 +324,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </TableScrollArea>
       </Card>
 
-      <RecentDocumentsTable contracts={scopedContracts} ios={scopedIOs} onNavigate={onNavigateTab} />
+      <RecentDocumentsTable contracts={scopedContracts} ios={scopedIOs} partners={partners}onNavigate={onNavigateTab} />
 
       {/* Stacked Spending Chart Card (Under Table); hidden with the spending module (PRD §4.5.3) */}
       {policy.settings.modules.spending && (

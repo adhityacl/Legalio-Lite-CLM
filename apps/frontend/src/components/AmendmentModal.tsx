@@ -2,7 +2,7 @@ import { ModalFrame } from './ui/modal-frame';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { useLanguage } from '../context/LanguageContext';
 import React, { useState } from 'react';
-import { Contract, InsertionOrder } from '@legalio/types';
+import { Contract, InsertionOrder, Partner } from '@legalio/types';
 import { GitCommit, Upload, X } from 'lucide-react';
 import { DateInput } from './DateInput';
 import { formatContractFileName, formatIOFileName } from '@legalio/shared/fileNaming';
@@ -22,6 +22,7 @@ interface AmendmentModalProps {
   initialParent?: Contract | InsertionOrder;
   contracts: Contract[];
   ios: InsertionOrder[];
+  partners: Partner[];
   onClose: () => void;
   onSave: (amendmentData: any) => Promise<void>;
 }
@@ -30,10 +31,12 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
   initialParent,
   contracts,
   ios,
+  partners,
   onClose,
   onSave,
 }) => {
   const { t } = useLanguage();
+  const partnerName = (id?: string) => partners.find((p) => p.partner_id === id)?.nama_partner;
   const isInitialIO = initialParent && 'io_id' in initialParent;
   const [parentType, setParentType] = useState<'Contract' | 'IO'>(isInitialIO ? 'IO' : 'Contract');
   const [parentId, setParentId] = useState<string>(
@@ -168,7 +171,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
       if (parentType === 'Contract') {
         const parentContract = contracts.find((c) => c.contract_id === parentId);
         finalFileName = formatContractFileName({
-          partnerName: parentContract?.partner_nama,
+          partnerName: partnerName(parentContract?.partner_id),
           documentType: 'Agreement Addendum',
           contractNumber: nomorAddendum.trim(),
           startDate: tanggalAddendum,
@@ -177,7 +180,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
       } else {
         const parentIO = ios.find((i) => i.io_id === parentId);
         finalFileName = formatIOFileName({
-          partnerName: parentIO?.partner_nama,
+          partnerName: partnerName(parentIO?.partner_id),
           mediaChannel: parentIO?.kanal_media || 'Addendum',
           ioNumber: nomorAddendum.trim(),
           startDate: tanggalAddendum,
@@ -244,12 +247,12 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
                   {parentType === 'Contract'
                     ? contracts.map((c) => (
                         <option key={c.contract_id} value={c.contract_id}>
-                          {c.nomor_kontrak} ({c.partner_nama})
+                          {c.nomor_kontrak} ({partnerName(c.partner_id)})
                         </option>
                       ))
                     : ios.map((i) => (
                         <option key={i.io_id} value={i.io_id}>
-                          {i.nomor_io} ({i.partner_nama})
+                          {i.nomor_io} ({partnerName(i.partner_id)})
                         </option>
                       ))}
                 </AlphabeticalSelect>
