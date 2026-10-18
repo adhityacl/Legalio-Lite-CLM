@@ -470,7 +470,7 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
             )}
             {documentId && (
               <Button variant="outline" type="button" onClick={() => onExportRedline(comments)} className="w-full">
-                <FileDown className="size-g16" aria-hidden /> {t('documents.comments.export_redline', 'Unduh dengan Redline (.doc)')}
+                <FileDown className="size-g16" aria-hidden /> {t('documents.comments.export_redline', 'Unduh dengan Redline (.docx)')}
               </Button>
             )}
           </section></Card>

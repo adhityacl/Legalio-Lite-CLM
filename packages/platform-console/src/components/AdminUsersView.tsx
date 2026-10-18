@@ -223,7 +223,7 @@ export const AdminUsersView: React.FC<{ initialTab?: SystemSubmenu; onManageOrga
           } }), `${t('admin.toast.org', 'Organization')} "${data.name}" ${t('admin.toast.created_success', 'successfully created.')}`);
           window.dispatchEvent(new CustomEvent('organization-updated'));
         }} />
-      <EditOrganizationModal org={orgForEdit} isOpen={Boolean(orgForEdit)} onClose={() => setOrgForEdit(null)} onDelete={(org) => setOrgForDelete(org)} onReset={(org) => setOrgForReset(org)}
+      <EditOrganizationModal org={orgForEdit} isOpen={Boolean(orgForEdit)} onClose={() => setOrgForEdit(null)} onReset={(org) => setOrgForReset(org)}
         onSubmit={async (orgId, data) => {
           await act(() => consoleApi(`/organizations/${orgId}`, { method: 'PUT', body: { name: data.name, slug: data.slug, expectedVersion: orgForEdit?.version, profile: { logoUrl: data.logo || '' } } }), `${t('admin.toast.org', 'Organisasi')} "${data.name}" ${t('admin.toast.updated_success', 'berhasil diperbarui.')}`);
           window.dispatchEvent(new CustomEvent('organization-updated'));

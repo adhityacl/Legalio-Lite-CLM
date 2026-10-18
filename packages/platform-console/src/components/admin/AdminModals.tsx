@@ -855,7 +855,6 @@ interface EditOrganizationModalProps {
   org: ConsoleOrganization | null;
   onClose: () => void;
   onSubmit: (orgId: string, data: { name: string; slug: string; logo?: string }) => Promise<void>;
-  onDelete?: (org: ConsoleOrganization) => void;
   onReset?: (org: ConsoleOrganization) => void;
 }
 
@@ -864,7 +863,6 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
   org,
   onClose,
   onSubmit,
-  onDelete,
   onReset,
 }) => {
   const { t } = useLanguage();
@@ -1002,19 +1000,6 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
                 >
                   <RotateCcw className="w-g13 h-g13" />
                   <span>{t('admin.btn_reset_org', 'Reset Organisasi')}</span>
-                </Button>
-              ) : null}
-              {onDelete && !org.metadata?.isDefault ? (
-                <Button variant="ghost" size="sm"
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onDelete(org);
-                  }}
-                  className="text-destructive"
-                >
-                  <Trash2 className="w-g13 h-g13" />
-                  <span>{t('admin.btn_delete_org', 'Hapus Organisasi')}</span>
                 </Button>
               ) : null}
             </div>

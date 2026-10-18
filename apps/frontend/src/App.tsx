@@ -65,11 +65,21 @@ const StateScreen: React.FC<{ title: string; message?: string; children?: React.
   // A transient load is a quiet status line, not a headline.
   if (busy) return <LoadingState label={title} />;
   return (
-  <div className="flex min-h-g377 items-center justify-center p-g21" aria-busy={busy || undefined}>
-    <div className="max-w-g377 space-y-g13 text-center" role={busy ? 'status' : undefined}>
-      <Heading className="text-xl font-semibold text-foreground ">{title}</Heading>
-      {message && <Text size="sm" tone="muted">{message}</Text>}
-      {children && <div className="flex flex-wrap justify-center gap-g8">{children}</div>}
+  <div className="relative flex min-h-[70dvh] items-center justify-center overflow-hidden px-g21 py-g42" aria-busy={busy || undefined}>
+    {/* Soft decoration only: a pale sun and a few drifting bars, no box around the content. */}
+    <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+      <div className="absolute top-[7%] right-[12%] size-[min(26rem,60vw)] rounded-full bg-accent opacity-70" />
+      <div className="absolute right-0 bottom-[22%] h-g21 w-[min(18rem,40vw)] rounded-l-full bg-accent opacity-50" />
+      <div className="absolute right-[12%] bottom-[14%] h-g21 w-[min(13rem,30vw)] rounded-full bg-accent opacity-50" />
+      <div className="absolute bottom-[26%] left-0 h-g26 w-[min(22rem,45vw)] rounded-r-full bg-accent opacity-50" />
+      <div className="absolute bottom-[17%] left-[6%] h-g26 w-[min(28rem,55vw)] rounded-full bg-accent opacity-50" />
+      <div className="absolute bottom-[10%] left-[14%] h-g21 w-[min(12rem,28vw)] rounded-full bg-accent opacity-50" />
+    </div>
+    <div className="relative z-10 flex max-w-g610 flex-col items-center gap-g21 text-center">
+      <span className="text-base font-semibold text-foreground">Legalio.</span>
+      <Heading className="text-3xl font-bold leading-tight tracking-tight text-foreground text-balance sm:text-5xl">{title}</Heading>
+      {message && <Text size="md" tone="muted" align="center" className="max-w-g377 text-balance">{message}</Text>}
+      {children && <div className="mt-g8 flex w-full flex-wrap justify-center gap-g13">{children}</div>}
     </div>
   </div>
   );
@@ -597,11 +607,11 @@ const MainApp: React.FC = () => {
       <StateScreen busy title={t('app.memuat_halaman', 'Memuat halaman...')} />
     ) : gate.kind === 'caps-error' ? (
       <StateScreen title={t('tb.access_check_failed', 'Your access could not be checked')} message={t('tb.access_check_failed_desc', 'Nothing is shown until your permissions for this organization load.')}>
-        <Button variant="ghost" type="button" onClick={caps.retry}>{t('tb.retry', 'Retry')}</Button>
+        <Button variant="outline" size="lg" type="button" onClick={caps.retry}>{t('tb.retry', 'Retry')}</Button>
       </StateScreen>
     ) : gate.kind === 'denied' ? (
       <StateScreen title={t('tb.access_denied', 'You do not have access to this page')} message={t('tb.access_denied_desc', 'Your role in this organization does not include this page.')}>
-        {permittedHome && <Button variant="ghost" type="button" onClick={() => replaceActiveTab(permittedHome)}>{t('tb.go_to_permitted', 'Go to an allowed page')}</Button>}
+        {permittedHome && <Button variant="outline" size="lg" type="button" onClick={() => replaceActiveTab(permittedHome)}>{t('tb.go_to_permitted', 'Go to an allowed page')}</Button>}
       </StateScreen>
     ) : null;
 

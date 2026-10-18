@@ -350,7 +350,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 type="button"
                 onClick={handleDeleteSelected}
               >
-                <Trash2 className="w-g13 h-g13 text-status-danger" />
+                <Trash2 className="w-g13 h-g13" />
                 <span>{t('notifications.delete_selected', 'Hapus Terpilih')}</span>
               </Button>
             )}

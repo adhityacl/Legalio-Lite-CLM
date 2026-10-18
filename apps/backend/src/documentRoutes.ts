@@ -12,6 +12,7 @@ import {
   type DocumentSortKey,
 } from "@legalio/types/documents";
 import { approvalStatusLock, ensureApprovalSchema } from "./approvalRoutes";
+import { sanitizePageLayout } from "@legalio/shared/pageLayout";
 
 // ponytail: unnamed, unlabeled versions beyond this are pruned; named/labeled ones are kept forever.
 const MAX_UNNAMED_VERSIONS = 50;
@@ -25,6 +26,9 @@ const MAX_TEXT = 5000;
  * repository records and is rewritten wholesale by syncDbToSqlite on every save.
  * Foreign keys are not enforced by this database, so deletes cascade by hand below.
  */
+/** Stored page setup: validated, null when the request carries none. */
+const pageLayoutJson = (value: unknown) => (value === undefined || value === null ? null : JSON.stringify(sanitizePageLayout(value)));
+
 export function ensureDocumentSchema(db: Database) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS contract_documents (
@@ -98,6 +102,10 @@ export function ensureDocumentSchema(db: Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_contract_comments_contract ON contract_comments (contract_id, status);
   `);
+  // Page setup (paper, margins, header, footer) as JSON; null means the defaults.
+  if (!(db.prepare('PRAGMA table_info(contract_documents)').all() as { name: string }[]).some((column) => column.name === 'page_layout')) {
+    db.exec('ALTER TABLE contract_documents ADD COLUMN page_layout TEXT');
+  }
 }
 
 interface Actor {
@@ -303,9 +311,9 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
     const at = new Date().toISOString();
     db.transaction(() => {
       db.prepare(`
-        INSERT INTO contract_documents (id, organization_id, name, type, status, content, current_version, file_size, created_by, created_at, modified_by, modified_at)
-        VALUES (?, ?, ?, ?, 'draft', ?, 1, ?, ?, ?, ?, ?)
-      `).run(id, tenantOf(req), name, type, content, byteSize(content), actor.id, at, actor.id, at);
+        INSERT INTO contract_documents (id, organization_id, name, type, status, content, current_version, file_size, created_by, created_at, modified_by, modified_at, page_layout)
+        VALUES (?, ?, ?, ?, 'draft', ?, 1, ?, ?, ?, ?, ?, ?)
+      `).run(id, tenantOf(req), name, type, content, byteSize(content), actor.id, at, actor.id, at, pageLayoutJson(req.body?.page_layout));
       insertDraft(id, 1, content, actor.id, "manual", at);
     })();
     res.status(201).json(documentDetail(id));
@@ -324,9 +332,9 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
       const locked = status === undefined ? null : approvalStatusLock(db, doc.id, doc.status, status);
       if (locked) return res.status(409).json({ error: "APPROVAL_OWNS_STATUS", message: locked });
       db.prepare(`
-        UPDATE contract_documents SET name = ?, status = COALESCE(?, status), type = COALESCE(?, type), modified_by = ?, modified_at = ?
+        UPDATE contract_documents SET name = ?, status = COALESCE(?, status), type = COALESCE(?, type), page_layout = COALESCE(?, page_layout), modified_by = ?, modified_at = ?
         WHERE id = ?
-      `).run(name, status ?? null, type ?? null, actor.id, new Date().toISOString(), doc.id);
+      `).run(name, status ?? null, type ?? null, pageLayoutJson(req.body?.page_layout), actor.id, new Date().toISOString(), doc.id);
       res.json(documentDetail(doc.id));
     }),
   );

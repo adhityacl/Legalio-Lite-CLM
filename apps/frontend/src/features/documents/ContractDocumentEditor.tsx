@@ -10,16 +10,21 @@ import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import Superscript from '@tiptap/extension-superscript';
 import Subscript from '@tiptap/extension-subscript';
-import { TextStyle } from '@tiptap/extension-text-style';
+import { TextStyle, FontFamily, FontSize } from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import { TableKit } from '@tiptap/extension-table';
+import { PaginationPlus } from 'tiptap-pagination-plus';
+import { htmlToDocxBlob } from '../../lib/editorDocx';
+import { printEditorDocument } from '../../lib/printDocument';
+import { DEFAULT_PAGE_LAYOUT, HEADER_FOOTER_DISTANCE_PX, PAGE_GAP_PX, mmToPx, mountedEditorDom, pageSizePx, paginationOptions, parsePageLayout, type PageLayout } from './pageLayout';
+import { PageBreak, PageNumber, ParagraphFormat } from '../../lib/tiptapPageFormat';
+import { DocumentImage, ImagePasteDrop, ImageTooLargeError } from '../../lib/tiptapImages';
 import { CustomTableCell, CustomTableHeader } from '../../lib/tiptapTableCellBackground';
 import {
   FileDown,
   Save,
   Printer,
-  RotateCcw,
   CheckCircle2,
   AlertCircle,
   RefreshCw,
@@ -63,7 +68,7 @@ import { useTenantSettings } from '../../context/TenantSettingsContext';
 import { useAuth } from '../../context/AuthContext';
 import { getAuthHeaders } from '../../lib/apiFetch';
 import { CommentAnchor, renderRedlineHtml, stripCommentAnchors } from '../../lib/tiptapCommentMark';
-import { documentsApi, errorMessage } from '../../lib/documentsApi';
+import { documentsApi, errorMessage, withTransientRetry } from '../../lib/documentsApi';
 import { formatDateTime, type DocumentComment, type DocumentDetail, type DocumentStatus, type DocumentType } from '@legalio/types/documents';
 import { diffParagraphs, htmlToParagraphs, type DiffPart } from '../../lib/paragraphDiff';
 import { DocumentExplorer } from '../../components/documents/DocumentExplorer';
@@ -82,6 +87,9 @@ import {
 } from '@legalio/shared/data/cooperationAgreementTemplate';
 import { FillableSlot, setFillableSlotValue, focusFillableSlot } from '../../lib/tiptapFillableSlot';
 import { ContractEditorToolbar } from '../../components/editor/ContractEditorToolbar';
+import { PageRuler, VerticalRuler, type ParagraphIndent } from '../../components/editor/PageRuler';
+import { PageSetupDialog } from '../../components/editor/PageLayoutDialogs';
+import { HeaderFooterLayer, type HeaderFooterEditing } from '../../components/editor/HeaderFooterLayer';
 import { TableSelectionOverlay } from '../../components/editor/TableSelectionOverlay';
 
 import { Textarea } from '@legalio/ui-components/textarea';
@@ -405,6 +413,18 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
   const [sidebarTab, setSidebarTab] = useState<'fields' | 'partners' | 'templates' | 'contents' | 'history' | 'info' | 'comments'>('fields');
   const [highlightFillable, setHighlightFillable] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [pageLayout, setPageLayout] = useState<PageLayout>(DEFAULT_PAGE_LAYOUT);
+  const [pageCount, setPageCount] = useState(1);
+  const [showRuler, setShowRuler] = useState(true);
+  const [pageSetupOpen, setPageSetupOpen] = useState(false);
+  const [headerFooterEditing, setHeaderFooterEditing] = useState<HeaderFooterEditing | null>(null);
+  const [headerFooterHeights, setHeaderFooterHeights] = useState({ header: 0, footer: 0 });
+  const pageLayoutSaveRef = useRef<{ running: boolean; next: { id: string; layout: PageLayout } | null }>({ running: false, next: null });
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [activePage, setActivePage] = useState(0);
+  const [caretIndent, setCaretIndent] = useState<ParagraphIndent | null>(null);
+  // Re-renders the ribbon when a picture is selected or deselected (it shows the Picture Format tab).
+  const [, setPictureSelected] = useState(false);
   const [viewMode, setViewMode] = useState<'editor' | 'preview'>('editor');
   const [wordCount, setWordCount] = useState(0);
   // Fields panel order/visibility: only slots actually present in the document, in document order.
@@ -727,29 +747,64 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     }
   };
 
+  // Text formatting shared by the body and the header and footer editors, so the ribbon works the same in all three.
+  const contentExtensions = () => [
+    StarterKit.configure({
+      link: {
+        openOnClick: false,
+        autolink: true,
+      },
+    }),
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    Superscript,
+    Subscript,
+    TextStyle,
+    FontFamily,
+    FontSize,
+    Color,
+    Highlight.configure({ multicolor: false }),
+    TableKit.configure({
+      table: { resizable: true },
+      tableCell: false,
+      tableHeader: false,
+    }),
+    CustomTableCell,
+    CustomTableHeader,
+    FillableSlot,
+    ParagraphFormat,
+    DocumentImage,
+    ImagePasteDrop.configure({ onError: (error: unknown) => showAlert({
+      title: error instanceof ImageTooLargeError
+        ? t('editor.image_too_large', 'The picture is larger than 15 MB.')
+        : t('editor.image_failed', 'The picture could not be read.'),
+      variant: 'destructive',
+    }) }),
+  ];
+
+  /** Header or footer editor: rich text like the body, with page-number fields; every edit shows on the pages at once. */
+  const useHeaderFooterEditor = (kind: 'header' | 'footer') => useEditor({
+    extensions: [...contentExtensions(), PageNumber],
+    content: '',
+    // The ribbon follows the caret in the header or footer.
+    shouldRerenderOnTransaction: true,
+    onUpdate: ({ editor: instance }) => setPageLayout((layout) => ({ ...layout, [kind]: instance.getHTML() })),
+  });
+  const headerEditor = useHeaderFooterEditor('header');
+  const footerEditor = useHeaderFooterEditor('footer');
+
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({
-        link: {
-          openOnClick: false,
-          autolink: true,
-        },
-      }),
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Superscript,
-      Subscript,
-      TextStyle,
-      Color,
-      Highlight.configure({ multicolor: false }),
-      TableKit.configure({
-        table: { resizable: true },
-        tableCell: false,
-        tableHeader: false,
-      }),
-      CustomTableCell,
-      CustomTableHeader,
-      FillableSlot,
+      ...contentExtensions(),
       CommentAnchor,
+      PageBreak,
+      // Pages are drawn by decorations; the document itself stays plain HTML. Layout changes go through the effect below.
+      // Double-clicking a header or footer edits it on the page (see the effect below), as in Word.
+      PaginationPlus.configure({
+        ...paginationOptions(DEFAULT_PAGE_LAYOUT, 1),
+        pageGapBorderSize: 1,
+        pageGapBorderColor: 'var(--moduix-color-border)',
+        pageBreakBackground: 'var(--moduix-color-muted)',
+      }),
     ],
     content: '',
     onUpdate: ({ editor: instance }) => {
@@ -807,6 +862,132 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
       },
     },
   });
+
+  // Page count comes from the pages the pagination extension actually drew.
+  useEffect(() => {
+    if (!editor) return;
+    const read = () => {
+      const dom = mountedEditorDom(editor);
+      if (!dom) return;
+      const pages = dom.querySelector('[data-rm-pagination]')?.children.length || 1;
+      setPageCount((previous) => (previous === pages ? previous : pages));
+    };
+    const onTransaction = () => requestAnimationFrame(read);
+    editor.on('transaction', onTransaction);
+    editor.on('create', read);
+    read();
+    return () => { editor.off('transaction', onTransaction); editor.off('create', read); };
+  }, [editor]);
+
+  const pageStride = pageSizePx(pageLayout).height + PAGE_GAP_PX;
+
+  // The page with the caret (for the vertical ruler) and the caret paragraph's indents (for the horizontal ruler).
+  useEffect(() => {
+    if (!editor) return;
+    const track = () => {
+      const dom = mountedEditorDom(editor);
+      if (!dom) return;
+      const box = dom.getBoundingClientRect();
+      const scale = dom.offsetWidth ? box.width / dom.offsetWidth : 1;
+      try {
+        const caret = editor.view.coordsAtPos(editor.state.selection.head);
+        setActivePage(Math.max(0, Math.floor((caret.top - box.top) / scale / pageStride)));
+      } catch { /* position not drawn yet */ }
+      setPictureSelected(editor.isActive('image'));
+      const attributes = editor.getAttributes(editor.isActive('heading') ? 'heading' : 'paragraph');
+      const inBlock = editor.isActive('paragraph') || editor.isActive('heading');
+      const next = inBlock ? { left: Number(attributes.indentLeft ?? 0), right: Number(attributes.indentRight ?? 0), first: Number(attributes.indentFirst ?? 0) } : null;
+      setCaretIndent((previous) => (previous && next && previous.left === next.left && previous.right === next.right && previous.first === next.first) || previous === next ? previous : next);
+    };
+    editor.on('selectionUpdate', track);
+    editor.on('update', track);
+    return () => { editor.off('selectionUpdate', track); editor.off('update', track); };
+  }, [editor, pageStride]);
+
+  // Double-clicking a page's header or footer area edits it on the page.
+  useEffect(() => {
+    if (!editor) return;
+    let dom: HTMLElement | null = null;
+    const onDoubleClick = (event: MouseEvent) => {
+      const zone = (event.target as HTMLElement | null)?.closest?.('.rm-page-header, .rm-page-footer');
+      if (!zone || !dom) return;
+      event.preventDefault();
+      const box = dom.getBoundingClientRect();
+      const scale = dom.offsetWidth ? box.width / dom.offsetWidth : 1;
+      const page = Math.max(0, Math.floor((event.clientY - box.top) / scale / pageStride));
+      setHeaderFooterEditing({ kind: zone.classList.contains('rm-page-footer') ? 'footer' : 'header', page });
+    };
+    const attach = () => {
+      dom?.removeEventListener('dblclick', onDoubleClick);
+      dom = mountedEditorDom(editor);
+      dom?.addEventListener('dblclick', onDoubleClick);
+    };
+    editor.on('create', attach);
+    attach();
+    return () => { editor.off('create', attach); dom?.removeEventListener('dblclick', onDoubleClick); };
+  }, [editor, pageStride]);
+
+  // Push the page setup (paper, margins, header, footer) into the extension and redraw the pages.
+  useEffect(() => {
+    if (!editor) return;
+    const apply = () => {
+      if (!mountedEditorDom(editor)) return;
+      Object.assign(editor.storage.PaginationPlus, paginationOptions(pageLayout, pageCount, headerFooterHeights));
+      editor.view.dispatch(editor.state.tr.setMeta('pageLayout', true));
+      // The body starts below the header text, so measure what was drawn and apply again when it changed height.
+      requestAnimationFrame(() => {
+        const dom = mountedEditorDom(editor);
+        const height = (selector: string) => (dom?.querySelector<HTMLElement>(selector)?.offsetHeight ?? 0);
+        const measured = { header: height('.rm-first-page-header .pg-hf-content'), footer: height('.rm-page-footer .pg-hf-content') };
+        setHeaderFooterHeights((previous) => (previous.header === measured.header && previous.footer === measured.footer ? previous : measured));
+      });
+    };
+    editor.on('create', apply);
+    apply();
+    return () => { editor.off('create', apply); };
+  }, [editor, pageLayout, pageCount, headerFooterHeights]);
+
+  // Header and footer editors show the stored text (after loading a document, or after a ribbon menu replaced it).
+  useEffect(() => {
+    for (const [instance, html] of [[headerEditor, pageLayout.header], [footerEditor, pageLayout.footer]] as const) {
+      if (instance && !instance.isDestroyed && instance.getHTML() !== html) instance.commands.setContent(html, { emitUpdate: false });
+    }
+  }, [headerEditor, footerEditor, pageLayout.header, pageLayout.footer]);
+
+  // Header and footer edits are stored a moment after typing stops (and when the editing ends).
+  useEffect(() => {
+    if (!headerFooterEditing) return;
+    const timer = setTimeout(() => void changePageLayout(pageLayout), 1000);
+    return () => clearTimeout(timer);
+  }, [headerFooterEditing, pageLayout.header, pageLayout.footer]);
+
+  const headerFooterEditor = headerFooterEditing ? (headerFooterEditing.kind === 'header' ? headerEditor : footerEditor) : null;
+
+  /** Applies a new page setup at once; a saved document stores it immediately, an unsaved one with its first save. */
+  const changePageLayout = async (next: PageLayout) => {
+    setPageLayout(next);
+    const saved = currentDocRef.current;
+    if (!saved) return;
+    // One save at a time, always of the latest layout: older saves can never land after newer ones.
+    const queue = pageLayoutSaveRef.current;
+    queue.next = { id: saved.id, layout: next };
+    if (queue.running) return;
+    queue.running = true;
+    try {
+      while (queue.next) {
+        const { id, layout } = queue.next;
+        queue.next = null;
+        try {
+          const updated = await withTransientRetry(() => documentsApi.update(id, { page_layout: layout }));
+          setCurrentDoc((previous) => (previous?.id === id ? { ...previous, page_layout: updated.page_layout, modified_at: updated.modified_at } : previous));
+        } catch (err) {
+          showAlert({ title: t('contract_creator.msg.page_setup_failed', 'Pengaturan halaman gagal disimpan'), description: errorMessage(err), variant: 'destructive' });
+        }
+      }
+    } finally {
+      queue.running = false;
+    }
+  };
 
   // Word & Character counter (for use after programmatic content/command changes)
   const updateStats = () => {
@@ -880,6 +1061,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     }
     const title = template?.name || defaultDocTitle;
     setDocument(null);
+    setPageLayout(DEFAULT_PAGE_LAYOUT);
     setDocTitle(title);
     setContractNumber('');
     setFieldValues({ ...defaultPartyFieldValues(), ...getFillableSlotValues(editor) });
@@ -895,6 +1077,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     editor.commands.setContent(doc.content || '');
     setCustomFields((prev) => mergeTemplateCustomFields(prev, undefined, doc.content, BUILT_IN_FIELD_KEYS, recoveredFieldDescription));
     setDocument(doc);
+    setPageLayout(parsePageLayout(doc.page_layout));
     setDocTitle(doc.name);
     setContractNumber('');
     setFieldValues({ ...defaultPartyFieldValues(), ...getFillableSlotValues(editor) });
@@ -935,7 +1118,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     try {
       const doc = existing
         ? (await documentsApi.saveDraft(existing.id, { content: html, name: title, kind }, keepalive, activeTenantId)).document
-        : await documentsApi.create({ name: title, content: html }, keepalive, activeTenantId);
+        : await documentsApi.create({ name: title, content: html, page_layout: pageLayout }, keepalive, activeTenantId);
       setDocument(doc);
       void queryClient.invalidateQueries({ queryKey: ['documents'] });
       baselineRef.current = { html, title };
@@ -1178,101 +1361,27 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
 
 
-  // Reset document to default template
-  const handleResetDocument = async () => {
-    if (
-      await confirmDialog({
-        description: t('contract_creator.confirm.reset_desc', 'Reset dokumen ke template awal? Perubahan yang belum disimpan akan hilang.'),
-        tone: 'danger',
-        confirmLabel: t('contract_creator.confirm.reset_label', 'Reset'),
-      })
-    ) {
-      renderTemplateToEditor(fieldValues, contractNumber);
-      setExportMessage({
-        type: 'info',
-        text: t('contract_creator.msg.reset_done', 'Template 15 Pasal Perjanjian Kerjasama berhasil direset ke kondisi awal.'),
-      });
-    }
-  };
-
-  // Word-importable .doc download of already-cleaned document HTML
-  const downloadWordDocument = (contentHtml: string, fileSuffix: string) => {
-      const docHtml = `<!DOCTYPE html>
-<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head>
-<meta charset='utf-8'>
-<title>${docTitle}</title>
-<!--[if gte mso 9]>
-<xml>
-  <w:WordDocument>
-    <w:View>Print</w:View>
-    <w:Zoom>100</w:Zoom>
-    <w:DoNotOptimizeForBrowser/>
-  </w:WordDocument>
-</xml>
-<![endif]-->
-<style>
-  /* Normal margin (Word preset): 1 inch on every side. */
-  @page {
-    size: A4 portrait;
-    margin: 1in 1in 1in 1in;
-    mso-page-orientation: portrait;
-  }
-  @page Section1 {
-    size: 21.0cm 29.7cm;
-    margin: 1in 1in 1in 1in;
-    mso-header-margin: 0.5in;
-    mso-footer-margin: 0.5in;
-    mso-paper-source: 0;
-  }
-  div.Section1 {
-    page: Section1;
-  }
-  /* Mirrors the ".ProseMirror" rules in src/index.css (the same typography
-     the live editor and the Pratinjau tab render with) so the downloaded
-     file reads as the same document, not a re-styled copy. Px values there
-     are converted 1:1 to pt (16px = 12pt) since Word documents are pt-based. */
-  body { font-family: 'Plus Jakarta Sans', 'Inter', Calibri, Arial, sans-serif; font-size: 12pt; line-height: 1.625; color: #0f172a; margin: 0; padding: 0; }
-  h1 { font-size: 22.5pt; font-weight: bold; line-height: 1.25; margin: 18pt 0 9pt 0; }
-  h2 { font-size: 18pt; font-weight: bold; line-height: 1.3; margin: 15pt 0 6pt 0; }
-  h3 { font-size: 15pt; font-weight: bold; line-height: 1.35; margin: 12pt 0 6pt 0; }
-  p { margin: 0 0 9pt 0; line-height: 1.625; }
-  table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 12pt 0; }
-  td, th { border: 1px solid #cbd5e1; padding: 6pt 9pt; vertical-align: top; }
-  th { background-color: #f8fafc; font-weight: bold; text-align: left; }
-  blockquote { border-left: 3px solid #cbd5e1; padding-left: 12pt; margin: 12pt 0; color: #475569; font-style: italic; }
-  hr { border: none; border-top: 1.5pt solid #e2e8f0; margin: 18pt 0; }
-</style>
-</head>
-<body>
-<div class="Section1">
-  ${contentHtml}
-</div>
-</body>
-</html>`;
-
-      const blob = new Blob(['\ufeff', docHtml], {
-        type: 'application/msword',
-      });
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${docTitle.replace(/[^\w\s-]/gi, '').replace(/\s+/g, '_')}_${fileSuffix}.doc`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+  // Real .docx of already-cleaned document HTML, with the page setup shown on screen (paper, margins, header, footer, page numbers).
+  const downloadWordDocument = async (contentHtml: string, fileSuffix: string) => {
+    const blob = await htmlToDocxBlob(contentHtml, pageLayout);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${docTitle.replace(/[^\w\s-]/gi, '').replace(/\s+/g, '_')}_${fileSuffix}.docx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Download DOCX in Single Indonesian Format (Direct from Editor)
-  const handleDownloadIndonesianDocx = () => {
+  const handleDownloadIndonesianDocx = async () => {
     setIsDownloadingDocx(true);
     try {
-      downloadWordDocument(stripFillableSlotsToPlainText(stripCommentAnchors(editor?.getHTML() || '')), 'ID');
+      await downloadWordDocument(stripFillableSlotsToPlainText(stripCommentAnchors(editor?.getHTML() || '')), 'ID');
       setExportMessage({
         type: 'success',
-        text: t('contract_creator.msg.docx_downloaded', 'File dokumen Word (.doc) versi Bahasa Indonesia berhasil diunduh!'),
+        text: t('contract_creator.msg.docx_downloaded', 'File dokumen Word (.docx) berhasil diunduh!'),
       });
     } catch (err: any) {
       console.error('Download error:', err);
@@ -1285,7 +1394,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     }
   };
 
-  const handleExportRedline = (comments: DocumentComment[]) => {
+  const handleExportRedline = async (comments: DocumentComment[]) => {
     const html = renderRedlineHtml(editor?.getHTML() || '', comments, {
       heading: t('documents.redline.heading', 'Komentar & Usulan Perubahan'),
       suggestion: t('documents.comments.suggestion', 'Usulan'),
@@ -1293,12 +1402,17 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
       deletion: t('documents.comments.deletion', '(hapus teks)'),
       formatDate: (iso) => formatDateTime(iso, language),
     });
-    downloadWordDocument(stripFillableSlotsToPlainText(html), 'redline');
+    try {
+      await downloadWordDocument(stripFillableSlotsToPlainText(html), 'redline');
+    } catch (err) {
+      showAlert({ title: t('contract_creator.msg.docx_download_failed', 'Gagal mengunduh dokumen'), description: errorMessage(err), variant: 'destructive' });
+    }
   };
 
   // Print Document (Save as PDF)
   const handlePrint = () => {
-    window.print();
+    const pages = editor ? mountedEditorDom(editor) : null;
+    if (pages) printEditorDocument(pages, pageLayout, docTitle);
   };
 
   // Save to LEGALIO system repository
@@ -1491,33 +1605,42 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
           >
             <SegmentGroupIndicator />
             <SegmentGroupItems items={[
-              { value: 'editor', label: <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-g8"><Edit3 className="size-g16" aria-hidden="true" />{t('contract_creator.mode_edit_label', 'Edit')}</span></TooltipTrigger><TooltipBody>{t('contract_creator.mode_edit_title', 'Sunting langsung teks kontrak dalam Bahasa Indonesia')}</TooltipBody></Tooltip> },
-              { value: 'preview', label: <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-g8"><FileText className="size-g16" aria-hidden="true" />{t('contract_creator.mode_preview_label', 'Pratinjau')}</span></TooltipTrigger><TooltipBody>{t('contract_creator.mode_preview_title', 'Pratinjau tampilan dokumen final')}</TooltipBody></Tooltip> },
+              { value: 'editor', label: <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-g8"><Edit3 className="size-g16" aria-hidden="true" /><span className="sr-only">{t('contract_creator.mode_edit_label', 'Edit')}</span></span></TooltipTrigger><TooltipBody>{t('contract_creator.mode_edit_title', 'Sunting langsung teks kontrak dalam Bahasa Indonesia')}</TooltipBody></Tooltip> },
+              { value: 'preview', label: <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-g8"><FileText className="size-g16" aria-hidden="true" /><span className="sr-only">{t('contract_creator.mode_preview_label', 'Pratinjau')}</span></span></TooltipTrigger><TooltipBody>{t('contract_creator.mode_preview_title', 'Pratinjau tampilan dokumen final')}</TooltipBody></Tooltip> },
             ]} />
           </SegmentGroup>
 
           {canEdit && (
-            <Tooltip><TooltipTrigger asChild><Button variant="outline"
+            <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon-md"
               type="button"
               onClick={() => void saveNow('manual')}
               disabled={saveState.status === 'saving'}
               aria-label={t('documents.save.manual_title', 'Simpan sebagai versi baru (Ctrl+S)')}
             >
               <Save className="size-g16" aria-hidden />
-              <span>{t('common.save', 'Simpan')}</span>
             </Button></TooltipTrigger><TooltipBody>{t('documents.save.manual_title', 'Simpan sebagai versi baru (Ctrl+S)')}</TooltipBody></Tooltip>
           )}
 
 
           {/* Primary Export: Download DOCX */}
-          <Tooltip><TooltipTrigger asChild><Button variant="outline"
+          <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon-md"
             type="button"
+            aria-label={t('contract_creator.download_title', 'Download file Word (.docx)')}
             onClick={handleDownloadIndonesianDocx}
             disabled={isDownloadingDocx}
           >
             {isDownloadingDocx ? <Spinner size="sm" decorative /> : <FileDown className="size-g16" aria-hidden="true" />}
-            <span>{t('contract_creator.download_label', 'Download')}</span>
-          </Button></TooltipTrigger><TooltipBody>{t('contract_creator.download_title', 'Download file Word (.doc)')}</TooltipBody></Tooltip>
+          </Button></TooltipTrigger><TooltipBody>{t('contract_creator.download_title', 'Download file Word (.docx)')}</TooltipBody></Tooltip>
+
+          {/* PDF: the browser print dialog on exact paper-sized pages (choose "Save as PDF"). */}
+          <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon-md"
+            type="button"
+            aria-label={t('contract_creator.print_title', 'Cetak atau simpan sebagai PDF')}
+            onClick={handlePrint}
+            disabled={viewMode !== 'editor'}
+          >
+            <Printer className="size-g16" aria-hidden="true" />
+          </Button></TooltipTrigger><TooltipBody>{t('contract_creator.print_title', 'Cetak atau simpan sebagai PDF')}</TooltipBody></Tooltip>
 
           {/* Fullscreen Toggle */}
           <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon-md"
@@ -1550,39 +1673,55 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
       {/* 2. WYSIWYG FORMATTING TOOLBAR (Only shown in Editor Mode) */}
       {viewMode === 'editor' && (
-        <div className="flex flex-col lg:flex-row items-stretch">
-          <div className="flex-1 min-w-0">
-            <ContractEditorToolbar editor={editor} />
-          </div>
-          <div className="flex items-center bg-card border-b border-border pr-g13 pl-g3 shrink-0">
-            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm"
-              type="button"
-              onClick={handleResetDocument} aria-label={t('contract_creator.reset_template_title', 'Kembalikan isi ke template awal 15 pasal Perjanjian Kerjasama')}
-            >
-              <RotateCcw className="size-g16" aria-hidden="true" />
-              <span>{t('contract_creator.reset_template_label', 'Reset Template')}</span>
-            </Button></TooltipTrigger><TooltipBody>{t('contract_creator.reset_template_title', 'Kembalikan isi ke template awal 15 pasal Perjanjian Kerjasama')}</TooltipBody></Tooltip>
-          </div>
-        </div>
+        <ContractEditorToolbar
+          editor={headerFooterEditor ?? editor}
+          editingHeaderFooter={Boolean(headerFooterEditor)}
+          layout={pageLayout}
+          onLayoutChange={changePageLayout}
+          onOpenPageSetup={() => setPageSetupOpen(true)}
+          onEditHeaderFooter={(kind) => setHeaderFooterEditing({ kind, page: Math.min(activePage, pageCount - 1) })}
+          showRuler={showRuler}
+          onToggleRuler={() => setShowRuler((visible) => !visible)}
+          zoom={zoomLevel}
+          onZoomChange={setZoomLevel}
+        />
       )}
+
+      {viewMode === 'editor' && showRuler && (
+        <PageRuler
+          layout={pageLayout}
+          pageRef={paperSheetRef}
+          zoom={zoomLevel}
+          indent={caretIndent}
+          onPreview={setPageLayout}
+          onCommit={changePageLayout}
+          onIndentChange={(indent) => editor?.chain().focus().setParagraphIndent({ left: indent.left || null, right: indent.right || null, first: indent.first || null }).run()}
+        />
+      )}
+      <PageSetupDialog isOpen={pageSetupOpen} layout={pageLayout} onClose={() => setPageSetupOpen(false)} onApply={changePageLayout} />
 
       {/* 3. MAIN WORKSPACE CONTAINER */}
       <div className="flex-1 flex overflow-hidden relative">
 
+        {viewMode === 'editor' && showRuler && (
+          <VerticalRuler layout={pageLayout} pageRef={paperSheetRef} zoom={zoomLevel} activePage={Math.min(activePage, pageCount - 1)} pageStride={pageStride} />
+        )}
+
         {/* VIEW MODE A: WYSIWYG CANVAS WORKSPACE (Versi Bahasa Indonesia) */}
         <div
-          className={`flex-1 min-w-0 overflow-y-auto p-g8 sm:p-g21 md:p-g34 justify-center items-start bg-muted/70 ${
+          ref={canvasRef}
+          className={`flex-1 min-w-0 overflow-auto p-g8 sm:p-g21 md:p-g34 items-start bg-muted/70 ${
  viewMode === 'editor' ? 'flex' : 'hidden'
  }`}
         >
           <div
-            style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
-            className="transition-transform duration-150 w-full max-w-g987 h-fit mb-g55"
+            style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', width: pageSizePx(pageLayout).width }}
+            className="transition-transform duration-150 h-fit mb-g55 mx-auto shrink-0"
           >
-            {/* White Paper Sheet */}
-            <Card
+            {/* The pages themselves are drawn by the pagination extension: no sheet, padding or box around them. */}
+            <div
               ref={paperSheetRef}
-              className={` text-foreground min-h-g987 p-g21 sm:p-g55 md:p-g55 relative ${
+              className={`text-foreground relative shadow-md ${
  highlightFillable ? 'highlight-fillable-mode' : ''
  }`}
             >
@@ -1590,10 +1729,21 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
               {/* Editable WYSIWYG Content Canvas */}
               <EditorContent
                 editor={editor}
-                className="outline-none min-h-g987 font-sans leading-relaxed text-foreground focus:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-g987 selection:bg-status-success-soft "
+                className="outline-none font-sans leading-relaxed text-foreground focus:outline-none [&_.ProseMirror]:outline-none selection:bg-status-success-soft "
               />
               <TableSelectionOverlay editor={editor} containerRef={paperSheetRef} />
-            </Card>
+              <HeaderFooterLayer
+                layout={pageLayout}
+                editor={headerFooterEditor}
+                pageCount={pageCount}
+                pageHeight={pageSizePx(pageLayout).height}
+                pageStride={pageStride}
+                textDistance={HEADER_FOOTER_DISTANCE_PX}
+                editing={viewMode === 'editor' ? headerFooterEditing : null}
+                onExit={() => { setHeaderFooterEditing(null); void changePageLayout(pageLayout); }}
+                boundaryRef={canvasRef}
+              />
+            </div>
           </div>
         </div>
 
@@ -1603,7 +1753,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
  viewMode === 'preview' ? 'flex' : 'hidden'
  }`}
         >
-          <div className="w-full max-w-g987 h-fit mb-g55">
+          <div className="h-fit mb-g55 mx-auto shrink-0" style={{ width: pageSizePx(pageLayout).width }}>
             {previewOverride && (
               <Alert status="info" role="status" className="mb-g13">
                 <AlertIndicator />
@@ -1623,8 +1773,8 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
               </Alert>
             )}
             {/* White Paper Sheet */}
-            <Card className="text-foreground min-h-g987 p-g21 sm:p-g55 md:p-g55 relative">
-              <div className="min-h-g987 font-sans leading-relaxed text-foreground">
+            <Card className="text-foreground relative" style={{ minHeight: pageSizePx(pageLayout).height, paddingTop: mmToPx(pageLayout.margins.top), paddingBottom: mmToPx(pageLayout.margins.bottom), paddingLeft: mmToPx(pageLayout.margins.left), paddingRight: mmToPx(pageLayout.margins.right) }}>
+              <div className="font-sans leading-relaxed text-foreground">
                 {/* "ProseMirror" class reused so this read-only preview picks up the exact
                     same heading/paragraph/table typography rules as the live editor content. */}
                 {previewOverride?.kind === 'diff' ? (

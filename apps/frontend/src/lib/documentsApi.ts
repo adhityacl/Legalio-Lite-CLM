@@ -1,3 +1,4 @@
+import type { PageLayout } from '@legalio/shared/pageLayout';
 import type {
   CommentAction,
   CommentType,
@@ -42,9 +43,9 @@ export const documentsApi = {
   list: (params: Record<string, string>, signal?: AbortSignal, tenantId?: string) =>
     request<DocumentListResponse>(`/documents?${new URLSearchParams(params)}`, { signal, headers: tenantHeaders(tenantId) }),
   get: (id: string) => request<DocumentDetail>(`/documents/${id}`),
-  create: (input: { name: string; content: string; type?: DocumentType }, keepalive = false, tenantId?: string) =>
+  create: (input: { name: string; content: string; type?: DocumentType; page_layout?: PageLayout }, keepalive = false, tenantId?: string) =>
     request<DocumentDetail>('/documents', json('POST', input, { keepalive, headers: tenantHeaders(tenantId) })),
-  update: (id: string, patch: { name?: string; status?: DocumentStatus; type?: DocumentType }) =>
+  update: (id: string, patch: { name?: string; status?: DocumentStatus; type?: DocumentType; page_layout?: PageLayout }) =>
     request<DocumentDetail>(`/documents/${id}`, json('PATCH', patch)),
   remove: (id: string) => request<{ success: true }>(`/documents/${id}`, json('DELETE')),
 
@@ -81,3 +82,20 @@ export const documentsApi = {
 };
 
 export const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/** Request failures that say nothing about the request itself: a cut-off connection, timeout or busy gateway. */
+export const isTransientFailure = (err: unknown) =>
+  err instanceof TypeError || /^HTTP (408|429|502|503|504)$/.test(errorMessage(err));
+
+/** Runs `request` again after a short pause when it failed for a transient reason (e.g. the dev tunnel's HTTP 408). */
+export async function withTransientRetry<T>(request: () => Promise<T>, delaysMs: number[] = [600, 1500]): Promise<T> {
+  for (const delay of delaysMs) {
+    try {
+      return await request();
+    } catch (err) {
+      if (!isTransientFailure(err)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  return request();
+}

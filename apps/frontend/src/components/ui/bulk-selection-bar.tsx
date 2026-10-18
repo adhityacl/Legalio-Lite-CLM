@@ -15,7 +15,7 @@ export function BulkSelectionBar({ count, noun, onDelete }: { count: number; nou
         <span>{t('bulk.selected', '{noun} dipilih', { noun })}</span>
       </div>
       <Button variant="destructive-outline" size="sm" type="button" onClick={onDelete}>
-        <Trash2 className="w-g13 h-g13 text-status-danger" />
+        <Trash2 className="w-g13 h-g13" />
         <span>{t('bulk.delete_selected', 'Hapus Terpilih')}</span>
       </Button>
     </Card>

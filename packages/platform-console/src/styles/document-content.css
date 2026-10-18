@@ -298,3 +298,114 @@
   border-top: var(--moduix-border-width-sm) solid var(--moduix-color-border) !important;
   margin: 1.5rem 0 !important;
 }
+
+/* Paged editor (A4 pages drawn by the pagination extension): the writing surface is the white page. */
+.ProseMirror.rm-with-pagination {
+  background-color: var(--moduix-color-card);
+  box-sizing: border-box;
+}
+
+/* Word-safe default typeface for the paged editor, so the downloaded document looks like what is on screen. */
+.ProseMirror.rm-with-pagination {
+  font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
+  font-size: 12pt;
+}
+
+/* Header and footer: rich text between the side margins, the same on the pages and in the header/footer editor. */
+.rm-with-pagination .pg-hf-content,
+.pg-hf-editor .ProseMirror {
+  width: calc(var(--rm-page-width, 100%) - var(--rm-margin-left, 0px) - var(--rm-margin-right, 0px));
+  font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
+  font-size: 12pt;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--moduix-color-foreground);
+}
+.pg-hf-editor .ProseMirror { width: auto; min-height: 1.4em; outline: none; }
+.rm-with-pagination .pg-hf-content p,
+.pg-hf-editor .ProseMirror p { margin: 0; }
+.rm-with-pagination .rm-page-header-right:empty,
+.rm-with-pagination .rm-page-footer-right:empty { display: none; }
+.rm-with-pagination .rm-page-header,
+.rm-with-pagination .rm-page-footer { cursor: default !important; }
+/* Header/footer tables lay out columns (Word's three-column header): no borders, plain table layout. */
+.rm-with-pagination .pg-hf-content table,
+.pg-hf-editor .ProseMirror table { display: table !important; width: 100%; table-layout: fixed; border-collapse: collapse; margin: 0; }
+.rm-with-pagination .pg-hf-content tbody { display: table-row-group !important; max-height: none !important; overflow: visible !important; }
+.rm-with-pagination .pg-hf-content tr { display: table-row !important; }
+.rm-with-pagination .pg-hf-content td,
+.rm-with-pagination .pg-hf-content th { border: 0; padding: 0; vertical-align: top; word-break: normal; }
+.pg-hf-editor .ProseMirror table td,
+.pg-hf-editor .ProseMirror table th { border: 0; outline: 1px dashed var(--moduix-color-border); outline-offset: -1px; padding: 0; vertical-align: top; background: transparent; }
+/* Page-number fields in the editor show the number of the page being edited. */
+.pg-hf-editor [data-page-number='page']::before { content: var(--hf-page, '#'); }
+.pg-hf-editor [data-page-number='total']::before { content: var(--hf-total, '#'); }
+.pg-hf-editor [data-page-number] { background: var(--moduix-color-muted); border-radius: 2px; padding: 0 1px; }
+/* Word dims the header and footer while the body is being edited; print shows them in full. */
+@media screen {
+  .rm-with-pagination .rm-page-header-content,
+  .rm-with-pagination .rm-page-footer-content { opacity: 0.6; }
+}
+
+/* Manual page break: an empty block the editor stretches to the end of its page (see tiptapPageFormat.ts). */
+.ProseMirror [data-page-break] { display: block; margin: 0; padding: 0; }
+.ProseMirror [data-page-break].ProseMirror-selectednode { outline: 1px dashed var(--moduix-color-primary); outline-offset: -1px; }
+:not(.ProseMirror) > [data-page-break] { border-top: 1px dashed var(--moduix-color-border); margin: 16px 0; break-after: page; }
+
+/* Paragraph styles from the ribbon's Styles gallery. */
+.ProseMirror p[data-style='title'], [data-style='title'] { font-size: 28pt; line-height: 1.15; margin: 0 0 4pt; }
+.ProseMirror p[data-style='no-spacing'], [data-style='no-spacing'] { margin: 0; line-height: 1.15; }
+
+/* Pictures: inline with the text like Word, never wider than the text area; corner handles resize them. */
+.ProseMirror img, .pg-hf-content img { max-width: 100%; height: auto; vertical-align: bottom; }
+.ProseMirror [data-resize-container] { max-width: 100%; vertical-align: bottom; }
+.ProseMirror [data-resize-container] img { display: block; max-width: 100%; height: auto !important; }
+.ProseMirror [data-resize-handle] {
+  width: 9px; height: 9px; z-index: 3;
+  background: var(--moduix-color-card); border: 1px solid var(--moduix-color-primary);
+  opacity: 0; transition: opacity 120ms;
+}
+.ProseMirror [data-resize-handle='top-left'], .ProseMirror [data-resize-handle='bottom-right'] { cursor: nwse-resize; }
+.ProseMirror [data-resize-handle='top-right'], .ProseMirror [data-resize-handle='bottom-left'] { cursor: nesw-resize; }
+.ProseMirror [data-resize-handle='top-left'] { margin: -5px 0 0 -5px; }
+.ProseMirror [data-resize-handle='top-right'] { margin: -5px -5px 0 0; }
+.ProseMirror [data-resize-handle='bottom-left'] { margin: 0 0 -5px -5px; }
+.ProseMirror [data-resize-handle='bottom-right'] { margin: 0 -5px -5px 0; }
+.ProseMirror [data-resize-container].ProseMirror-selectednode [data-resize-handle],
+.ProseMirror [data-resize-container][data-resize-state='true'] [data-resize-handle] { opacity: 1; }
+.ProseMirror [data-resize-container].ProseMirror-selectednode [data-resize-wrapper] { outline: 1px solid var(--moduix-color-primary); }
+
+/* Wrap Text. In the editor the layout is on the picture box ([data-resize-container]); in stored HTML on the <img>. */
+:is(img:not([data-resize-wrapper] > img), [data-resize-container])[data-wrap] { margin-top: 4px; margin-bottom: 4px; }
+:is(img:not([data-resize-wrapper] > img), [data-resize-container]):is([data-wrap='square'], [data-wrap='tight'], [data-wrap='through'])[data-align='left'] { float: left; margin-right: 12px; }
+:is(img:not([data-resize-wrapper] > img), [data-resize-container]):is([data-wrap='square'], [data-wrap='tight'], [data-wrap='through'])[data-align='right'] { float: right; margin-left: 12px; }
+:is(img:not([data-resize-wrapper] > img), [data-resize-container])[data-wrap='tight'][data-align='left'] { margin-right: 6px; }
+:is(img:not([data-resize-wrapper] > img), [data-resize-container])[data-wrap='tight'][data-align='right'] { margin-left: 6px; }
+:is(img:not([data-resize-wrapper] > img), [data-resize-container])[data-wrap='through'][data-align='left'] { margin-right: 3px; }
+:is(img:not([data-resize-wrapper] > img), [data-resize-container])[data-wrap='through'][data-align='right'] { margin-left: 3px; }
+:is(img:not([data-resize-wrapper] > img), [data-resize-container])[data-wrap='topBottom'] { display: flex !important; width: fit-content; }
+img:not([data-resize-wrapper] > img)[data-wrap='topBottom'] { display: block !important; }
+:is(img:not([data-resize-wrapper] > img), [data-resize-container])[data-wrap='topBottom'][data-align='center'] { margin-left: auto; margin-right: auto; }
+:is(img:not([data-resize-wrapper] > img), [data-resize-container])[data-wrap='topBottom'][data-align='right'] { margin-left: auto; }
+/* Behind / in front of text: out of the text flow, at the dragged offset from where the picture is anchored. */
+:is(img:not([data-resize-wrapper] > img), [data-resize-container]):is([data-wrap='behind'], [data-wrap='front']) { position: absolute; margin-bottom: 0; }
+:is(img:not([data-resize-wrapper] > img), [data-resize-container])[data-wrap='behind'] { z-index: -1; }
+:is(img:not([data-resize-wrapper] > img), [data-resize-container])[data-wrap='front'] { z-index: 5; }
+.ProseMirror [data-resize-container]:is([data-wrap='behind'], [data-wrap='front']) { cursor: move; }
+/* The page is the layer behind-text pictures sit on, so they stay above the white paper. */
+.ProseMirror.rm-with-pagination { position: relative; z-index: 0; }
+/* Page breaks are floats drawn before the text; a paragraph with a text-wrapped picture gets its own layout context
+   so the picture floats inside it instead of being pushed below the last page break. Such a paragraph moves to the
+   next page as a whole instead of splitting. */
+p:has(> :is([data-resize-container], img):is([data-wrap='square'], [data-wrap='tight'], [data-wrap='through'])) { display: flow-root; }
+.ProseMirror [data-resize-container]:is([data-wrap='behind'], [data-wrap='front']) img { max-width: none; }
+/* A selected behind-text picture comes forward so it can be dragged and resized. */
+.ProseMirror [data-resize-container][data-wrap='behind'].ProseMirror-selectednode { z-index: 5; }
+/* In the editor the picture box carries the wrap layout; the picture inside it must not repeat the offset. */
+.ProseMirror [data-resize-wrapper] > img { margin: 0 !important; }
+/* Header and footer pictures placed behind or in front of the text may reach outside the header area (a letterhead
+   logo, a watermark): the pagination extension clips that area, so let it overflow. flow-root keeps text-wrapped
+   pictures inside the measured header height. */
+.rm-with-pagination :is(.rm-page-header, .rm-page-footer) { overflow: visible !important; }
+.rm-with-pagination :is(.rm-page-header-content, .rm-page-footer-content) { overflow: visible !important; display: flow-root; }

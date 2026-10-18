@@ -37,6 +37,8 @@ export interface DocumentSummary {
 export interface DocumentDetail extends DocumentSummary {
   organization_id: string;
   content: string;
+  /** Page setup as stored JSON; parse with parsePageLayout from @legalio/shared/pageLayout. */
+  page_layout?: string | null;
   draft_count: number;
 }
 
