@@ -2,6 +2,8 @@ import { createMailTemplateStore } from "./mailTemplateStore";
 import { forwardAsyncRouteErrors } from './asyncRoutes';
 import { migrateNormalizedCore } from './migrations/003_normalized_core';
 import { removeLegacyCoreTables } from './migrations/004_remove_legacy_core';
+import { addStatusIndexes } from './migrations/005_status_indexes';
+import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
 import { readBusinessRows, searchBusinessRows } from './normalizedCoreStore';
 import { SQLiteBackups } from './sqliteBackups';
 import { createSQLiteBackupRouter } from './sqliteBackupRoutes';
@@ -444,7 +446,7 @@ function saveLocalFile(
       ? base64Data.split("base64,")[1]
       : base64Data;
     fs.writeFileSync(filePath, Buffer.from(cleanContent, "base64"));
-    scheduleDriveBackup();
+    scheduleDriveBackup(filePath);
     return `/uploads/${encodeURIComponent(cleanOrg)}/${encodeURIComponent(cleanVendor)}/${encodeURIComponent(category)}/${safeFileName}`;
   } catch (err) {
     console.error("Error saving local file in hierarchical subfolder:", err);
@@ -487,12 +489,15 @@ let driveBackupTimer: NodeJS.Timeout | null = null;
 /**
  * Mirrors the local uploads tree (Org/Partner/Category) to Drive under the master root.
  * Local files stay the source of truth: links and files are never touched here.
+ * `only` limits the pass to those files (relative paths); without it the whole tree is checked.
  * shortcut: a file edited in place is uploaded again as a new Drive file, no version replace.
+ * shortcut: a file that fails in an `only` pass is retried by the next full pass (connect, config save, Backup Sekarang).
  */
-async function backupLocalFilesToGoogleDrive(token?) {
+async function backupLocalFilesToGoogleDrive(token?, only?: string[][]) {
   const rootId = sanitizeParentFolderId(db.googleConfig?.driveFolderId);
   const activeToken = await resolveActiveGoogleToken(token);
-  if (driveBackupRunning || !activeToken || !rootId) return { backedUpCount: 0, failedCount: 0 };
+  if (!activeToken || !rootId) return { backedUpCount: 0, failedCount: 0 };
+  if (driveBackupRunning) return { backedUpCount: 0, failedCount: 0, busy: true };
   driveBackupRunning = true;
   let backedUpCount = 0;
   let failedCount = 0;
@@ -515,12 +520,12 @@ async function backupLocalFilesToGoogleDrive(token?) {
       e.name.startsWith(".") ? [] : e.isDirectory() ? walk(path.join(dir, e.name), [...rel, e.name]) : [[...rel, e.name]],
     );
   try {
-    for (const parts of walk(uploadsDir, [])) {
+    for (const parts of only ?? walk(uploadsDir, [])) {
       const key = parts.join("/");
       const full = path.join(uploadsDir, ...parts);
-      const stamp = String(fs.statSync(full).mtimeMs);
-      if (done[key] === stamp) continue;
       try {
+        const stamp = String(fs.statSync(full).mtimeMs);
+        if (done[key] === stamp) continue;
         const driveUrl = await uploadFileToDrive(
           parts[parts.length - 1],
           fs.readFileSync(full).toString("base64"),
@@ -547,12 +552,23 @@ async function backupLocalFilesToGoogleDrive(token?) {
   if (backedUpCount) console.log(`[Drive Backup] ${backedUpCount} file dicadangkan ke Google Drive.`);
   return { backedUpCount, failedCount };
 }
-/** Debounced so a burst of uploads triggers one sweep. */
-function scheduleDriveBackup() {
+const pendingDriveBackups = new Map<string, string[]>();
+/** Debounced so a burst of uploads becomes one pass over just the new files. */
+function scheduleDriveBackup(savedFile: string) {
   if (IS_TEST_MODE) return;
+  const parts = path.relative(uploadsDir, savedFile).split(path.sep);
+  pendingDriveBackups.set(parts.join("/"), parts);
   if (driveBackupTimer) clearTimeout(driveBackupTimer);
-  driveBackupTimer = setTimeout(() => {
-    backupLocalFilesToGoogleDrive().catch((e) => console.warn("[Drive Backup]", e?.message));
+  driveBackupTimer = setTimeout(async () => {
+    const batch = [...pendingDriveBackups.values()];
+    pendingDriveBackups.clear();
+    try {
+      const result = await backupLocalFilesToGoogleDrive(undefined, batch);
+      if (result.busy) for (const parts of batch) pendingDriveBackups.set(parts.join("/"), parts);
+    } catch (e) {
+      console.warn("[Drive Backup]", e?.message);
+    }
+    if (pendingDriveBackups.size) scheduleDriveBackup(path.join(uploadsDir, ...[...pendingDriveBackups.values()][0]));
   }, 5000);
 }
 /** Exact canonical ownership. Records without an organization belong to nobody (PRD §14.3). */
@@ -1176,6 +1192,7 @@ if (!migrationBlock) {
   if (result.applied) console.log('Normalized SQLite business schema:', result.counts);
   const cleanup = removeLegacyCoreTables(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-remove-legacy-core-${Date.now()}.db`));
   if (cleanup.applied) console.log('Removed legacy SQLite snapshots:', cleanup.tables);
+  if (addStatusIndexes(sqliteDb).applied) console.log('Added status indexes for dashboard and list queries.');
 }
 const sqliteInitialData = loadCoreDataFromSqlite();
 const sqliteHasCoreData = ["partners", "contracts", "ios", "spendings", "evaluations", "notifications", "templates", "activityLogs"]
@@ -1403,8 +1420,11 @@ if (db.partners && Array.isArray(db.partners)) {
   }));
   saveDb();
 }
+// Statuses only change when a date passes or a contract is saved, so a minute-old pass is as good as a new one.
+let lifecyclesFreshUntil = 0;
 function saveDb() {
   uploadIndex = null;
+  lifecyclesFreshUntil = 0;
   if (migrationBlock) return; // never persist legacy projections before migration
   try {
     syncDbToSqlite(db);
@@ -1719,11 +1739,16 @@ function recalculateStatuses() {
 recalculateStatuses();
 /** Reads refresh date-driven status without sending reminders or requiring a cron run. */
 function refreshContractLifecycles() {
+  if (Date.now() < lifecyclesFreshUntil) return;
+  lifecyclesFreshUntil = Date.now() + 60_000;
   let changed = false;
+  const settingsByOrg = new Map<string, ReturnType<typeof getTenantSettings>>();
   for (const contract of db.contracts || []) {
     const previousEnd = contract.tanggal_berakhir;
     rollForwardAutoRenewal(contract);
-    const lifecycle = contractLifecycle(contract, getTenantSettings(contract.organizationId));
+    const orgKey = String(contract.organizationId ?? "");
+    if (!settingsByOrg.has(orgKey)) settingsByOrg.set(orgKey, getTenantSettings(contract.organizationId));
+    const lifecycle = contractLifecycle(contract, settingsByOrg.get(orgKey)!);
     const remaining = lifecycle.daysRemaining ?? contract.sisa_hari;
     if (previousEnd !== contract.tanggal_berakhir || contract.status !== lifecycle.status || contract.sisa_hari !== remaining) {
       contract.status = lifecycle.status;
@@ -4350,6 +4375,7 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
   const targetOrgId = getRequestTenantId(req);
   const targetTenant = findTenant(targetOrgId);
   const partner = db.partners.find((p) => p.partner_id === partner_id);
+  if (!partner) return res.status(400).json({ error: "Partner tidak ditemukan." });
   const token = await resolveActiveGoogleToken(
     req.headers["x-google-access-token"] || req.body.accessToken,
   );
@@ -4863,6 +4889,7 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
   const targetOrgId = getRequestTenantId(req);
   const targetTenant = findTenant(targetOrgId);
   const partner = db.partners.find((p) => p.partner_id === partner_id);
+  if (!partner) return res.status(400).json({ error: "Partner tidak ditemukan." });
   const contract = db.contracts.find((c) => c.contract_id === contract_id);
   const token = await resolveActiveGoogleToken(
     req.headers["x-google-access-token"] || req.body.accessToken,
@@ -6108,15 +6135,30 @@ const BULK_ENUMS = {
 app.post("/api/bulk-import", async (req: express.Request, res: express.Response) => {
   const {
     type,
-    rows,
+    rows: rawRows,
     defaultDepartment,
     overrideDepartment,
   } = req.body;
-  if (!type || !Array.isArray(rows) || rows.length === 0) {
+  if (!type || !Array.isArray(rawRows) || rawRows.length === 0) {
     return res
       .status(400)
       .json({ error: "Tipe data dan baris tidak boleh kosong." });
   }
+  // Spreadsheet cells arrive as numbers or booleans as often as text, and dates in local formats.
+  const invalidDates = new Map<number, string>();
+  const rows = rawRows.map((raw, i) => {
+    const row: Record<string, any> = {};
+    for (const [key, value] of Object.entries(raw && typeof raw === "object" ? raw : {})) {
+      row[key] = typeof value === "number" || typeof value === "boolean" ? String(value) : value;
+    }
+    for (const field of BULK_DATE_FIELDS) {
+      if (!(field in row)) continue;
+      const normalized = bulkDate(row[field]);
+      if (normalized === null) invalidDates.set(i, `${field} harus berformat YYYY-MM-DD atau DD/MM/YYYY.`);
+      else row[field] = normalized;
+    }
+    return row;
+  });
   const tenantId = getRequestTenantId(req);
   const tenantCurrency = tenantDefaultCurrency(tenantId);
   const inTenant = (row: any) => isMatchingOrg(row?.organizationId, tenantId);
@@ -6131,6 +6173,10 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowIndex = i + 2;
+      if (invalidDates.has(i)) {
+        failed.push({ rowIndex, identifier: `Baris ${rowIndex}`, message: invalidDates.get(i)! });
+        continue;
+      }
       const name = (row.nama_partner || "").trim();
       if (!name) {
         failed.push({
@@ -6229,6 +6275,10 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowIndex = i + 2;
+      if (invalidDates.has(i)) {
+        failed.push({ rowIndex, identifier: `Baris ${rowIndex}`, message: invalidDates.get(i)! });
+        continue;
+      }
       const nomor = (row.nomor_kontrak || "").trim();
       if (!nomor) {
         failed.push({
@@ -6302,7 +6352,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           tanggal_mulai: row.tanggal_mulai || "",
           tanggal_berakhir: row.tanggal_berakhir || "",
           currency: normalizeCurrencyCode(row.currency, tenantCurrency),
-          nilai_kontrak: parseFloat(row.nilai_kontrak) || 0,
+          nilai_kontrak: bulkNumber(row.nilai_kontrak),
           auto_renewal: bulkBool(row.auto_renewal),
           notice_period_hari: parseInt(row.notice_period_hari) || 30,
           notice_type_required: noticeType || "Both",
@@ -6331,6 +6381,10 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowIndex = i + 2;
+      if (invalidDates.has(i)) {
+        failed.push({ rowIndex, identifier: `Baris ${rowIndex}`, message: invalidDates.get(i)! });
+        continue;
+      }
       const nomor = (row.nomor_io || "").trim();
       if (!nomor) {
         failed.push({
@@ -6390,7 +6444,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           pricing_model: pickEnum(row.pricing_model, BULK_PRICING_MODELS) || String(row.pricing_model || "").trim() || "Fixed",
           charging_type: chargingType || "Prepaid",
           currency: normalizeCurrencyCode(row.currency, tenantCurrency),
-          nilai_io: parseFloat(row.nilai_io) || 0,
+          nilai_io: bulkNumber(row.nilai_io),
           deliverables: row.deliverables || "",
           notice_period_hari: parseInt(row.notice_period_hari) || 14,
           notice_type_required: noticeTypeIo || "Termination",
@@ -6417,6 +6471,10 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowIndex = i + 2;
+      if (invalidDates.has(i)) {
+        failed.push({ rowIndex, identifier: `Baris ${rowIndex}`, message: invalidDates.get(i)! });
+        continue;
+      }
       const supplierName = (row.supplier_name || "").trim();
       const reviewDate = (row.review_date || "").trim();
       if (!supplierName || !reviewDate) {
@@ -6498,6 +6556,10 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowIndex = i + 2;
+      if (invalidDates.has(i)) {
+        failed.push({ rowIndex, identifier: `Baris ${rowIndex}`, message: invalidDates.get(i)! });
+        continue;
+      }
       const invoiceNumber = (row.invoice_number || "").trim();
       const vendorName = (row.vendor_name || "").trim();
       if (!invoiceNumber || !vendorName) {
@@ -6527,7 +6589,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
       );
       try {
         const invoiceMonth = normalizeSpendingMonths(row.invoice_month);
-        const totalAmount = parseFloat(row.total_amount) || 0;
+        const totalAmount = bulkNumber(row.total_amount);
         const currency = normalizeCurrencyCode(row.currency, tenantCurrency);
         const newSpending = {
           id: generateNextSpendingId(),

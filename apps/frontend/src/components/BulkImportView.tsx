@@ -17,6 +17,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useTenantSettings, type TenantPolicyView } from '../context/TenantSettingsContext';
 import { downloadCsv, parseCSV } from '../lib/csv';
 import { Partner, Contract, InsertionOrder } from '@legalio/types';
+import { BULK_DATE_FIELDS, bulkDate, bulkDateAmbiguous } from '@legalio/shared/bulkParse';
 
 import { Button } from '@legalio/ui-components/button';
 import { Table, TableHeader, TableRow, TableColumnHeader, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
@@ -183,11 +184,37 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
     setUploadKey(k => k + 1);
   };
 
+  // Distinct (column, text) pairs: problems first, then readings worth a second look, then the rest.
+  const datePreview = useMemo(() => {
+    const columns = parsedHeaders.filter(header => BULK_DATE_FIELDS.includes(header));
+    if (!parsedRows || !columns.length) return null;
+    const entries = new Map<string, { column: string; raw: string; iso: string | null; ambiguous: boolean; count: number }>();
+    for (const row of parsedRows) for (const column of columns) {
+      const raw = (row[column] || '').trim();
+      if (!raw) continue;
+      const key = `${column}\u0000${raw}`;
+      const entry = entries.get(key) || { column, raw, iso: bulkDate(raw) || null, ambiguous: bulkDateAmbiguous(raw), count: 0 };
+      entry.count++;
+      entries.set(key, entry);
+    }
+    if (!entries.size) return null;
+    const rank = (entry: { iso: string | null; ambiguous: boolean }) => (!entry.iso ? 0 : entry.ambiguous ? 1 : 2);
+    const sorted = [...entries.values()].sort((a, b) => rank(a) - rank(b));
+    const shown = sorted.slice(0, 12);
+    return { shown, hidden: sorted.length - shown.length, hasAmbiguous: sorted.some(entry => entry.ambiguous) };
+  }, [parsedRows, parsedHeaders]);
+
   const handleFileChange = useCallback((file: File | undefined) => {
     if (!file) return;
     setFileName(file.name);
     setReport(null);
     setParseError('');
+    // The picker filters by extension, but drag-and-drop does not: only .csv is read.
+    if (!/\.csv$/i.test(file.name)) {
+      setParsedRows(null);
+      setParseError(t('import.invalid_csv', 'Format CSV tidak valid atau file kosong.'));
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
@@ -282,7 +309,7 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
       {/* ── Page Header ─────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-g13">
         <Heading as="h2" size="md" weight="semibold">
-          {t('import.title', 'Import Data Massal (Excel / CSV)')}
+          {t('import.title', 'Import Data Massal (CSV)')}
         </Heading>
       </div>
 
@@ -348,7 +375,7 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
               </div>
             </div>
 
-            <FileUpload key={uploadKey} accept=".csv,text/csv" maxFiles={1} onFileAccept={details => handleFileChange(details.files[0])} className="min-h-0 flex-1">
+            <FileUpload key={uploadKey} accept=".csv,text/csv" maxFiles={1} onFileAccept={details => handleFileChange(details.files[0])} onFileReject={() => { setParsedRows(null); setReport(null); setParseError(t('import.csv_only', 'Hanya file .csv yang dapat diimpor. Simpan file Excel atau Google Sheets sebagai CSV terlebih dahulu.')); }} className="min-h-0 flex-1">
               <FileUploadDropzone aria-label={t('import.choose_file', 'Pilih File CSV')} className="min-h-g144 flex-1">
                 <FileSpreadsheet className="size-g34 text-muted-foreground" aria-hidden="true" />
                 {fileName
@@ -393,6 +420,60 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
           </div>
         </Card>
       </div>
+
+      {/* ── Date Preview: how each distinct date in the file will be read ─────── */}
+      {datePreview && !report && (
+        <Card className="overflow-hidden" id="import-date-preview">
+          <div className="p-g13 border-b border-border">
+            <Heading as="h3" size="sm" weight="semibold">{t('import.date_preview_title', 'Pratinjau Tanggal')}</Heading>
+            <Text size="xs" tone="muted">{t('import.date_preview_hint', 'Beginilah tanggal di file Anda akan dibaca. Periksa urutan hari dan bulan sebelum import.')}</Text>
+          </div>
+          <TableScrollArea>
+            <Table className="w-full text-left">
+              <TableHeader>
+                <TableRow>
+                  <TableColumnHeader>{t('import.date_column', 'Kolom')}</TableColumnHeader>
+                  <TableColumnHeader>{t('import.date_in_file', 'Di file')}</TableColumnHeader>
+                  <TableColumnHeader>{t('import.date_read_as', 'Dibaca sebagai')}</TableColumnHeader>
+                  <TableColumnHeader>{t('import.date_rows', 'Baris')}</TableColumnHeader>
+                  <TableColumnHeader>{t('import.date_status', 'Status')}</TableColumnHeader>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {datePreview.shown.map((entry) => (
+                  <TableRow key={`${entry.column}|${entry.raw}`}>
+                    <TableCell className="whitespace-nowrap">{entry.column}</TableCell>
+                    <TableCell className="whitespace-nowrap font-mono">{entry.raw}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {entry.iso ? new Date(`${entry.iso}T00:00:00Z`).toLocaleDateString(language, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : '-'}
+                    </TableCell>
+                    <TableCell>{entry.count}</TableCell>
+                    <TableCell>
+                      {!entry.iso
+                        ? <span className="text-status-danger">{t('import.date_invalid', 'Tidak valid, baris ditolak')}</span>
+                        : entry.ambiguous
+                          ? <span className="text-status-warning">{t('import.date_check', 'Hari/bulan/tahun, periksa')}</span>
+                          : <span className="text-status-success">{t('import.date_ok', 'Sesuai')}</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {datePreview.hidden > 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center">
+                      {t('bulk_import.dan', '... dan')} {datePreview.hidden} {t('import.date_more', 'tanggal lainnya yang sesuai')}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableScrollArea>
+          {datePreview.hasAmbiguous && (
+            <Alert status="warning" role="note" className="m-g13"><AlertIndicator /><AlertContent><AlertDescription>
+              {t('import.date_ambiguous_note', 'Tanggal berformat DD/MM/YYYY dibaca sebagai hari/bulan/tahun. Jika file dibuat dengan pengaturan wilayah Amerika (bulan/hari/tahun), simpan ulang dengan tanggal berformat YYYY-MM-DD.')}
+            </AlertDescription></AlertContent></Alert>
+          )}
+        </Card>
+      )}
 
       {/* ── CSV Preview ──────────────────────────────────────────────────────── */}
       {parsedRows && parsedRows.length > 0 && !report && (

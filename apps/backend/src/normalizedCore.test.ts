@@ -6,6 +6,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { migrateNormalizedCore } from './migrations/003_normalized_core';
 import { removeLegacyCoreTables } from './migrations/004_remove_legacy_core';
+import { addStatusIndexes } from './migrations/005_status_indexes';
 import { ENTITIES } from './normalizedSchema';
 import { decimalParts, normalizedCoreReady, readBusinessRows, searchBusinessRows, synchronizeBusinessRows } from './normalizedCoreStore';
 
@@ -92,6 +93,40 @@ test('cross-organization references and duplicate IDs roll back all business cha
     rows.ios.push({...rows.ios[0]});
     assert.throws(()=>synchronizeBusinessRows(db,rows),/Duplicate io_id/);
     assert.equal(readBusinessRows(db,'partners')[0].nama_partner,'Unique Orchard Services');
+  } finally {db.close();}
+});
+
+test('unchanged rows are skipped, yet foreign writes, deletions and failed saves never leave stale state', () => {
+  const {db,rows} = fixture();
+  try {
+    migrateNormalizedCore(db);
+    synchronizeBusinessRows(db,rows);
+    // Another writer on the same connection: the next save must not trust its fingerprints.
+    db.prepare("UPDATE partners SET nama_partner = 'Edited elsewhere' WHERE partner_id = 'p1'").run();
+    synchronizeBusinessRows(db,rows);
+    assert.equal(readBusinessRows(db,'partners')[0].nama_partner,'Unique Orchard Services');
+    // Rows removed from memory disappear even though every remaining row is unchanged.
+    rows.ios.pop();
+    synchronizeBusinessRows(db,rows);
+    assert.equal(readBusinessRows(db,'insertion_orders').length,0);
+    // A rolled-back save forgets what it believed was written, so the retry persists the change.
+    rows.partners[0].nama_partner='Retry persists';
+    rows.contracts[0].partner_id='p2';
+    assert.throws(()=>synchronizeBusinessRows(db,rows),/FOREIGN KEY/);
+    rows.contracts[0].partner_id='p1';
+    synchronizeBusinessRows(db,rows);
+    assert.equal(readBusinessRows(db,'partners')[0].nama_partner,'Retry persists');
+  } finally {db.close();}
+});
+
+test('status index migration is idempotent and serves status filters', () => {
+  const {db} = fixture();
+  try {
+    migrateNormalizedCore(db);
+    assert.equal(addStatusIndexes(db).applied,true);
+    assert.equal(addStatusIndexes(db).applied,false);
+    const names = (db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_v5_%'").all() as {name:string}[]).map(row=>row.name).sort();
+    assert.deepEqual(names,['idx_v5_contracts_status','idx_v5_ios_status','idx_v5_spendings_payment']);
   } finally {db.close();}
 });
 

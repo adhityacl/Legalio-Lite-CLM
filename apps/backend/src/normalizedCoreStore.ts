@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { ENTITIES, entityFor, NORMALIZED_MIGRATION, type EntitySchema, type Field } from './normalizedSchema';
 import { migratePartnerContact } from './partnerContact';
@@ -5,7 +6,16 @@ import { migratePartnerContact } from './partnerContact';
 type DB = Database.Database;
 type Row = Record<string, any>;
 const q = (name: string) => `"${name.replaceAll('"', '""')}"`;
-export const normalizedCoreReady = (db: DB) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").get()) && Boolean(db.prepare('SELECT 1 FROM schema_migrations WHERE id = ?').get(NORMALIZED_MIGRATION));
+// Compiling SQL dominates per-row cost; statements are reusable, so compile each text once per connection.
+const statements = new WeakMap<DB, Map<string, Database.Statement>>();
+function prep(db: DB, sql: string) {
+  let cache = statements.get(db);
+  if (!cache) statements.set(db, cache = new Map());
+  let statement = cache.get(sql);
+  if (!statement) cache.set(sql, statement = db.prepare(sql));
+  return statement;
+}
+export const normalizedCoreReady = (db: DB) => Boolean(prep(db, "SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").get()) && Boolean(prep(db, 'SELECT 1 FROM schema_migrations WHERE id = ?').get(NORMALIZED_MIGRATION));
 
 // Integer coefficient + decimal scale preserves existing decimal amounts without rounding.
 export function decimalParts(value: unknown): { minor: bigint; scale: number } {
@@ -168,7 +178,7 @@ function decodeFields(record: Row, fields: Field[]) {
 function upsert(db: DB, table: string, key: string[], values: Row) {
   const columns = Object.keys(values);
   const changed = columns.filter(column => !key.includes(column));
-  return db.prepare(`INSERT INTO ${q(table)} (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})
+  return prep(db, `INSERT INTO ${q(table)} (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})
     ON CONFLICT(${key.map(q).join(',')}) DO UPDATE SET ${changed.map(column => `${q(column)}=excluded.${q(column)}`).join(',')}
     WHERE ${changed.map(column => `${q(table)}.${q(column)} IS NOT excluded.${q(column)}`).join(' OR ')}`).run(values);
 }
@@ -180,8 +190,8 @@ function arrayMarkers(row: Row, keys: string[]) {
 function writeChildren(db: DB, entity: EntitySchema, row: Row) {
   const id = String(row[entity.key]);
   const replaceList = (table: string, parentKey: string, list: any[], make: (value: any, index: number) => Row) => {
-    db.prepare(`DELETE FROM ${q(table)} WHERE ${q(parentKey)} = ?`).run(id);
-    list.forEach((value, position) => { const record = { [parentKey]: id, position, ...make(value, position) }; const columns = Object.keys(record); db.prepare(`INSERT INTO ${q(table)} (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})`).run(record); });
+    prep(db, `DELETE FROM ${q(table)} WHERE ${q(parentKey)} = ?`).run(id);
+    list.forEach((value, position) => { const record = { [parentKey]: id, position, ...make(value, position) }; const columns = Object.keys(record); prep(db, `INSERT INTO ${q(table)} (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})`).run(record); });
   };
   if (entity.table === 'partners') {
     replaceList('partner_categories','partner_id',row.tags || [], value => ({ category: value }));
@@ -191,7 +201,7 @@ function writeChildren(db: DB, entity: EntitySchema, row: Row) {
       (requirement.files || []).forEach((file: Row, position: number) => {
         const values = { partner_id: id, requirement_position: index, position, ...encodeFields(file,fileFields) };
         const columns = Object.keys(values);
-        db.prepare(`INSERT INTO partner_dd_files (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})`).run(values);
+        prep(db, `INSERT INTO partner_dd_files (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})`).run(values);
       });
     });
   }
@@ -202,14 +212,14 @@ function writeChildren(db: DB, entity: EntitySchema, row: Row) {
   }
 }
 function childArrays(db: DB, entity: EntitySchema, row: Row) {
-  const list = (table: string, parentKey: string) => db.prepare(`SELECT * FROM ${q(table)} WHERE ${q(parentKey)} = ? ORDER BY position`).safeIntegers().all(row[entity.key]) as Row[];
+  const list = (table: string, parentKey: string) => prep(db, `SELECT * FROM ${q(table)} WHERE ${q(parentKey)} = ? ORDER BY position`).safeIntegers().all(row[entity.key]) as Row[];
   const assign = (key: string, value: any[]) => { if (value.length || key in row) row[key] = value; };
   if (entity.table === 'partners') {
     assign('tags',list('partner_categories','partner_id').map(record => record.category));
     assign('identifiers',list('partner_identifiers','partner_id').map(record => decodeFields(record,identifierFields)));
     assign('daftar_dokumen_dd',list('partner_dd_requirements','partner_id').map(record => {
       const requirement = decodeFields(record,ddFields);
-      const files = db.prepare('SELECT * FROM partner_dd_files WHERE partner_id = ? AND requirement_position = ? ORDER BY position').safeIntegers().all(row.partner_id, record.position) as Row[];
+      const files = prep(db, 'SELECT * FROM partner_dd_files WHERE partner_id = ? AND requirement_position = ? ORDER BY position').safeIntegers().all(row.partner_id, record.position) as Row[];
       if (files.length || 'files' in requirement) requirement.files = files.map(file => decodeFields(file,fileFields));
       return requirement;
     }));
@@ -229,21 +239,46 @@ export function readBusinessRows(db: DB, table: string, organizationId?: string,
     if (!searchIds.length) return [];
     clauses.push(`${q(entity.key)} IN (${searchIds.map(() => '?').join(',')})`); params.push(...searchIds);
   }
-  const records = db.prepare(`SELECT * FROM ${q(table)}${clauses.length ? ' WHERE ' + clauses.join(' AND ') : ''} ORDER BY record_position, ${q(entity.key)}`).safeIntegers().all(...params) as Row[];
+  const records = prep(db, `SELECT * FROM ${q(table)}${clauses.length ? ' WHERE ' + clauses.join(' AND ') : ''} ORDER BY record_position, ${q(entity.key)}`).safeIntegers().all(...params) as Row[];
   return records.map(record => { const row = decodeFields(record,entity.fields); row[entity.key] = record[entity.key]; row.organizationId = record.organization_id; childArrays(db,entity,row); return row; });
 }
+// Fingerprints of rows as last written, so an unchanged row costs one hash instead of several SQL round trips.
+// Trusted only while this connection made every change since: any other write (sessions, SQL editor, restore) drops it.
+// shortcut: any write by another module on this connection empties the cache, costing one full-speed-less save; upgrade to per-table counters if that is frequent.
+const syncedRows = new WeakMap<DB, { changes: number; fingerprints: Map<string, string> }>();
+const changesOf = (db: DB) => (prep(db, 'SELECT total_changes() AS n').get() as { n: number }).n;
+const fingerprintOf = (table: string, position: number, input: Row) =>
+  table + '\u0000' + createHash('sha1').update(position + ':' + JSON.stringify(input)).digest('base64');
+/** The caller's own writes after synchronizeBusinessRows (same save) must not count as foreign changes. */
+export function acknowledgeOwnWrites(db: DB) {
+  const state = syncedRows.get(db);
+  if (state) state.changes = changesOf(db);
+}
 export function synchronizeBusinessRows(db: DB, data: Row) {
+  const previous = syncedRows.get(db);
+  const known = previous && previous.changes === changesOf(db) ? previous.fingerprints : new Map<string, string>();
+  const written = new Map<string, string>();
   // All tables commit together. Deferred constraints support reparenting and full replacement.
+  try {
   db.transaction(() => {
     for (const entity of ENTITIES) {
       const rows = Array.isArray(data[entity.collection]) ? data[entity.collection] : [];
       const seen = new Set<string>();
       for (const [position,input] of rows.entries()) {
+        const fingerprint = fingerprintOf(entity.table,position,input);
+        const unchanged = known.get(fingerprint);
+        if (unchanged !== undefined) {
+          if (seen.has(unchanged)) throw new Error(`Duplicate ${entity.key} in ${entity.table}: ${unchanged}`);
+          seen.add(unchanged);
+          written.set(fingerprint,unchanged);
+          continue;
+        }
         const row = canonicalize(entity,input);
         const id = String(row[entity.key] || '');
         if (!id.trim()) throw new Error(`Missing ${entity.key} in ${entity.table}`);
         if (seen.has(id)) throw new Error(`Duplicate ${entity.key} in ${entity.table}: ${id}`);
         seen.add(id);
+        written.set(fingerprint,id);
         const old = readBusinessRows(db,entity.table,undefined,[id])[0];
         const markerKeys = entity.table === 'partners' ? ['tags','identifiers','daftar_dokumen_dd'] : entity.table === 'contracts' ? ['kategori_kerjasama'] : entity.table === 'spendings' ? ['month_allocations','invoice_month'] : [];
         const values = { [entity.key]: id, organization_id: row.organizationId ?? null, record_position: position, ...encodeFields(arrayMarkers(row,markerKeys), entity.fields, [entity.key,'organizationId']) };
@@ -255,13 +290,18 @@ export function synchronizeBusinessRows(db: DB, data: Row) {
           upsert(db,'search_records',['entity_type','entity_id'],{ organization_id: row.organizationId, entity_type: entity.table, entity_id: id, title: texts[0], body: texts.slice(1).join('\n') });
         }
       }
-      const stored = db.prepare(`SELECT ${q(entity.key)} AS id FROM ${q(entity.table)}`).all() as {id:string}[];
+      const stored = prep(db, `SELECT ${q(entity.key)} AS id FROM ${q(entity.table)}`).all() as {id:string}[];
       for (const {id} of stored) if (!seen.has(id)) {
-        db.prepare(`DELETE FROM ${q(entity.table)} WHERE ${q(entity.key)} = ?`).run(id);
-        db.prepare('DELETE FROM search_records WHERE entity_type = ? AND entity_id = ?').run(entity.table,id);
+        prep(db, `DELETE FROM ${q(entity.table)} WHERE ${q(entity.key)} = ?`).run(id);
+        prep(db, 'DELETE FROM search_records WHERE entity_type = ? AND entity_id = ?').run(entity.table,id);
       }
     }
   })();
+  } catch (error) {
+    syncedRows.delete(db); // rolled back: nothing about the cache can be trusted
+    throw error;
+  }
+  syncedRows.set(db,{ changes: changesOf(db), fingerprints: written });
 }
 export interface SearchHit { entity_type: string; entity_id: string; title: string; score: number }
 export function searchBusinessRows(db: DB, organizationId: string, query: string): SearchHit[] {
@@ -269,7 +309,7 @@ export function searchBusinessRows(db: DB, organizationId: string, query: string
   if (!tokens.length) return [];
   const match = tokens.map(token => '"' + token.replaceAll('"','""') + '"*').join(' AND ');
   // Authorization by department is applied by the caller before returning any text/counts.
-  return db.prepare(`SELECT s.entity_type,s.entity_id,s.title,bm25(business_search) AS score
+  return prep(db, `SELECT s.entity_type,s.entity_id,s.title,bm25(business_search) AS score
     FROM business_search JOIN search_records s ON s.rowid=business_search.rowid
     WHERE business_search MATCH ? AND s.organization_id = ? ORDER BY score,s.entity_type,s.entity_id`).all(match,organizationId) as SearchHit[];
 }

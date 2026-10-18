@@ -258,6 +258,20 @@ try{
  const importedContract=(await call('/api/contracts',{org})).find((c:any)=>c.nomor_kontrak==='E2E/IMP/001');assert.equal('partner_nama' in importedContract,false);assert.equal(importedContract.partner_id,csvPartner.partner_id);
  assert.equal((sql.prepare("SELECT count(*) n FROM contracts WHERE nomor_kontrak='E2E/IMP/002'").get() as any).n,0);
  checks.push('Contract import links partner and rejects unknown partner names');
+ // Drive is backup only: an upload is always stored locally and the record keeps the local link.
+ const uploaded=(await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,nomor_kontrak:'E2E-UPLOAD-001',judul_kontrak:'E2E Upload',tanggal_mulai:'2026-01-01',tanggal_berakhir:'2099-12-31',currency:'USD',nilai_kontrak:1,status_approval:'Signed',auto_renewal:false,pic_internal:owner.name,fileName:'e2e-upload.pdf',fileData:'data:application/pdf;base64,'+Buffer.from('%PDF-1.4 e2e').toString('base64')}})).contract;
+ assert.match(uploaded.link_file_kontrak,/^\/uploads\//);
+ assert.equal(readFileSync(path.join(directory,'uploads',...decodeURIComponent(uploaded.link_file_kontrak.slice('/uploads/'.length)).split('/')),'utf8'),'%PDF-1.4 e2e');
+ const initContract=(await call('/api/init-data',{org})).contracts.find((c:any)=>c.contract_id===uploaded.contract_id);
+ assert.equal('partner_nama' in initContract,false);assert.equal(initContract.partner_id,partner.partner_id);
+ const driveBackup=await call('/api/google-integration/backup',{method:'POST',org});assert.equal(driveBackup.success,true);assert.equal(driveBackup.backedUpCount,0);
+ await call('/api/google-integration/backup',{method:'POST',org,token:'',status:401});
+ assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM schema_migrations WHERE id='005_status_indexes'").get() as any).n,1);
+ assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='index' AND name LIKE 'idx_v5_%'").get() as any).n,3);
+ checks.push('local-only upload with local link, no partner_nama alias, Drive backup endpoint authorization, status index migration');
+ // Six soon-to-expire contracts: the dashboard must show only the five nearest, with partner names.
+ const extraContractIds=[uploaded.contract_id];
+ for(let i=1;i<=6;i++) extraContractIds.push((await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,nomor_kontrak:`E2E-EXP-${i}`,judul_kontrak:`E2E Expiring ${i}`,tanggal_mulai:'2026-01-01',tanggal_berakhir:new Date(Date.now()+(5+i)*86400000).toISOString().slice(0,10),currency:'USD',nilai_kontrak:1,status_approval:'Signed',auto_renewal:false,pic_internal:owner.name}})).contract.contract_id);
  const editorToken=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'editor@example.com',password},token:''})).token;
  const hidden=(await call('/api/partners',{method:'POST',org,body:{nama_partner:'E2E Indexed Hidden',pic_internal:otherOwner.name,tags:['Supplier']}})).partner;
  const found=await call('/api/search?q=E2E%20Indexed',{org,token:editorToken});assert.ok(found.results.some((hit:any)=>hit.entity_id===partner.partner_id));assert.equal(found.results.some((hit:any)=>hit.entity_id===hidden.partner_id),false);
@@ -277,8 +291,21 @@ try{
  frontend=run(['../../node_modules/vite/bin/vite.js','--config','vite.config.ts','--host','127.0.0.1','--port',String(frontendPort)],path.join(repository,'apps/frontend'));await waitFor(frontendURL,frontend);
  browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
  const errors:string[]=[];const failedAPI:string[]=[];page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.url().includes('/api/')&&r.status()>=500)failedAPI.push(`${r.status()} ${r.url()}`);});
- await page.goto(frontendURL+'/app');await expect(page.locator('#signin-email')).toBeVisible();await page.locator('#signin-email').fill('admin@example.com');await page.locator('#signin-password').fill(password);await page.locator('button[type=submit]').click();
+ await page.goto(frontendURL+'/app');await expect(page.locator('#signin-email')).toBeVisible();
+ await expect(page.getByText(/continue with google/i)).toHaveCount(0);
+ await page.locator('#signin-email').fill('admin@example.com');await page.locator('#signin-password').fill(password);await page.locator('button[type=submit]').click();
  await expect(page.locator('#signin-email')).toHaveCount(0,{timeout:30000});
+ await page.goto(frontendURL+'/app?tab=dashboard');
+ const expiring=page.getByRole('region',{name:'Expiring Documents'});
+ await expect(expiring.getByText('E2E Expiring 1')).toBeVisible({timeout:30000});
+ assert.equal(await expiring.locator('tbody tr').count(),5);
+ await expect(expiring.getByText('E2E Expiring 6')).toHaveCount(0);
+ const currentName=(await call('/api/partners',{org})).find((p:any)=>p.partner_id===partner.partner_id).nama_partner;
+ for(const row of await expiring.locator('tbody tr').all()) assert.equal((await row.locator('td').nth(3).innerText()).trim(),currentName);
+ assert.equal(await page.getByRole('region',{name:'Latest Documents'}).locator('tbody tr').count(),5);
+ await expect(page.locator('[aria-label^="Google Drive:"]')).toHaveCount(0);
+ checks.push('Chromium sign-in without Google option, dashboard shows five nearest expiring documents with partner names, no sidebar Google dot');
+ for(const id of extraContractIds) await call(`/api/contracts/${id}`,{method:'DELETE',org}); // keep the list pages below on their first page
  await page.screenshot({path:path.join(directory,'app-desktop.png'),fullPage:true});writeFileSync(path.join(directory,'browser.html'),await page.content());
  for (const [tab,text] of [['partners','E2E Renamed Orchard'],['contracts','E2E-CTR-001'],['ios','E2E-IO-1']]) {
   await page.goto(frontendURL+`/app?tab=${tab}`);
@@ -289,6 +316,19 @@ try{
   await expect(page.locator('main')).toBeVisible();
   await expect(page.locator('main').getByRole('heading').first()).toBeVisible();
  }
+ // Date preview: 03/04/2026 must be shown as 3 April, a US-style date rejected, and nothing is imported by looking.
+ await page.goto(frontendURL+'/app?tab=bulk-import');
+ await page.getByRole('tab',{name:/^(contract|kontrak)$/i}).click();
+ await page.locator('input[type=file]').setInputFiles({name:'dates.csv',mimeType:'text/csv',buffer:Buffer.from('nomor_kontrak,partner_nama,tanggal_mulai,tanggal_berakhir\nPREVIEW-1,X,03/04/2026,2026-12-31\nPREVIEW-2,X,12/31/2026,not-a-date\n')});
+ const datePreview=page.locator('#import-date-preview');
+ await expect(datePreview).toBeVisible();
+ await expect(datePreview.getByText(/april 3, 2026|3 april 2026/i)).toBeVisible();
+ await expect(datePreview.getByText('03/04/2026',{exact:true})).toBeVisible();
+ assert.equal(await datePreview.locator('tbody tr').count()>=4,true);
+ assert.match(await datePreview.locator('tbody tr').first().innerText(),/invalid|tidak valid|无效/i);
+ await expect(datePreview.getByRole('note')).toBeVisible();
+ assert.equal((await call('/api/contracts',{org})).some((c:any)=>String(c.nomor_kontrak).startsWith('PREVIEW-')),false);
+ checks.push('Chromium CSV date preview shows how 03/04/2026 is read, flags invalid dates and imports nothing');
  await page.goto(frontendURL+'/app?tab=bulk-import');
  await expect(page.getByText('nama_partner',{exact:true})).toBeVisible();
  await expect(page.getByText('pic_partner',{exact:true})).toHaveCount(0);
@@ -297,6 +337,9 @@ try{
  const header=csvTemplate.split(/\r?\n/).find(line=>line.includes('nama_partner')) || '';
  assert.equal(header.includes('pic_partner'),false);
  assert.ok(header.includes('nama_pic'));
+ await expect(page.getByText(/\(Excel/i)).toHaveCount(0);
+ await page.locator('input[type=file]').setInputFiles({name:'spreadsheet.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from('PK\u0003\u0004 not a csv')});
+ await expect(page.getByRole('alert')).toBeVisible();
  await page.locator('input[type=file]').setInputFiles({name:'browser-import.csv',mimeType:'text/csv',buffer:Buffer.from(`nama_partner,internal_pic,nama_pic,email_pic,telepon_pic,tags\nE2E Browser CSV,${owner.name},Browser Contact,browser@example.com,+62123,Supplier\n`)});
  await expect(page.getByText('E2E Browser CSV',{exact:true})).toBeVisible();
  const [importResponse]=await Promise.all([page.waitForResponse(r=>r.url().includes('/api/bulk-import')&&r.request().method()==='POST'),page.getByRole('button',{name:/^(mulai import|start import)$/i}).click()]);

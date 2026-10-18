@@ -1,4 +1,4 @@
-import { normalizedCoreReady, synchronizeBusinessRows } from './normalizedCoreStore';
+import { acknowledgeOwnWrites, normalizedCoreReady, synchronizeBusinessRows } from './normalizedCoreStore';
 import { ENTITIES } from './normalizedSchema';
 import { migratePartnerContact } from './partnerContact';
 import type Database from 'better-sqlite3';
@@ -134,4 +134,5 @@ function synchronizeCoreDataTransaction(sqliteDb: Database.Database, data: any) 
 
 export function synchronizeCoreData(sqliteDb: Database.Database, data: any) {
   sqliteDb.transaction(() => synchronizeCoreDataTransaction(sqliteDb, data))();
+  acknowledgeOwnWrites(sqliteDb);
 }

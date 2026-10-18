@@ -93,6 +93,7 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['POST', '/api/google-integration/connect', platform('platform.configuration.update')],
   ['POST', '/api/auth/google/connect', platform('platform.configuration.update')],
   ['POST', '/api/google-integration/disconnect', platform('platform.configuration.update')],
+  ['POST', '/api/google-integration/backup', platform('platform.configuration.update')],
   ['POST', '/api/auth/google/disconnect', platform('platform.configuration.update')],
   ['POST', '/api/auth/google/exchange-code', pub('OAuth code exchange for the caller only; nothing is stored')],
   ['POST', '/api/google-auth/exchange-code', pub('OAuth code exchange for the caller only; nothing is stored')],
