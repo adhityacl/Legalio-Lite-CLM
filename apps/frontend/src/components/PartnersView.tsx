@@ -526,7 +526,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   else if (col === 'channel') label = t('partners.col_channel', 'Nama Channel');
                   else if (col === 'legal_status_flag') label = t('partners.col_entity', 'Badan Hukum');
                   else if (col === 'kategori') label = t('partners.col_category', 'Kategori Kerjasama');
-                  else if (col === 'pic') label = t('partners.col_pic', 'PIC Partner');
+                  else if (col === 'pic') label = t('partners.col_pic', 'PIC Name');
                   else if (col === 'email') label = t('partners.col_email', 'Email');
                   else if (col === 'telepon') label = t('partners.col_phone', 'Telepon');
                   else if (col === 'status') label = t('partners.col_status', 'Status Partner');
@@ -565,7 +565,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                       {visibleColumns.channel && renderSortHeader(t('partners.col_channel', 'Nama Channel'), 'channel')}
                       {visibleColumns.legal_status_flag && <TableColumnHeader scope="col">{t('partners.col_entity', 'Badan Hukum')}</TableColumnHeader>}
                       {visibleColumns.kategori && renderSortHeader(t('partners.col_category', 'Kategori Kerjasama'), 'tags')}
-                      {visibleColumns.pic && renderSortHeader(t('partners.col_pic', 'PIC Partner'), 'pic')}
+                      {visibleColumns.pic && renderSortHeader(t('partners.col_pic', 'PIC Name'), 'pic')}
                       {visibleColumns.email && <TableColumnHeader scope="col">{t('partners.col_email', 'Email')}</TableColumnHeader>}
                       {visibleColumns.telepon && <TableColumnHeader scope="col">{t('partners.col_phone', 'Telepon')}</TableColumnHeader>}
                       {visibleColumns.status && renderSortHeader(t('partners.col_status', 'Status Partner'), 'status')}
