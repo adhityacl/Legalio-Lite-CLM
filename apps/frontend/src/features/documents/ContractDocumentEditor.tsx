@@ -1381,12 +1381,9 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
   // Download DOCX in Single Indonesian Format (Direct from Editor)
   const handleDownloadIndonesianDocx = async () => {
     setIsDownloadingDocx(true);
+    setExportMessage(null);
     try {
       await downloadWordDocument(stripFillableSlotsToPlainText(stripCommentAnchors(editor?.getHTML() || '')), 'ID');
-      setExportMessage({
-        type: 'success',
-        text: t('contract_creator.msg.docx_downloaded', 'File dokumen Word (.docx) berhasil diunduh!'),
-      });
     } catch (err: any) {
       console.error('Download error:', err);
       setExportMessage({
@@ -1664,7 +1661,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
       {/* Alert Notification Bar */}
       {exportMessage && (
-        <Alert status={exportMessage.type === 'success' ? 'success' : exportMessage.type === 'error' ? 'error' : 'info'} className="rounded-none border-x-0 border-t-0"><AlertIndicator />
+        <Alert status={exportMessage.type === 'success' ? 'success' : exportMessage.type === 'error' ? 'error' : 'info'} className="rounded-none border-x-0 border-t-0">
           {exportMessage.type === 'info' ? <Spinner size="sm" decorative /> : <AlertIndicator />}
           <AlertContent><AlertDescription>{exportMessage.text}</AlertDescription></AlertContent>
           <AlertActions><CloseButton aria-label={t('common.close', 'Tutup')} onClick={() => setExportMessage(null)} /></AlertActions>
