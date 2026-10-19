@@ -564,24 +564,28 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                     )}
                   </Field>
 
-                  <Card size="sm" className="gap-g13 border-status-warning-border bg-status-warning-soft p-g13">
+                  <Card size="sm" className="gap-g13 p-g13">
                     <Fieldset>
-                      <FieldsetLegend>{t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')}</FieldsetLegend>
-                      <ToggleGroup multiple value={fieldYangBerubah} onValueChange={details => setFieldYangBerubah(details.value)} aria-label={t('form.contract.changed_fields', 'Elemen / Field Yang Berubah *')} className="flex-wrap">
-                        {['Nilai Kontrak / IO', 'Jangka Waktu Periode', 'Ruang Lingkup / Deliverables', 'Syarat Pembayaran', 'Pihak Berwenang'].map((f) => (
-                          <ToggleGroupItem key={f} value={f}>{f}</ToggleGroupItem>
+                      <FieldsetLegend>{t('form.contract.changed_fields', 'Isi yang Berubah *')}</FieldsetLegend>
+                      <ToggleGroup multiple value={fieldYangBerubah} onValueChange={details => setFieldYangBerubah(details.value)} aria-label={t('form.contract.changed_fields', 'Isi yang Berubah *')} variant="outline" size="sm" className="flex-wrap gap-g8 p-g8">
+                        {/* values are the stored codes the backend expects; only the chip text is shortened */}
+                        {[['Nilai Kontrak / IO', 'Nilai Kontrak'], ['Jangka Waktu Periode', 'Jangka Waktu'], ['Ruang Lingkup / Deliverables', 'Ruang Lingkup'], ['Syarat Pembayaran', 'Syarat Pembayaran'], ['Pihak Berwenang', 'Pihak Berwenang']].map(([f, label]) => (
+                          <ToggleGroupItem key={f} value={f}>
+                            {fieldYangBerubah.includes(f) && <Check aria-hidden />}
+                            {label}
+                          </ToggleGroupItem>
                         ))}
                       </ToggleGroup>
                     </Fieldset>
 
                     <Field>
                       <FieldLabel htmlFor="contract-field-4">
-                        {t('form.contract.track_change_summary', 'Ringkasan Detail Track-Change Perubahan * (Wajib)')}
+                        {t('form.contract.track_change_summary', 'Ringkasan perubahan')}
                       </FieldLabel>
                       <Textarea id="contract-field-4"
                         required
                         rows={3}
-                        placeholder={t('form.contract.track_change_placeholder', 'Jelaskan secara eksplisit nilai lama -> nilai baru, tanggal lama -> tanggal baru, atau perubahan pasal...')}
+                        placeholder={t('form.contract.track_change_placeholder', 'Jelaskan perubahan secara spesifik, misalnya nilai lama → nilai baru, tanggal lama → tanggal baru, atau pasal yang diperbarui.')}
                         value={ringkasanPerubahan}
                         onChange={(e) => setRingkasanPerubahan(e.target.value)}
                         className="w-full"
