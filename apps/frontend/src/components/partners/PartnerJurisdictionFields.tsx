@@ -1,6 +1,6 @@
 import { AlphabeticalSelect } from '../ui/alphabetical-select';
 import { SuggestInput } from '../ui/suggest-input';
-import React, { useId } from 'react';
+import React, { useId, useMemo } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTenantSettings } from '../../context/TenantSettingsContext';
@@ -22,6 +22,20 @@ export interface PartnerJurisdictionFieldsProps {
   onIdentifiersChange: (next: PartyIdentifier[]) => void;
 }
 
+// ISO region codes Intl knows that are not countries.
+const NON_COUNTRY_CODES = new Set(['EU', 'EZ', 'QO', 'UN', 'XA', 'XB', 'ZZ']);
+const intlLocale = (language: string) => (language === 'ZH' ? 'zh-CN' : language === 'ID' ? 'id' : 'en');
+
+/** Country name for any ISO 3166 alpha-2 code, including ones without a policy pack. */
+export const countryDisplayName = (code: string, language: string): string =>
+  new Intl.DisplayNames([intlLocale(language)], { type: 'region', fallback: 'none' }).of(code) || code;
+
+/** Every country the browser can name, so partners outside the policy packs (US, EU…) can be recorded. */
+const allCountryCodes = (language: string): string[] => {
+  const names = new Intl.DisplayNames([intlLocale(language)], { type: 'region', fallback: 'none' });
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  return [...letters].flatMap((a) => [...letters].map((b) => a + b)).filter((code) => !NON_COUNTRY_CODES.has(code) && names.of(code));
+};
 
 /**
  * Country of incorporation, legal form and identifiers for a counterparty
@@ -40,7 +54,12 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
   const { countries, policy } = useTenantSettings();
   const countryId = useId();
   const entityId = useId();
-  const pack = countries.find((c) => c.code === country);
+  // Countries without their own pack get the jurisdiction-neutral legal forms and identifiers.
+  const pack = countries.find((c) => c.code === country) || countries.find((c) => c.code === 'INTL');
+  const otherCountries = useMemo(() => {
+    const packed = new Set(countries.map((c) => c.code));
+    return allCountryCodes(language).filter((code) => !packed.has(code));
+  }, [countries, language]);
   // Industries that contract with individuals (KOL, freelancers) also get personal tax IDs.
   const counterpartyTypes = policy.industry.counterpartyTypes?.length ? policy.industry.counterpartyTypes : ['organization'];
   const schemes = (pack?.identifierSchemes || []).filter((s) => s.appliesTo.some((type) => counterpartyTypes.includes(type)));
@@ -64,6 +83,9 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
             <option value="">{t('form.partner.country_unknown', 'Unknown / not stated')}</option>
             {countries.filter((c) => c.code !== 'INTL').map((c) => (
               <option key={c.code} value={c.code}>{localizeName(c.name, language)}</option>
+            ))}
+            {otherCountries.map((code) => (
+              <option key={code} value={code}>{countryDisplayName(code, language)}</option>
             ))}
           </AlphabeticalSelect>
         </Field>

@@ -1411,6 +1411,10 @@ function sanitizeCountryCode(value: unknown): string {
   const code = String(value ?? "").trim().toUpperCase();
   return /^[A-Z]{2}$/.test(code) ? code : "";
 }
+/** English country name for prompts; codes without a policy pack (US, DE…) would otherwise read as "International". */
+function countryNameForPrompt(code: string): string {
+  return new Intl.DisplayNames(["en"], { type: "region", fallback: "none" }).of(code.toUpperCase()) || code;
+}
 /**
  * Partner identifiers (PRD §3.2.2): `{ scheme, value, country }`. Values are
  * kept as entered — format checks are advisory only and done client-side.
@@ -2445,7 +2449,7 @@ app.post("/api/partners/generate-dd-notes", async (req: express.Request, res: ex
       });
     }
     const ctx = aiPolicyContext(getRequestTenantId(req));
-    const countryName = country ? getCountryPack(String(country)).name : "";
+    const countryName = sanitizeCountryCode(country) ? countryNameForPrompt(sanitizeCountryCode(country)) : "";
     const prompt = `Act as a senior due-diligence and vendor-risk analyst for ${ctx.organizationName}, an organization in the ${ctx.industryName} industry operating in ${ctx.countryName}.
 
 Summarise the counterparty below in ONE comprehensive, professional paragraph written in ${ctx.responseLanguage}.
@@ -3926,7 +3930,7 @@ Perform a risk and compliance analysis of the commercial contract below and prop
 Reference: ${contract.contract_number}
 Title: ${contract.contract_title}
 Document type: ${contract.document_type || "Master Agreement"}
-Counterparty: ${partner?.partner_name || "-"}${partner?.country ? ` (${getCountryPack(partner.country).name})` : ""}
+Counterparty: ${partner?.partner_name || "-"}${partner?.country ? ` (${countryNameForPrompt(partner.country)})` : ""}
 Categories: ${(contract.cooperation_categories || []).join(", ") || "-"}
 Value: ${normalizeCurrencyCode(contract.currency, ctx.defaultCurrency)} ${Number(contract.contract_value || 0)}
 Term: ${contract.start_date} to ${contract.end_date} (days remaining: ${contract.days_remaining ?? "-"})

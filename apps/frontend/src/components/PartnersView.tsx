@@ -9,6 +9,7 @@ import { CONTRACT_STATUS_LABEL_KEY, DD_STATUS_LABEL_KEY, DOC_STATUS_LABEL_KEY } 
 import { isTerminationNoticeDocument, localizeDueDiligenceDocument } from '@legalio/shared/dueDiligence';
 import { useTenantSettings } from '../context/TenantSettingsContext';
 import { getCountryPack, localizeName } from '@legalio/shared/policy';
+import { countryDisplayName } from './partners/PartnerJurisdictionFields';
 
 /** Country of incorporation, falling back to the legacy BHI flag (BHI = Indonesia). */
 const partnerCountry = (p: Partner): string => p.country ?? (p.legal_status_flag === 'BHI' ? 'ID' : '');
@@ -120,7 +121,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   const [selectedBadanHukum, setSelectedBadanHukum] = useState<string>('ALL');
   const { policy } = useTenantSettings();
   const homeCountry = policy.settings.countryCode;
-  const countryLabel = (code: string) => (code ? `${code} · ${getCountryPack(code).code === code ? localizeName(getCountryPack(code).name, language) : code}` : t('common.unknown', 'Unknown'));
+  const countryLabel = (code: string) => (code ? `${code} · ${getCountryPack(code).code === code ? localizeName(getCountryPack(code).name, language) : countryDisplayName(code, language)}` : t('common.unknown', 'Unknown'));
   const [selectedPartnerStatus, setSelectedPartnerStatus] = useState<string>('ALL');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('ALL');
   const [selectedPartnerDetail, setSelectedPartnerDetail] = useState<Partner | null>(null);

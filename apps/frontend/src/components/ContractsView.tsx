@@ -880,7 +880,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                     {ios
                       .filter((i) => i.contract_id === detailContract.contract_id)
                       .map((io) => (
-                        <Card key={io.io_id} className="p-g13 flex items-center justify-between gap-g13">
+                        <Card key={io.io_id} className="p-g13 flex flex-row items-center justify-between gap-g13">
                           <div>
                             <div className="font-bold text-foreground text-xs font-mono">{io.io_number}</div>
                             <div className="text-xs text-muted-foreground mt-g2">{io.io_title}</div>

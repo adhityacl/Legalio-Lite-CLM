@@ -70,7 +70,7 @@ export const LegalDocument: React.FC<{
   return (
     <main lang={language.toLowerCase()} className="legal-page h-screen overflow-y-auto scroll-smooth bg-background text-foreground transition-colors px-g13 py-g13 sm:px-g21 sm:py-g21 lg:px-g34">
       <div className="max-w-g987 mx-auto">
-        <Card className="sticky top-g13 z-30 flex flex-wrap items-center justify-between gap-g13 backdrop-blur-md p-g13 sm:p-g13 print:hidden">
+        <Card className="sticky top-g13 z-30 flex flex-row flex-wrap items-center justify-between gap-g13 backdrop-blur-md p-g13 sm:p-g13 print:hidden">
           <div className="flex items-center gap-g13">
             {onBack && (
               <Button variant="ghost"

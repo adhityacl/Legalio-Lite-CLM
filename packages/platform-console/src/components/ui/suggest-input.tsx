@@ -36,12 +36,14 @@ export function SuggestInput({ id, value, onValueChange, options, placeholder, e
       <ComboboxControl>
         <ComboboxInput placeholder={placeholder} {...aria} />
       </ComboboxControl>
-      <ComboboxPositioner>
-        <ComboboxContent>
-          {emptyText && <ComboboxEmpty>{emptyText}</ComboboxEmpty>}
-          {collection.items.map(item => <ComboboxOption key={item} item={item}>{item}</ComboboxOption>)}
-        </ComboboxContent>
-      </ComboboxPositioner>
+      {(collection.items.length > 0 || emptyText) && (
+        <ComboboxPositioner>
+          <ComboboxContent>
+            {emptyText && <ComboboxEmpty>{emptyText}</ComboboxEmpty>}
+            {collection.items.map(item => <ComboboxOption key={item} item={item}>{item}</ComboboxOption>)}
+          </ComboboxContent>
+        </ComboboxPositioner>
+      )}
     </Combobox>
   );
 }

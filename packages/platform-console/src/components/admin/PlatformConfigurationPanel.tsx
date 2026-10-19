@@ -1053,7 +1053,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
                         {/* Read-Only or Edit Mode */}
                         {!isEditUnlocked ? (
-                          <Card className="p-g13 flex items-center justify-between gap-g8">
+                          <Card className="p-g13 flex flex-row items-center justify-between gap-g8">
                             <div className="min-w-0 flex-1 space-y-g3">
                               <Text as="span" size="xs" weight="bold" className="flex items-center gap-g5">
                                 <Folder className="w-g13 h-g13 text-accent-foreground shrink-0" />
