@@ -246,7 +246,7 @@ export const ActivityLogsView: React.FC = () => {
               <TableRow>
                 <TableColumnHeader scope="col" className="w-g42">
                   <div className="flex items-center justify-start">
-                    <Checkbox checked={selectedRows.length > 0 && selectedRows.length === currentLogs.length} aria-label={t('logs.pilih_semua_log_aktivitas', 'Pilih semua log aktivitas')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
+                    <Checkbox checked={selectedRows.length > 0 && selectedRows.length === filteredLogs.length} aria-label={t('logs.pilih_semua_log_aktivitas', 'Pilih semua log aktivitas')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
                 </TableColumnHeader>
                 {visibleColumns.time && <TableColumnHeader scope="col">{t('logs.col_time', 'Waktu')}</TableColumnHeader>}

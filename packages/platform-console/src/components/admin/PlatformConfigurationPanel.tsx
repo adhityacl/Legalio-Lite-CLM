@@ -217,7 +217,10 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
       const res = await fetch('/api/google-integration/backup', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Backup gagal.');
-      setBackupState({ running: false, message: `${data.backedUpCount} file dicadangkan${data.failedCount ? `, ${data.failedCount} gagal` : ''}.` });
+      if (data.skipped === 'not_connected') throw new Error('Akun Google belum terhubung. Hubungkan akun Google (OAuth) agar backup bisa berjalan.');
+      if (data.skipped === 'no_root_folder') throw new Error('Root Folder Drive belum diatur.');
+      if (data.busy) throw new Error('Backup sedang berjalan, coba lagi sebentar.');
+      setBackupState({ running: false, message: `${data.backedUpCount} file baru dicadangkan${data.alreadyBackedUpCount ? `, ${data.alreadyBackedUpCount} sudah ada di Drive` : ''}${data.failedCount ? `, ${data.failedCount} gagal` : ''}.` });
     } catch (err: any) {
       setBackupState({ running: false, message: err?.message || 'Backup gagal.' });
     }

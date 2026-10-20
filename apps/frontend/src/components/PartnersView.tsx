@@ -558,7 +558,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                     <TableRow>
                       <TableColumnHeader scope="col" className="w-g42">
                         <div className="flex items-center justify-start">
-                          <Checkbox checked={selectedRows.length > 0 && selectedRows.length === currentPartners.length} aria-label={t('partners.select_all', 'Pilih semua partner')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
+                          <Checkbox checked={selectedRows.length > 0 && selectedRows.length === sortedPartners.length} aria-label={t('partners.select_all', 'Pilih semua partner')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                         </div>
                       </TableColumnHeader>
                       {visibleColumns.partner_name && renderSortHeader(t('partners.col_name', 'Nama Partner'), 'name')}

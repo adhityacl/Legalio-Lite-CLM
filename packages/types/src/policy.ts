@@ -156,6 +156,8 @@ export interface TenantModules {
   evaluation: boolean;
   aiAssistant: boolean;
   newsTicker: boolean;
+  /** Tiled "organization · user email · date" overlay on every page. */
+  watermark: boolean;
 }
 
 export interface DueDiligenceOverride {

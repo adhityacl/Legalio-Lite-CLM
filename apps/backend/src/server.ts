@@ -507,11 +507,13 @@ let driveBackupTimer: NodeJS.Timeout | null = null;
 async function backupLocalFilesToGoogleDrive(token?, only?: string[][]) {
   const rootId = sanitizeParentFolderId(db.googleConfig?.driveFolderId);
   const activeToken = await resolveActiveGoogleToken(token);
-  if (!activeToken || !rootId) return { backedUpCount: 0, failedCount: 0 };
+  if (!rootId) return { backedUpCount: 0, failedCount: 0, skipped: "no_root_folder" };
+  if (!activeToken) return { backedUpCount: 0, failedCount: 0, skipped: "not_connected" };
   if (driveBackupRunning) return { backedUpCount: 0, failedCount: 0, busy: true };
   driveBackupRunning = true;
   let backedUpCount = 0;
   let failedCount = 0;
+  let alreadyBackedUpCount = 0;
   let done: Record<string, string> = {};
   try {
     done = JSON.parse(fs.readFileSync(DRIVE_BACKUP_INDEX, "utf8"));
@@ -536,7 +538,10 @@ async function backupLocalFilesToGoogleDrive(token?, only?: string[][]) {
       const full = path.join(uploadsDir, ...parts);
       try {
         const stamp = String(fs.statSync(full).mtimeMs);
-        if (done[key] === stamp) continue;
+        if (done[key] === stamp) {
+          alreadyBackedUpCount++;
+          continue;
+        }
         const driveUrl = await uploadFileToDrive(
           parts[parts.length - 1],
           fs.readFileSync(full).toString("base64"),
@@ -561,7 +566,7 @@ async function backupLocalFilesToGoogleDrive(token?, only?: string[][]) {
     }
   }
   if (backedUpCount) console.log(`[Drive Backup] ${backedUpCount} file dicadangkan ke Google Drive.`);
-  return { backedUpCount, failedCount };
+  return { backedUpCount, failedCount, alreadyBackedUpCount };
 }
 const pendingDriveBackups = new Map<string, string[]>();
 /** Debounced so a burst of uploads becomes one pass over just the new files. */

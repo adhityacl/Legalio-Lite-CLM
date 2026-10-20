@@ -220,6 +220,7 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
     { key: 'evaluation', label: t('settings.region.module_evaluation', 'Partner evaluation') },
     { key: 'aiAssistant', label: t('settings.region.module_ai', 'AI assistant, document parsing and contract review') },
     { key: 'newsTicker', label: t('settings.region.module_news', 'Regulatory news ticker (uses AI)') },
+    { key: 'watermark', label: t('settings.region.module_watermark', 'Page watermark (organization, user email, date)') },
   ];
   const emailsValid = [...splitEmails(recipients.list), recipients.legal, recipients.finance].filter(Boolean).every((e) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(e));
 

@@ -2430,6 +2430,7 @@ export const ZH_TRANSLATIONS: Record<string, string> = {
   'settings.region.module_evaluation': '合作伙伴评估',
   'settings.region.module_news': '法规新闻滚动条（使用 AI）',
   'settings.region.module_spending': '合作伙伴支出与发票',
+  'settings.region.module_watermark': '页面水印（组织、用户邮箱、日期）',
   'settings.region.modules': '模块',
   'settings.region.pack_default': '配置包默认：{value}',
   'settings.region.profile': '资料',

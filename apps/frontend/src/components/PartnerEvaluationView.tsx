@@ -761,7 +761,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
               <TableRow>
                 <TableColumnHeader scope="col" className="w-g42">
                   <div className="flex items-center justify-start">
-                    <Checkbox aria-label={t('eval.pilih_semua_evaluasi', 'Pilih semua evaluasi')} checked={selectedRows.length > 0 && selectedRows.length === currentEvaluations.length} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
+                    <Checkbox aria-label={t('eval.pilih_semua_evaluasi', 'Pilih semua evaluasi')} checked={selectedRows.length > 0 && selectedRows.length === sortedEvaluations.length} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
                 </TableColumnHeader>
                 {visibleColumns.vendor && (

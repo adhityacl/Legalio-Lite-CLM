@@ -132,7 +132,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
     return matchJenis && matchSearch && matchCategory && matchStatus;
   }), [contracts, partners, partnersById, user, selectedJenisDokumen, selectedCategory, selectedStatus, searchTerm]);
 
-  type SortField = 'no' | 'partner' | 'doc_type' | 'value' | 'duration' | 'status' | 'document';
+  type SortField = 'no' | 'partner' | 'doc_type' | 'value' | 'duration' | 'start' | 'end' | 'status' | 'document';
   type SortOrder = 'asc' | 'desc';
 
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -207,6 +207,14 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
         case 'duration':
           valA = a.completion_date || a.start_date || '';
           valB = b.completion_date || b.start_date || '';
+          break;
+        case 'start':
+          valA = a.start_date || '';
+          valB = b.start_date || '';
+          break;
+        case 'end':
+          valA = a.completion_date || '';
+          valB = b.completion_date || '';
           break;
         case 'status':
           valA = a.status || '';
@@ -473,7 +481,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               <TableRow>
                 <TableColumnHeader scope="col" className="w-g42">
                   <div className="flex items-center justify-start">
-                    <Checkbox checked={selectedRows.length > 0 && selectedRows.length === currentContracts.length} aria-label={t('contracts.select_all', 'Pilih semua kontrak')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
+                    <Checkbox checked={selectedRows.length > 0 && selectedRows.length === sortedContracts.length} aria-label={t('contracts.select_all', 'Pilih semua kontrak')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
                 </TableColumnHeader>
                 {visibleColumns.document_type && renderSortHeader(t('contracts.col_doc_type', 'Jenis'), 'doc_type')}
@@ -486,12 +494,8 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                   <TableColumnHeader scope="col">{t('contracts.col_category', 'Kategori')}</TableColumnHeader>
                 )}
                 {visibleColumns.nilai && renderSortHeader(t('contracts.col_value', 'Nilai'), 'value')}
-                {visibleColumns.start_date && (
-                  <TableColumnHeader scope="col">{t('contracts.col_start_date', 'Tanggal Mulai')}</TableColumnHeader>
-                )}
-                {visibleColumns.completion_date && (
-                  <TableColumnHeader scope="col">{t('contracts.col_end_date', 'Tanggal Selesai')}</TableColumnHeader>
-                )}
+                {visibleColumns.start_date && renderSortHeader(t('contracts.col_start_date', 'Tanggal Mulai'), 'start')}
+                {visibleColumns.completion_date && renderSortHeader(t('contracts.col_end_date', 'Tanggal Selesai'), 'end')}
                 {visibleColumns.status && renderSortHeader(t('contracts.col_status', 'Status'), 'status')}
                 {visibleColumns.file && (
                   <TableColumnHeader scope="col">{t('contracts.col_document', 'File')}</TableColumnHeader>

@@ -124,7 +124,7 @@ export const DEFAULT_PRIMARY_COLOR = '#0090FF';
 const EMAIL = /^[^\s@,;<>"']+@[^\s@,;<>"']+\.[^\s@,;<>"']+$/;
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const RESOURCE_ID = /^[A-Za-z0-9_-]{10,200}$/;
-const MODULE_KEYS = ['commercialDocuments', 'spending', 'evaluation', 'aiAssistant', 'newsTicker'] as const;
+const MODULE_KEYS = ['commercialDocuments', 'spending', 'evaluation', 'aiAssistant', 'newsTicker', 'watermark'] as const;
 const POLICY_KEYS = new Set([
   'countryCode', 'industry', 'language', 'timezone', 'defaultCurrency', 'reportingCurrency',
   'expiryWarningDays', 'reminderOffsetsDays', 'modules', 'governingLaw', 'disputeVenue',

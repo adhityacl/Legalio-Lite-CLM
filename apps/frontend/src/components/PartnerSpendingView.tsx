@@ -877,7 +877,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               <TableRow>
                 <TableColumnHeader scope="col" className="w-g42">
                   <div className="flex items-center justify-start">
-                    <Checkbox aria-label={t('spending.pilih_semua_spending', 'Pilih semua spending')} checked={selectedRows.length > 0 && selectedRows.length === currentSpendings.length} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
+                    <Checkbox aria-label={t('spending.pilih_semua_spending', 'Pilih semua spending')} checked={selectedRows.length > 0 && selectedRows.length === sortedSpendings.length} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
                 </TableColumnHeader>
                 {visibleColumns.invoice_no && renderSortHeader(t('spending.col_invoice_no', 'No. Invoice'), 'invoice_no')}

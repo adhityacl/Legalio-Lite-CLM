@@ -79,6 +79,7 @@ export const DEFAULT_MODULES: TenantModules = {
   evaluation: true,
   aiAssistant: true,
   newsTicker: false,
+  watermark: false,
 };
 
 export const DEFAULT_EXPIRY_WARNING_DAYS = 90;

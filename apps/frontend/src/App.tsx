@@ -49,6 +49,7 @@ import { deleteRecords } from './lib/bulkDelete';
 import { useWorkspaceData } from './features/workspace/useWorkspaceData';
 import { buildWorkspaceSearchResults, type WorkspaceSearchResult } from '@legalio/platform-console/lib/workspaceSearch';
 import { AIChatLauncher } from './components/AIChatLauncher';
+import { Watermark } from './components/Watermark';
 import { PermissionProvider, usePermissions } from './lib/permissions';
 import { OrganizationOnboarding } from './components/account/OrganizationOnboarding';
 import { InvitationPrompt } from './components/account/InvitationPrompt';
@@ -915,6 +916,10 @@ const MainApp: React.FC = () => {
 
       {modules.aiAssistant && (
         <AIChatLauncher />
+      )}
+
+      {modules.watermark && (
+        <Watermark text={[organizations.find((org) => org.organizationId === activeTenantId)?.organizationName, user.email, new Date().toLocaleDateString('sv-SE')].filter(Boolean).join(' ')} />
       )}
     </div>
   );

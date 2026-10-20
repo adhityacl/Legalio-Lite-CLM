@@ -532,7 +532,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                     className="w-full" controlProps={{ className: "w-full" }}
                   >
                     {partners.map((p) => (
-                      <option key={p.partner_id} value={p.partner_id}>{p.partner_name} ({p.partner_type})</option>
+                      <option key={p.partner_id} value={p.partner_id}>{p.partner_name}</option>
                     ))}
                   </AlphabeticalSelect>
                 </Field>
