@@ -2481,6 +2481,66 @@ Output rules: exactly one paragraph, no bullet points or headings, no opening or
       });
   }
 });
+/** AI due-diligence review of the partner form's current values; an existing partner stores the result right away. */
+app.post("/api/partners/review-analysis", async (req: express.Request, res: express.Response) => {
+  const draft = req.body?.partner;
+  if (!draft || typeof draft !== "object" || !String(draft.partner_name || "").trim()) {
+    return res.status(400).json({ error: "Partner name is required." });
+  }
+  const saved = draft.partner_id ? db.partners.find((p) => p.partner_id === String(draft.partner_id)) : undefined;
+  if (draft.partner_id && (!saved || assertRecordAccess(req, "partner", saved) || assertRecordWritable(req, "partner", saved))) {
+    return res.status(404).json({ error: "Partner tidak ditemukan." });
+  }
+  if (!ensureAiAvailable(req, res)) return;
+  const text = (v: unknown, max = 2000) => (v == null || v === "" ? "-" : String(v).slice(0, max));
+  const country = sanitizeCountryCode(draft.country);
+  const identifiers = sanitizeIdentifiers(draft.identifiers);
+  // Only the e-mail domain is sent: it tells corporate vs free-mail without sharing the PIC's personal data.
+  const emailDomain = String(draft.pic_email || "").split("@")[1]?.trim().toLowerCase() || "-";
+  const documents = Array.isArray(saved?.dd_documents) ? saved.dd_documents : [];
+  const ctx = aiPolicyContext(getRequestTenantId(req));
+  const prompt = `You are a senior vendor-risk and due-diligence analyst acting for ${ctx.organizationName}, a ${ctx.industryName} organization in ${ctx.countryName}.
+Assess onboarding risk for the counterparty below and recommend concrete due-diligence actions. Write every narrative field (titles, summary, findings, actions and notes) in English.
+
+=== COUNTERPARTY ===
+Legal name: ${text(draft.partner_name, 300)}
+Country of incorporation: ${country ? countryNameForPrompt(country) : "unknown"}
+Legal form: ${text(draft.entity_type, 120)}
+Registration / tax identifiers: ${identifiers.length ? identifiers.map((i: any) => `${i.scheme} (${i.country || "-"})`).join(", ") : "none provided"}
+Partnership categories: ${Array.isArray(draft.tags) && draft.tags.length ? draft.tags.map(String).slice(0, 20).join(", ") : "-"}
+PIC e-mail domain: ${emailDomain}
+Internal notes: ${text(draft.notes)}
+Due-diligence documents on file: ${documents.length ? documents.map((d: any) => `${d.name} [${d.required ? "required" : "optional"}, ${d.status}${d.expiryDate ? `, expires ${d.expiryDate}` : ""}]`).join("; ") : "none yet (new partner)"}
+
+=== REVIEW INSTRUCTIONS ===
+You have NO access to company registries, sanctions lists, PEP lists or adverse media. Never state that the counterparty is verified, clean or listed; instead recommend the screening step that should be done.
+Assess: jurisdiction risk (cross-border tax such as withholding and tax-treaty documents, ${ctx.indirectTaxName}, cross-border data transfer under ${ctx.dataProtectionLaw}); whether the legal form and identifiers fit the country; missing or expired due-diligence documents; risk of the partnership categories for a ${ctx.industryName} organization (${ctx.reviewFocus.join("; ")}); and contact red flags such as a free-mail domain for a corporate counterparty.
+${ctx.regulators.length ? `Regulators relevant to us: ${ctx.regulators.join(", ")} — consider their third-party / outsourcing expectations.` : ""}
+Do not invent statute or regulation numbers.
+
+Return JSON with exactly:
+1. overallRiskScore: integer 0-100 (0-25 low, 26-55 moderate, 56-75 high, 76-100 critical).
+2. riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL".
+3. executiveSummary: one short paragraph on the counterparty profile, jurisdiction and readiness to onboard.
+4. keyFindings: 2-4 of the most important issues.
+5. analyzedClauses: 2-5 items, each with clauseTitle (short topic), riskCategory, severity ("LOW"|"MEDIUM"|"HIGH"|"CRITICAL"), originalTextOrIssue (the finding), identifiedRisk, recommendedRedline (the concrete recommended action, e.g. which document to request or which clause to add to the contract) and legalRationale.
+6. complianceChecklist: 3-5 items, each with item, status ("COMPLIANT" | "NEEDS_REVIEW" | "NON_COMPLIANT") and notes.
+`;
+  try {
+    const analysis = await generateRedlineAnalysis(req, prompt);
+    if (saved) {
+      saved.redline_analysis = analysis;
+      saved.redline_analyzed_at = analysis.analyzed_at;
+      saved.updated_at = analysis.analyzed_at;
+      saveDb();
+    }
+    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
+  } catch (error) {
+    console.error("Error during partner review:", error);
+    res.status(500).json({ error: error?.message || "Gagal melakukan analisis AI. Silakan coba kembali." });
+  }
+});
+
 app.post("/api/partners", async (req: express.Request, res: express.Response) => {
   const {
     partner_name,
@@ -2564,6 +2624,9 @@ app.post("/api/partners", async (req: express.Request, res: express.Response) =>
     dd_documents: defaultDD,
     notes: notes || "",
     tags: sanitizePartnerTags(tags),
+    // Review run on the add page before the partner existed.
+    redline_analysis: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? req.body.redline_analysis : void 0,
+    redline_analyzed_at: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? String(req.body.redline_analyzed_at || new Date().toISOString()) : void 0,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -2732,6 +2795,77 @@ app.get("/api/partner-evaluations", (req: express.Request, res: express.Response
   const list = scopedRecords(req, "evaluation", db.evaluations);
   res.json(list);
 });
+/** AI annual review for the partner evaluation form: summarises the year's snapshot and suggests ratings; an existing evaluation stores the result right away. */
+app.post("/api/partner-evaluations/review-analysis", async (req: express.Request, res: express.Response) => {
+  const draft = req.body?.evaluation;
+  if (!draft || typeof draft !== "object" || !String(draft.supplier_name || "").trim()) {
+    return res.status(400).json({ error: "Partner is required." });
+  }
+  const organizationId = getRequestTenantId(req);
+  const saved = draft.id ? (db.evaluations || []).find((e) => e.id === String(draft.id)) : undefined;
+  if (draft.id && (!saved || assertRecordAccess(req, "evaluation", saved) || assertRecordWritable(req, "evaluation", saved))) {
+    return res.status(404).json({ error: "Evaluasi tidak ditemukan." });
+  }
+  const partner = db.partners.find((p) => p.partner_id === draft.partner_id && p.organizationId === organizationId);
+  const visiblePartner = partner && !assertRecordAccess(req, "partner", partner) ? partner : undefined;
+  if (!ensureAiAvailable(req, res)) return;
+  const text = (v: unknown, max = 2000) => (v == null || v === "" ? "-" : String(v).slice(0, max));
+  const num = (v: unknown) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+  const snap = req.body.snapshot && typeof req.body.snapshot === "object" ? req.body.snapshot : {};
+  const months = Array.isArray(snap.monthlyUsd) ? snap.monthlyUsd.slice(0, 12).map((v: unknown, i: number) => `${i + 1}:${num(v) ?? 0}`).join(", ") : "-";
+  const under = snap.underDelivered && typeof snap.underDelivered === "object" ? snap.underDelivered : {};
+  const expiring = Array.isArray(snap.expiring) ? snap.expiring.slice(0, 10).map((c: any) => `${text(c?.number, 80)} ends ${text(c?.endDate, 10)}${c?.autoRenewal ? " (auto-renews)" : ""}`).join("; ") : "";
+  const pricing = snap.pricing && typeof snap.pricing === "object" ? snap.pricing : null;
+  const ctx = aiPolicyContext(organizationId);
+  const prompt = `You are a senior vendor-management lead acting for ${ctx.organizationName}, a ${ctx.industryName} organization in ${ctx.countryName}.
+Write the annual partner evaluation review for the partner below, based on the system snapshot of the cooperation year. Write every narrative field (titles, summary, findings, actions and notes) in English.
+
+=== PARTNER ===
+${text(draft.supplier_name, 300)}${visiblePartner?.country ? ` (${countryNameForPrompt(visiblePartner.country)})` : ""}; type of work: ${text(draft.type_of_work, 200)}
+Evaluation year: ${num(snap.year) ?? "-"}${snap.ytd ? " (year to date)" : ""}
+
+=== SYSTEM SNAPSHOT (already computed — use these numbers, do not recompute) ===
+Spend: USD ${num(snap.spendUsd) ?? 0}${num(snap.growthPct) != null ? ` (${num(snap.growthPct)}% vs previous year)` : " (no spend recorded the previous year)"}; invoices: ${num(snap.invoices) ?? 0}
+Monthly spend USD (month:amount): ${months}
+Active contracts: ${num(snap.activeContracts) ?? 0}; active service orders: ${num(snap.activeSos) ?? 0}; SO budget used: ${num(snap.soUsedPct) != null ? `${num(snap.soUsedPct)}%` : "n/a"}
+Under-delivery: ${num(under.count) ?? 0} of ${num(under.of) ?? 0} invoices that record units${num(under.avgPct) != null ? `, average shortfall ${num(under.avgPct)}%` : ""}
+Contracts ending within 90 days: ${expiring || "none"}
+Average contract redline risk score: ${num(snap.avgRiskScore) ?? "n/a"}/100
+Previous evaluation: ${snap.previous && typeof snap.previous === "object" ? `${num(snap.previous.score)}/100 in ${num(snap.previous.year)}` : "none"}
+Unit price benchmark: ${pricing ? `${text(pricing.model, 40)} ${text(pricing.currency, 8)} ${num(pricing.price)} vs peer average ${num(pricing.peerAvg)} (${num(pricing.diffPct)}%)` : "not available (no unit prices recorded)"}
+
+=== EVALUATOR'S CURRENT RATINGS ===
+Obligation / target: ${text(draft.obligation_target, 40)}; incident frequency: ${text(draft.incident_frequency, 40)}; communication: ${text(draft.communication, 40)}; pricing: ${text(draft.pricing, 40)}; final: ${text(draft.final_evaluation, 40)}
+Evaluator notes: ${text(draft.notes)}
+
+=== REVIEW INSTRUCTIONS ===
+Describe how the cooperation went this year (growth, spend pattern, delivery, upcoming renewals, pricing) and what to do next (renew, renegotiate, monitor, phase out).
+Incident frequency and communication are NOT tracked by the system — never judge them; leave them to the evaluator.
+Ratings are suggestions only; the evaluator decides.
+
+Return JSON with exactly:
+1. overallRiskScore: integer 0-100 for the partnership risk (0-25 low, 26-55 moderate, 56-75 high, 76-100 critical).
+2. riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL".
+3. executiveSummary: one short paragraph snapshot of the cooperation this year.
+4. keyFindings: 2-4 of the most important points.
+5. analyzedClauses: 2-5 items, each with clauseTitle (short topic), riskCategory, severity ("LOW"|"MEDIUM"|"HIGH"|"CRITICAL"), originalTextOrIssue (the finding, citing the snapshot numbers), identifiedRisk, recommendedRedline (the concrete recommended action) and legalRationale.
+6. complianceChecklist: exactly 3 rating suggestions, with item set to "Obligation / Target", "Pricing" and "Final Evaluation". For each, status is "COMPLIANT" when the evaluator's current rating already matches your suggestion, otherwise "NEEDS_REVIEW"; notes starts with the suggested option — one of "Sangat baik" | "Baik" | "Kurang baik" for Obligation / Target, "Cheap" | "Moderate" | "Expensive" for Pricing (say "No data" when there is no unit price benchmark), "Recommended" | "Recommended with notes" | "Not recommended" for Final Evaluation — then " — " and a one-sentence reason.
+`;
+  try {
+    const analysis = await generateRedlineAnalysis(req, prompt);
+    if (saved) {
+      saved.redline_analysis = analysis;
+      saved.redline_analyzed_at = analysis.analyzed_at;
+      saved.updated_at = analysis.analyzed_at;
+      saveDb();
+    }
+    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
+  } catch (error) {
+    console.error("Error during evaluation review:", error);
+    res.status(500).json({ error: error?.message || "Gagal melakukan analisis AI. Silakan coba kembali." });
+  }
+});
+
 app.post("/api/partner-evaluations", async (req: express.Request, res: express.Response) => {
   const {
     review_date,
@@ -2787,6 +2921,9 @@ app.post("/api/partner-evaluations", async (req: express.Request, res: express.R
     final_evaluation,
     notes: (notes || "").trim(),
     calculated_score,
+    // Review run on the add page before the evaluation existed.
+    redline_analysis: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? req.body.redline_analysis : void 0,
+    redline_analyzed_at: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? String(req.body.redline_analyzed_at || new Date().toISOString()) : void 0,
     evaluator_email: userEmail || "user@app",
     evaluator_name: userName || "User",
     created_at: new Date().toISOString(),
@@ -3075,6 +3212,80 @@ const normalizeSpendingMonths = __name((input) => {
   });
   return Array.from(new Set(result));
 }, "normalizeSpendingMonths");
+/** AI review of the spending (invoice) form's current values before payment; an existing spending stores the result right away. */
+app.post("/api/spendings/review-analysis", async (req: express.Request, res: express.Response) => {
+  const draft = req.body?.spending;
+  if (!draft || typeof draft !== "object") return res.status(400).json({ error: "Spending data is required." });
+  const organizationId = getRequestTenantId(req);
+  const saved = draft.id ? (db.spendings || []).find((s) => s.id === String(draft.id)) : undefined;
+  if (draft.id && (!saved || assertRecordAccess(req, "spending", saved) || assertRecordWritable(req, "spending", saved))) {
+    return res.status(404).json({ error: "Data spending tidak ditemukan." });
+  }
+  const partner = db.partners.find((p) => p.partner_id === draft.vendor_id && p.organizationId === organizationId);
+  const visiblePartner = partner && !assertRecordAccess(req, "partner", partner) ? partner : undefined;
+  const so = draft.io_id ? db.ios.find((io) => io.io_id === String(draft.io_id)) : undefined;
+  const visibleSo = so && !assertRecordAccess(req, "io", so) ? so : undefined;
+  const parent = visibleSo?.contract_id ? db.contracts.find((c) => c.contract_id === visibleSo.contract_id && c.organizationId === organizationId) : undefined;
+  if (!ensureAiAvailable(req, res)) return;
+  const text = (v: unknown, max = 2000) => (v == null || v === "" ? "-" : String(v).slice(0, max));
+  const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  const c = req.body.computed && typeof req.body.computed === "object" ? req.body.computed : {};
+  const flags = req.body.flags && typeof req.body.flags === "object" ? req.body.flags : {};
+  const allocations = Array.isArray(draft.month_allocations) ? draft.month_allocations.slice(0, 36).map((a: any) => `${text(a?.month, 7)}: ${num(a?.amount) ?? "-"}`).join(", ") : "-";
+  const pdf = typeof req.body.pdfBase64 === "string" && req.body.pdfBase64.length < 20 * 1024 * 1024 ? req.body.pdfBase64 : undefined;
+  const ctx = aiPolicyContext(organizationId);
+  const prompt = `You are a senior accounts-payable controller and procurement auditor acting for ${ctx.organizationName}, a ${ctx.industryName} organization in ${ctx.countryName}.
+Review the vendor invoice below BEFORE payment and recommend concrete actions. Write every narrative field (titles, summary, findings, actions and notes) in English.
+
+=== INVOICE (as typed in the form) ===
+Vendor: ${text(draft.vendor_name, 300)}${visiblePartner?.country ? ` (${countryNameForPrompt(visiblePartner.country)})` : ""}; vendor due-diligence status: ${visiblePartner?.status_dd || "unknown"}
+Invoice number: ${text(draft.invoice_number, 120)}; invoice date: ${text(draft.invoice_date, 20)}
+Title: ${text(draft.invoice_title, 300)}
+Description: ${text(draft.invoice_description)}
+Amount: ${text(draft.currency, 8)} ${num(draft.total_amount) ?? "-"}; monthly allocation: ${allocations}
+Units billed (as typed): ${num(draft.billed_quantity) ?? "not given"}
+Bank details: ${flags.bank_changed ? "CHANGED compared with this vendor's previous invoices" : "same as previous invoices or no history"}; account holder ${flags.holder_mismatch ? "does NOT match the vendor name" : "matches the vendor name or is empty"}. (Account numbers are deliberately withheld.)
+${visibleSo ? `
+=== LINKED SERVICE ORDER ===
+${text(visibleSo.io_number, 120)} — ${text(visibleSo.io_title, 300)}${parent ? ` (under contract ${parent.contract_number})` : ""}
+Period: ${visibleSo.start_date} to ${visibleSo.end_date}; value: ${visibleSo.currency || "-"} ${Number(visibleSo.io_value || 0)}
+Pricing: ${text(visibleSo.pricing_model, 60)}${visibleSo.unit_price ? `, ${visibleSo.currency || ""} ${visibleSo.unit_price} per ${visibleSo.pricing_model === "CPM" ? "1,000 " : ""}${visibleSo.unit || "unit"}` : ", no unit price recorded"}${visibleSo.unit_quantity ? `; agreed quantity ${visibleSo.unit_quantity} ${visibleSo.unit || "units"}` : ""}
+Deliverables: ${text(visibleSo.deliverables)}` : "\nNo service order is linked to this invoice."}
+
+=== SYSTEM CALCULATIONS (already computed — use these numbers, do not recompute) ===
+Expected units for this invoice at the SO unit price: ${num(c.expectedUnits) ?? "n/a"}
+Units billed: ${num(c.billedUnits) ?? "n/a"}; shortfall vs expected: ${num(c.shortfallPct) != null ? `${num(c.shortfallPct)}%` : "n/a"}
+SO budget used including this invoice: ${num(c.budgetUsedPct) != null ? `${num(c.budgetUsedPct)}%` : "n/a"}; SO period elapsed at invoice date: ${num(c.elapsedPct) != null ? `${num(c.elapsedPct)}%` : "n/a"}
+Remaining SO budget: ${num(c.remainingBudget) ?? "n/a"}; remaining units: ${num(c.remainingUnits) ?? "n/a"}
+${pdf ? "\nThe invoice document is attached: compare its amount, invoice number, date, currency, units, bank details and tax lines with the typed values above and report every mismatch." : "\nNo invoice document is attached; say so when a finding would need it."}
+
+=== REVIEW INSTRUCTIONS ===
+Assess: whether what is billed is covered by the linked SO / contract scope; under-delivery or over-billing using the system calculations; billing ahead of schedule; tax treatment (${ctx.indirectTaxName}, withholding tax, tax-treaty documents for foreign vendors, valid tax invoice for local vendors: ${ctx.taxConsiderations.join(" ")}); payment fraud red flags (changed bank details, account holder mismatch); and duplicate-billing risk.
+Never approve or reject payment — recommend checks and actions for Finance. Do not invent statute or regulation numbers.
+
+Return JSON with exactly:
+1. overallRiskScore: integer 0-100 (0-25 low, 26-55 moderate, 56-75 high, 76-100 critical).
+2. riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL".
+3. executiveSummary: one short paragraph on whether the invoice looks consistent with the agreement and what to check before paying.
+4. keyFindings: 2-4 of the most important issues.
+5. analyzedClauses: 2-5 items, each with clauseTitle (short topic), riskCategory, severity ("LOW"|"MEDIUM"|"HIGH"|"CRITICAL"), originalTextOrIssue (the finding, citing the numbers), identifiedRisk, recommendedRedline (the concrete recommended action, e.g. request a delivery report, ask for a make-good or credit note, withhold tax) and legalRationale.
+6. complianceChecklist: 3-5 items, each with item, status ("COMPLIANT" | "NEEDS_REVIEW" | "NON_COMPLIANT") and notes.
+`;
+  try {
+    const analysis = await generateRedlineAnalysis(req, prompt, pdf);
+    if (saved) {
+      saved.redline_analysis = analysis;
+      saved.redline_analyzed_at = analysis.analyzed_at;
+      saved.updated_at = analysis.analyzed_at;
+      saveDb();
+    }
+    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
+  } catch (error) {
+    console.error("Error during invoice review:", error);
+    res.status(500).json({ error: error?.message || "Gagal melakukan analisis AI. Silakan coba kembali." });
+  }
+});
+
 app.post("/api/partner-spendings", async (req: express.Request, res: express.Response) => {
   const {
     vendor_id,
@@ -3232,6 +3443,11 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
     billing_file_url,
     billing_file_name,
     folder_link: partner ? partner.dd_folder_link : void 0,
+    io_id: req.body.io_id && db.ios.some((io) => io.io_id === String(req.body.io_id) && io.organizationId === targetOrgId) ? String(req.body.io_id) : void 0,
+    billed_quantity: Number(req.body.billed_quantity) > 0 ? Number(req.body.billed_quantity) : void 0,
+    // Review run on the add page before the spending existed.
+    redline_analysis: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? req.body.redline_analysis : void 0,
+    redline_analyzed_at: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? String(req.body.redline_analyzed_at || new Date().toISOString()) : void 0,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -3902,34 +4118,14 @@ app.get("/api/contracts/:id/redline-analysis", (req: express.Request, res: expre
     analyzed_at: contract.redline_analyzed_at || null,
   });
 });
-app.post("/api/contracts/:id/redline-analysis", async (req: express.Request, res: express.Response) => {
-  const { id } = req.params;
-  const contract = db.contracts.find((c) => c.contract_id === id);
-  if (!contract || assertRecordAccess(req, "contract", contract)) {
-    return res.status(404).json({ error: "Contract not found." });
-  }
-  const force = Boolean(req.body.force);
-  const hasCustomClause = Boolean(
-    req.body.customClauseText && req.body.customClauseText.trim(),
-  );
-  if (!force && !hasCustomClause && contract.redline_analysis) {
-    return res.json({
-      success: true,
-      cached: true,
-      analysis: contract.redline_analysis,
-      analyzed_at: contract.redline_analyzed_at || contract.updated_at,
-    });
-  }
-  if (!ensureAiAvailable(req, res)) return;
-  const partner = db.partners.find((p) => p.partner_id === contract.partner_id && p.organizationId === contract.organizationId);
-  try {
-    const selectedModel = getValidAiModel(req.body.model);
-    const ctx = aiPolicyContext(contract.organizationId);
-    const regulatorLine = ctx.regulators.length > 0
-      ? `Regulators relevant to our industry in ${ctx.countryName}: ${ctx.regulators.join(", ")}. Assess outsourcing, audit-right and reporting expectations they typically impose.`
-      : "No specific sector regulator is configured; assess against general commercial law and good practice.";
-    const prompt = `You are a senior corporate legal counsel and AI contract reviewer acting for ${ctx.organizationName}, a ${ctx.industryName} organization whose primary jurisdiction is ${ctx.countryName}.
-Perform a risk and compliance analysis of the commercial contract below and propose balanced redlines. Write every narrative field in ${ctx.responseLanguage}.
+/** Runs the AI risk/redline review for a saved or draft contract; returns the parsed analysis (not persisted). */
+async function runContractRedlineAnalysis(req: express.Request, contract: any, partner: any) {
+  const ctx = aiPolicyContext(contract.organizationId);
+  const regulatorLine = ctx.regulators.length > 0
+    ? `Regulators relevant to our industry in ${ctx.countryName}: ${ctx.regulators.join(", ")}. Assess outsourcing, audit-right and reporting expectations they typically impose.`
+    : "No specific sector regulator is configured; assess against general commercial law and good practice.";
+  const prompt = `You are a senior corporate legal counsel and AI contract reviewer acting for ${ctx.organizationName}, a ${ctx.industryName} organization whose primary jurisdiction is ${ctx.countryName}.
+Perform a risk and compliance analysis of the commercial contract below and propose balanced redlines. Write every narrative field (titles, summary, findings, clause text and notes) in English.
 
 === CONTRACT ===
 Reference: ${contract.contract_number}
@@ -3964,68 +4160,147 @@ Return JSON with exactly:
 5. analyzedClauses: the main clauses, each with clauseTitle, riskCategory, severity ("LOW"|"MEDIUM"|"HIGH"|"CRITICAL"), originalTextOrIssue, identifiedRisk, recommendedRedline (balanced replacement wording) and legalRationale (legal basis or negotiation argument).
 6. complianceChecklist: 5-6 items, each with item, status ("COMPLIANT" | "NEEDS_REVIEW" | "NON_COMPLIANT") and notes. Cover: data protection, audit and regulator access (if a regulator applies), notice period and auto-renewal clarity, governing law and dispute forum, and the industry focus areas above.
 `;
-    const response = await generateContentWithRetryAndFallback({
-      model: selectedModel,
-      contents: [{ text: prompt }],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            overallRiskScore: { type: Type.INTEGER },
-            riskLevel: { type: Type.STRING },
-            executiveSummary: { type: Type.STRING },
-            keyFindings: { type: Type.ARRAY, items: { type: Type.STRING } },
-            analyzedClauses: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  clauseTitle: { type: Type.STRING },
-                  riskCategory: { type: Type.STRING },
-                  severity: { type: Type.STRING },
-                  originalTextOrIssue: { type: Type.STRING },
-                  identifiedRisk: { type: Type.STRING },
-                  recommendedRedline: { type: Type.STRING },
-                  legalRationale: { type: Type.STRING },
-                },
-                required: [
-                  "clauseTitle",
-                  "severity",
-                  "originalTextOrIssue",
-                  "identifiedRisk",
-                  "recommendedRedline",
-                  "legalRationale",
-                ],
+  return generateRedlineAnalysis(req, prompt);
+}
+
+/** Sends a redline-review prompt and parses the shared RedlineAnalysisData JSON (contracts and service orders). */
+async function generateRedlineAnalysis(req: express.Request, prompt: string, pdfBase64?: string) {
+  const selectedModel = getValidAiModel(req.body.model);
+  const contents: any[] = [{ text: prompt }];
+  if (pdfBase64) contents.push({ inlineData: { data: pdfBase64.includes("base64,") ? pdfBase64.split("base64,")[1] : pdfBase64, mimeType: "application/pdf" } });
+  const response = await generateContentWithRetryAndFallback({
+    model: selectedModel,
+    contents,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          overallRiskScore: { type: Type.INTEGER },
+          riskLevel: { type: Type.STRING },
+          executiveSummary: { type: Type.STRING },
+          keyFindings: { type: Type.ARRAY, items: { type: Type.STRING } },
+          analyzedClauses: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                clauseTitle: { type: Type.STRING },
+                riskCategory: { type: Type.STRING },
+                severity: { type: Type.STRING },
+                originalTextOrIssue: { type: Type.STRING },
+                identifiedRisk: { type: Type.STRING },
+                recommendedRedline: { type: Type.STRING },
+                legalRationale: { type: Type.STRING },
               },
-            },
-            complianceChecklist: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  item: { type: Type.STRING },
-                  status: { type: Type.STRING },
-                  notes: { type: Type.STRING },
-                },
-                required: ["item", "status", "notes"],
-              },
+              required: [
+                "clauseTitle",
+                "severity",
+                "originalTextOrIssue",
+                "identifiedRisk",
+                "recommendedRedline",
+                "legalRationale",
+              ],
             },
           },
-          required: [
-            "overallRiskScore",
-            "riskLevel",
-            "executiveSummary",
-            "keyFindings",
-            "analyzedClauses",
-            "complianceChecklist",
-          ],
+          complianceChecklist: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                item: { type: Type.STRING },
+                status: { type: Type.STRING },
+                notes: { type: Type.STRING },
+              },
+              required: ["item", "status", "notes"],
+            },
+          },
         },
+        required: [
+          "overallRiskScore",
+          "riskLevel",
+          "executiveSummary",
+          "keyFindings",
+          "analyzedClauses",
+          "complianceChecklist",
+        ],
       },
+    },
+  });
+  const parsed = JSON.parse((response as any).text);
+  parsed.analyzed_at = new Date().toISOString();
+  return parsed;
+}
+
+/** Redline review of the contract form's current values; a new contract saves the result together with the contract. */
+app.post("/api/contracts/redline-analysis", async (req: express.Request, res: express.Response) => {
+  const draft = req.body?.contract;
+  if (!draft || typeof draft !== "object") return res.status(400).json({ error: "Contract data is required." });
+  const organizationId = getRequestTenantId(req);
+  const partner = db.partners.find((p) => p.partner_id === draft.partner_id && p.organizationId === organizationId);
+  if (!partner || assertRecordAccess(req, "partner", partner)) return res.status(400).json({ error: "Partner tidak ditemukan." });
+  // Editing an existing contract: the result is stored on it right away so it survives leaving without saving.
+  const saved = draft.contract_id ? db.contracts.find((c) => c.contract_id === String(draft.contract_id)) : undefined;
+  if (draft.contract_id && (!saved || assertRecordAccess(req, "contract", saved) || assertRecordWritable(req, "contract", saved))) {
+    return res.status(404).json({ error: "Contract not found." });
+  }
+  if (!ensureAiAvailable(req, res)) return;
+  const pick = (k: string) => (draft[k] == null ? undefined : String(draft[k]).slice(0, 20000));
+  const contract = {
+    organizationId,
+    partner_id: partner.partner_id,
+    contract_number: pick("contract_number"),
+    contract_title: pick("contract_title"),
+    document_type: pick("document_type"),
+    cooperation_categories: Array.isArray(draft.cooperation_categories) ? draft.cooperation_categories.map(String).slice(0, 50) : [],
+    currency: pick("currency"),
+    contract_value: Number(draft.contract_value) || 0,
+    start_date: pick("start_date"),
+    end_date: pick("end_date"),
+    auto_renewal: Boolean(draft.auto_renewal),
+    notice_period_days: Number(draft.notice_period_days) || undefined,
+    notice_type_required: pick("notice_type_required"),
+    internal_notes: pick("internal_notes"),
+    change_summary: pick("change_summary"),
+  };
+  try {
+    const analysis = await runContractRedlineAnalysis(req, contract, partner);
+    if (saved) {
+      saved.redline_analysis = analysis;
+      saved.redline_analyzed_at = analysis.analyzed_at;
+      saved.updated_at = analysis.analyzed_at;
+      saveDb();
+    }
+    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
+  } catch (error) {
+    console.error("Error during draft redline analysis:", error);
+    res.status(500).json({ error: error?.message || "Gagal melakukan analisis redline AI. Silakan coba kembali." });
+  }
+});
+
+app.post("/api/contracts/:id/redline-analysis", async (req: express.Request, res: express.Response) => {
+  const { id } = req.params;
+  const contract = db.contracts.find((c) => c.contract_id === id);
+  if (!contract || assertRecordAccess(req, "contract", contract)) {
+    return res.status(404).json({ error: "Contract not found." });
+  }
+  const force = Boolean(req.body.force);
+  const hasCustomClause = Boolean(
+    req.body.customClauseText && req.body.customClauseText.trim(),
+  );
+  if (!force && !hasCustomClause && contract.redline_analysis) {
+    return res.json({
+      success: true,
+      cached: true,
+      analysis: contract.redline_analysis,
+      analyzed_at: contract.redline_analyzed_at || contract.updated_at,
     });
-    const parsed = JSON.parse((response as any).text);
-    const nowIso = new Date().toISOString();
-    parsed.analyzed_at = nowIso;
+  }
+  if (!ensureAiAvailable(req, res)) return;
+  const partner = db.partners.find((p) => p.partner_id === contract.partner_id && p.organizationId === contract.organizationId);
+  try {
+    const parsed = await runContractRedlineAnalysis(req, contract, partner);
+    const nowIso = parsed.analyzed_at;
     contract.redline_analysis = parsed;
     contract.redline_analyzed_at = nowIso;
     contract.updated_at = nowIso;
@@ -4511,6 +4786,9 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
       ? changed_fields
       : void 0,
     change_summary: change_summary || void 0,
+    // Analysis run on the add page before the contract existed.
+    redline_analysis: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? req.body.redline_analysis : void 0,
+    redline_analyzed_at: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? String(req.body.redline_analyzed_at || new Date().toISOString()) : void 0,
     days_remaining: diffDays,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -4862,6 +5140,72 @@ Return strictly one valid JSON object matching the schema.`;
       });
   }
 });
+/** AI review of the service order form's current values (deliverables and commercial terms); an existing SO stores the result right away. */
+app.post("/api/ios/review-analysis", async (req: express.Request, res: express.Response) => {
+  const draft = req.body?.io;
+  if (!draft || typeof draft !== "object") return res.status(400).json({ error: "Service order data is required." });
+  const organizationId = getRequestTenantId(req);
+  const partner = db.partners.find((p) => p.partner_id === draft.partner_id && p.organizationId === organizationId);
+  if (!partner || assertRecordAccess(req, "partner", partner)) return res.status(400).json({ error: "Partner tidak ditemukan." });
+  const saved = draft.io_id ? db.ios.find((i) => i.io_id === String(draft.io_id)) : undefined;
+  if (draft.io_id && (!saved || assertRecordAccess(req, "io", saved) || assertRecordWritable(req, "io", saved))) {
+    return res.status(404).json({ error: "Service order not found." });
+  }
+  const parent = draft.contract_id ? db.contracts.find((c) => c.contract_id === String(draft.contract_id)) : undefined;
+  const parentVisible = parent && !assertRecordAccess(req, "contract", parent) ? parent : undefined;
+  if (!ensureAiAvailable(req, res)) return;
+  const pick = (k: string) => (draft[k] == null ? "-" : String(draft[k]).slice(0, 20000));
+  const ctx = aiPolicyContext(organizationId);
+  const prompt = `You are a senior commercial counsel and procurement reviewer acting for ${ctx.organizationName}, a ${ctx.industryName} organization in ${ctx.countryName}.
+Review the service order (SO) below — an operational order placed under a vendor relationship — and propose balanced fixes. Write every narrative field (titles, summary, findings, clause text and notes) in English.
+
+=== SERVICE ORDER ===
+SO number: ${pick("io_number")}
+Title: ${pick("io_title")}
+Vendor: ${partner.partner_name}${partner.country ? ` (${countryNameForPrompt(partner.country)})` : ""}
+Deliverable / channel: ${pick("media_channel")}
+Pricing model: ${pick("pricing_model")}
+Charging type: ${pick("charging_type")}
+Value: ${pick("currency")} ${Number(draft.io_value) || 0}
+Period: ${pick("start_date")} to ${pick("end_date")}
+Notice period: ${pick("notice_period_days")} days
+Deliverables text:
+${pick("deliverables")}
+${parentVisible ? `
+=== PARENT CONTRACT ===
+Reference: ${parentVisible.contract_number} — ${parentVisible.contract_title}
+Term: ${parentVisible.start_date} to ${parentVisible.end_date}; status: ${parentVisible.status || "-"}
+Value: ${parentVisible.currency || "-"} ${Number(parentVisible.contract_value || 0)}
+Clause summary: ${parentVisible.internal_notes || "-"}` : "\nNo parent contract is linked; the SO must stand on its own terms."}
+
+=== REVIEW INSTRUCTIONS ===
+Focus on: (1) whether deliverables are measurable — quantities, specs, KPIs, dates and acceptance criteria; (2) commercial fit — the pricing model matches the charging type, payment timing is clear, and there is a remedy for under-delivery (make-good, credit or refund); (3) reporting/proof-of-performance obligations; (4) cancellation and change terms; (5) consistency with the parent contract when one is given.
+Industry focus areas: ${ctx.reviewFocus.join("; ")}.
+Do not invent statute or regulation numbers.
+
+Return JSON with exactly:
+1. overallRiskScore: integer 0-100 (0-25 low, 26-55 moderate, 56-75 high, 76-100 critical).
+2. riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL".
+3. executiveSummary: one short paragraph on how ready this SO is to issue and its main gaps.
+4. keyFindings: 2-4 of the most important issues.
+5. analyzedClauses: 2-5 items to fix, each with clauseTitle, riskCategory, severity ("LOW"|"MEDIUM"|"HIGH"|"CRITICAL"), originalTextOrIssue (quote the SO wording when possible, otherwise describe what is missing), identifiedRisk, recommendedRedline (replacement or additional SO wording) and legalRationale.
+6. complianceChecklist: 3-5 items, each with item, status ("COMPLIANT" | "NEEDS_REVIEW" | "NON_COMPLIANT") and notes.
+`;
+  try {
+    const analysis = await generateRedlineAnalysis(req, prompt);
+    if (saved) {
+      saved.redline_analysis = analysis;
+      saved.redline_analyzed_at = analysis.analyzed_at;
+      saved.updated_at = analysis.analyzed_at;
+      saveDb();
+    }
+    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
+  } catch (error) {
+    console.error("Error during service order review:", error);
+    res.status(500).json({ error: error?.message || "Gagal melakukan analisis AI. Silakan coba kembali." });
+  }
+});
+
 app.post("/api/ios", async (req: express.Request, res: express.Response) => {
   const {
     contract_id,
@@ -4996,7 +5340,14 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
     io_value: amt,
     io_value_usd: Number(total_usd),
     deliverables: deliverables || "-",
+    // Optional unit pricing used to estimate how many units an invoice should cover.
+    unit: req.body.unit ? String(req.body.unit).slice(0, 60) : void 0,
+    unit_price: Number(req.body.unit_price) > 0 ? Number(req.body.unit_price) : void 0,
+    unit_quantity: Number(req.body.unit_quantity) > 0 ? Number(req.body.unit_quantity) : void 0,
     notice_period_days: Number(notice_period_days) || 14,
+    // Review run on the add page before the SO existed.
+    redline_analysis: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? req.body.redline_analysis : void 0,
+    redline_analyzed_at: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? String(req.body.redline_analyzed_at || new Date().toISOString()) : void 0,
     notice_type_required: notice_type_required || "Termination",
     status,
     io_file_link,

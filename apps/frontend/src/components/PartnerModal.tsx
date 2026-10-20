@@ -1,9 +1,8 @@
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { SuggestInput, SuggestTagsInput } from './ui/suggest-input';
-import { ModalFrame } from './ui/modal-frame';
 import React, { useState } from 'react';
-import { Partner, PartyIdentifier } from '@legalio/types';
-import { Building2, User, Mail, Phone, X, MapPin, Upload, Loader2, Shield } from 'lucide-react';
+import { Partner, PartyIdentifier, RedlineAnalysisData } from '@legalio/types';
+import { ArrowLeft, AlertTriangle, XCircle } from 'lucide-react';
 import { AiIcon } from './icons/AiIcon';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -17,7 +16,9 @@ import { Button } from '@legalio/ui-components/button';
 import { FormSection } from '@legalio/ui-components/blocks';
 import { Input } from '@legalio/ui-components/input';
 import { Textarea } from '@legalio/ui-components/textarea';
-import { DialogBody, DialogCloseIcon, DialogFooter, DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
+import { Heading } from '@legalio/ui-components/heading';
+import { ContractRedliningPanel } from './ContractRedliningPanel';
+import { partnerChecks } from '../lib/partnerChecks';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { Card } from '@legalio/ui-components/card';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
@@ -37,14 +38,29 @@ export const ENTERPRISE_DEPARTMENTS = [
 
 interface PartnerModalProps {
   partnerToEdit?: Partner | null;
+  /** All partners, for the duplicate name / identifier checks. */
+  partners: Partner[];
   onClose: () => void;
   onSave: (partnerData: any) => Promise<void>;
+  /** An existing partner's review was stored by the server; keep the list in sync. */
+  onRedlineSaved?: (partnerId: string, analysis: RedlineAnalysisData, analyzedAt: string) => void;
 }
+
+/** English fallback per flagged check. */
+const CHECK_TEXT: Record<string, string> = {
+  name: 'A partner with this legal name already exists',
+  identifier: 'This registration / tax number is already used by another partner',
+  identifier_country: 'An identifier is issued by a different country than the partner',
+  email: 'PIC e-mail looks invalid',
+  dd_expiring: '{count} DD documents are expired or expire within 30 days',
+};
 
 export const PartnerModal: React.FC<PartnerModalProps> = ({
   partnerToEdit,
+  partners,
   onClose,
   onSave,
+  onRedlineSaved,
 }) => {
   const { t } = useLanguage();
 
@@ -113,6 +129,9 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
     }
     return loaded;
   });
+  const [redline, setRedline] = useState<{ analysis: RedlineAnalysisData; at?: string } | null>(
+    partnerToEdit?.redline_analysis ? { analysis: partnerToEdit.redline_analysis, at: partnerToEdit.redline_analyzed_at } : null
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -286,31 +305,27 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
       internal_pic: picInternal.trim(),
       notes: notes.trim(),
       tags,
+      ...(redline && { redline_analysis: redline.analysis, redline_analyzed_at: redline.at }),
     });
 
     setSubmitting(false);
     onClose();
   };
 
-  return (
-    <ModalFrame size="form" onClose={onClose}>
-        {/* Header */}
-        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
-          <div>
-            <DialogTitle className="flex items-center gap-g8">
-              <Building2 className="w-g21 h-g21 text-muted-foreground" />
-              <span>
-                {partnerToEdit
-                  ? t('form.partner.title_edit', 'Edit Data Partner')
-                  : t('form.partner.title_add', 'Tambah Partner / Vendor Baru')}
-              </span>
-            </DialogTitle>
-          </div>
-          <DialogCloseIcon aria-label={t('common.close', 'Close')} />
-        </DialogHeader>
+  const issues = partnerChecks({ partner_id: partnerToEdit?.partner_id, partner_name: namaPartner, country, pic_email: emailPic,
+    identifiers, dd_documents: partnerToEdit?.dd_documents }, partners, new Date().toISOString().slice(0, 10));
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <DialogBody className="mt-0 flex flex-1 flex-col gap-g13 overflow-y-auto px-g21 py-g13 text-foreground">
+  return (
+    <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-g21" aria-labelledby="partner-form-heading">
+      <div className="flex flex-wrap items-center justify-between gap-g13">
+        <Heading as="h2" size="md" weight="semibold" id="partner-form-heading">
+          {partnerToEdit?.partner_id ? t('form.partner.title_edit', 'Edit Data Partner') : t('form.partner.page_title_new', 'Add a new partner')}
+        </Heading>
+        <Button variant="link" size="sm" type="button" onClick={onClose} className="no-underline hover:underline"><ArrowLeft className="size-g13" aria-hidden />{t('form.partner.back', 'Back to partner list')}</Button>
+      </div>
+
+      <div className="grid grid-cols-1 items-start gap-g21 xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
+          <div className="flex min-w-0 flex-col gap-g13 text-foreground">
             <FormSection step={1} title={t('form.partner.section_basic', 'Basic Information')}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
                 <Field>
@@ -457,9 +472,45 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
             {error && (
               <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>
             )}
-          </DialogBody>
+          </div>
 
-          <DialogFooter className="mt-0 flex-wrap items-center justify-between border-t border-border px-g21 py-g13">
+          <ContractRedliningPanel
+            title={t('partner.review.panel_title', 'AI Partner Due Diligence')}
+            endpoint="/api/partners/review-analysis"
+            canAnalyze={Boolean(namaPartner.trim())}
+            analysis={redline?.analysis ?? null}
+            onAnalysis={(analysis, at) => {
+              setRedline({ analysis, at });
+              if (partnerToEdit?.partner_id) onRedlineSaved?.(partnerToEdit.partner_id, analysis, at);
+            }}
+            labels={{
+              attention: t('partner.review.attention', '{count} items require attention.'),
+              items: t('partner.review.items', 'Key items'),
+              original: t('partner.review.finding', 'Finding'),
+              recommended: t('partner.review.action', 'Recommended Action'),
+            }}
+            body={{ partner: {
+              partner_id: partnerToEdit?.partner_id, partner_name: namaPartner, country, entity_type: entityType, identifiers,
+              tags, notes, pic_email: emailPic,
+            } }}
+          >
+            {/* Only problems are shown, so a clean partner looks like the contract panel. */}
+            {issues.length > 0 && (
+              <ul className="flex flex-col gap-g5">
+                {issues.map((check) => (
+                  <li key={check.key} className="flex items-start gap-g8">
+                    {check.status === 'fail'
+                      ? <XCircle className="mt-g2 size-g13 shrink-0 text-status-danger" aria-hidden />
+                      : <AlertTriangle className="mt-g2 size-g13 shrink-0 text-status-warning" aria-hidden />}
+                    <Text size="xs">{t(`partner.review.check_${check.key}`, CHECK_TEXT[check.key], { count: check.count ?? 0 })}</Text>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ContractRedliningPanel>
+      </div>
+
+          <Card className="flex-row flex-wrap items-center justify-between gap-g8 px-g21 py-g13">
             <Text size="xs" tone="muted" className="hidden sm:block">{t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}</Text>
             <div className="flex items-center gap-g8 ml-auto">
               <Button variant="outline" onClick={onClose}
@@ -475,8 +526,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                   : t('form.partner.save_btn', 'Simpan Partner')}
               </Button></TooltipTrigger><TooltipBody>{!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : ''}</TooltipBody></Tooltip>
             </div>
-          </DialogFooter>
-        </form>
-    </ModalFrame>
+          </Card>
+    </form>
   );
 };

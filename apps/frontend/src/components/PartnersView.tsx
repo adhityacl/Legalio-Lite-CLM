@@ -13,7 +13,7 @@ import { countryDisplayName } from './partners/PartnerJurisdictionFields';
 
 /** Country of incorporation, falling back to the legacy BHI flag (BHI = Indonesia). */
 const partnerCountry = (p: Partner): string => p.country ?? (p.legal_status_flag === 'BHI' ? 'ID' : '');
-import { Partner, Contract, DDDokumenItem, PartnerEvaluation } from '@legalio/types';
+import { Partner, Contract, DDDokumenItem, PartnerEvaluation, InsertionOrder, PartnerSpending } from '@legalio/types';
 import {
   MoreHorizontal,
   Building2,
@@ -77,6 +77,8 @@ export function getValidPartnerTags(tags?: string[]): string[] {
 interface PartnersViewProps {
   partners: Partner[];
   contracts?: Contract[];
+  ios?: InsertionOrder[];
+  spendings?: PartnerSpending[];
   evaluations?: PartnerEvaluation[];
   onRefreshData?: () => void;
   initialSubTab?: 'list' | 'evaluation';
@@ -92,6 +94,8 @@ interface PartnersViewProps {
 export const PartnersView: React.FC<PartnersViewProps> = ({
   partners,
   contracts = [],
+  ios = [],
+  spendings = [],
   evaluations = [],
   onRefreshData,
   initialSubTab = 'list',
@@ -413,6 +417,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
           onEvaluationOpened={onEvaluationOpened}
           partners={partners}
           contracts={contracts}
+          ios={ios}
+          spendings={spendings}
           evaluations={evaluations}
           onRefreshData={onRefreshData || (() => {})}
           userEmail={user?.email}

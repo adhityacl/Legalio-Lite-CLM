@@ -7,7 +7,7 @@ import { useTenantSettings } from '../../context/TenantSettingsContext';
 import type { PartyIdentifier } from '@legalio/types';
 import { localizeName } from '@legalio/shared/policy';
 
-import { Input } from '@legalio/ui-components/input';
+import { InputGroup, InputGroupButton, InputGroupInput } from '@legalio/ui-components/input-group';
 import { Button } from '@legalio/ui-components/button';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
@@ -109,7 +109,7 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
               const scheme = schemes.find((s) => s.key === item.scheme);
               const schemeLabel = (scheme && localizeName(scheme.label, language)) || t('form.partner.identifier_other', 'Other identifier');
               return (
-                <ListItem key={index} className="grid grid-cols-1 gap-g8 sm:grid-cols-[1fr_1fr_auto]">
+                <ListItem key={index} className="grid grid-cols-1 gap-g13 sm:grid-cols-2">
                   <AlphabeticalSelect
                     aria-label={t('form.partner.identifier_scheme', 'Identifier type')}
                     className={`cursor-pointer`}
@@ -119,34 +119,34 @@ export const PartnerJurisdictionFields: React.FC<PartnerJurisdictionFieldsProps>
                     {schemes.map((s) => <option key={s.key} value={s.key}>{localizeName(s.label, language)}</option>)}
                     <option value="other">{t('form.partner.identifier_other', 'Other identifier')}</option>
                   </AlphabeticalSelect>
-                  <Input
-                    aria-label={`${t('form.partner.identifier_value', 'Identifier value')}: ${schemeLabel}`}
-                    value={item.value}
-                    placeholder={scheme?.example || ''}
-                    onChange={(e) => updateIdentifier(index, { value: e.target.value, country: item.country || country })}
-                  />
-                  <Button variant="ghost" size="icon-md"
-                    type="button"
-                    onClick={() => onIdentifiersChange(identifiers.filter((_, i) => i !== index))}
-                    className="text-destructive"
-                    aria-label={`${t('form.partner.identifier_remove', 'Remove identifier')}: ${schemeLabel}`}
-                  >
-                    <Trash2 className="h-g16 w-g16" aria-hidden="true" />
-                  </Button>
+                  <InputGroup>
+                    <InputGroupInput
+                      aria-label={`${t('form.partner.identifier_value', 'Identifier value')}: ${schemeLabel}`}
+                      value={item.value}
+                      placeholder={scheme?.example || ''}
+                      onChange={(e) => updateIdentifier(index, { value: e.target.value, country: item.country || country })}
+                    />
+                    <InputGroupButton size="icon-md"
+                      onClick={() => onIdentifiersChange(identifiers.filter((_, i) => i !== index))}
+                      className="text-destructive"
+                      aria-label={`${t('form.partner.identifier_remove', 'Remove identifier')}: ${schemeLabel}`}
+                    >
+                      <Trash2 className="h-g16 w-g16" aria-hidden="true" />
+                    </InputGroupButton>
+                  </InputGroup>
                 </ListItem>
               );
             })}
           </List>
         )}
-        <div className="grid grid-cols-1 gap-g13 sm:grid-cols-2">
-          <Button variant="outline"
+        <Button variant="outline"
             type="button"
             onClick={addIdentifier}
+            className="mt-g8 w-full"
           >
             <Plus className="h-g16 w-g16" aria-hidden="true" />
             {t('form.partner.identifier_add', 'Add Identifier')}
           </Button>
-        </div>
       </Fieldset>
     </div>
   );

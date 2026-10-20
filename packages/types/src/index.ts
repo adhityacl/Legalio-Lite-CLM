@@ -94,6 +94,8 @@ export interface Partner {
   dd_verified_date?: string;
   notes?: string;
   tags?: string[];
+  redline_analysis?: RedlineAnalysisData;
+  redline_analyzed_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -161,6 +163,10 @@ export interface InsertionOrder {
   io_value: number;
   io_value_usd?: number;
   deliverables: string;
+  /** Optional unit pricing, e.g. unit "impressions" at unit_price per 1,000 for CPM (per 1 otherwise). */
+  unit?: string;
+  unit_price?: number;
+  unit_quantity?: number;
   notice_period_days: number;
   notice_type_required: NoticeType;
   status: ContractStatus;
@@ -169,6 +175,8 @@ export interface InsertionOrder {
   io_file_link?: string;
   fileName?: string;
   days_remaining?: number;
+  redline_analysis?: RedlineAnalysisData;
+  redline_analyzed_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -239,6 +247,8 @@ export interface PartnerEvaluation {
   total_score?: number;
   evaluator_email?: string;
   evaluator_name?: string;
+  redline_analysis?: RedlineAnalysisData;
+  redline_analyzed_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -271,6 +281,11 @@ export interface PartnerSpending {
   billing_file_url?: string;
   billing_file_name?: string;
   folder_link?: string;
+  /** Service order this invoice bills against, and how many units it bills. */
+  io_id?: string;
+  billed_quantity?: number;
+  redline_analysis?: RedlineAnalysisData;
+  redline_analyzed_at?: string;
   created_at: string;
   updated_at?: string;
 }

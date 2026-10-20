@@ -8,7 +8,10 @@ import { formatBusinessDate } from '../lib/displayDate';
 import { FilterSummary } from './ui/filter-summary';
 import { TableEmptyState } from './ui/table-empty-state';
 import React, { useEffect, useState } from 'react';
-import { Partner, PartnerEvaluation, Contract } from '@legalio/types';
+import { Partner, PartnerEvaluation, Contract, InsertionOrder, PartnerSpending, RedlineAnalysisData } from '@legalio/types';
+import { ContractRedliningPanel } from './ContractRedliningPanel';
+import { evaluationSnapshot, type EvaluationSnapshot } from '../lib/evaluationSnapshot';
+import { formatMoney, getActiveFormattingLocale } from '@legalio/shared/currencyUtils';
 import { DateInput } from './DateInput';
 import { XCircle, Clock, Filter, ClipboardCheck,
   Plus,
@@ -27,6 +30,8 @@ import { XCircle, Clock, Filter, ClipboardCheck,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  ArrowLeft,
+  AlertTriangle,
 } from 'lucide-react';
 import { ActionMenu } from './ui/action-menu';
 import { TablePagination } from './ui/TablePagination';
@@ -56,6 +61,9 @@ import { FormSection } from '@legalio/ui-components/blocks';
 interface PartnerEvaluationViewProps {
   partners: Partner[];
   contracts?: Contract[];
+  /** For the partnership snapshot shown beside the form. */
+  ios?: InsertionOrder[];
+  spendings?: PartnerSpending[];
   evaluations: PartnerEvaluation[];
   onRefreshData: () => void;
   userEmail?: string;
@@ -121,9 +129,44 @@ function CriterionRow({ label, value, onChange, options, stacked = false }: {
   );
 }
 
+/** Single-series monthly spend bars (USD): one colour, no legend, value on hover and in a screen-reader list. */
+function MonthlySpendBars({ values, label }: { values: number[]; label: string }) {
+  const max = Math.max(...values, 0);
+  const locale = getActiveFormattingLocale();
+  const month = (i: number, style: 'narrow' | 'short') => new Intl.DateTimeFormat(locale, { month: style }).format(new Date(2026, i, 1));
+  return (
+    <figure className="space-y-g5">
+      <figcaption><Text as="span" size="xs" tone="muted">{label}</Text></figcaption>
+      <div className="flex h-g55 items-end gap-[2px]" aria-hidden="true">
+        {values.map((v, i) => (
+          <div key={i} title={`${month(i, 'short')}: ${formatMoney(v, 'USD')}`} className="flex h-full flex-1 items-end hover:bg-muted">
+            <div className="w-full rounded-t-[4px] bg-primary" style={{ height: max > 0 ? `${(v / max) * 100}%` : 0 }} />
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-[2px]" aria-hidden="true">
+        {values.map((_, i) => <Text key={i} as="span" size="xs" tone="muted" className="flex-1 text-center">{month(i, 'narrow')}</Text>)}
+      </div>
+      <ul className="sr-only">{values.map((v, i) => <li key={i}>{month(i, 'short')}: {formatMoney(v, 'USD')}</li>)}</ul>
+    </figure>
+  );
+}
+
+function SnapshotTile({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-md border border-border bg-muted/40 p-g8">
+      <Text as="span" size="xs" tone="muted" className="block truncate">{label}</Text>
+      <Text as="span" size="sm" weight="bold" className="block tabular-nums">{value}</Text>
+      {sub && <Text as="span" size="xs" tone="muted" className="block">{sub}</Text>}
+    </div>
+  );
+}
+
 export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
   partners,
   contracts = [],
+  ios = [],
+  spendings = [],
   evaluations = [],
   onRefreshData,
   userEmail,
@@ -234,6 +277,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
       const payload = {
         ...formData,
+        ...(redline && { redline_analysis: redline.analysis, redline_analyzed_at: redline.at }),
         userEmail,
         userName,
         userRole,
@@ -298,6 +342,11 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
   }, [openEvaluationId, evaluations, hasPermission, onEvaluationOpened]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [redline, setRedline] = useState<{ analysis: RedlineAnalysisData; at?: string } | null>(null);
+  // Every opener sets editingItem, so the stored review follows it.
+  useEffect(() => {
+    setRedline(editingItem?.redline_analysis ? { analysis: editingItem.redline_analysis, at: editingItem.redline_analyzed_at } : null);
+  }, [editingItem]);
 
   const availableYears = React.useMemo(() => {
     const currentYr = new Date().getFullYear().toString();
@@ -629,6 +678,239 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
     );
   };
 
+  const isSavedEvaluation = Boolean(editingItem?.id && !editingItem.id.startsWith('NOT_REVIEWED'));
+  const snapshotYear = Number((formData.review_date || '').slice(0, 4)) || new Date().getFullYear();
+  const snapshot: EvaluationSnapshot | null = formData.supplier_name
+    ? evaluationSnapshot({ partner_id: formData.partner_id || undefined, partner_name: formData.supplier_name }, snapshotYear,
+        new Date().toISOString().slice(0, 10), { partners, contracts, ios, spendings, evaluations }, isSavedEvaluation ? editingItem?.id : undefined)
+    : null;
+
+  /** Snapshot figures; lines that have nothing to report are left out to keep the panel minimal. */
+  const renderSnapshot = (snap: EvaluationSnapshot, liveTotal: number) => {
+    const pct = (n: number) => `${n > 0 ? '+' : ''}${n}%`;
+    return (
+      <div className="space-y-g13">
+        {snap.ytd && <Text size="xs" tone="muted">{t('eval.snapshot.ytd', 'Year to date, until today')}</Text>}
+        <div className="grid grid-cols-2 gap-g8">
+          <SnapshotTile label={t('eval.snapshot.spend', 'Total spending')} value={formatMoney(snap.spendUsd, 'USD')}
+            sub={snap.growthPct !== undefined ? t('eval.snapshot.vs_last_year', '{pct} vs {year}', { pct: pct(snap.growthPct), year: snap.year - 1 }) : undefined} />
+          <SnapshotTile label={t('eval.snapshot.invoices', 'Invoices')} value={snap.invoices} />
+          <SnapshotTile label={t('eval.snapshot.agreements', 'Active contracts · SOs')} value={`${snap.activeContracts} · ${snap.activeSos}`} />
+          <SnapshotTile label={t('eval.snapshot.so_used', 'SO budget used')} value={snap.soUsedPct !== undefined ? `${snap.soUsedPct}%` : '—'} />
+        </div>
+        {snap.spendUsd > 0 && <MonthlySpendBars values={snap.monthlyUsd} label={t('eval.snapshot.monthly', 'Monthly spending (USD)')} />}
+        <ul className="flex flex-col gap-g5">
+          {snap.previous && (
+            <li><Text size="xs">{t('eval.snapshot.previous', 'Previous evaluation ({year}): {score}/100 · now {now}/100', { year: snap.previous.year, score: snap.previous.score, now: liveTotal })}</Text></li>
+          )}
+          {snap.underDelivered.count > 0 && (
+            <li><Text size="xs">{t('eval.snapshot.under', '{count} of {of} invoices under-delivered (avg {pct}% below)', { count: snap.underDelivered.count, of: snap.underDelivered.of, pct: snap.underDelivered.avgPct ?? 0 })}</Text></li>
+          )}
+          {snap.expiring.map((c) => (
+            <li key={c.number}><Text size="xs">{c.autoRenewal
+              ? t('eval.snapshot.expiring_auto', 'Contract {number} ends {date} (auto-renews)', { number: c.number, date: formatBusinessDate(c.endDate) })
+              : t('eval.snapshot.expiring', 'Contract {number} ends {date}', { number: c.number, date: formatBusinessDate(c.endDate) })}</Text></li>
+          ))}
+          {snap.avgRiskScore !== undefined && (
+            <li><Text size="xs">{t('eval.snapshot.risk', 'Average contract risk score: {score}/100', { score: snap.avgRiskScore })}</Text></li>
+          )}
+          {snap.pricing && (
+            <li><Text size="xs">{t('eval.snapshot.pricing', '{model} {price} vs peer average {avg} ({pct})', { model: snap.pricing.model,
+              price: formatMoney(snap.pricing.price, snap.pricing.currency), avg: formatMoney(snap.pricing.peerAvg, snap.pricing.currency), pct: pct(snap.pricing.diffPct) })}</Text></li>
+          )}
+        </ul>
+      </div>
+    );
+  };
+
+  if (showFormModal) {
+    return (
+    <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-g21" aria-labelledby="evaluation-form-heading">
+      <div className="flex flex-wrap items-center justify-between gap-g13">
+        <Heading as="h2" size="md" weight="semibold" id="evaluation-form-heading">
+          {isSavedEvaluation ? t('eval.modal_title_edit', 'Edit Evaluasi Partner') : t('eval.modal_title_add', 'Form Evaluasi Partner')}
+        </Heading>
+        <Button variant="link" size="sm" type="button" onClick={() => setShowFormModal(false)} className="no-underline hover:underline"><ArrowLeft className="size-g13" aria-hidden />{t('eval.back', 'Back to evaluation list')}</Button>
+      </div>
+
+      <div className="grid grid-cols-1 items-start gap-g21 xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
+              <div className="flex min-w-0 flex-col gap-g13 text-foreground">
+              {formError && (
+                <Alert status="error"><AlertIndicator /><AlertContent><AlertDescription>{formError}</AlertDescription></AlertContent></Alert>
+              )}
+
+              <FormSection step={1} title={t('eval.section1')}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
+                    {/* Tanggal Review */}
+                    <Field>
+                      <FieldLabel htmlFor="partnerevaluationview-field-1">
+                        {t('eval.review_date')} <span className="text-status-danger">*</span>
+                      </FieldLabel>
+                      <DateInput id="partnerevaluationview-field-1"
+                        required
+                        value={formData.review_date}
+                        onChange={(val) => setFormData({ ...formData, review_date: val })}
+                      />
+                    </Field>
+  
+                    {/* Supplier Name (Dropdown Tersinkron) */}
+                    <Field required>
+                      <FieldLabel htmlFor="partnerevaluationview-field-2">{t('eval.supplier_name')}</FieldLabel>
+                      {partners.length > 0 ? (
+                        <AlphabeticalSelect id="partnerevaluationview-field-2"
+                          required
+                          value={formData.supplier_name}
+                          onChange={(e) => {
+                            const selectedPartnerName = e.target.value;
+                            const found = partners.find((p) => p.partner_name === selectedPartnerName);
+                            setFormData({
+                              ...formData,
+                              supplier_name: selectedPartnerName,
+                              partner_id: found ? found.partner_id : '',
+                            });
+                          }}
+                          className="w-full" controlProps={{ className: "w-full" }}
+                        >
+                          <option value="" disabled>
+                            {t('eval.select_partner_ph')}
+                          </option>
+                          {partners.map((p) => (
+                            <option key={p.partner_id} value={p.partner_name}>
+                              {p.partner_name} ({p.partner_id} - {p.partner_type})
+                            </option>
+                          ))}
+                        </AlphabeticalSelect>
+                      ) : (
+                        <Alert status="warning"><AlertIndicator /><AlertContent><AlertDescription>{t('eval.no_partners_warning')}</AlertDescription></AlertContent></Alert>
+                      )}
+                    </Field>
+                  </div>
+              </FormSection>
+
+              <FormSection step={2} title={t('eval.section2')}>
+                <CriterionRow label={t('eval.obligation_target')} value={formData.obligation_target} onChange={value => setFormData({ ...formData, obligation_target: value as typeof formData.obligation_target })} options={[
+                  { value: 'Sangat baik', label: t('eval.opt_sangat_baik'), points: `30 ${t('eval.points')}` },
+                  { value: 'Baik', label: t('eval.opt_baik'), points: `20 ${t('eval.points')}` },
+                  { value: 'Kurang baik', label: t('eval.opt_kurang_baik'), points: `10 ${t('eval.points')}` },
+                ]} />
+                <CriterionRow label={t('eval.incident_freq')} value={formData.incident_frequency} onChange={value => setFormData({ ...formData, incident_frequency: value as typeof formData.incident_frequency })} options={[
+                  { value: 'Never', label: t('eval.opt_never'), points: `20 ${t('eval.points')}` },
+                  { value: 'Rare', label: t('eval.opt_rare'), points: `15 ${t('eval.points')}` },
+                  { value: 'Frequent', label: t('eval.opt_frequent'), points: `10 ${t('eval.points')}` },
+                ]} />
+                <CriterionRow label={t('eval.communication')} value={formData.communication} onChange={value => setFormData({ ...formData, communication: value as typeof formData.communication })} options={[
+                  { value: 'Sangat baik', label: t('eval.opt_sangat_baik'), points: `20 ${t('eval.points')}` },
+                  { value: 'Baik', label: t('eval.opt_baik'), points: `15 ${t('eval.points')}` },
+                  { value: 'Kurang baik', label: t('eval.opt_kurang_baik'), points: `10 ${t('eval.points')}` },
+                ]} />
+                <CriterionRow label={t('eval.pricing')} value={formData.pricing} onChange={value => setFormData({ ...formData, pricing: value as typeof formData.pricing })} options={[
+                  { value: 'Cheap', label: t('eval.opt_cheap'), points: `30 ${t('eval.points')}` },
+                  { value: 'Moderate', label: t('eval.opt_moderate'), points: `20 ${t('eval.points')}` },
+                  { value: 'Expensive', label: t('eval.opt_expensive'), points: `10 ${t('eval.points')}` },
+                ]} />
+              </FormSection>
+
+              <FormSection step={3} title={t('eval.section3')}>
+                <div className="grid grid-cols-2 gap-g8 sm:grid-cols-5" aria-label={t('eval.calc_score_breakdown')}>
+                  {[
+                    [t('eval.obligation_target_2', 'Obligation / Target'), liveBreakdown.tScore],
+                    [t('eval.incident_freq_2', 'Incident Freq'), liveBreakdown.fScore],
+                    [t('audit_col_evalCommunication', 'Communication'), liveBreakdown.cScore],
+                    [t('eval.pricing_2', 'Pricing'), liveBreakdown.pScore],
+                  ].map(([label, score]) => (
+                    <div key={String(label)} className="rounded-md border border-border bg-muted p-g8">
+                      <Text as="span" size="xs" weight="semibold" tone="muted" className="block truncate">{label}</Text>
+                      <Text as="span" weight="bold" size="md" className="tabular-nums">{score} {t('eval.points')}</Text>
+                    </div>
+                  ))}
+                  <div className="col-span-2 rounded-md border border-primary bg-primary p-g8 text-primary-foreground sm:col-span-1">
+                    <Text as="span" size="xs" weight="semibold" className="block text-current">{t('eval.total', 'Total:')}</Text>
+                    <Text as="span" weight="bold" size="md" className="tabular-nums text-current">{liveBreakdown.total} / 100</Text>
+                  </div>
+                </div>
+
+                <CriterionRow stacked label={t('eval.col_final_eval')} value={formData.final_evaluation} onChange={value => setFormData({ ...formData, final_evaluation: value as typeof formData.final_evaluation })} options={[
+                  { value: 'Recommended', label: t('eval.status_rec'), points: t('eval.opt_rec_desc') },
+                  { value: 'Recommended with notes', label: t('eval.rec_with_notes'), points: t('eval.opt_rec_notes_desc') },
+                  { value: 'Not recommended', label: t('eval.status_not_rec'), points: t('eval.opt_not_rec_desc') },
+                ]} />
+
+                <Field>
+                  <FieldLabel htmlFor="partnerevaluationview-field-3">{t('eval.notes_label')}</FieldLabel>
+                  <Textarea id="partnerevaluationview-field-3"
+                    rows={2}
+                    placeholder={t('eval.notes_ph')}
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    className="w-full"
+                  />
+                </Field>
+              </FormSection>
+              </div>
+
+          <ContractRedliningPanel
+            title={snapshot ? t('eval.snapshot.panel_title_year', 'Partnership Snapshot {year}', { year: snapshot.year }) : t('eval.snapshot.panel_title', 'Partnership Snapshot')}
+            endpoint="/api/partner-evaluations/review-analysis"
+            canAnalyze={Boolean(formData.supplier_name)}
+            analysis={redline?.analysis ?? null}
+            onAnalysis={(analysis, at) => {
+              setRedline({ analysis, at });
+              if (isSavedEvaluation) onRefreshData();
+            }}
+            labels={{
+              attention: t('partner.review.attention', '{count} items require attention.'),
+              items: t('partner.review.items', 'Key items'),
+              original: t('partner.review.finding', 'Finding'),
+              recommended: t('partner.review.action', 'Recommended Action'),
+            }}
+            body={{ evaluation: { ...formData, id: isSavedEvaluation ? editingItem?.id : undefined }, snapshot: snapshot ?? undefined }}
+            renderExtra={(analysis) => analysis.complianceChecklist?.length ? (
+              <div className="space-y-g5">
+                <Text as="span" size="sm" weight="bold">{t('eval.snapshot.suggested', 'Suggested ratings')}</Text>
+                <ul className="flex flex-col gap-g5">
+                  {analysis.complianceChecklist.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-g8">
+                      {item.status === 'COMPLIANT'
+                        ? <CheckCircle2 className="mt-g2 size-g13 shrink-0 text-status-success" aria-hidden />
+                        : <AlertTriangle className="mt-g2 size-g13 shrink-0 text-status-warning" aria-hidden />}
+                      <Text size="xs"><span className="font-semibold">{item.item}:</span> {item.notes}</Text>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          >
+            {snapshot && renderSnapshot(snapshot, liveBreakdown.total)}
+          </ContractRedliningPanel>
+      </div>
+
+              <Card className="flex-row flex-wrap items-center justify-between gap-g8 px-g21 py-g13">
+                <Text as="span" size="xs" weight="medium" tone="muted" className="hidden sm:inline">
+                  {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
+                </Text>
+                <div className="flex items-center gap-g8 ml-auto">
+                  <Button variant="ghost"
+                    type="button"
+                    onClick={() => setShowFormModal(false)}
+                  >
+                    {t('eval.btn_cancel')}
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting
+                      ? t('eval.btn_saving')
+                      : editingItem
+                      ? t('eval.btn_update')
+                      : t('eval.btn_submit')}
+                  </Button>
+                </div>
+              </Card>
+    </form>
+    );
+  }
+
   return (
     <div className="space-y-g21">
       <div className="flex flex-wrap items-center justify-between gap-g13">
@@ -947,174 +1229,6 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
         />
       </Card>
 
-      {/* FORM MODAL: Submit / Edit Evaluasi Tahunan Vendor */}
-      {showFormModal && (
-        <ModalFrame size="form" onClose={() => setShowFormModal(false)}>
-
-            {/* Modal Header */}
-            <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
-              <div className="flex items-center gap-g8">
-                <ClipboardCheck className="w-g21 h-g21 text-muted-foreground" />
-                <div>
-                  <DialogTitle className="flex items-center gap-g8">
-                    {editingItem?.id && !editingItem.id.startsWith('NOT_REVIEWED')
-                      ? t('eval.modal_title_edit', 'Edit Evaluasi Partner')
-                      : t('eval.modal_title_add', 'Form Evaluasi Partner')}
-                  </DialogTitle>
-                </div>
-              </div>
-              <Button variant="outline" size="icon-md"
-                type="button"
-                onClick={() => setShowFormModal(false)}
-                aria-label={t('common.close')}
-              >
-                <X className="w-g21 h-g21" />
-              </Button>
-            </DialogHeader>
-
-            {/* Modal Form Body */}
-            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-              <div className="flex flex-1 flex-col gap-g13 overflow-y-auto px-g21 py-g13 text-foreground">
-              {formError && (
-                <Alert status="error"><AlertIndicator /><AlertContent><AlertDescription>{formError}</AlertDescription></AlertContent></Alert>
-              )}
-
-              <FormSection step={1} title={t('eval.section1')}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
-                    {/* Tanggal Review */}
-                    <Field>
-                      <FieldLabel htmlFor="partnerevaluationview-field-1">
-                        {t('eval.review_date')} <span className="text-status-danger">*</span>
-                      </FieldLabel>
-                      <DateInput id="partnerevaluationview-field-1"
-                        required
-                        value={formData.review_date}
-                        onChange={(val) => setFormData({ ...formData, review_date: val })}
-                      />
-                    </Field>
-  
-                    {/* Supplier Name (Dropdown Tersinkron) */}
-                    <Field required>
-                      <FieldLabel htmlFor="partnerevaluationview-field-2">{t('eval.supplier_name')}</FieldLabel>
-                      {partners.length > 0 ? (
-                        <AlphabeticalSelect id="partnerevaluationview-field-2"
-                          required
-                          value={formData.supplier_name}
-                          onChange={(e) => {
-                            const selectedPartnerName = e.target.value;
-                            const found = partners.find((p) => p.partner_name === selectedPartnerName);
-                            setFormData({
-                              ...formData,
-                              supplier_name: selectedPartnerName,
-                              partner_id: found ? found.partner_id : '',
-                            });
-                          }}
-                          className="w-full" controlProps={{ className: "w-full" }}
-                        >
-                          <option value="" disabled>
-                            {t('eval.select_partner_ph')}
-                          </option>
-                          {partners.map((p) => (
-                            <option key={p.partner_id} value={p.partner_name}>
-                              {p.partner_name} ({p.partner_id} - {p.partner_type})
-                            </option>
-                          ))}
-                        </AlphabeticalSelect>
-                      ) : (
-                        <Alert status="warning"><AlertIndicator /><AlertContent><AlertDescription>{t('eval.no_partners_warning')}</AlertDescription></AlertContent></Alert>
-                      )}
-                    </Field>
-                  </div>
-              </FormSection>
-
-              <FormSection step={2} title={t('eval.section2')}>
-                <CriterionRow label={t('eval.obligation_target')} value={formData.obligation_target} onChange={value => setFormData({ ...formData, obligation_target: value as typeof formData.obligation_target })} options={[
-                  { value: 'Sangat baik', label: t('eval.opt_sangat_baik'), points: `30 ${t('eval.points')}` },
-                  { value: 'Baik', label: t('eval.opt_baik'), points: `20 ${t('eval.points')}` },
-                  { value: 'Kurang baik', label: t('eval.opt_kurang_baik'), points: `10 ${t('eval.points')}` },
-                ]} />
-                <CriterionRow label={t('eval.incident_freq')} value={formData.incident_frequency} onChange={value => setFormData({ ...formData, incident_frequency: value as typeof formData.incident_frequency })} options={[
-                  { value: 'Never', label: t('eval.opt_never'), points: `20 ${t('eval.points')}` },
-                  { value: 'Rare', label: t('eval.opt_rare'), points: `15 ${t('eval.points')}` },
-                  { value: 'Frequent', label: t('eval.opt_frequent'), points: `10 ${t('eval.points')}` },
-                ]} />
-                <CriterionRow label={t('eval.communication')} value={formData.communication} onChange={value => setFormData({ ...formData, communication: value as typeof formData.communication })} options={[
-                  { value: 'Sangat baik', label: t('eval.opt_sangat_baik'), points: `20 ${t('eval.points')}` },
-                  { value: 'Baik', label: t('eval.opt_baik'), points: `15 ${t('eval.points')}` },
-                  { value: 'Kurang baik', label: t('eval.opt_kurang_baik'), points: `10 ${t('eval.points')}` },
-                ]} />
-                <CriterionRow label={t('eval.pricing')} value={formData.pricing} onChange={value => setFormData({ ...formData, pricing: value as typeof formData.pricing })} options={[
-                  { value: 'Cheap', label: t('eval.opt_cheap'), points: `30 ${t('eval.points')}` },
-                  { value: 'Moderate', label: t('eval.opt_moderate'), points: `20 ${t('eval.points')}` },
-                  { value: 'Expensive', label: t('eval.opt_expensive'), points: `10 ${t('eval.points')}` },
-                ]} />
-              </FormSection>
-
-              <FormSection step={3} title={t('eval.section3')}>
-                <div className="grid grid-cols-2 gap-g8 sm:grid-cols-5" aria-label={t('eval.calc_score_breakdown')}>
-                  {[
-                    [t('eval.obligation_target_2', 'Obligation / Target'), liveBreakdown.tScore],
-                    [t('eval.incident_freq_2', 'Incident Freq'), liveBreakdown.fScore],
-                    [t('audit_col_evalCommunication', 'Communication'), liveBreakdown.cScore],
-                    [t('eval.pricing_2', 'Pricing'), liveBreakdown.pScore],
-                  ].map(([label, score]) => (
-                    <div key={String(label)} className="rounded-md border border-border bg-muted p-g8">
-                      <Text as="span" size="xs" weight="semibold" tone="muted" className="block truncate">{label}</Text>
-                      <Text as="span" weight="bold" size="md" className="tabular-nums">{score} {t('eval.points')}</Text>
-                    </div>
-                  ))}
-                  <div className="col-span-2 rounded-md border border-primary bg-primary p-g8 text-primary-foreground sm:col-span-1">
-                    <Text as="span" size="xs" weight="semibold" className="block text-current">{t('eval.total', 'Total:')}</Text>
-                    <Text as="span" weight="bold" size="md" className="tabular-nums text-current">{liveBreakdown.total} / 100</Text>
-                  </div>
-                </div>
-
-                <CriterionRow stacked label={t('eval.col_final_eval')} value={formData.final_evaluation} onChange={value => setFormData({ ...formData, final_evaluation: value as typeof formData.final_evaluation })} options={[
-                  { value: 'Recommended', label: t('eval.status_rec'), points: t('eval.opt_rec_desc') },
-                  { value: 'Recommended with notes', label: t('eval.rec_with_notes'), points: t('eval.opt_rec_notes_desc') },
-                  { value: 'Not recommended', label: t('eval.status_not_rec'), points: t('eval.opt_not_rec_desc') },
-                ]} />
-
-                <Field>
-                  <FieldLabel htmlFor="partnerevaluationview-field-3">{t('eval.notes_label')}</FieldLabel>
-                  <Textarea id="partnerevaluationview-field-3"
-                    rows={2}
-                    placeholder={t('eval.notes_ph')}
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    className="w-full"
-                  />
-                </Field>
-              </FormSection>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="p-g13 sm:p-g21 bg-card border-t border-border flex items-center justify-between gap-g8 shrink-0">
-                <Text as="span" size="xs" weight="medium" tone="muted" className="hidden sm:inline">
-                  {t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}
-                </Text>
-                <div className="flex items-center gap-g8 ml-auto">
-                  <Button variant="ghost"
-                    type="button"
-                    onClick={() => setShowFormModal(false)}
-                  >
-                    {t('eval.btn_cancel')}
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting
-                      ? t('eval.btn_saving')
-                      : editingItem
-                      ? t('eval.btn_update')
-                      : t('eval.btn_submit')}
-                  </Button>
-                </div>
-              </div>
-            </form>
-        </ModalFrame>
-      )}
 
       {/* DETAIL MODAL: View Single Evaluation Report */}
       {viewingDetailItem && (

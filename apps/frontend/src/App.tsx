@@ -185,6 +185,8 @@ const MainApp: React.FC = () => {
 
   const [showPartnerModal, setShowPartnerModal] = useState(false);
   const [partnerToEdit, setPartnerToEdit] = useState<Partner | null>(null);
+  // The contract, service order and partner forms are pages now; leaving via the sidebar must close them.
+  useEffect(() => { setShowContractModal(false); setShowIOModal(false); setShowPartnerModal(false); }, [activeTab]);
 
   const [showAmendmentModal, setShowAmendmentModal] = useState(false);
   const [amendmentParent, setAmendmentParent] = useState<Contract | InsertionOrder | undefined>(undefined);
@@ -666,7 +668,43 @@ const MainApp: React.FC = () => {
             />
           )}
           <Suspense fallback={<LoadingState label={t('app.memuat_halaman', 'Memuat halaman...')} />}>
-            {gateScreen ?? (
+            {gateScreen ?? (showContractModal ? (
+              <ContractModal
+                key={contractToEdit?.contract_id || 'new'}
+                contractToEdit={contractToEdit}
+                partners={partners}
+                contracts={contracts}
+                onClose={() => setShowContractModal(false)}
+                onSave={handleSaveContract}
+                onRedlineSaved={(id, analysis, at) => updateData('contracts', (prev) =>
+                  prev.map((c) => (c.contract_id === id ? { ...c, redline_analysis: analysis, redline_analyzed_at: at } : c))
+                )}
+              />
+            ) : showPartnerModal ? (
+              <PartnerModal
+                key={partnerToEdit?.partner_id || 'new'}
+                partnerToEdit={partnerToEdit}
+                partners={partners}
+                onClose={() => setShowPartnerModal(false)}
+                onSave={handleSavePartner}
+                onRedlineSaved={(id, analysis, at) => updateData('partners', (prev) =>
+                  prev.map((p) => (p.partner_id === id ? { ...p, redline_analysis: analysis, redline_analyzed_at: at } : p))
+                )}
+              />
+            ) : showIOModal ? (
+              <IOModal
+                key={ioToEdit?.io_id || 'new'}
+                ioToEdit={ioToEdit}
+                contracts={contracts}
+                partners={partners}
+                ios={ios}
+                onClose={() => setShowIOModal(false)}
+                onSave={handleSaveIO}
+                onRedlineSaved={(id, analysis, at) => updateData('ios', (prev) =>
+                  prev.map((i) => (i.io_id === id ? { ...i, redline_analysis: analysis, redline_analyzed_at: at } : i))
+                )}
+              />
+            ) : (
             <section className="w-full space-y-g21">
               {activeTab === 'dashboard' && (
                 <LazyDashboardView
@@ -751,11 +789,6 @@ const MainApp: React.FC = () => {
                     setAmendmentParent(ctr);
                     setShowAmendmentModal(true);
                   }}
-                  onUpdateContractData={(updated) => {
-                    updateData('contracts', (prev) =>
-                      prev.map((c) => (c.contract_id === updated.contract_id ? updated : c))
-                    );
-                  }}
                 />
               )}
 
@@ -799,6 +832,8 @@ const MainApp: React.FC = () => {
                   onEvaluationOpened={() => setRecordToOpen(null)}
                   partners={partners}
                   contracts={contracts}
+                  ios={ios}
+                  spendings={spendings}
                   evaluations={evaluations}
                   onRefreshData={loadAllData}
                   initialSubTab={activeTab === 'partner-evaluation' ? 'evaluation' : 'list'}
@@ -822,6 +857,8 @@ const MainApp: React.FC = () => {
                   onSpendingOpened={() => setRecordToOpen(null)}
                   partners={partners}
                   spendings={spendings}
+                  contracts={contracts}
+                  ios={ios}
                   onRefreshData={loadAllData}
                   userEmail={user.email}
                   userName={user.name}
@@ -866,41 +903,13 @@ const MainApp: React.FC = () => {
                 <LazyTermsOfServiceView onBack={() => setActiveTab('dashboard')} />
               )}
             </section>
-            )}
+            ))}
           </Suspense>
         </main>
       </AppShell>
 
       {/* Modals */}
       <Suspense fallback={null}>
-      {showContractModal && (
-        <ContractModal
-          contractToEdit={contractToEdit}
-          partners={partners}
-          contracts={contracts}
-          onClose={() => setShowContractModal(false)}
-          onSave={handleSaveContract}
-        />
-      )}
-
-      {showIOModal && (
-        <IOModal
-          ioToEdit={ioToEdit}
-          contracts={contracts}
-          partners={partners}
-          onClose={() => setShowIOModal(false)}
-          onSave={handleSaveIO}
-        />
-      )}
-
-      {showPartnerModal && (
-        <PartnerModal
-          partnerToEdit={partnerToEdit}
-          onClose={() => setShowPartnerModal(false)}
-          onSave={handleSavePartner}
-        />
-      )}
-
       {showAmendmentModal && (
         <AmendmentModal
           initialParent={amendmentParent}

@@ -36,7 +36,6 @@ import {
   ArrowUp,
   ArrowDown,
   X,
-  Scale,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -46,7 +45,6 @@ import {
   canCreateContract,
   canDeletePartner,
 } from '../lib/rbacScoping';
-import { ContractRedliningModal } from './ContractRedliningModal';
 import { usePermissions } from '../lib/permissions';
 import { ContractEndingSummary } from '../features/contracts/ContractEndingSummary';
 
@@ -68,7 +66,6 @@ interface ContractsViewProps {
   onDeleteContract: (contractId: string) => void;
   onDeleteContracts: (ids: string[]) => Promise<void>;
   onOpenAddendumModal: (contract: Contract) => void;
-  onUpdateContractData?: (updatedContract: Contract) => void;
   openDocumentId?: string;
   onDocumentOpened?: () => void;
 }
@@ -82,7 +79,6 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
   onDeleteContract,
   onDeleteContracts,
   onOpenAddendumModal,
-  onUpdateContractData,
   openDocumentId,
   onDocumentOpened,
 }) => {
@@ -101,7 +97,6 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
     if (contract && hasPermission('document.view') && canViewContract(contract, partners, user)) setDetailContract(contract);
     onDocumentOpened?.();
   }, [openDocumentId, contracts, partners, user, hasPermission, onDocumentOpened]);
-  const [redliningContract, setRedliningContract] = useState<Contract | null>(null);
 
   // Categories list
   const allCategories = useMemo(() => Array.from(new Set(contracts.flatMap(c => c.cooperation_categories || []))), [contracts]);
@@ -630,11 +625,6 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                                 icon: <ExternalLink className="w-g13 h-g13" />,
                                 onClick: () => setDetailContract(ctr),
                               },
-                              {
-                                label: t('contracts.action_redline', 'Redlining'),
-                                icon: <Scale className="w-g13 h-g13" />,
-                                onClick: () => setRedliningContract(ctr),
-                              },
                               ...(canEditContract(ctr, partners, user)
                                 ? [
                                     {
@@ -910,18 +900,6 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
         </ModalFrame>
       )}
-
-      {/* AI Contract Risk & Compliance Analyzer (AI Redlining Modal) */}
-      <ContractRedliningModal
-        isOpen={Boolean(redliningContract)}
-        contract={redliningContract}
-        partnerName={partnersById.get(redliningContract?.partner_id || '')?.partner_name}
-        onClose={() => setRedliningContract(null)}
-        onUpdateContract={(updatedContract) => {
-          setRedliningContract(updatedContract);
-          onUpdateContractData?.(updatedContract);
-        }}
-      />
     </div>
   );
 };

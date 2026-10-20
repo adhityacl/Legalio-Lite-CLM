@@ -2,8 +2,8 @@ import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { SuggestTagsInput } from './ui/suggest-input';
 import React, { useState, useEffect, useRef } from 'react';
 import { useTenantSettings } from '../context/TenantSettingsContext';
-import { Contract, Partner, NoticeType, JenisDokumenContract, ContractStatus } from '@legalio/types';
-import { FileText, Upload, Plus, X, Tag, Link2, Shield, Check } from 'lucide-react';
+import { Contract, Partner, NoticeType, JenisDokumenContract, ContractStatus, RedlineAnalysisData } from '@legalio/types';
+import { ArrowLeft, Link2, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { DateInput } from './DateInput';
@@ -21,12 +21,12 @@ import { Button } from '@legalio/ui-components/button';
 import { Textarea } from '@legalio/ui-components/textarea';
 import { Input } from '@legalio/ui-components/input';
 import { Card } from '@legalio/ui-components/card';
-import { ModalFrame } from './ui/modal-frame';
+import { Heading } from '@legalio/ui-components/heading';
+import { ContractRedliningPanel } from './ContractRedliningPanel';
 import { FormSection } from '@legalio/ui-components/blocks';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
 import { TagsInput, TagsInputClearTrigger, TagsInputControl, TagsInputHiddenInput, TagsInputInput, TagsInputItems, TagsInputLabel } from '@legalio/ui-components/tags-input';
-import { DialogBody, DialogCloseIcon, DialogFooter, DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
 import { Alert, AlertContent, AlertDescription, AlertIndicator, AlertTitle } from '@legalio/ui-components/alert';
 import { FileUpload, FileUploadDropzone, FileUploadDropzoneIcon, FileUploadHiddenInput, FileUploadLabel, FileUploadTrigger } from '@legalio/ui-components/file-upload';
 import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
@@ -40,6 +40,8 @@ interface ContractModalProps {
   contracts?: Contract[];
   onClose: () => void;
   onSave: (contractData: any) => Promise<void>;
+  /** An existing contract's analysis was stored by the server; keep the list in sync. */
+  onRedlineSaved?: (contractId: string, analysis: RedlineAnalysisData, analyzedAt: string) => void;
 }
 
 export const ContractModal: React.FC<ContractModalProps> = ({
@@ -48,6 +50,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   contracts = [],
   onClose,
   onSave,
+  onRedlineSaved,
 }) => {
   const { user } = useAuth();
   const { t, language } = useLanguage();
@@ -191,6 +194,9 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   const [rawFileName, setRawFileName] = useState(contractToEdit?.fileName || '');
   const [fileData, setFileData] = useState<string | null>(null);
   const [rawFileObj, setRawFileObj] = useState<File | null>(null);
+  const [redline, setRedline] = useState<{ analysis: RedlineAnalysisData; at?: string } | null>(
+    contractToEdit?.redline_analysis ? { analysis: contractToEdit.redline_analysis, at: contractToEdit.redline_analyzed_at } : null
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -478,6 +484,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
         change_summary: jenisDokumen === 'Agreement Addendum' ? ringkasanPerubahan.trim() : undefined,
         fileName: finalFileName,
         fileData,
+        ...(redline && { redline_analysis: redline.analysis, redline_analyzed_at: redline.at }),
       });
 
       onClose();
@@ -489,25 +496,22 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   };
 
   return (
-    <ModalFrame size="form" onClose={onClose} className="contract-form">
-        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
-          <DialogTitle className="flex items-center gap-g8">
-            <FileText className="size-g21 text-muted-foreground" aria-hidden="true" />
-            <span>
-              {contractToEdit?.contract_id
-                ? (jenisDokumen === 'Agreement Addendum'
-                    ? t('form.contract.title_edit_addendum', 'Edit Agreement Addendum')
-                    : t('form.contract.title_edit_master', 'Edit Kontrak Induk'))
-                : (jenisDokumen === 'Agreement Addendum'
-                    ? t('form.contract.title_add_addendum', 'Buat & Upload Agreement Addendum Baru')
-                    : t('contract.form.title_new', 'New Contract Form'))}
-            </span>
-          </DialogTitle>
-          <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
-        </DialogHeader>
+    <form onSubmit={handleSubmit} className="contract-form w-full min-w-0 space-y-g21" aria-labelledby="contract-form-heading">
+      <div className="flex flex-wrap items-center justify-between gap-g13">
+        <Heading as="h2" size="md" weight="semibold" id="contract-form-heading">
+          {contractToEdit?.contract_id
+            ? (jenisDokumen === 'Agreement Addendum'
+                ? t('form.contract.title_edit_addendum', 'Edit Agreement Addendum')
+                : t('form.contract.title_edit_master', 'Edit Kontrak Induk'))
+            : (jenisDokumen === 'Agreement Addendum'
+                ? t('form.contract.title_add_addendum', 'Buat & Upload Agreement Addendum Baru')
+                : t('contract.form.page_title_new', 'Submit a new contract'))}
+        </Heading>
+        <Button variant="link" size="sm" type="button" onClick={onClose} className="no-underline hover:underline"><ArrowLeft className="size-g13" aria-hidden />{t('contract.form.back', 'Back to contract list')}</Button>
+      </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <DialogBody className="mt-0 flex flex-1 flex-col gap-g13 overflow-y-auto px-g21 py-g13 text-foreground">
+      <div className="grid grid-cols-1 items-start gap-g21 xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
+          <div className="flex min-w-0 flex-col gap-g13 text-foreground">
             <FormSection step={1} title={t('contract.form.section_details', 'Contract Details')}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
                 <Field className="min-w-0">
@@ -745,9 +749,27 @@ export const ContractModal: React.FC<ContractModalProps> = ({
             {error && (
               <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>
             )}
-          </DialogBody>
+          </div>
 
-          <DialogFooter className="mt-0 flex-wrap items-center justify-between border-t border-border px-g21 py-g13">
+          <ContractRedliningPanel
+            canAnalyze={Boolean(partnerId && nomorKontrak.trim() && judulKontrak.trim())}
+            analysis={redline?.analysis ?? null}
+            onAnalysis={(analysis, at) => {
+              setRedline({ analysis, at });
+              if (contractToEdit?.contract_id) onRedlineSaved?.(contractToEdit.contract_id, analysis, at);
+            }}
+            endpoint="/api/contracts/redline-analysis"
+            body={{ contract: {
+              contract_id: contractToEdit?.contract_id,
+              contract_number: nomorKontrak, contract_title: judulKontrak, document_type: jenisDokumen, partner_id: partnerId,
+              cooperation_categories: kategoriTags, currency, contract_value: nilaiKontrak, start_date: tanggalMulai, end_date: tanggalBerakhir,
+              auto_renewal: autoRenewal, notice_period_days: noticePeriodHari, notice_type_required: noticeTypeRequired,
+              internal_notes: internalNotes, change_summary: jenisDokumen === 'Agreement Addendum' ? ringkasanPerubahan : undefined,
+            } }}
+          />
+      </div>
+
+          <Card className="flex-row flex-wrap items-center justify-between gap-g8 px-g21 py-g13">
             <Text size="xs" tone="muted" className="hidden sm:block">{t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}</Text>
             <div className="ms-auto flex items-center gap-g8">
               <Button variant="outline" onClick={onClose}>
@@ -763,8 +785,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                   : t('contract.form.save', 'Save Contract Data')}
               </Button></TooltipTrigger><TooltipBody>{!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : ''}</TooltipBody></Tooltip>
             </div>
-          </DialogFooter>
-        </form>
-    </ModalFrame>
+          </Card>
+    </form>
   );
 };

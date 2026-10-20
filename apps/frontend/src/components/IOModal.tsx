@@ -1,10 +1,9 @@
 import { AlphabeticalSelect } from './ui/alphabetical-select';
-import { ModalFrame } from './ui/modal-frame';
 import { FormSection } from '@legalio/ui-components/blocks';
 import React, { useState, useEffect } from 'react';
 import { useTenantSettings } from '../context/TenantSettingsContext';
-import { InsertionOrder, Contract, Partner, PricingModel, ChargingType, PRICING_MODELS } from '@legalio/types';
-import { FileSpreadsheet, Upload, X } from 'lucide-react';
+import { InsertionOrder, Contract, Partner, ChargingType, PRICING_MODELS, RedlineAnalysisData } from '@legalio/types';
+import { ArrowLeft, AlertTriangle, XCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { DateInput } from './DateInput';
 import { SUPPORTED_CURRENCIES, currencyLabel, formatMoney, fetchHistoricalRate, getDefaultUsdRate } from '@legalio/shared/currencyUtils';
@@ -13,7 +12,10 @@ import { formatIOFileName } from '@legalio/shared/fileNaming';
 import { Button } from '@legalio/ui-components/button';
 import { Input } from '@legalio/ui-components/input';
 import { Textarea } from '@legalio/ui-components/textarea';
-import { DialogBody, DialogCloseIcon, DialogFooter, DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
+import { Card } from '@legalio/ui-components/card';
+import { Heading } from '@legalio/ui-components/heading';
+import { ContractRedliningPanel } from './ContractRedliningPanel';
+import { serviceOrderChecks, type CheckStatus } from '../lib/serviceOrderChecks';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { FileUpload, FileUploadDropzone, FileUploadDropzoneIcon, FileUploadHiddenInput, FileUploadLabel, FileUploadTrigger } from '@legalio/ui-components/file-upload';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
@@ -24,16 +26,37 @@ interface IOModalProps {
   ioToEdit?: InsertionOrder | null;
   contracts: Contract[];
   partners: Partner[];
+  /** All service orders, for duplicate-number and parent-contract budget checks. */
+  ios: InsertionOrder[];
   onClose: () => void;
   onSave: (ioData: any) => Promise<void>;
+  /** An existing SO's review was stored by the server; keep the list in sync. */
+  onRedlineSaved?: (ioId: string, analysis: RedlineAnalysisData, analyzedAt: string) => void;
 }
+
+const CHECK_ICON: Record<Exclude<CheckStatus, 'ok'>, React.ReactNode> = {
+  warn: <AlertTriangle className="mt-g2 size-g13 shrink-0 text-status-warning" aria-hidden />,
+  fail: <XCircle className="mt-g2 size-g13 shrink-0 text-status-danger" aria-hidden />,
+};
+
+/** English fallback per flagged check. */
+const CHECK_TEXT: Record<string, string> = {
+  active: 'Parent contract is expired or terminated',
+  period: 'SO period falls outside the contract term',
+  partner: 'Partner differs from the parent contract',
+  currency: 'Currency differs from the parent contract',
+  budget: 'Total SO value exceeds the contract value',
+  number: 'SO number is already used',
+};
 
 export const IOModal: React.FC<IOModalProps> = ({
   ioToEdit,
   contracts,
   partners,
+  ios,
   onClose,
   onSave,
+  onRedlineSaved,
 }) => {
   const { t, language } = useLanguage();
 
@@ -136,6 +159,9 @@ export const IOModal: React.FC<IOModalProps> = ({
     ioToEdit?.deliverables || 'Guaranteed 5.000.000 Impressions banner 300x250 + 2x Native Advertorial Article'
   );
   const [noticePeriodHari, setNoticePeriodHari] = useState(ioToEdit?.notice_period_days || 14);
+  const [unit, setUnit] = useState(ioToEdit?.unit || '');
+  const [unitPrice, setUnitPrice] = useState<number | ''>(ioToEdit?.unit_price ?? '');
+  const [unitQuantity, setUnitQuantity] = useState<number | ''>(ioToEdit?.unit_quantity ?? '');
 
   const [fileName, setFileName] = useState(ioToEdit?.fileName || '');
   const [rawFileName, setRawFileName] = useState(ioToEdit?.fileName || '');
@@ -143,6 +169,9 @@ export const IOModal: React.FC<IOModalProps> = ({
   const [rawFileObj, setRawFileObj] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [parseSuccessMsg, setParseSuccessMsg] = useState<string | null>(null);
+  const [redline, setRedline] = useState<{ analysis: RedlineAnalysisData; at?: string } | null>(
+    ioToEdit?.redline_analysis ? { analysis: ioToEdit.redline_analysis, at: ioToEdit.redline_analyzed_at } : null
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -357,10 +386,14 @@ export const IOModal: React.FC<IOModalProps> = ({
         io_value: Number(nilaiIO),
         io_value_usd: estimatedUsd,
         deliverables: deliverables.trim(),
+        unit: unit.trim() || undefined,
+        unit_price: unitPrice === '' ? undefined : Number(unitPrice),
+        unit_quantity: unitQuantity === '' ? undefined : Number(unitQuantity),
         notice_period_days: Number(noticePeriodHari),
         notice_type_required: 'Termination',
         fileName: finalFileName,
         fileData,
+        ...(redline && { redline_analysis: redline.analysis, redline_analyzed_at: redline.at }),
       });
 
       onClose();
@@ -371,23 +404,22 @@ export const IOModal: React.FC<IOModalProps> = ({
     }
   };
 
-  return (
-    <ModalFrame size="form" onClose={onClose}>
-        {/* Header */}
-        <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
-          <DialogTitle className="flex items-center gap-g8">
-            <FileSpreadsheet className="size-g21 text-muted-foreground" aria-hidden="true" />
-            <span>
-              {ioToEdit?.io_id
-                ? t('form.io.title_edit', 'Edit Insertion Order')
-                : t('so.form.title_new', 'New Service Order Form')}
-            </span>
-          </DialogTitle>
-          <DialogCloseIcon aria-label={t('common.close', 'Close')} />
-        </DialogHeader>
+  const parentContract = contracts.find((c) => c.contract_id === contractId);
+  const checks = serviceOrderChecks({ io_id: ioToEdit?.io_id, io_number: nomorIO, partner_id: partnerId, currency, io_value: nilaiIO,
+    start_date: tanggalMulai, end_date: tanggalBerakhir }, parentContract, ios);
+  const issues = checks.filter((check) => check.status !== 'ok');
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <DialogBody className="mt-0 flex flex-1 flex-col gap-g13 overflow-y-auto px-g21 py-g13 text-foreground">
+  return (
+    <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-g21" aria-labelledby="io-form-heading">
+      <div className="flex flex-wrap items-center justify-between gap-g13">
+        <Heading as="h2" size="md" weight="semibold" id="io-form-heading">
+          {ioToEdit?.io_id ? t('form.io.title_edit', 'Edit Insertion Order') : t('so.form.page_title_new', 'Submit a new service order')}
+        </Heading>
+        <Button variant="link" size="sm" type="button" onClick={onClose} className="no-underline hover:underline"><ArrowLeft className="size-g13" aria-hidden />{t('so.form.back', 'Back to service order list')}</Button>
+      </div>
+
+      <div className="grid grid-cols-1 items-start gap-g21 xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
+          <div className="flex min-w-0 flex-col gap-g13 text-foreground">
             <FormSection step={1} title={t('so.form.section_details', 'Service Order Details')}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
               <Field className="min-w-0">
@@ -575,6 +607,24 @@ export const IOModal: React.FC<IOModalProps> = ({
               </Field>
             </div>
 
+            {/* Optional: lets invoices be checked against how many units they should cover. */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-g13">
+              <Field className="min-w-0">
+                <FieldLabel htmlFor="IOModal-field-unit">{t('so.form.unit', 'Unit')}</FieldLabel>
+                <Input id="IOModal-field-unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder={t('so.form.unit_ph', 'e.g., impressions, clicks, items')} className="w-full" />
+              </Field>
+              <Field className="min-w-0">
+                <FieldLabel htmlFor="IOModal-field-unit-price">
+                  {effectivePricingModel === 'CPM' ? t('so.form.unit_price_cpm', 'Price per 1,000 units') : t('so.form.unit_price', 'Price per unit')}
+                </FieldLabel>
+                <NumberInput className="w-full" ids={{ input: 'IOModal-field-unit-price' }} min={0} value={String(unitPrice)} onValueChange={(d) => setUnitPrice(d.value === '' ? '' : Number(d.value))}><NumberInputControl><NumberInputDecrementTrigger /><NumberInputInput /><NumberInputIncrementTrigger /></NumberInputControl></NumberInput>
+              </Field>
+              <Field className="min-w-0">
+                <FieldLabel htmlFor="IOModal-field-unit-qty">{t('so.form.unit_quantity', 'Agreed quantity')}</FieldLabel>
+                <NumberInput className="w-full" ids={{ input: 'IOModal-field-unit-qty' }} min={0} value={String(unitQuantity)} onValueChange={(d) => setUnitQuantity(d.value === '' ? '' : Number(d.value))}><NumberInputControl><NumberInputDecrementTrigger /><NumberInputInput /><NumberInputIncrementTrigger /></NumberInputControl></NumberInput>
+              </Field>
+            </div>
+
             <div className="flex flex-wrap items-center justify-between gap-g8 rounded-md border border-border bg-muted px-g13 py-g8" aria-live="polite"
               title={currency === 'USD' ? undefined : t('io.1_usd', '1 {currency} ≈ {value} USD', { currency, value: historicalRate.toFixed(8) })}>
               <Text as="span" size="sm" tone="muted">{t('contract.form.usd_estimate', 'Estimated USD Conversion (Rate on {date})', { date: tanggalMulai })}</Text>
@@ -615,9 +665,38 @@ export const IOModal: React.FC<IOModalProps> = ({
             {error && (
               <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>
             )}
-          </DialogBody>
+          </div>
 
-          <DialogFooter className="mt-0 flex-wrap items-center justify-between border-t border-border px-g21 py-g13">
+          <ContractRedliningPanel
+            title={t('so.review.panel_title', 'AI Service Order Review')}
+            endpoint="/api/ios/review-analysis"
+            canAnalyze={Boolean(partnerId && nomorIO.trim() && judulIO.trim())}
+            analysis={redline?.analysis ?? null}
+            onAnalysis={(analysis, at) => {
+              setRedline({ analysis, at });
+              if (ioToEdit?.io_id) onRedlineSaved?.(ioToEdit.io_id, analysis, at);
+            }}
+            body={{ io: {
+              io_id: ioToEdit?.io_id, contract_id: contractId || undefined, io_number: nomorIO, io_title: judulIO, partner_id: partnerId,
+              media_channel: kanalMedia, pricing_model: effectivePricingModel, charging_type: chargingType, currency, io_value: nilaiIO,
+              start_date: tanggalMulai, end_date: tanggalBerakhir, deliverables, notice_period_days: noticePeriodHari,
+            } }}
+          >
+            {/* Only problems are shown, so a clean SO looks like the contract panel. */}
+            {issues.length > 0 && (
+              <ul className="flex flex-col gap-g5">
+                {issues.map((check) => (
+                  <li key={check.key} className="flex items-start gap-g8">
+                    {CHECK_ICON[check.status as 'warn' | 'fail']}
+                    <Text size="xs">{t(`so.review.check_${check.key}_bad`, CHECK_TEXT[check.key])}</Text>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ContractRedliningPanel>
+      </div>
+
+          <Card className="flex-row flex-wrap items-center justify-between gap-g8 px-g21 py-g13">
             <Text size="xs" tone="muted" className="hidden sm:block">{t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan')}</Text>
             <div className="flex items-center gap-g8 ml-auto">
               <Button variant="outline" onClick={onClose}
@@ -633,8 +712,7 @@ export const IOModal: React.FC<IOModalProps> = ({
                   : t('so.form.save', 'Save Service Order')}
               </Button></TooltipTrigger><TooltipBody>{!isFormValid ? t('form.common.required_hint', 'Lengkapi semua kolom wajib (*) untuk menyimpan') : ''}</TooltipBody></Tooltip>
             </div>
-          </DialogFooter>
-        </form>
-    </ModalFrame>
+          </Card>
+    </form>
   );
 };
