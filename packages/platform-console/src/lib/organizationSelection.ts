@@ -47,8 +47,9 @@ export function getSelectionRevision(): number {
 }
 
 export function setSelectedOrganizationId(organizationId: string | null): void {
+  // Re-committing the same organization must not orphan its in-flight capability load.
+  if (organizationId !== currentOrganizationId) revision++;
   currentOrganizationId = organizationId;
-  revision++;
   if (currentUserId) {
     try {
       if (organizationId) sessionStorage.setItem(keyFor(currentUserId), organizationId);
