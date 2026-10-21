@@ -1,4 +1,5 @@
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
+import { useRowsPerPage } from '../lib/tablePreferences';
 import { BulkSelectionBar } from './ui/bulk-selection-bar';
 import { deleteRecords } from '../lib/bulkDelete';
 import { downloadCsv } from '../lib/csv';
@@ -717,7 +718,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   );
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useRowsPerPage('partner_spending');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   useEffect(() => {
     if (!openSpendingId) return;

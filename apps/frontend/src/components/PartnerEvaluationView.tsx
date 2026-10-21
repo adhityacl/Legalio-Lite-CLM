@@ -36,7 +36,7 @@ import { XCircle, Clock, Filter, ClipboardCheck,
 import { ActionMenu } from './ui/action-menu';
 import { TablePagination } from './ui/TablePagination';
 import { Badge, statusTone } from '@legalio/ui-components/badge';
-import { getSavedColumnPreferences, saveColumnPreferences } from '../lib/tablePreferences';
+import { getSavedColumnPreferences, saveColumnPreferences, useRowsPerPage } from '../lib/tablePreferences';
 import { getCachedAccessToken } from '../lib/googleAuthService';
 import { useLanguage } from '../context/LanguageContext';
 import { useConfirm } from '../context/ConfirmDialogContext';
@@ -531,7 +531,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
   }, [filteredEvaluations, sortField, sortOrder]);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useRowsPerPage('evaluations');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
   const handleSelectAll = (checked: boolean) => {

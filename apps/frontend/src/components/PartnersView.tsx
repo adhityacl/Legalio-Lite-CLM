@@ -54,7 +54,7 @@ import { PartnerEvaluationView } from './PartnerEvaluationView';
 import { TablePagination } from './ui/TablePagination';
 import { ActionMenu } from './ui/action-menu';
 import { Badge, statusTone } from '@legalio/ui-components/badge';
-import { getSavedColumnPreferences, saveColumnPreferences } from '../lib/tablePreferences';
+import { getSavedColumnPreferences, saveColumnPreferences, useRowsPerPage } from '../lib/tablePreferences';
 import { UploadDDModal } from './UploadDDModal';
 import { getAuthHeaders } from '../lib/apiFetch';
 import { usePermissions } from '../lib/permissions';
@@ -269,7 +269,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   }, [filteredPartners, sortField, sortOrder, contracts]);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useRowsPerPage('partners');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
   const handleSelectAll = (checked: boolean) => {

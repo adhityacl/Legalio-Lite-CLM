@@ -126,3 +126,16 @@ test('uploaded file: validation, rejection stops the chain, file is served to pa
     assert.equal(new Set(await Promise.all(codes)).size, 3); // a delete must not make a code repeat
   } finally { close(); }
 });
+
+test('viewers are not offered or accepted as approvers', async () => {
+  const { db, call, close } = await setup();
+  try {
+    db.prepare(`INSERT INTO "user" VALUES ('vw', 'Viewer')`).run();
+    db.prepare(`INSERT INTO member VALUES ('m-vw', 'org-a', 'vw', 'viewer', 'active')`).run();
+    const approvers = (await call('al', 'GET', '/approvals/approvers')).body.approvers.map((a: { id: string }) => a.id);
+    assert.ok(approvers.includes('as'));
+    assert.ok(!approvers.includes('vw'));
+    const created = await call('al', 'POST', '/approvals', { title: 'NDA', category: 'nda', approverIds: ['vw'], documentId: 'doc-1' });
+    assert.equal(created.status, 400);
+  } finally { close(); }
+});

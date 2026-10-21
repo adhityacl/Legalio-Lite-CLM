@@ -1,4 +1,5 @@
 import { ModalFrame } from './ui/modal-frame';
+import { useRowsPerPage } from '../lib/tablePreferences';
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import React, { useState, useEffect } from 'react';
@@ -87,7 +88,7 @@ export const ActivityLogsView: React.FC = () => {
   });
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useRowsPerPage('activity_logs');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
   const handleSelectAll = (checked: boolean) => {

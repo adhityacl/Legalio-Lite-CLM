@@ -1769,7 +1769,7 @@ export const ZH_TRANSLATIONS: Record<string, string> = {
   'io.col_action': '操作',
   'io.col_channel': '媒体渠道',
   'io.col_charging_type': '付款方式',
-  'io.col_document': 'PDF 文件',
+  'io.col_document': '文件',
   'io.col_end_date': '结束日期',
   'io.col_no': 'IO 编号',
   'io.col_partner': '合作伙伴',

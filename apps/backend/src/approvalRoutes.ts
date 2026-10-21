@@ -127,10 +127,11 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
       { organizationId: ctx.organizationId, action, targetType: "approval", targetId, outcome: "success" },
     );
 
+  // Viewers cannot open My Approval, so they cannot be approvers either.
   const activeMembers = (org: string) =>
     db.prepare(`
       SELECT u.id, u.name, m.role FROM member m JOIN "user" u ON u.id = m.userId
-      WHERE m.organizationId = ? AND m.status = 'active' ORDER BY u.name COLLATE NOCASE
+      WHERE m.organizationId = ? AND m.status = 'active' AND m.role <> 'viewer' ORDER BY u.name COLLATE NOCASE
     `).all(org) as Array<{ id: string; name: string; role: string }>;
 
   const isApprover = (requestId: string, userId: string) =>
@@ -211,7 +212,7 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
     if (approverIds.length === 0 || approverIds.length > MAX_APPROVERS) return bad(res, `Choose 1 to ${MAX_APPROVERS} approvers.`);
     if (new Set(approverIds).size !== approverIds.length) return bad(res, "An approver can appear only once.");
     if (approverIds.includes(ctx.userId)) return bad(res, "You cannot approve your own request.");
-    if (!approverIds.every((id) => members.has(id))) return bad(res, "Every approver must be an active member of this organization.");
+    if (!approverIds.every((id) => members.has(id))) return bad(res, "Every approver must be an active member of this organization with editor access or higher.");
 
     const documentId = str(body.documentId);
     const file = body.file && typeof body.file === "object" ? body.file : null;

@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useId, useMemo, useState } from 'react';
+import { useRowsPerPage } from '../../lib/tablePreferences';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Copy, KeyRound, History, Layers, Loader2, Mail, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2, UserMinus, UserCheck, UserX, X } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
@@ -75,7 +76,7 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>(intent === 'pending-invitations' ? 'pending' : 'active');
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+  const [pageSize, setPageSize] = useRowsPerPage('members', PAGE_SIZES[0]);
   const [dialog, setDialog] = useState<null | { kind: 'invite'; codeOnly?: boolean } | { kind: 'departments' } | { kind: 'history' } | { kind: 'edit'; member: Member } | { kind: 'link'; url: string; code?: string; expiresAt?: string }>(
     intent === 'departments' ? { kind: 'departments' } : intent === 'history' ? { kind: 'history' } : null,
   );
@@ -524,7 +525,7 @@ const HistoryDialog: React.FC<{ organizationId: string; onClose: () => void }> =
   const { identity } = useIdentity();
   const [dataset, setDataset] = useState<'admin' | 'activity'>('admin');
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+  const [pageSize, setPageSize] = useRowsPerPage('org_audit', PAGE_SIZES[0]);
   const audit = useQuery<{ events: AuditEvent[]; total: number }>({
     queryKey: ['org-audit', identity?.id, organizationId, page, pageSize],
     queryFn: ({ signal }) => orgApi(orgPath(organizationId, `/audit?limit=${pageSize}&offset=${page * pageSize}`), { signal }),

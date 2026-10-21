@@ -1,4 +1,5 @@
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
+import { useRowsPerPage } from '../lib/tablePreferences';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { formatDateTime } from '../lib/displayDate';
 import { notificationMessage } from '../lib/notificationText';
@@ -54,7 +55,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [runningCron, setRunningCron] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useRowsPerPage('notifications');
 
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     time: true,

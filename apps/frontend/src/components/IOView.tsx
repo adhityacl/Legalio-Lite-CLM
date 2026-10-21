@@ -40,7 +40,7 @@ import {
 } from '../lib/rbacScoping';
 import { cn } from '@legalio/ui-components/utils';
 import { Badge, statusTone } from '@legalio/ui-components/badge';
-import { getSavedColumnPreferences, saveColumnPreferences } from '../lib/tablePreferences';
+import { getSavedColumnPreferences, saveColumnPreferences, useRowsPerPage } from '../lib/tablePreferences';
 import { Button } from '@legalio/ui-components/button';
 import { ActionMenu } from './ui/action-menu';
 import { TablePagination } from './ui/TablePagination';
@@ -90,7 +90,7 @@ export const IOView: React.FC<IOViewProps> = ({
   // Row selection & Pagination State
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
   const [pageIndex, setPageIndex] = useState(0);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize, setPageSize] = useRowsPerPage('io');
 
   // Sorting State
   type SortField = ServiceOrderSortField;
@@ -114,13 +114,13 @@ export const IOView: React.FC<IOViewProps> = ({
     judul: true,
     partner: true,
     kanal: true,
-    nilai: true,
+    nilai: false,
     pricing_model: false,
     payment_scheme: false,
-    start_date: false,
-    completion_date: false,
+    start_date: true,
+    completion_date: true,
     status: false,
-    file: false,
+    file: true,
   };
 
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() =>
@@ -426,7 +426,7 @@ export const IOView: React.FC<IOViewProps> = ({
               else if (col === 'start_date') label = t('io.col_start_date', 'Tanggal Mulai');
               else if (col === 'completion_date') label = t('io.col_end_date', 'Tanggal Selesai');
               else if (col === 'status') label = t('io.col_status', 'Status');
-              else if (col === 'file') label = t('io.col_document', 'File PDF');
+              else if (col === 'file') label = t('io.col_document', 'Document');
 
               return (
                 <TableViewOption key={col} value={col} checked={visibleColumns[col]} onToggle={() => toggleColumnVisibility(col)}>{label}</TableViewOption>
@@ -480,7 +480,7 @@ export const IOView: React.FC<IOViewProps> = ({
                 {visibleColumns.status && renderSortHeader(t('io.col_status', 'Status'), 'status')}
                 {visibleColumns.file && (
                   <TableColumnHeader scope="col">
-                    <span>{t('io.col_document', 'File')}</span>
+                    <span>{t('io.col_document', 'Document')}</span>
                   </TableColumnHeader>
                 )}
                 <TableColumnHeader data-actions="true" scope="col" className="text-right w-g89">

@@ -50,6 +50,7 @@ const SETTINGS_PERMISSION: Record<SettingsTabId, string> = {
  */
 const OPERATIONAL_PERMISSION: Record<string, string> = {
   'create-contract': 'document.create',
+  'document-approval': 'document.create',
   'bulk-import': 'tenant.data.import',
 };
 

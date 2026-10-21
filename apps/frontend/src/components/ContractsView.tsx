@@ -12,7 +12,7 @@ import { formatMoney } from '@legalio/shared/currencyUtils';
 import { ActionMenu } from './ui/action-menu';
 import { TablePagination } from './ui/TablePagination';
 import { Badge, BadgeDot, statusTone } from '@legalio/ui-components/badge';
-import { getSavedColumnPreferences, saveColumnPreferences } from '../lib/tablePreferences';
+import { getSavedColumnPreferences, saveColumnPreferences, useRowsPerPage } from '../lib/tablePreferences';
 import {
   FileSpreadsheet,
   FileText,
@@ -138,11 +138,11 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
     contract_title: true,
     partner: true,
     kategori: false,
-    nilai: true,
-    start_date: false,
-    completion_date: false,
+    nilai: false,
+    start_date: true,
+    completion_date: true,
     status: true,
-    file: false,
+    file: true,
   };
 
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() =>
@@ -236,7 +236,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
   }, [filteredContracts, sortField, sortOrder, partnersById]);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useRowsPerPage('contracts');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
   const handleSelectAll = (checked: boolean) => {

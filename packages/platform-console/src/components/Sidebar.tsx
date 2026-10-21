@@ -111,7 +111,7 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
       const res = await fetch('/api/approvals?box=inbox');
       return res.ok ? ((await res.json()).stats?.waiting as number) : 0;
     },
-    enabled: Boolean(activeTenantId) && !showSystemAdmin && hasPermission('document.view'),
+    enabled: Boolean(activeTenantId) && !showSystemAdmin && hasPermission('document.create'),
     refetchInterval: 60_000,
   }).data || undefined;
 
@@ -158,7 +158,7 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
   ].filter(Boolean) as NavEntry[];
   const documents: NavEntry[] = [
     can('document.create') && { id: 'create-contract', label: t('nav.create_contract', 'Dokumen Saya'), icon: FileSignature, active: activeTab === 'create-contract' },
-    can('document.view') && { id: 'document-approval', label: t('nav.document_approval', 'My Approval'), icon: ClipboardCheck, active: activeTab === 'document-approval', badge: approvalInboxCount },
+    can('document.create') && { id: 'document-approval', label: t('nav.document_approval', 'My Approval'), icon: ClipboardCheck, active: activeTab === 'document-approval', badge: approvalInboxCount },
   ].filter(Boolean) as NavEntry[];
   /* Administration (PRD §6.1): System Admin only in the standalone console for platform administrators,
      Import Data for tenant admins, and exactly one Settings entry for whoever may open one of its tabs. */
