@@ -536,7 +536,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   else if (col === 'email') label = t('partners.col_email', 'Email');
                   else if (col === 'telepon') label = t('partners.col_phone', 'Telepon');
                   else if (col === 'status') label = t('partners.col_status', 'Status Partner');
-                  else if (col === 'due_diligence') label = t('partners.col_dd_status', 'Status Due Diligence');
+                  else if (col === 'due_diligence') label = t('partners.col_dd_status', 'Due Diligence');
 
                   return (
                     <TableViewOption key={col} value={col} checked={visibleColumns[col]} onToggle={() => toggleColumnVisibility(col)}>{label}</TableViewOption>
@@ -575,7 +575,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                       {visibleColumns.email && <TableColumnHeader scope="col">{t('partners.col_email', 'Email')}</TableColumnHeader>}
                       {visibleColumns.telepon && <TableColumnHeader scope="col">{t('partners.col_phone', 'Telepon')}</TableColumnHeader>}
                       {visibleColumns.status && renderSortHeader(t('partners.col_status', 'Status Partner'), 'status')}
-                      {visibleColumns.due_diligence && renderSortHeader(t('partners.col_dd_status', 'Status DD'), 'status_dd')}
+                      {visibleColumns.due_diligence && renderSortHeader(t('partners.col_dd_status', 'Due Diligence'), 'status_dd')}
                       <TableColumnHeader data-actions="true" scope="col" className="text-right w-g89">
                         <div className="flex items-center justify-end">
                           {t('partners.col_action', 'Aksi')}
@@ -700,7 +700,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                 <ActionMenu
                                   items={[
                                     {
-                                      label: t('partners.audit_dd', 'Audit DD'),
+                                      label: t('partners.audit_dd', 'Due Diligence'),
                                       icon: <FileCheck2 className="w-g13 h-g13" />,
                                       onClick: () => setSelectedPartnerDetail(partner),
                                     },

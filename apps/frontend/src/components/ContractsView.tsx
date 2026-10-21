@@ -200,16 +200,16 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
           valB = b.contract_value_usd ?? b.contract_value;
           break;
         case 'duration':
-          valA = a.completion_date || a.start_date || '';
-          valB = b.completion_date || b.start_date || '';
+          valA = a.end_date || a.completion_date || a.start_date || '';
+          valB = b.end_date || b.completion_date || b.start_date || '';
           break;
         case 'start':
           valA = a.start_date || '';
           valB = b.start_date || '';
           break;
         case 'end':
-          valA = a.completion_date || '';
-          valB = b.completion_date || '';
+          valA = a.end_date || a.completion_date || '';
+          valB = b.end_date || b.completion_date || '';
           break;
         case 'status':
           valA = a.status || '';

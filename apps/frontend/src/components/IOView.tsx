@@ -3,6 +3,7 @@ import { BulkSelectionBar } from './ui/bulk-selection-bar';
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { formatBusinessDate } from '../lib/displayDate';
+import { sortServiceOrders, type ServiceOrderSortField, type SortOrder } from '../lib/serviceOrderSort';
 import { FilterSummary } from './ui/filter-summary';
 import { TableEmptyState } from './ui/table-empty-state';
 import React, { useState, useMemo, useEffect } from 'react';
@@ -92,8 +93,7 @@ export const IOView: React.FC<IOViewProps> = ({
   const [pageSize, setPageSize] = useState(5);
 
   // Sorting State
-  type SortField = 'no' | 'judul' | 'partner' | 'pricing' | 'value' | 'duration' | 'status';
-  type SortOrder = 'asc' | 'desc';
+  type SortField = ServiceOrderSortField;
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
@@ -168,57 +168,10 @@ export const IOView: React.FC<IOViewProps> = ({
   }, [ios, partners, user, searchTerm, selectedStatus, selectedPricingModel, selectedChargingType]);
 
   // Sorting Logic
-  const sortedIOs = useMemo(() => {
-    if (!sortField) return filteredIOs;
-
-    return [...filteredIOs].sort((a, b) => {
-      let valA: any = '';
-      let valB: any = '';
-
-      switch (sortField) {
-        case 'no':
-          valA = a.io_number || '';
-          valB = b.io_number || '';
-          break;
-        case 'judul':
-          valA = a.io_title || '';
-          valB = b.io_title || '';
-          break;
-        case 'partner':
-          valA = partnerNameOf(a.partner_id);
-          valB = partnerNameOf(b.partner_id);
-          break;
-        case 'pricing':
-          valA = a.pricing_model || '';
-          valB = b.pricing_model || '';
-          break;
-        case 'value':
-          valA = a.io_value || 0;
-          valB = b.io_value || 0;
-          break;
-        case 'duration':
-          valA = a.end_date || a.completion_date || a.start_date || '';
-          valB = b.end_date || b.completion_date || b.start_date || '';
-          break;
-        case 'status':
-          valA = a.status || '';
-          valB = b.status || '';
-          break;
-        default:
-          return 0;
-      }
-
-      if (typeof valA === 'number' && typeof valB === 'number') {
-        return sortOrder === 'asc' ? valA - valB : valB - valA;
-      }
-
-      const res = String(valA || '').localeCompare(String(valB || ''), undefined, {
-        numeric: true,
-        sensitivity: 'base',
-      });
-      return sortOrder === 'asc' ? res : -res;
-    });
-  }, [filteredIOs, sortField, sortOrder]);
+  const sortedIOs = useMemo(
+    () => (sortField ? sortServiceOrders(filteredIOs, sortField, sortOrder, partnerNameOf) : filteredIOs),
+    [filteredIOs, sortField, sortOrder, partners],
+  );
 
   // Paginated Slices
   const pageCount = Math.ceil(sortedIOs.length / pageSize);
@@ -521,16 +474,8 @@ export const IOView: React.FC<IOViewProps> = ({
                     <span>{t('io.col_charging_type', 'Skema')}</span>
                   </TableColumnHeader>
                 )}
-                {visibleColumns.start_date && (
-                  <TableColumnHeader scope="col">
-                    <span>{t('io.col_start_date', 'Tgl Mulai')}</span>
-                  </TableColumnHeader>
-                )}
-                {visibleColumns.completion_date && (
-                  <TableColumnHeader scope="col">
-                    <span>{t('io.col_end_date', 'Tgl Selesai')}</span>
-                  </TableColumnHeader>
-                )}
+                {visibleColumns.start_date && renderSortHeader(t('io.col_start_date', 'Tgl Mulai'), 'start')}
+                {visibleColumns.completion_date && renderSortHeader(t('io.col_end_date', 'Tgl Selesai'), 'end')}
                 {visibleColumns.nilai && renderSortHeader(t('io.col_value', 'Nilai Order'), 'value')}
                 {visibleColumns.status && renderSortHeader(t('io.col_status', 'Status'), 'status')}
                 {visibleColumns.file && (
