@@ -2,7 +2,7 @@
 
 Status per 22 Oktober 2026. Branch: `PostgreSQL`.
 
-Pekerjaan dibagi menjadi 7 fase (A–G). **Fase A dan B selesai** dan semua tesnya hijau. **Fase C–G belum dikerjakan.** Dokumen ini berisi semua yang perlu diketahui untuk melanjutkan. Catatan kerja sebelumnya (rencana arsitek dan review) hanya disimpan di `/tmp` dan sudah hilang, jadi isinya dirangkum ulang di sini.
+Pekerjaan dibagi menjadi 7 fase (A–G). **Fase A dan B selesai**, review keamanan fase B juga selesai dan 10 temuannya sudah diperbaiki, semua tes hijau. **Fase C–G belum dikerjakan.** File ini di-update dan di-push setiap kali satu fase selesai. Dokumen ini berisi semua yang perlu diketahui untuk melanjutkan. Catatan kerja sebelumnya (rencana arsitek dan review) hanya disimpan di `/tmp` dan sudah hilang, jadi isinya dirangkum ulang di sini.
 
 > **Jangan merge ke `main` sebelum fase G selesai.** `.github/workflows/deploy.yml` men-deploy `main` ke produksi secara otomatis. Fase A dan B tidak aman dideploy sendirian (lihat §6). Setelah merge, produksi akan mulai dengan PostgreSQL kosong. Itu memang keputusannya, tetapi **jangan hapus `/data/kaelyn.db`** di server; biarkan sebagai arsip.
 
@@ -30,15 +30,10 @@ Pekerjaan dibagi menjadi 7 fase (A–G). **Fase A dan B selesai** dan semua tesn
 
 ```bash
 git switch PostgreSQL
-git status            # fase A+B ada di index (staged); Alert.tsx sengaja TIDAK di-stage
+git pull              # semua fase yang selesai sudah di-commit dan di-push ke origin/PostgreSQL
 ```
 
-> **Penting:** hasil fase A dan B saat ini **hanya di-stage, belum di-commit**. Jika pindah mesin atau codespace, commit dan push dulu:
-> ```bash
-> git restore --staged packages/ui-components/src/moduix/ui/alert/Alert.tsx  # perubahan lain, bukan bagian pekerjaan ini
-> git commit -m "refactor: async sql facade and remove SQLite-only features (phase A+B)"
-> git push -u origin PostgreSQL
-> ```
+> Aturan kerja: setiap fase yang selesai dan lulus gate langsung di-commit, file ini di-update, lalu di-push. Jangan pernah meng-commit `packages/ui-components/src/moduix/ui/alert/Alert.tsx` (perubahan lain, bukan bagian pekerjaan ini).
 
 PostgreSQL untuk pengujian (container lama ikut hilang saat restart):
 
@@ -99,7 +94,21 @@ Tujuannya: perubahan async yang paling berisiko diuji dulu dengan engine lama, s
 - **Migrasi:** `002_tenant_boundaries.ts` dihapus karena tidak dipakai. 003 diberi shim async; 004–006 hanya berubah import.
 - **Hasil gate:** lint ✅, build ✅, unit 62/62 ✅, e2e sqlite 32 ✅ (termasuk tes baru "akses upload mengikuti record pemilik dan departemennya"), data-entry 41 skenario ✅, cek promise tanpa temuan baru.
 
-> **Belum selesai:** review keamanan khusus diff fase B terhenti karena limit API. **Ulangi review ini sebelum fase C** dengan daftar di §8.
+### Perbaikan hasil review fase B ✅
+Review menemukan bahwa di SQLite tidak ada bug aktif, karena request tidak pernah saling menyela. Tetapi ada pola "cek di luar tx, lalu tulis" yang akan menjadi race begitu memakai pg. Semua perbaikan di bawah bekerja di kedua engine: write bersyarat dengan cek `changes === 1`, plus lock baris.
+
+1. **Approval tidak bisa dilompati.** `approvalRoutes.ts`: write pertama di tx adalah `UPDATE approval_requests … WHERE id=? AND status='pending' AND current_step=?`. Jika `changes !== 1` hasilnya 409 `NOT_CURRENT_APPROVER`. Ada tes.
+2. **Approval yang sudah diputuskan tidak bisa dihapus.** DELETE diawali `DELETE FROM approval_requests WHERE id=? AND status='pending'`, lalu wajib `changes === 1` (selain itu 409). Ada tes. Tabel approval tidak punya FK, jadi parent boleh dihapus duluan.
+3. **Kunci status dokumen.** `documentRoutes.ts` punya `lockDocument(id)` (`UPDATE contract_documents SET id = id WHERE id = ?`). Di pg ini mengunci baris. PATCH dan DELETE: lock → baca ulang status → `approvalStatusLock` → write, semua dalam satu tx.
+4. **Save gagal tidak membuang perubahan lain.** `createCoreSaver(db, memory, reload?)` menjalankan `resetSyncCache` dan `reload` **di dalam** lock save. Ada tes.
+5. **Tidak ada referensi lepas.** `recalculateStatuses` sekarang mengubah kontrak/IO di tempat (`Object.assign`), bukan mengganti array.
+6. **Nomor versi draft.** Draft dan restore membaca versi terakhir di dalam tx, setelah `lockDocument`.
+7. **Reset aplikasi.** State baru baru dipasang ke `db` setelah commit. Catch tidak lagi melakukan restore dangkal. **Jangan menambah `await`** antara membangun state dan mengembalikannya (ada komentar di kode).
+8. **Refresh lifecycle.** Satu promise in-flight (`lifecycleRefresh`) dipakai bersama oleh semua pemanggil.
+9. **Login Google bersamaan.** `isUniqueViolation(err)` di `db.ts`. Insert user yang bentrok diabaikan, lalu user dibaca ulang. Ada tes.
+10. **Impor `data_store.json` gagal** sekarang memanggil `resetSyncCache`.
+
+Gate: lint ✅, build ✅, unit 66/66 ✅, e2e sqlite 32 ✅, data-entry 41 ✅, cek promise tanpa temuan baru ✅.
 
 ---
 
@@ -192,6 +201,9 @@ Tujuannya: perubahan async yang paling berisiko diuji dulu dengan engine lama, s
    - Pembuatan kode approval: `pg_advisory_xact_lock(hashtext('approval:'||org))`.
    - `assertSuperusersRemainWithout` dan `assertAdminsRemainWithout` (`organizationAdminRoutes.ts`): statement pertama `pg_advisory_xact_lock(hashtext('legalio:admin-invariants'))`. Semua pemanggilnya harus berada di dalam `sql.tx`.
    - `acceptInvitation` tetap memeriksa `changes === 1`.
+   - **Submit approval** (`POST /approvals`) masih mengecek dokumen di luar tx. Panggil `lockDocument` lebih dulu di tx submit, lalu cek ulang bahwa dokumen ada dan belum punya approval pending. Tanpa ini, dua submit bisa lolos bersamaan, atau approval bisa menunjuk dokumen yang sudah dihapus.
+   - `isUniqueViolation` di `db.ts` perlu ditambah `|| err.code === '23505'`. Pemetaan constraint ke 409 di `saveDb` menjadi `/^23/`.
+   - Jika menambah FK di tabel approval, gunakan `ON DELETE CASCADE` atau `DEFERRABLE`. DELETE approval sekarang menghapus parent lebih dulu.
 7. **Hapus:** migrasi 003–006, `indexedConfiguration.ts`, `normalizedCoreReady`/`normalizedCoreApplied` (probe `sqlite_master`), import `sqliteDb` mentah di `server.ts`, `migrationBlock`/`MIGRATION_REQUIRED`, impor `data_store.json` (`LEGACY_DATA_FILE`), `AUTH_DB_PATH`, dan watch-ignore `*.db` di `apps/frontend/vite.config.ts`. better-auth diberi `database: pool()`.
 8. Tes:
    - Ganti nama script root: `test:sqlite` menjadi `test`, `test:e2e:sqlite` menjadi `test:e2e:postgres`.
@@ -354,10 +366,18 @@ Sebelum dipakai, uji dulu config di atas pada file probe: `if (p)`, `!p`, `p && 
 
 ---
 
-## 8. Review fase B yang tertunda
+## 8. Review fase B: selesai
 
-Sebelum mulai fase C, periksa diff fase B (`git diff --cached`, atau `git show` jika sudah di-commit) untuk:
-1. Urutan middleware otorisasi dan semua jalur penolakan. `req.teams` yang kosong harus gagal tertutup. Setiap pemanggilan `identityOf(req)` harus berada di belakang policy yang non-publik.
-2. Sisa promise yang dipakai sebagai boolean, async di callback array, atau `await` yang hilang sebelum membaca data yang bergantung pada save. Contohnya `refreshContractLifecycles` sebelum `scopedRecords`.
-3. `db.ts`: kemungkinan self-deadlock, yaitu badan tx yang menunggu sesuatu yang justru menunggu tx itu selesai (helper yang memanggil `saveDb`/`withSaveLock`, atau masuk ke better-auth). Juga error saat `COMMIT`.
-4. `init()`: hanya statement yang dipindah, bukan deklarasi fungsi hoisted. Urutan mount middleware dan route harus sama dengan sebelumnya.
+Sudah dicek dan aman:
+- Middleware otorisasi: urutan dan semua jalur penolakannya. `req.teams` yang kosong gagal tertutup.
+- Semua `identityOf(req)` berada di belakang policy non-publik.
+- `/uploads`, pencarian, undangan dan visibilitas approval.
+- Pemetaan transaksi, tanpa self-deadlock.
+- Penanganan `COMMIT` yang gagal di `db.ts`.
+- Pemindahan ke `init()`.
+- Cek promise menangkap `!p`.
+
+Kesepuluh temuan sudah diperbaiki (§3). Batasan yang tersisa:
+- **Save gagal saat ada perubahan lain di memori.** Jika save A gagal sementara request B sudah mengubah memori, reload membuang perubahan B, padahal save B tetap melaporkan sukses. Data tetap konsisten, tetapi edit B hilang. Perbaikannya butuh pelacakan perubahan per request; di luar scope.
+- **Baris `account` Google bisa dobel.** Login Google bersamaan masih bisa menyisipkan dua baris, karena tidak ada unique key (userId, providerId). Tidak berbahaya.
+- **Belum ada tes race** untuk temuan 3, 6 dan 8; tes ini perlu interleave ala pg. Tambahkan di fase D jika murah.

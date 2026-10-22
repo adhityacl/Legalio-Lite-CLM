@@ -23,7 +23,7 @@ import { buildMatrix as buildRbacMatrix, can, hasOrganizationScope, type OrgCont
 import {
   RequestDenied, accessibleOrganizations, identityOf, isIdentityBanned, resolveIdentity, resolveLegacyContext, resolveOrganizationContext, sendError,
 } from "./identity";
-import { sql } from "./db";
+import { isUniqueViolation, sql } from "./db";
 import { BETTER_AUTH_ALLOWED, createAuthorizationMiddleware, isBetterAuthPathAllowed } from "./routePolicies";
 import { createOrganizationScope, filterRecords, recordVisible, normalizeDepartmentName, teamsOf, type RecordKind } from "./recordScope";
 import { IS_TEST_MODE, LEGACY_DATA_FILE, UPLOADS_DIR, REPOSITORY_DIR, APP_DATA_DIR } from "./runtimePaths";
@@ -1456,7 +1456,7 @@ function sanitizeIdentifiers(value: unknown): Array<{ scheme: string; value: str
       country: sanitizeCountryCode(item.country),
     }));
 }
-const coreSaver = createCoreSaver(sql, () => db);
+const coreSaver = createCoreSaver(sql, () => db, async () => { Object.assign(db, await loadCoreDataFromSqlite()); });
 /** Persists the in-memory projection: one writer at a time, never inside sql.tx. */
 async function saveDb() {
   uploadIndex = null;
@@ -1466,7 +1466,6 @@ async function saveDb() {
     await coreSaver.save();
   } catch (err) {
     console.error("Failed to save core data to SQLite", err);
-    Object.assign(db, await loadCoreDataFromSqlite());
     if (String((err as any)?.code || '').startsWith('SQLITE_CONSTRAINT')) (err as any).status = 409;
     throw err;
   }
@@ -1746,33 +1745,36 @@ async function recalculateStatuses() {
     }
   };
 
-  db.contracts = (db.contracts || []).map((contract) => {
+  // In place, not copies: a handler holding a record across an await must not end up mutating a detached object.
+  for (const contract of db.contracts || []) {
     rollForwardAutoRenewal(contract);
     const { daysRemaining, status } = contractLifecycle(contract, getTenantSettings(contract.organizationId));
     if (status !== 'Terminated' && daysRemaining !== null) emitReminder("contract", contract, daysRemaining);
-    return {
-      ...contract,
+    Object.assign(contract, {
       status,
       days_remaining: daysRemaining ?? contract.days_remaining,
       updated_at: contract.updated_at || new Date().toISOString(),
-    };
-  });
-  db.ios = (db.ios || []).map((io) => {
-    if (normalizeContractStatus(io.status) === "Terminated") return { ...io, status: "Terminated" };
+    });
+  }
+  for (const io of db.ios || []) {
+    if (normalizeContractStatus(io.status) === "Terminated") { io.status = "Terminated"; continue; }
     const { daysRemaining, status } = computeLifecycle(io.organizationId, io.end_date, io.status, false);
     if (daysRemaining !== null) emitReminder("commercial", io, daysRemaining);
-    return {
-      ...io,
+    Object.assign(io, {
       status,
       days_remaining: daysRemaining ?? io.days_remaining,
       updated_at: io.updated_at || new Date().toISOString(),
-    };
-  });
+    });
+  }
   await saveDb();
   return newNotifsCount;
 }
-/** Reads refresh date-driven status without sending reminders or requiring a cron run. */
-async function refreshContractLifecycles() {
+let lifecycleRefresh: Promise<void> | null = null;
+/** Reads refresh date-driven status without sending reminders or requiring a cron run. Concurrent reads share one in-flight refresh, so none returns before its save lands. */
+function refreshContractLifecycles(): Promise<void> {
+  return lifecycleRefresh ??= refreshLifecyclesOnce().finally(() => { lifecycleRefresh = null; });
+}
+async function refreshLifecyclesOnce() {
   if (Date.now() < lifecyclesFreshUntil) return;
   lifecyclesFreshUntil = Date.now() + 60_000;
   let changed = false;
@@ -5685,12 +5687,15 @@ app.post(
       const invited = await hasApprovalInvitation(sql, cleanEmail, req.get('x-invitation-token'));
       let existingUser: any = await sql.get(`SELECT id, name, role, banned, banReason, banExpires FROM "user" WHERE LOWER(email) = ?`, cleanEmail);
       if (!existingUser) {
-        const newId = `usr_${crypto.randomUUID()}`;
-        await sql.run(`
-          INSERT INTO "user" (id, name, email, emailVerified, image, role, banned, banReason, createdAt, updatedAt)
-          VALUES (?, ?, ?, 1, ?, 'user', ?, ?, ?, ?)
-        `, newId, userName, cleanEmail, photoURL || null, invited ? 0 : 1, invited ? null : 'PENDING_APPROVAL', now, now);
-        existingUser = await sql.get('SELECT id, name, role, banned, banReason, banExpires FROM "user" WHERE id = ?', newId);
+        try {
+          await sql.run(`
+            INSERT INTO "user" (id, name, email, emailVerified, image, role, banned, banReason, createdAt, updatedAt)
+            VALUES (?, ?, ?, 1, ?, 'user', ?, ?, ?, ?)
+          `, `usr_${crypto.randomUUID()}`, userName, cleanEmail, photoURL || null, invited ? 0 : 1, invited ? null : 'PENDING_APPROVAL', now, now);
+        } catch (err) {
+          if (!isUniqueViolation(err)) throw err; // a concurrent sign-in of the same address created it first
+        }
+        existingUser = await sql.get(`SELECT id, name, role, banned, banReason, banExpires FROM "user" WHERE LOWER(email) = ?`, cleanEmail);
       }
       if (existingUser.banReason === 'PENDING_APPROVAL' && invited) {
         await sql.run('UPDATE "user" SET banned = 0, banReason = NULL, banExpires = NULL, updatedAt = ? WHERE id = ?', now, existingUser.id);
@@ -6353,7 +6358,7 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
    * membership in the new organization; the acting superuser manages it in
    * platform context. The append-only audit log is never cleared.
    */
-  const previousState = { ...db };
+  let nextState: Record<string, any> = {};
   try {
     await coreSaver.withSaveLock(() => sql.tx(async () => {
       // Clear editor data and extraction caches with the same reset.
@@ -6372,11 +6377,15 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
         allowedUsers: mode === "demo" && process.env.NODE_ENV !== "production" ? dataset.allowedUsers : [],
       });
       await sql.run("UPDATE session SET activeOrganizationId = NULL, activeTeamId = NULL");
+      const tenants = migrationBlock ? [] : await buildTenantProjection(sql);
 
-      // Mutate `db` in place: the auth console holds a reference to this object.
+      // Built on `db` (tenant policy and migrateLegacyRecords read it), then swapped back before the next await:
+      // other handlers keep the committed state until this transaction commits.
+      const liveState = { ...db };
       const provider = db.googleConfig || {};
+      let snapshot: ReturnType<typeof coreSaver.snapshot>;
       Object.assign(db, {
-        tenants: [],
+        tenants,
         allowedUsers: [],
         partners: dataset.partners,
         contracts: dataset.contracts,
@@ -6410,11 +6419,16 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
           accessToken: "",
         },
       });
-      await refreshTenantProjection();
-      migrateLegacyRecords();
+      try {
+        migrateLegacyRecords();
+        snapshot = coreSaver.snapshot();
+        nextState = { ...db };
+      } finally {
+        Object.assign(db, liveState);
+      }
       // search_records was emptied above, so no fingerprint may skip a row; the replacement and its business records commit together.
       resetSyncCache(sql);
-      await syncDbToSqlite(coreSaver.snapshot());
+      await syncDbToSqlite(snapshot);
       await appendAudit(sql, auditActorFor(req, identity), {
         organizationId: null, action: "platform.application.reset", targetType: "installation", targetId: "installation",
         outcome: "success", changedFields: [`mode:${mode}`],
@@ -6422,10 +6436,11 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
     }));
   } catch (err) {
     resetSyncCache(sql);
-    Object.assign(db, previousState);
     console.error("Error resetting auth organization tables:", err);
     return res.status(500).json({ error: "Failed to reset organization tables." });
   }
+  // Mutate `db` in place: the auth console holds a reference to this object.
+  Object.assign(db, nextState);
 
   if (fs.existsSync(uploadsDir)) {
     try {

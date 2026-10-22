@@ -190,6 +190,10 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
       return handler(req, res, doc, actorOf(req)!);
     };
 
+  // First statement of a tx that checks then writes one document: on pg the row lock queues other writers of it
+  // and later statements see their commits (FOR UPDATE equivalent); SQLite already runs one tx at a time.
+  const lockDocument = (id: string) => db.run(`UPDATE contract_documents SET id = id WHERE id = ?`, id);
+
   const latestDraft = async (contractId: string) =>
     await db.get(`SELECT * FROM contract_drafts WHERE contract_id = ? ORDER BY version_number DESC LIMIT 1`, contractId) as
       | DraftRow
@@ -325,12 +329,18 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
       const { status, type } = req.body ?? {};
       if (status !== undefined && !isOneOf(DOCUMENT_STATUSES, status)) return res.status(400).json({ error: "Invalid status." });
       if (type !== undefined && !isOneOf(DOCUMENT_TYPES, type)) return res.status(400).json({ error: "Invalid type." });
-      const locked = status === undefined ? null : await approvalStatusLock(db, doc.id, doc.status, status);
+      const locked = await db.tx(async () => {
+        await lockDocument(doc.id);
+        const current = (await db.get(`SELECT status FROM contract_documents WHERE id = ?`, doc.id) as { status: string } | undefined)?.status ?? doc.status;
+        const reason = status === undefined ? null : await approvalStatusLock(db, doc.id, current, status);
+        if (reason) return reason;
+        await db.run(`
+          UPDATE contract_documents SET name = ?, status = COALESCE(?, status), type = COALESCE(?, type), page_layout = COALESCE(?, page_layout), modified_by = ?, modified_at = ?
+          WHERE id = ?
+        `, name, status ?? null, type ?? null, pageLayoutJson(req.body?.page_layout), actor.id, new Date().toISOString(), doc.id);
+        return null;
+      });
       if (locked) return res.status(409).json({ error: "APPROVAL_OWNS_STATUS", message: locked });
-      await db.run(`
-        UPDATE contract_documents SET name = ?, status = COALESCE(?, status), type = COALESCE(?, type), page_layout = COALESCE(?, page_layout), modified_by = ?, modified_at = ?
-        WHERE id = ?
-      `, name, status ?? null, type ?? null, pageLayoutJson(req.body?.page_layout), actor.id, new Date().toISOString(), doc.id);
       res.json(await documentDetail(doc.id));
     }),
   );
@@ -338,14 +348,17 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
   router.delete(
     "/documents/:id",
     withDocument(async (_req, res, doc) => {
-      const locked = await approvalStatusLock(db, doc.id, doc.status, null);
-      if (locked) return res.status(409).json({ error: "APPROVAL_OWNS_STATUS", message: locked });
-      await db.tx(async () => {
+      const locked = await db.tx(async () => {
+        await lockDocument(doc.id);
+        const reason = await approvalStatusLock(db, doc.id, doc.status, null);
+        if (reason) return reason;
         for (const table of ["contract_comments", "document_metadata", "contract_drafts"]) {
           await db.run(`DELETE FROM ${table} WHERE contract_id = ?`, doc.id);
         }
         await db.run(`DELETE FROM contract_documents WHERE id = ?`, doc.id);
+        return null;
       });
+      if (locked) return res.status(409).json({ error: "APPROVAL_OWNS_STATUS", message: locked });
       res.json({ success: true });
     }),
   );
@@ -384,27 +397,28 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
       const kind = req.body?.kind === "auto" ? "auto" : "manual";
       const name = cleanName(req.body?.name) || doc.name;
       const at = new Date().toISOString();
-      const latest = await latestDraft(doc.id);
-      const version = latest?.version_number ?? 0;
+      const saved = await db.tx(async () => {
+        // Read under the lock: concurrent saves would otherwise pick the same next version and collide on the unique key.
+        await lockDocument(doc.id);
+        const latest = await latestDraft(doc.id);
+        const version = latest?.version_number ?? 0;
 
-      if (latest && latest.content_hash === sha256(content)) {
-        if (name !== doc.name) {
-          await db.run(`UPDATE contract_documents SET name = ?, modified_by = ?, modified_at = ? WHERE id = ?`, name, actor.id, at, doc.id);
+        if (latest && latest.content_hash === sha256(content)) {
+          if (name !== doc.name) {
+            await db.run(`UPDATE contract_documents SET name = ?, modified_by = ?, modified_at = ? WHERE id = ?`, name, actor.id, at, doc.id);
+          }
+          return { version, created: false };
         }
-        return res.json({ document: await documentDetail(doc.id), version, created: false });
-      }
 
-      const coalesce =
-        latest &&
-        kind === "auto" &&
-        latest.save_kind === "auto" &&
-        latest.saved_by === actor.id &&
-        latest.draft_name === null &&
-        latest.labels === "[]" &&
-        Date.now() - Date.parse(latest.created_at) < AUTOSAVE_COALESCE_MS;
-      const nextVersion = coalesce ? version : version + 1;
-
-      await db.tx(async () => {
+        const coalesce =
+          latest &&
+          kind === "auto" &&
+          latest.save_kind === "auto" &&
+          latest.saved_by === actor.id &&
+          latest.draft_name === null &&
+          latest.labels === "[]" &&
+          Date.now() - Date.parse(latest.created_at) < AUTOSAVE_COALESCE_MS;
+        const nextVersion = coalesce ? version : version + 1;
         if (coalesce) {
           await db.run(`
             UPDATE contract_drafts SET content = ?, content_hash = ?, file_size = ?, saved_at = ?
@@ -416,8 +430,9 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
         await setCurrentContent(doc.id, content, nextVersion, actor.id, at);
         await db.run(`UPDATE contract_documents SET name = ? WHERE id = ?`, name, doc.id);
         await pruneDrafts(doc.id);
+        return { version: nextVersion, created: !coalesce };
       });
-      res.json({ document: await documentDetail(doc.id), version: nextVersion, created: !coalesce });
+      res.json({ document: await documentDetail(doc.id), ...saved });
     }),
   );
 
@@ -440,18 +455,18 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
     withDocument(async (req, res, doc, actor) => {
       const source = await db.get(`SELECT version_number, content, content_hash FROM contract_drafts WHERE contract_id = ? AND version_number = ?`, doc.id, Number(req.params.version)) as Pick<DraftRow, "version_number" | "content" | "content_hash"> | undefined;
       if (!source) return res.status(404).json({ error: "Version not found." });
-      const latest = (await latestDraft(doc.id))!;
-      if (latest.content_hash === source.content_hash) {
-        return res.json({ document: await documentDetail(doc.id), version: latest.version_number, created: false });
-      }
       const at = new Date().toISOString();
-      const nextVersion = latest.version_number + 1;
-      await db.tx(async () => {
+      const restored = await db.tx(async () => {
+        await lockDocument(doc.id);
+        const latest = (await latestDraft(doc.id))!;
+        if (latest.content_hash === source.content_hash) return { version: latest.version_number, created: false };
+        const nextVersion = latest.version_number + 1;
         await insertDraft(doc.id, nextVersion, source.content, actor.id, "restore", at, source.version_number);
         await setCurrentContent(doc.id, source.content, nextVersion, actor.id, at);
         await pruneDrafts(doc.id);
+        return { version: nextVersion, created: true };
       });
-      res.json({ document: await documentDetail(doc.id), version: nextVersion, created: true });
+      res.json({ document: await documentDetail(doc.id), ...restored });
     }),
   );
 

@@ -1,4 +1,4 @@
-import { normalizedCoreReady, readBusinessRows } from '../normalizedCoreStore';
+import { normalizedCoreReady, readBusinessRows, resetSyncCache } from '../normalizedCoreStore';
 import { migratePartnerContact } from '../partnerContact';
 import { synchronizeCoreData } from '../coreDataStore';
 import { ensureTenantBoundarySchema } from '../organizationSettingsStore';
@@ -404,7 +404,8 @@ export async function initializeCoreDataSchema() {
 }
 
 export function hydrateCoreDataFromJson(data: any) {
-  return synchronizeCoreData(sql, renameLegacyKeys(data));
+  // A rolled-back import must not leave fingerprints of rows it never committed.
+  return synchronizeCoreData(sql, renameLegacyKeys(data)).catch((err) => { resetSyncCache(sql); throw err; });
 }
 
 export async function loadCoreDataFromSqlite() {

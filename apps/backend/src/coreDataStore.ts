@@ -144,7 +144,7 @@ const PERSISTED = ['allowedUsers', ...ENTITIES.map(entity => entity.collection),
  * comes, so handlers mutating `memory` during a write cannot tear it. The lock is taken outside the transaction
  * (waiters hold no connection); `withSaveLock` lets other writers of the same tables join the queue.
  */
-export function createCoreSaver(db: Sql, memory: () => Record<string, any>) {
+export function createCoreSaver(db: Sql, memory: () => Record<string, any>, reload?: () => Promise<void>) {
   let queue: Promise<unknown> = Promise.resolve();
   const withSaveLock = <T>(fn: () => Promise<T>): Promise<T> => {
     if (process.env.NODE_ENV !== 'production' && db.inTx()) throw new Error('Saves must not start inside a transaction.');
@@ -153,7 +153,7 @@ export function createCoreSaver(db: Sql, memory: () => Record<string, any>) {
     return run;
   };
   const snapshot = () => { const data = memory(); return structuredClone(Object.fromEntries(PERSISTED.filter(key => data[key] !== undefined).map(key => [key, data[key]]))); };
-  /** `alongside` runs in the same transaction after the sync (e.g. the audit row of the change being saved). */
+  /** `alongside` runs in the same transaction after the sync (e.g. the audit row of the change being saved); `reload` restores `memory` from the database after a failed save. */
   const save = (alongside?: () => Promise<unknown>) => withSaveLock(async () => {
     const data = snapshot();
     try {
@@ -163,6 +163,8 @@ export function createCoreSaver(db: Sql, memory: () => Record<string, any>) {
       });
     } catch (error) {
       resetSyncCache(db);
+      // Still holding the lock: the next queued save must snapshot the reloaded state, not the one that just failed.
+      await reload?.();
       throw error;
     }
   });

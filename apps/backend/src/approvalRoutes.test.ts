@@ -38,7 +38,10 @@ async function setup() {
     }
     next();
   });
-  app.use('/api', createApprovalRouter({ db: sql, tenantOf: (req) => (req as any).orgContext.organizationId }));
+  // `beforeTx` runs once, after the handler's checks and before its transaction: a concurrent request landing in that gap.
+  const hooks: { beforeTx?: () => Promise<unknown> } = {};
+  const racy = { ...sql, tx: async <T>(fn: () => Promise<T>) => { const hook = hooks.beforeTx; hooks.beforeTx = undefined; await hook?.(); return sql.tx(fn); } };
+  app.use('/api', createApprovalRouter({ db: racy, tenantOf: (req) => (req as any).orgContext.organizationId }));
   const server = app.listen(0);
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
   const call = async (user: string, method: string, path: string, body?: unknown, org = 'org-a') => {
@@ -49,7 +52,7 @@ async function setup() {
     });
     return { status: res.status, body: (res.headers.get('content-type')?.includes('json') ? await res.json() : await res.text()) as any };
   };
-  return { db, call, close: () => { server.close(); db.close(); } };
+  return { db, call, hooks, close: () => { server.close(); db.close(); } };
 }
 
 const docStatus = (db: Database.Database) => (db.prepare(`SELECT status FROM contract_documents WHERE id = 'doc-1'`).get() as any).status;
@@ -141,5 +144,31 @@ test('viewers are not offered or accepted as approvers', async () => {
     assert.ok(!approvers.includes('vw'));
     const created = await call('al', 'POST', '/approvals', { title: 'NDA', category: 'nda', approverIds: ['vw'], documentId: 'doc-1' });
     assert.equal(created.status, 400);
+  } finally { close(); }
+});
+
+test('a double-submitted decision cannot skip the next approver', async () => {
+  const { call, hooks, close } = await setup();
+  try {
+    const { id } = (await call('al', 'POST', '/approvals', { title: 'NDA', category: 'nda', approverIds: ['as', 'bw'], documentId: 'doc-1' })).body;
+    let twin: Awaited<ReturnType<typeof call>> | undefined;
+    hooks.beforeTx = async () => { twin = await call('as', 'POST', `/approvals/${id}/decision`, { decision: 'approve' }); };
+    const first = await call('as', 'POST', `/approvals/${id}/decision`, { decision: 'approve' });
+    assert.deepEqual([twin?.status, first.status], [200, 409]);
+    const detail = (await call('al', 'GET', `/approvals/${id}`)).body;
+    assert.deepEqual([detail.status, detail.current_step, detail.steps.map((s: any) => s.status)], ['pending', 2, ['approved', 'waiting']]);
+    assert.equal((await call('bw', 'POST', `/approvals/${id}/decision`, { decision: 'approve' })).status, 200);
+    assert.equal((await call('al', 'GET', `/approvals/${id}`)).body.status, 'approved');
+  } finally { close(); }
+});
+
+test('an approval decided while its delete is in flight is kept', async () => {
+  const { db, call, hooks, close } = await setup();
+  try {
+    const { id } = (await call('al', 'POST', '/approvals', { title: 'NDA', category: 'nda', approverIds: ['as'], documentId: 'doc-1' })).body;
+    hooks.beforeTx = () => call('as', 'POST', `/approvals/${id}/decision`, { decision: 'approve' });
+    assert.equal((await call('al', 'DELETE', `/approvals/${id}`)).status, 409);
+    assert.equal((await call('al', 'GET', `/approvals/${id}`)).body.status, 'approved');
+    assert.equal(docStatus(db), 'approved');
   } finally { close(); }
 });

@@ -109,3 +109,7 @@ export function createSql(connection: Database.Database): Sql {
   if (!facade) facades.set(connection, facade = build(() => connection));
   return facade;
 }
+
+/** A duplicate key on insert; callers treat it as "someone else created it first" and re-read. Phase D adds pg `23505`. */
+export const isUniqueViolation = (err: unknown) =>
+  ['SQLITE_CONSTRAINT_UNIQUE', 'SQLITE_CONSTRAINT_PRIMARYKEY'].includes(String((err as { code?: unknown } | null)?.code));

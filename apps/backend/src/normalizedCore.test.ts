@@ -158,6 +158,25 @@ test('serialized saves snapshot when their turn comes, so mutations during a wri
   } finally {db.close();}
 });
 
+test('a failed save reloads memory inside the lock, so the queued save neither replays the bad state nor loses its own write', async () => {
+  const {db,rows,s} = fixture();
+  try {
+    await migrateNormalizedCore(db);
+    db.exec('CREATE TABLE allowed_users (id TEXT PRIMARY KEY, email TEXT, name TEXT, role TEXT, status TEXT, organizationId TEXT, payload TEXT, createdAt TEXT, updatedAt TEXT); CREATE TABLE audit (note TEXT)');
+    const persisted = structuredClone(rows);
+    let memory: Record<string, any> = rows;
+    const saver = createCoreSaver(s, () => memory, async () => { memory = structuredClone(persisted); });
+    memory.ios.push({...memory.ios[0]});
+    const failed = saver.save();
+    const queued = saver.save(() => s.run(`INSERT INTO audit VALUES ('queued')`));
+    await assert.rejects(failed, /Duplicate io_id/);
+    await queued;
+    assert.equal(memory.ios.length, 1);
+    assert.equal((await readBusinessRows(s,'insertion_orders')).length, 1);
+    assert.deepEqual(db.prepare('SELECT note FROM audit').all(), [{ note: 'queued' }]);
+  } finally {db.close();}
+});
+
 test('field-name migration renames columns, extra_json aliases, views and indexes of an existing database, once', async () => {
   const {db,s} = fixture();
   try {

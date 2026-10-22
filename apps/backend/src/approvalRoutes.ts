@@ -295,21 +295,23 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
 
     const at = new Date().toISOString();
     const stepStatus = decision === "approve" ? "approved" : "rejected";
-    await db.tx(async () => {
-      await db.run(`UPDATE approval_steps SET status = ?, comment = ?, decided_at = ? WHERE id = ?`, stepStatus, comment, at, step.id);
-      await db.run(`INSERT INTO approval_events (id, request_id, actor_id, kind, message, created_at) VALUES (?, ?, ?, ?, ?, ?)`, newId("ape"), row.id, ctx.userId, stepStatus, comment, at);
+    const decided = await db.tx(async () => {
       const { total } = await db.get(`SELECT COUNT(*) AS total FROM approval_steps WHERE request_id = ?`, row.id) as { total: number };
       const finished = decision === "reject" || row.current_step >= total;
-      if (finished) {
-        await db.run(`UPDATE approval_requests SET status = ?, decided_at = ? WHERE id = ?`, stepStatus, at, row.id);
-        if (row.document_id) {
-          await db.run(`UPDATE contract_documents SET status = ? WHERE id = ?`, decision === "approve" ? "approved" : "draft", row.document_id);
-        }
-      } else {
-        await db.run(`UPDATE approval_requests SET current_step = current_step + 1 WHERE id = ?`, row.id);
+      // Guarded on the step checked above: a concurrent decision that already moved the request on matches nothing.
+      const { changes } = finished
+        ? await db.run(`UPDATE approval_requests SET status = ?, decided_at = ? WHERE id = ? AND status = 'pending' AND current_step = ?`, stepStatus, at, row.id, row.current_step)
+        : await db.run(`UPDATE approval_requests SET current_step = current_step + 1 WHERE id = ? AND status = 'pending' AND current_step = ?`, row.id, row.current_step);
+      if (changes !== 1) return false;
+      await db.run(`UPDATE approval_steps SET status = ?, comment = ?, decided_at = ? WHERE id = ?`, stepStatus, comment, at, step.id);
+      await db.run(`INSERT INTO approval_events (id, request_id, actor_id, kind, message, created_at) VALUES (?, ?, ?, ?, ?, ?)`, newId("ape"), row.id, ctx.userId, stepStatus, comment, at);
+      if (finished && row.document_id) {
+        await db.run(`UPDATE contract_documents SET status = ? WHERE id = ?`, decision === "approve" ? "approved" : "draft", row.document_id);
       }
       await audit(req, ctx, `approval.${decision}`, row.id);
+      return true;
     });
+    if (!decided) return res.status(409).json({ error: "NOT_CURRENT_APPROVER", message: "This approval is no longer waiting for you." });
     res.json({ ok: true });
   }));
 
@@ -317,18 +319,18 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
     if (row.created_by !== ctx.userId) {
       return res.status(403).json({ error: "NOT_REQUESTER", message: "Only the requester can delete this approval." });
     }
-    if (row.status !== "pending") {
-      return res.status(409).json({ error: "APPROVAL_FINISHED", message: "A decided approval is part of the record and cannot be deleted." });
-    }
-    await db.tx(async () => {
+    const deleted = await db.tx(async () => {
+      // Parent first and guarded: a decision committed since the check above keeps the request. No FKs, so order is free.
+      if ((await db.run(`DELETE FROM approval_requests WHERE id = ? AND status = 'pending'`, row.id)).changes !== 1) return false;
       for (const table of ["approval_steps", "approval_events"]) await db.run(`DELETE FROM ${table} WHERE request_id = ?`, row.id);
-      await db.run(`DELETE FROM approval_requests WHERE id = ?`, row.id);
       // A withdrawn review must not leave the document stuck in pending_review.
-      if (row.status === "pending" && row.document_id) {
+      if (row.document_id) {
         await db.run(`UPDATE contract_documents SET status = 'draft' WHERE id = ? AND status = 'pending_review'`, row.document_id);
       }
       await audit(req, ctx, "approval.delete", row.id);
+      return true;
     });
+    if (!deleted) return res.status(409).json({ error: "APPROVAL_FINISHED", message: "A decided approval is part of the record and cannot be deleted." });
     res.json({ ok: true });
   }));
 

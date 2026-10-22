@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import Database from 'better-sqlite3';
-import { createSql } from './db';
+import { createSql, isUniqueViolation } from './db';
 
 function fixture() {
   const raw = new Database(':memory:');
@@ -93,5 +93,19 @@ test('concurrent outermost transactions run one at a time in call order', async 
     hold.open();
     await Promise.all([first, second]);
     assert.deepEqual(events, ['first:start', 'first:end', 'second:start', 'second:end']);
+  } finally { raw.close(); }
+});
+
+test('isUniqueViolation recognizes duplicate keys only', async () => {
+  const { raw, sql } = fixture();
+  try {
+    raw.exec('CREATE TABLE e (email TEXT UNIQUE, n INTEGER NOT NULL)');
+    await sql.run(`INSERT INTO t (id) VALUES (1)`);
+    await sql.run(`INSERT INTO e VALUES ('a', 1)`);
+    const failure = (text: string) => sql.run(text).then(() => assert.fail('expected a constraint error'), (err) => err);
+    assert.ok(isUniqueViolation(await failure(`INSERT INTO t (id) VALUES (1)`)));
+    assert.ok(isUniqueViolation(await failure(`INSERT INTO e VALUES ('a', 2)`)));
+    assert.ok(!isUniqueViolation(await failure(`INSERT INTO e VALUES ('b', NULL)`)));
+    assert.ok(!isUniqueViolation(null));
   } finally { raw.close(); }
 });
