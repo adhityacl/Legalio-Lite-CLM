@@ -2,7 +2,7 @@
 
 Status per 22 Oktober 2026. Branch: `PostgreSQL`.
 
-Pekerjaan dibagi menjadi 7 fase (A–G). **Fase A, B dan C selesai.** Review keamanan fase B sudah dilakukan dan 10 temuannya sudah diperbaiki; semua tes hijau. **Fase D–G belum dikerjakan.** File ini di-update dan di-push setiap kali satu fase selesai. Dokumen ini berisi semua yang perlu diketahui untuk melanjutkan. Catatan kerja sebelumnya (rencana arsitek dan review) hanya disimpan di `/tmp` dan sudah hilang, jadi isinya dirangkum ulang di sini.
+Pekerjaan dibagi menjadi 7 fase (A–G). Fase D dipecah menjadi D1 (backend pg dan skema, sifatnya hanya menambah) dan D2 (pindah engine). **Fase A, B, C dan D1 selesai.** Review keamanan fase B sudah dilakukan dan 10 temuannya sudah diperbaiki; semua tes hijau. **Fase D2, E, F dan G belum dikerjakan.** File ini di-update dan di-push setiap kali satu fase selesai. Dokumen ini berisi semua yang perlu diketahui untuk melanjutkan. Catatan kerja sebelumnya (rencana arsitek dan review) hanya disimpan di `/tmp` dan sudah hilang, jadi isinya dirangkum ulang di sini.
 
 > **Jangan merge ke `main` sebelum fase G selesai.** `.github/workflows/deploy.yml` men-deploy `main` ke produksi secara otomatis. Fase A dan B tidak aman dideploy sendirian (lihat §6). Setelah merge, produksi akan mulai dengan PostgreSQL kosong. Itu memang keputusannya, tetapi **jangan hapus `/data/kaelyn.db`** di server; biarkan sebagai arsip.
 
@@ -132,6 +132,38 @@ Gate: lint ✅, build ✅, unit 66/66 ✅, e2e sqlite 32 ✅, data-entry 41 ✅,
 - **Tes:** `objectStore.test.ts` (5), `secretBox.test.ts` (3, termasuk store kredensial), reset org di `memoryStore`, upload di e2e dicek lewat HTTP, dan endpoint COS di e2e (400/401/403/404).
 - **Gate:** lint ✅, build ✅, unit 74/74 ✅, e2e sqlite 32 ✅, data-entry 41 ✅, cek promise tanpa temuan baru ✅, grep `UPLOADS_DIR` kosong ✅.
 
+### Fase D1: backend pg dan skema (hanya menambah; aplikasi masih SQLite) ✅
+- **`db.ts`** (backend SQLite tidak berubah):
+  - `toPg(text, params)`: `?` dan `@name` menjadi `$n`. `@name` yang berulang memakai `$n` yang sama; `@name` yang hilang melempar error.
+  - Assert camelCase dan `user` di luar produksi.
+  - Type parser per query: 1184 menjadi string ISO; 20 menjadi Number (atau string jika tidak aman).
+  - `pgSql`, `connect`/`pool`/`end`, `resolveDatabaseConfig`, `testConnection`, `saveDatabaseConfig` (0600).
+  - `isUniqueViolation` juga mengenali `23505`.
+  - Guard mode tes: nama database wajib diawali `legalio_test_`.
+- **`schema.ts` → `ensureSchema()`:**
+  - Urutan: better-auth `getMigrations(authOptions(pool()))` → tabel inti dan `apikey` → tabel tenant-boundary (`organization_settings`, `organization_integrations`, `audit_log`, `schema_migrations`) → `createNormalizedCoreSchema(sql, true)` → index status → dokumen → approval (`file_data bytea`, `approval_events.seq`) → mail, kredensial, instalasi → `uq_member_org_user`, `uq_team_member`.
+  - Idempoten. **Belum dipanggil aplikasi.**
+- **`lib/auth.ts`:** `authOptions(database)` berupa fungsi, karena `baseURL` dibaca ulang saat `reloadAuthConfiguration`.
+- **`normalizedCoreStore.ts`:** `createNormalizedCoreSchema(db, postgres)`.
+- **`runtimePaths.ts`:** `DATABASE_CONFIG_FILE`.
+- **`testDatabase.ts`:** `createTestDatabase()` mengembalikan `{ name, url, drop }`. `drop` menjalankan `DROP … WITH (FORCE)`.
+- **Script baru `npm run test:pg`:** `db.pg.test.ts` (9 tes) dan `schema.test.ts` (1 tes). Butuh container pg (§2).
+- **Gate:** lint ✅, build ✅, sqlite 74/74 ✅, pg 10/10 ✅, e2e 32 ✅, data-entry 41 ✅, promise ✅, tidak ada DB tes yang tertinggal ✅.
+
+**Fakta skema better-auth 1.7.5 di pg17** (NN = NOT NULL):
+- `session.updatedAt` dan `account.updatedAt` bersifat NN tanpa default.
+- `account` tidak punya `issuer`.
+- `organization.slug` NN dan UNIQUE. `organization.createdAt`, `team.createdAt`, `member.createdAt`, `team.memberCount` dan `invitation.expiresAt` NN tanpa default.
+- `teamMember.membershipKey` bertipe text dengan index UNIQUE. Insert manual harus mengisi NULL atau nilai yang unik.
+- `member.status` nullable tanpa default, jadi insert manual wajib menulis `'active'`.
+- Semua FK `ON DELETE CASCADE`, termasuk `invitation.inviterId` → `"user"`.
+
+**Jebakan pg:**
+- Satu statement yang error membatalkan seluruh transaksi. Pola catch-lalu-lanjut di dalam `sql.tx` wajib dibungkus `sql.tx(...)` bersarang (savepoint).
+- `SUM` atas bigint mengembalikan **string**.
+- `toPg` tidak memahami komentar SQL, jadi jangan menulis `'` atau kata camelCase di komentar `--`.
+- `connect()` melempar error jika pool sudah ada. Panggil `end()` sebelum retry (penting untuk fase F).
+
 > **Perilaku baru di dev:** di luar `APP_TEST_MODE`, upload mengembalikan 503 sampai superuser menyimpan COS di /sys (tab Google credentials) atau, setelah fase F, di onboarding. File lama di `uploads/` tidak lagi dilayani; ini sesuai keputusan "tanpa impor".
 
 ---
@@ -187,7 +219,37 @@ Hasilnya ada di §3. Spesifikasi asli disimpan di bawah sebagai referensi. Penyi
    - Bagian reset organisasi di `normalizedCore.test.ts` memakai `memoryStore`.
    - E2E memeriksa upload lewat `GET /uploads/...` (200, atau 404 setelah reset), bukan dengan membaca disk.
 
-### Fase D: ganti engine ke PostgreSQL
+### Fase D: ganti engine ke PostgreSQL (D1 ✅, D2 belum)
+
+**Checklist D2, berurutan** (dari hasil D1; melengkapi spesifikasi di bawah):
+1. Hapus `better-sqlite3` dan `@types/better-sqlite3` (di backend **dan** root), `@better-auth/cli`, `apps/backend/auth.config.ts`, serta script `auth:generate`/`auth:migrate`.
+2. `db.ts`: `sql` menjadi facade pg (rename `pgSql`). Hapus `build`, `plain`, `useSqlite`, `createSql`, import better-sqlite3 dan kode `SQLITE_CONSTRAINT_*`. `db.test.ts` diganti `db.pg.test.ts`.
+3. `lib/auth.ts`:
+   - Hapus `sqliteDb`, pragma, `useSqlite`, `initAuthDatabase` dan `initializeCoreDataSchema`.
+   - `createAuth = () => betterAuth(authOptions(pool()))`.
+   - `loadCoreDataFromSqlite` tidak lagi membaca `tenants`/`departments` dan tidak lagi punya cabang `normalizedCoreReady`.
+4. `server.ts` `init()`:
+   - `connect(resolveDatabaseConfig())`, sampai fase F mengambil alih, lalu `ensureSchema()`.
+   - `googleCredentials.init` dan `loadInstallationSettings` tetap memuat baris ke memori, tetapi tanpa CREATE.
+   - Hapus import `sqliteDb` mentah, migrasi 003–006, `migrationBlock`/`MIGRATION_REQUIRED`, `LEGACY_DATA_FILE` dan `AUTH_DB_PATH`.
+5. Hapus DDL modul yang sekarang dimiliki `schema.ts`: `ensureTenantBoundarySchema` (termasuk `columnsOf` dan PRAGMA), `ensureDocumentSchema`, `ensureApprovalSchema`, `mailTemplateStore.init`, serta CREATE di `googleCredentials.init` dan `loadInstallationSettings`.
+6. `normalizedCoreStore.ts`:
+   - Hapus cabang SQLite dan flag `postgres`. Hapus `normalizedCoreReady`.
+   - `IS NOT excluded.` menjadi `IS DISTINCT FROM excluded.`.
+   - `searchBusinessRows` memakai ILIKE di `search_records`, dengan komentar `shortcut:`.
+   - `coreDataStore.ts`: hapus `syncTable` legacy, dan ganti `IS NOT excluded` dengan cara yang sama.
+7. `organizationReset.ts`: hapus probe `sqlite_master`.
+8. Sapu terjemahan SQL sesuai langkah 5 di bawah. Jalankan e2e dengan `NODE_ENV` non-produksi agar assert `toPg` menangkap yang terlewat.
+9. Lock sesuai langkah 6 di bawah, termasuk `lockDocument` saat submit approval.
+10. Hapus `indexedConfiguration.ts`, `migrations/003`–`006`, dan watch-ignore `*.db` di `apps/frontend/vite.config.ts`.
+11. Tes:
+    - Semua unit test memakai `createTestDatabase()`.
+    - E2E men-spawn server dengan `DATABASE_URL` = URL database tes.
+    - `test:sqlite` + `test:pg` digabung menjadi `test`, dan `test:e2e:sqlite` menjadi `test:e2e:postgres`.
+12. Gate akhir: `grep -rn "better-sqlite3\|sqliteDb\|\.prepare(\|sqlite_master\|PRAGMA" apps packages` harus kosong.
+
+**Spesifikasi asli fase D:**
+
 1. Tambahkan `pg` sebagai dependency langsung (saat ini hanya transitif) dan `@types/pg` sebagai devDependency. Hapus `better-sqlite3` dan `@types/better-sqlite3` dari `apps/backend/package.json` **dan** `package.json` root. Hapus `auth.config.ts`, script `auth:generate`/`auth:migrate` dan `@better-auth/cli`.
 2. **Backend pg di `db.ts`**, dengan API yang sama seperti sekarang:
    - Pool holder: `connect(cfg)`, `pool()`, `end()`.

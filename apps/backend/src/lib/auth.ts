@@ -2,7 +2,7 @@ import { normalizedCoreReady, readBusinessRows, resetSyncCache } from '../normal
 import { migratePartnerContact } from '../partnerContact';
 import { synchronizeCoreData } from '../coreDataStore';
 import { ensureTenantBoundarySchema } from '../organizationSettingsStore';
-import { betterAuth, type BetterAuthPlugin } from "better-auth";
+import { betterAuth, type BetterAuthOptions, type BetterAuthPlugin } from "better-auth";
 import { APIError } from "better-auth/api";
 import { hasApprovalInvitation } from "../organizationAdminRoutes";
 import { admin, organization } from "better-auth/plugins";
@@ -462,12 +462,13 @@ const invitationApprovalPlugin = {
   } } }),
 } satisfies BetterAuthPlugin;
 
-const createAuth = () => betterAuth({
+// Also handed to getMigrations by schema.ts, so the created tables match this plugin and field setup.
+export const authOptions = (database: BetterAuthOptions["database"]) => ({
   // Unset: Better Auth derives the base URL per request from its real
   // Host/X-Forwarded-Proto headers (see the comment above) instead of a
   // fixed host baked in at startup.
   baseURL: getPublicBaseUrl() || undefined,
-  database: sqliteDb,
+  database,
   user: {
     additionalFields: {
       bio: { type: 'string', required: false, input: true },
@@ -540,7 +541,9 @@ const createAuth = () => betterAuth({
   // request instead of once at startup — see selfOrigin() above.
   trustedOrigins: async (request?: Request) => [...extraOrigins, ...(getPublicBaseUrl() ? [getPublicBaseUrl()] : []), ...selfOrigin(request)],
   secret: authSecret || "insecure-development-secret-change-me",
-});
+}) satisfies BetterAuthOptions;
+
+const createAuth = () => betterAuth(authOptions(sqliteDb));
 
 export let auth = createAuth();
 

@@ -20,13 +20,15 @@ export function decimalParts(value: unknown): { minor: bigint; scale: number } {
   if (scale > 30 || minor > 9223372036854775807n || minor < -9223372036854775808n) throw new Error('Amount exceeds supported decimal precision.');
   return { minor, scale };
 }
-function fieldDDL(field: Field): string {
-  if (field.kind === 'money') return `${q(field.sql + '_minor')} INTEGER, ${q(field.sql + '_scale')} INTEGER CHECK (${q(field.sql + '_scale')} BETWEEN 0 AND 30)`;
-  const type = field.kind === 'number' ? 'REAL' : field.kind === 'boolean' ? 'INTEGER' : 'TEXT';
-  const check = field.kind === 'boolean' ? ` CHECK (${q(field.sql)} IN (0,1))` : field.kind === 'json' ? ` CHECK (${q(field.sql)} IS NULL OR json_valid(${q(field.sql)}))` : '';
+function fieldDDL(field: Field, postgres: boolean): string {
+  if (field.kind === 'money') return `${q(field.sql + '_minor')} ${postgres ? 'bigint' : 'INTEGER'}, ${q(field.sql + '_scale')} INTEGER CHECK (${q(field.sql + '_scale')} BETWEEN 0 AND 30)`;
+  const type = field.kind === 'number' ? (postgres ? 'double precision' : 'REAL') : field.kind === 'boolean' ? 'INTEGER' : 'TEXT';
+  const check = field.kind === 'boolean' ? ` CHECK (${q(field.sql)} IN (0,1))` : field.kind === 'json' && !postgres ? ` CHECK (${q(field.sql)} IS NULL OR json_valid(${q(field.sql)}))` : '';
   return `${q(field.sql)} ${type}${check}`;
 }
-export async function createNormalizedCoreSchema(db: DB) {
+/** `postgres` drops what pg lacks (json_valid, generated risk columns, views, FTS5) and widens _minor to bigint. */
+export async function createNormalizedCoreSchema(db: DB, postgres = false) {
+  const json = postgres ? '' : ' CHECK(json_valid(extra_json))';
   for (const entity of ENTITIES) {
     const relations = entity.table === 'contracts' ? [
       'FOREIGN KEY (organization_id, partner_id) REFERENCES partners(organization_id, partner_id) DEFERRABLE INITIALLY DEFERRED',
@@ -42,19 +44,18 @@ export async function createNormalizedCoreSchema(db: DB) {
       ${q(entity.key)} TEXT PRIMARY KEY NOT NULL CHECK(length(trim(${q(entity.key)})) > 0),
       organization_id TEXT ${optionalOrg ? '' : 'NOT NULL'} REFERENCES organization(id) DEFERRABLE INITIALLY DEFERRED,
       record_position INTEGER NOT NULL,
-      extra_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(extra_json)),
-      ${entity.fields.map(fieldDDL).join(',\n')},
-      ${entity.table === 'contracts' ? "risk_score REAL GENERATED ALWAYS AS (json_extract(redline_analysis,'$.overallRiskScore')) VIRTUAL, risk_level TEXT GENERATED ALWAYS AS (json_extract(redline_analysis,'$.riskLevel')) VIRTUAL," : ''}
+      extra_json TEXT NOT NULL DEFAULT '{}'${json},
+      ${entity.fields.map(field => fieldDDL(field, postgres)).join(',\n')},
+      ${entity.table === 'contracts' && !postgres ? "risk_score REAL GENERATED ALWAYS AS (json_extract(redline_analysis,'$.overallRiskScore')) VIRTUAL, risk_level TEXT GENERATED ALWAYS AS (json_extract(redline_analysis,'$.riskLevel')) VIRTUAL," : ''}
       UNIQUE(organization_id, ${q(entity.key)})${relations.length ? ',\n' + relations.join(',\n') : ''}
     )`);
     await db.exec(`CREATE INDEX IF NOT EXISTS ${q('idx_v3_' + entity.table + '_org_order')} ON ${q(entity.table)}(organization_id, record_position, ${q(entity.key)})`);
   }
   await db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_v3_partners_name ON partners(organization_id, partner_name COLLATE NOCASE, partner_id);
+    CREATE INDEX IF NOT EXISTS idx_v3_partners_name ON partners(organization_id, ${postgres ? 'lower(partner_name)' : 'partner_name COLLATE NOCASE'}, partner_id);
     CREATE INDEX IF NOT EXISTS idx_v3_partners_owner ON partners(organization_id, internal_pic, partner_id);
     CREATE INDEX IF NOT EXISTS idx_v3_contracts_partner ON contracts(organization_id, partner_id);
     CREATE INDEX IF NOT EXISTS idx_v3_contracts_expiry ON contracts(organization_id, end_date, contract_id);
-    CREATE INDEX IF NOT EXISTS idx_v3_contracts_risk ON contracts(organization_id, risk_level, risk_score);
     CREATE INDEX IF NOT EXISTS idx_v3_contracts_reference ON contracts(organization_id, contract_number);
     CREATE INDEX IF NOT EXISTS idx_v3_ios_contract ON insertion_orders(organization_id, contract_id, io_id);
     CREATE INDEX IF NOT EXISTS idx_v3_ios_partner ON insertion_orders(organization_id, partner_id);
@@ -74,31 +75,36 @@ export async function createNormalizedCoreSchema(db: DB) {
     CREATE INDEX IF NOT EXISTS idx_v3_contract_category ON contract_categories(category, contract_id);
     CREATE TABLE IF NOT EXISTS partner_identifiers (
       partner_id TEXT NOT NULL REFERENCES partners(partner_id) ON DELETE CASCADE, position INTEGER NOT NULL,
-      scheme TEXT, value TEXT, country TEXT, extra_json TEXT NOT NULL CHECK(json_valid(extra_json)), PRIMARY KEY(partner_id, position));
+      scheme TEXT, value TEXT, country TEXT, extra_json TEXT NOT NULL${json}, PRIMARY KEY(partner_id, position));
     CREATE INDEX IF NOT EXISTS idx_v3_identifier_value ON partner_identifiers(scheme, value, partner_id);
     CREATE TABLE IF NOT EXISTS partner_dd_requirements (
       partner_id TEXT NOT NULL REFERENCES partners(partner_id) ON DELETE CASCADE, position INTEGER NOT NULL,
       key TEXT, name TEXT, required INTEGER CHECK(required IN (0,1)), expires INTEGER CHECK(expires IN (0,1)), status TEXT,
       document_number TEXT, expiry_date TEXT, link_drive TEXT, file_id TEXT, file_size TEXT, uploaded_at TEXT,
-      extra_json TEXT NOT NULL CHECK(json_valid(extra_json)), PRIMARY KEY(partner_id, position));
+      extra_json TEXT NOT NULL${json}, PRIMARY KEY(partner_id, position));
     CREATE INDEX IF NOT EXISTS idx_v3_dd_expiry ON partner_dd_requirements(expiry_date, partner_id);
     CREATE TABLE IF NOT EXISTS partner_dd_files (
       partner_id TEXT NOT NULL, requirement_position INTEGER NOT NULL, position INTEGER NOT NULL,
       id TEXT, file_name TEXT, link_drive TEXT, file_size TEXT, uploaded_at TEXT, year TEXT, expiry_date TEXT,
-      extra_json TEXT NOT NULL CHECK(json_valid(extra_json)), PRIMARY KEY(partner_id, requirement_position, position),
+      extra_json TEXT NOT NULL${json}, PRIMARY KEY(partner_id, requirement_position, position),
       FOREIGN KEY(partner_id, requirement_position) REFERENCES partner_dd_requirements(partner_id, position) ON DELETE CASCADE);
     CREATE TABLE IF NOT EXISTS spending_allocations (
       spending_id TEXT NOT NULL REFERENCES spendings(id) ON DELETE CASCADE, position INTEGER NOT NULL,
-      month TEXT NOT NULL, amount_minor INTEGER NOT NULL, amount_scale INTEGER NOT NULL,
-      extra_json TEXT NOT NULL CHECK(json_valid(extra_json)), PRIMARY KEY(spending_id, position), UNIQUE(spending_id, month));
+      month TEXT NOT NULL, amount_minor ${postgres ? 'bigint' : 'INTEGER'} NOT NULL, amount_scale INTEGER NOT NULL,
+      extra_json TEXT NOT NULL${json}, PRIMARY KEY(spending_id, position), UNIQUE(spending_id, month));
     CREATE INDEX IF NOT EXISTS idx_v3_allocations_month ON spending_allocations(month, spending_id);
     CREATE TABLE IF NOT EXISTS spending_reporting_months (
       spending_id TEXT NOT NULL REFERENCES spendings(id) ON DELETE CASCADE, position INTEGER NOT NULL,
       month TEXT NOT NULL, PRIMARY KEY(spending_id, position));
     CREATE INDEX IF NOT EXISTS idx_v3_reporting_month ON spending_reporting_months(month, spending_id);
     CREATE TABLE IF NOT EXISTS search_records (
-      rowid INTEGER PRIMARY KEY, organization_id TEXT NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL,
+      ${postgres ? '' : 'rowid INTEGER PRIMARY KEY,'} organization_id TEXT NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL,
       title TEXT NOT NULL, body TEXT NOT NULL, UNIQUE(entity_type, entity_id));
+    CREATE INDEX IF NOT EXISTS idx_v3_search_org ON search_records(organization_id, entity_type, entity_id);
+  `);
+  if (postgres) return;
+  await db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_v3_contracts_risk ON contracts(organization_id, risk_level, risk_score);
     CREATE VIEW IF NOT EXISTS v_partner_summary AS
       SELECT p.partner_id,p.organization_id,p.partner_name,p.country,p.entity_type,p.partner_type,p.internal_pic,p.status_dd,p.notes,
         (SELECT count(*) FROM contracts c WHERE c.organization_id=p.organization_id AND c.partner_id=p.partner_id) AS contract_count
@@ -109,7 +115,6 @@ export async function createNormalizedCoreSchema(db: DB) {
         c.status,c.status_approval,c.internal_pic,c.internal_notes,c.risk_level,c.risk_score
       FROM contracts c JOIN partners p ON p.partner_id=c.partner_id AND p.organization_id=c.organization_id
       LEFT JOIN contracts parent ON parent.contract_id=c.parent_contract_id AND parent.organization_id=c.organization_id;
-    CREATE INDEX IF NOT EXISTS idx_v3_search_org ON search_records(organization_id, entity_type, entity_id);
     CREATE VIRTUAL TABLE IF NOT EXISTS business_search USING fts5(title, body, content='search_records', content_rowid='rowid', tokenize='unicode61');
     CREATE TRIGGER IF NOT EXISTS business_search_insert AFTER INSERT ON search_records BEGIN
       INSERT INTO business_search(rowid,title,body) VALUES(new.rowid,new.title,new.body); END;
