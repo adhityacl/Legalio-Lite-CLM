@@ -43,15 +43,8 @@ export default defineConfig(() => {
         // the dev server serving stale modules; polling keeps edits visible.
         usePolling: true,
         interval: 300,
-        // SQLite writes to its -wal/-shm files (and the app rewrites
-        // data_store.json) continuously during normal use — none of that is
-        // source code, so it must never trigger a client page reload.
-        ignored: [
-          '**/*.db',
-          '**/*.db-wal',
-          '**/*.db-shm',
-          '**/data_store.json',
-        ],
+        // Runtime files the backend writes into APP_DATA_DIR (the repository in dev) are not source code.
+        ignored: ['**/database.json', '**/drive-backup.json'],
       },
       // Only used when Vite runs as its own dev server (`npm run
       // dev:frontend`, backend on its own process via `npm run

@@ -7,7 +7,6 @@ import net from 'node:net';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { generateKeyPairSync } from 'node:crypto';
-import Database from 'better-sqlite3';
 import { chromium, expect } from '@playwright/test';
 import { hashPassword } from 'better-auth/crypto';
 import { buildDemoDataset } from '@legalio/shared/data/demoDataset';
@@ -17,26 +16,27 @@ const directory=mkdtempSync(path.join(os.tmpdir(),'legalio-data-entry-'));
 const freePort=()=>new Promise<number>((resolve,reject)=>{const s=net.createServer();s.on('error',reject);s.listen(0,'127.0.0.1',()=>{const p=(s.address() as net.AddressInfo).port;s.close(()=>resolve(p));});});
 const backendPort=await freePort();const frontendPort=await freePort();
 const backendURL=`http://127.0.0.1:${backendPort}`;const frontendURL=`http://127.0.0.1:${frontendPort}`;
-Object.assign(process.env,{APP_TEST_MODE:'1',AUTH_DB_PATH:path.join(directory,'kaelyn.db'),APP_DATA_DIR:directory,BETTER_AUTH_URL:frontendURL,TRUSTED_ORIGINS:`${backendURL},${frontendURL}`,BETTER_AUTH_ENABLE_INFRA:'false',API_ONLY:'true',SEED_DEMO_ADMIN:'false',PORT:String(backendPort),DISABLE_HMR:'true',BETTER_AUTH_SECRET:'test-only-secret-for-isolated-sqlite-e2e-123456789',GEMINI_API_KEY:'',GOOGLE_CLIENT_ID:'',GOOGLE_CLIENT_SECRET:'',GOOGLE_APPLICATION_CREDENTIALS:''});
-const {sqliteDb:fixtureDb,hydrateCoreDataFromJson,initAuthDatabase}=await import('./lib/auth');
+Object.assign(process.env,{APP_TEST_MODE:'1',APP_DATA_DIR:directory,BETTER_AUTH_URL:frontendURL,TRUSTED_ORIGINS:`${backendURL},${frontendURL}`,BETTER_AUTH_ENABLE_INFRA:'false',API_ONLY:'true',SEED_DEMO_ADMIN:'false',PORT:String(backendPort),DISABLE_HMR:'true',BETTER_AUTH_SECRET:'test-only-secret-for-isolated-sqlite-e2e-123456789',GEMINI_API_KEY:'',GOOGLE_CLIENT_ID:'',GOOGLE_CLIENT_SECRET:'',GOOGLE_APPLICATION_CREDENTIALS:''});
+const {createTestDatabase}=await import('./testDatabase');
+// A throwaway legalio_test_* database; every server this test spawns inherits DATABASE_URL.
+const database=await createTestDatabase();process.env.DATABASE_URL=database.url;
 const {sql:fixtureSql}=await import('./db');
 const {seedOrganizationsFromDataset,createOrganizationRecord}=await import('./organizationProvisioning');
-const {markMigrationApplied}=await import('./organizationSettingsStore');
-await initAuthDatabase();
-const dataset=buildDemoDataset();await seedOrganizationsFromDataset(fixtureSql,dataset);await markMigrationApplied(fixtureSql,{fixture:true});await hydrateCoreDataFromJson(dataset);
-fixtureDb.exec("UPDATE insertion_orders SET id=json_extract(payload,'$.contract_id')");
+const {synchronizeCoreData}=await import('./coreDataStore');
+await (await import('./schema')).ensureSchema();
+const dataset=buildDemoDataset();await seedOrganizationsFromDataset(fixtureSql,dataset);await synchronizeCoreData(fixtureSql,dataset);
 const now=new Date().toISOString();const password='E2e-local-password-1234';const hash=await hashPassword(password);
 for(const [id,email,role] of [['e2e-root','root@example.com','superuser'],['e2e-admin','admin@example.com','user'],['e2e-editor','editor@example.com','user']]){
- fixtureDb.prepare('INSERT INTO "user"(id,name,email,emailVerified,role,banned,createdAt,updatedAt) VALUES(?,?,?,1,?,0,?,?)').run(id,id,email,role,now,now);
- fixtureDb.prepare("INSERT INTO account(id,accountId,providerId,userId,password,createdAt,updatedAt) VALUES(?,?,'credential',?,?,?,?)").run(`account-${id}`,id,id,hash,now,now);
+ await fixtureSql.run('INSERT INTO "user"(id,name,email,"emailVerified",role,banned,"createdAt","updatedAt") VALUES(?,?,?,true,?,false,?,?)',id,id,email,role,now,now);
+ await fixtureSql.run(`INSERT INTO account(id,"accountId","providerId","userId",password,"createdAt","updatedAt") VALUES(?,?,'credential',?,?,?,?)`,`account-${id}`,id,id,hash,now,now);
 }
 const org=dataset.tenants[0].id;
 const otherOrg='e2e-other-org';
 await createOrganizationRecord(fixtureSql,{id:otherOrg,name:'Other Organization'});
-for(const [id,role] of [['e2e-admin','admin'],['e2e-editor','editor']])fixtureDb.prepare("INSERT INTO member(id,organizationId,userId,role,status) VALUES(?,?,?,?,'active')").run(`${id}-member`,org,id,role);
-const teams=fixtureDb.prepare('SELECT id,name FROM team WHERE organizationId=? ORDER BY name').all(org) as any[];
+for(const [id,role] of [['e2e-admin','admin'],['e2e-editor','editor']])await fixtureSql.run(`INSERT INTO member(id,"organizationId","userId",role,status,"createdAt") VALUES(?,?,?,?,'active',?)`,`${id}-member`,org,id,role,now);
+const teams=await fixtureSql.all('SELECT id,name FROM team WHERE "organizationId"=? ORDER BY name',org);
 const owner=teams[0];const otherOwner=teams[1];
-fixtureDb.prepare("INSERT INTO teamMember(id,teamId,userId) VALUES('e2e-editor-team',?,'e2e-editor')").run(owner.id);fixtureDb.close();
+await fixtureSql.run(`INSERT INTO "teamMember"(id,"teamId","userId","createdAt") VALUES('e2e-editor-team',?,'e2e-editor',?)`,owner.id,now);
 let server:ChildProcess|undefined;let frontend:ChildProcess|undefined;let browser:Awaited<ReturnType<typeof chromium.launch>>|undefined;
 const logs:string[]=[];const checks:string[]=[];
 const appTabs=['dashboard','hierarchy','partners','contracts','create-contract','ios','partner-spending','partner-evaluation','notifikasi','settings-organization','settings-access'];
@@ -52,7 +52,7 @@ const call=async(route:string,o:{method?:string;body?:any;org?:string;token?:str
 /**
  * Data-entry audit: every entity created the way the forms do (API payloads) and through bulk import,
  * with valid, edge and invalid input. A 5xx is always a problem; invalid input must be rejected with 4xx.
- * Afterwards: read-back equality, SQLite integrity, persistence across a restart, and a clean server log.
+ * Afterwards: read-back equality, persistence across a restart, and a clean server log.
  */
 type Want='ok'|'reject'|'any';
 const outcomes:string[]=[];const problems:string[]=[];
@@ -69,7 +69,7 @@ const send=async(name:string,route:string,method:string,body:any,want:Want,orgId
 const pdf=(text='%PDF-1.4 data-entry')=>'data:application/pdf;base64,'+Buffer.from(text).toString('base64');
 const uploadText=async(link:string)=>{const response=await fetch(backendURL+link,{headers:{Authorization:`Bearer ${token}`}});assert.equal(response.status,200,link);return response.text();};
 const initData=async()=>(await call('/api/init-data',{org}));
-const errorLogPattern=/Failed to save|TypeError|ReferenceError|SQLITE_|UnhandledPromise|Unhandled rejection|Cannot read prop/i;
+const errorLogPattern=/Failed to save|TypeError|ReferenceError|Unquoted "|violates .*constraint|syntax error at|(column|relation) .* does not exist|UnhandledPromise|Unhandled rejection|Cannot read prop/i;
 try{
  server=run(['apps/backend/dist/server.cjs']);await waitFor(backendURL+'/api/health',server);
  token=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'root@example.com',password},token:''})).token;assert.ok(token);
@@ -185,11 +185,8 @@ try{
  assert.equal(data.spendings.find((s:any)=>s.invoice_number==='DE-IMP-INV1').total_amount,2500000.75);
  const importedPartnerCountry=data.partners.find((p:any)=>p.partner_name==='DE Imp Alpha');assert.equal(importedPartnerCountry.country,'ID');assert.deepEqual(importedPartnerCountry.tags,['Supplier','Media']);
 
- // ---- SQLite integrity, then persistence across a restart
- const sql=new Database(path.join(directory,'kaelyn.db'),{readonly:true});
- assert.equal(sql.pragma('integrity_check',{simple:true}),'ok');assert.deepEqual(sql.pragma('foreign_key_check'),[]);
- for(const table of ['partners','contracts','insertion_orders','spendings','evaluations']){const n=(sql.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE extra_json != '{}'`).get() as any).n;outcomes.push(`INFO  ${table}: ${n} rows keep unmapped fields in extra_json`);}
- sql.close();
+ // ---- Unmapped fields, then persistence across a restart
+ for(const table of ['partners','contracts','insertion_orders','spendings','evaluations']){const n=(await fixtureSql.get(`SELECT COUNT(*) AS n FROM ${table} WHERE extra_json != '{}'`)).n;outcomes.push(`INFO  ${table}: ${n} rows keep unmapped fields in extra_json`);}
  const counts=(d:any)=>['partners','contracts','ios','spendings','evaluations'].map(k=>d[k].length);
  const beforeRestart=counts(data);await stop(server);server=run(['apps/backend/dist/server.cjs']);await waitFor(backendURL+'/api/health',server);
  token=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'root@example.com',password},token:''})).token;
@@ -204,4 +201,4 @@ try{
  if(problems.length){console.error('\nPROBLEMS:\n'+problems.map(p=>' - '+p).join('\n'));process.exitCode=1;}
  else console.log(`\nAll ${outcomes.filter(o=>!o.startsWith('INFO')).length} data-entry scenarios behaved correctly.`);
 }catch(error){console.log(outcomes.join('\n'));console.error('PROBLEMS so far:\n'+problems.map(p=>' - '+p).join('\n'));throw error;}
-finally{writeFileSync(path.join(directory,'servers.log'),logs.join(''));await stop(server);}
+finally{writeFileSync(path.join(directory,'servers.log'),logs.join(''));await stop(server);await database.drop();}

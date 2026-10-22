@@ -61,7 +61,7 @@ const platformAudit = (req: Request, identity: Identity, action: string, targetT
 export async function ensureUserAccountsExist(defaultPassword = process.env.DEMO_ADMIN_PASSWORD || '') {
   if (!defaultPassword) return;
   try {
-    const users = (await sql.all('SELECT id, email FROM user') as any[]).filter(
+    const users = (await sql.all('SELECT id, email FROM "user"') as any[]).filter(
       (u) => u.id === 'demo-admin' || isDemoAccountEmail(u.email),
     );
     if (users.length === 0) return;
@@ -69,24 +69,24 @@ export async function ensureUserAccountsExist(defaultPassword = process.env.DEMO
     let hashedDef: string | null = null;
     // While the bootstrap admin is still seeded, its credential must track
     // DEMO_ADMIN_PASSWORD on every boot — otherwise editing .env after the
-    // account already exists (e.g. kaelyn.db was copied from another install)
+    // account already exists (e.g. the database was copied from another install)
     // silently has no effect and the configured login just stops working.
     const reseedBootstrapAdmin = process.env.SEED_DEMO_ADMIN !== 'false' && defaultPassword === process.env.DEMO_ADMIN_PASSWORD;
 
     for (const u of users) {
-      const existing = await sql.get("SELECT id FROM account WHERE userId = ? AND providerId = 'credential'", u.id) as any;
+      const existing = await sql.get(`SELECT id FROM account WHERE "userId" = ? AND "providerId" = 'credential'`, u.id) as any;
       if (existing && !(reseedBootstrapAdmin && u.id === 'demo-admin')) continue;
       if (!hashedDef) {
         hashedDef = await hashPassword(defaultPassword);
       }
       if (existing) {
-        await sql.run('UPDATE account SET password = ?, updatedAt = ? WHERE id = ?', hashedDef, now, existing.id);
+        await sql.run('UPDATE account SET password = ?, "updatedAt" = ? WHERE id = ?', hashedDef, now, existing.id);
       } else {
         const accountId = 'acc_' + u.id;
         await sql.run(`
-          INSERT OR IGNORE INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer)
-          VALUES (?, ?, 'credential', ?, ?, ?, ?, ?)
-        `, accountId, u.id, u.id, hashedDef, now, now, 'local:credential');
+          INSERT INTO account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt")
+          VALUES (?, ?, 'credential', ?, ?, ?, ?) ON CONFLICT DO NOTHING
+        `, accountId, u.id, u.id, hashedDef, now, now);
       }
     }
   } catch (err) {
@@ -96,19 +96,19 @@ export async function ensureUserAccountsExist(defaultPassword = process.env.DEMO
 // 1. GET /overview - High-level metrics for Console Dashboard
 authConsoleRouter.get('/overview', async (req: Request, res: Response) => {
   try {
-    const totalUsers = (await sql.get('SELECT COUNT(*) as count FROM user') as any)?.count || 0;
-    const activeUsers = (await sql.get("SELECT COUNT(*) as count FROM user WHERE banned = 0 OR banned IS NULL") as any)?.count || 0;
-    const bannedUsers = (await sql.get('SELECT COUNT(*) as count FROM user WHERE banned = 1') as any)?.count || 0;
-    const verifiedUsers = (await sql.get('SELECT COUNT(*) as count FROM user WHERE emailVerified = 1') as any)?.count || 0;
+    const totalUsers = (await sql.get('SELECT COUNT(*) as count FROM "user"') as any)?.count || 0;
+    const activeUsers = (await sql.get('SELECT COUNT(*) as count FROM "user" WHERE banned IS NOT TRUE') as any)?.count || 0;
+    const bannedUsers = (await sql.get('SELECT COUNT(*) as count FROM "user" WHERE banned IS TRUE') as any)?.count || 0;
+    const verifiedUsers = (await sql.get('SELECT COUNT(*) as count FROM "user" WHERE "emailVerified"') as any)?.count || 0;
     
     // Active sessions (not expired)
     const now = new Date().toISOString();
-    const activeSessions = (await sql.get('SELECT COUNT(*) as count FROM session WHERE expiresAt > ?', now) as any)?.count || 0;
+    const activeSessions = (await sql.get('SELECT COUNT(*) as count FROM session WHERE "expiresAt" > ?', now) as any)?.count || 0;
     
     // Total accounts & providers
     const totalAccounts = (await sql.get('SELECT COUNT(*) as count FROM account') as any)?.count || 0;
-    const credentialAccounts = (await sql.get("SELECT COUNT(*) as count FROM account WHERE providerId = 'credential'") as any)?.count || 0;
-    const googleAccounts = (await sql.get("SELECT COUNT(*) as count FROM account WHERE providerId = 'google'") as any)?.count || 0;
+    const credentialAccounts = (await sql.get(`SELECT COUNT(*) as count FROM account WHERE "providerId" = 'credential'`) as any)?.count || 0;
+    const googleAccounts = (await sql.get(`SELECT COUNT(*) as count FROM account WHERE "providerId" = 'google'`) as any)?.count || 0;
 
     // Organizations & Teams
     const totalOrgs = (await sql.get('SELECT COUNT(*) as count FROM organization') as any)?.count || 0;
@@ -117,19 +117,19 @@ authConsoleRouter.get('/overview', async (req: Request, res: Response) => {
     const totalApiKeys = (await sql.get("SELECT COUNT(*) as count FROM apikey WHERE status = 'active'") as any)?.count || 0;
 
     // Platform roles only; tenant roles are per-organization membership data.
-    const superusers = (await sql.get("SELECT COUNT(*) as count FROM user WHERE role = 'superuser'") as any)?.count || 0;
+    const superusers = (await sql.get(`SELECT COUNT(*) as count FROM "user" WHERE role = 'superuser'`) as any)?.count || 0;
     const roleDistribution: Record<string, number> = { superuser: superusers, user: totalUsers - superusers };
 
     // Recent users
-    const recentUsers = (await sql.all('SELECT id, name, email, role, banned, createdAt FROM user ORDER BY createdAt DESC LIMIT 5') as any[])
+    const recentUsers = (await sql.all('SELECT id, name, email, role, banned, "createdAt" FROM "user" ORDER BY "createdAt" DESC LIMIT 5') as any[])
       .map((u) => ({ id: u.id, name: u.name, email: u.email, platformRole: u.role === 'superuser' ? 'superuser' : 'user', banned: Boolean(u.banned), createdAt: u.createdAt }));
 
     // Recent sessions
     const recentSessions = await sql.all(`
-      SELECT s.id, s.ipAddress, s.userAgent, s.createdAt, s.expiresAt, u.name as userName, u.email as userEmail
+      SELECT s.id, s."ipAddress", s."userAgent", s."createdAt", s."expiresAt", u.name as "userName", u.email as "userEmail"
       FROM session s
-      LEFT JOIN user u ON s.userId = u.id
-      ORDER BY s.createdAt DESC LIMIT 5
+      LEFT JOIN "user" u ON s."userId" = u.id
+      ORDER BY s."createdAt" DESC LIMIT 5
     `);
 
     return res.json({
@@ -139,7 +139,7 @@ authConsoleRouter.get('/overview', async (req: Request, res: Response) => {
           id: 'production',
           name: 'Production',
           env: 'production',
-          adapter: 'Better-Auth Native (SQLite)',
+          adapter: 'Better-Auth Native (PostgreSQL)',
           plugins: ['admin', 'organization', 'teams', 'accessControl'],
         },
         metrics: {
@@ -177,10 +177,10 @@ authConsoleRouter.get('/overview', async (req: Request, res: Response) => {
 /* ------------------------------------------------------------------ */
 
 const userSelect = `
-  SELECT u.id, u.name, u.email, u.emailVerified, u.image, u.createdAt, u.updatedAt, u.role, u.banned, u.banReason, u.banExpires,
-    (SELECT COUNT(*) FROM session WHERE userId = u.id) AS sessionCount,
-    (SELECT providerId FROM account WHERE userId = u.id LIMIT 1) AS primaryProvider,
-    (SELECT COUNT(*) FROM member WHERE userId = u.id) AS membershipCount
+  SELECT u.id, u.name, u.email, u."emailVerified", u.image, u."createdAt", u."updatedAt", u.role, u.banned, u."banReason", u."banExpires",
+    (SELECT COUNT(*) FROM session WHERE "userId" = u.id) AS "sessionCount",
+    (SELECT "providerId" FROM account WHERE "userId" = u.id LIMIT 1) AS "primaryProvider",
+    (SELECT COUNT(*) FROM member WHERE "userId" = u.id) AS "membershipCount"
   FROM "user" u`;
 
 function platformUserDto(u: any) {
@@ -202,9 +202,9 @@ async function setCredentialPassword(userId: string, password: unknown) {
   if (typeof password !== 'string' || password.length < 8 || password.length > 256) throw bad('Password must be 8–256 characters.');
   const hashed = await hashPassword(password);
   const now = new Date().toISOString();
-  const existing = await sql.get("SELECT id FROM account WHERE userId = ? AND providerId = 'credential'", userId) as any;
-  if (existing) await sql.run('UPDATE account SET password = ?, updatedAt = ? WHERE id = ?', hashed, now, existing.id);
-  else await sql.run(`INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer) VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')`, `acc_${crypto.randomUUID()}`, userId, userId, hashed, now, now);
+  const existing = await sql.get(`SELECT id FROM account WHERE "userId" = ? AND "providerId" = 'credential'`, userId) as any;
+  if (existing) await sql.run('UPDATE account SET password = ?, "updatedAt" = ? WHERE id = ?', hashed, now, existing.id);
+  else await sql.run(`INSERT INTO account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt") VALUES (?, ?, 'credential', ?, ?, ?, ?)`, `acc_${crypto.randomUUID()}`, userId, userId, hashed, now, now);
 }
 
 /** Ban/delete invariants (§4.3 rules 3–4): never strand an organization or the platform. */
@@ -216,22 +216,22 @@ async function assertAccountRemovable(userId: string) {
 async function setBanned(userId: string, banned: boolean, reason: string | null) {
   if (banned) {
     await assertAccountRemovable(userId);
-    await sql.run('UPDATE "user" SET banned = 1, banReason = ?, banExpires = NULL, updatedAt = ? WHERE id = ?', reason, new Date().toISOString(), userId);
-    await sql.run('DELETE FROM session WHERE userId = ?', userId);
+    await sql.run('UPDATE "user" SET banned = true, "banReason" = ?, "banExpires" = NULL, "updatedAt" = ? WHERE id = ?', reason, new Date().toISOString(), userId);
+    await sql.run('DELETE FROM session WHERE "userId" = ?', userId);
   } else {
-    await sql.run('UPDATE "user" SET banned = 0, banReason = NULL, banExpires = NULL, updatedAt = ? WHERE id = ?', new Date().toISOString(), userId);
+    await sql.run('UPDATE "user" SET banned = false, "banReason" = NULL, "banExpires" = NULL, "updatedAt" = ? WHERE id = ?', new Date().toISOString(), userId);
   }
 }
 
 async function deleteAccount(userId: string) {
   await assertAccountRemovable(userId);
-  for (const table of ['session', 'account', 'teamMember', 'member']) await sql.run(`DELETE FROM "${table}" WHERE userId = ?`, userId);
+  for (const table of ['session', 'account', 'teamMember', 'member']) await sql.run(`DELETE FROM "${table}" WHERE "userId" = ?`, userId);
   await sql.run('DELETE FROM "user" WHERE id = ?', userId); // audit_log keeps the actor id (no cascade)
 }
 
 authConsoleRouter.get('/users', platformHandler(async (req, res) => {
   const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase().slice(0, 200) : '';
-  const rows = await sql.all(`${userSelect} ORDER BY u.createdAt DESC, u.id`) as any[];
+  const rows = await sql.all(`${userSelect} ORDER BY u."createdAt" DESC, u.id`) as any[];
   const users = rows.filter((u) => !search || String(u.name).toLowerCase().includes(search) || String(u.email).toLowerCase().includes(search));
   res.json({ success: true, users: users.map(platformUserDto) });
 }));
@@ -251,7 +251,7 @@ authConsoleRouter.post('/users', platformHandler(async (req, res, identity) => {
     const userId = await createIdentityRecord(sql, { name: cleanName, email: cleanEmail, platformRole });
     if (hashed) {
       const now = new Date().toISOString();
-      await sql.run(`INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer) VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')`, `acc_${crypto.randomUUID()}`, userId, userId, hashed, now, now);
+      await sql.run(`INSERT INTO account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt") VALUES (?, ?, 'credential', ?, ?, ?, ?)`, `acc_${crypto.randomUUID()}`, userId, userId, hashed, now, now);
     }
     await platformAudit(req, identity, 'platform.user.create', 'user', userId, ['name', 'email', 'platformRole']);
     return userId;
@@ -268,14 +268,14 @@ authConsoleRouter.put('/users/:id', platformHandler(async (req, res, identity) =
     if (body.name !== undefined) {
       const name = String(body.name).trim().slice(0, 200);
       if (!name) throw bad('Name is required.');
-      await sql.run('UPDATE "user" SET name = ?, updatedAt = ? WHERE id = ?', name, new Date().toISOString(), user.id);
+      await sql.run('UPDATE "user" SET name = ?, "updatedAt" = ? WHERE id = ?', name, new Date().toISOString(), user.id);
       changed.push('name');
     }
     if (body.email !== undefined) {
       const email = String(body.email).trim().toLowerCase();
       if (!EMAIL.test(email)) throw bad('Email is not valid.');
       if (await sql.get('SELECT 1 FROM "user" WHERE LOWER(email) = ? AND id <> ?', email, user.id)) throw new ApiError(409, 'ACCOUNT_EXISTS', 'Another account uses this email.');
-      await sql.run('UPDATE "user" SET email = ?, emailVerified = 0, updatedAt = ? WHERE id = ?', email, new Date().toISOString(), user.id);
+      await sql.run('UPDATE "user" SET email = ?, "emailVerified" = false, "updatedAt" = ? WHERE id = ?', email, new Date().toISOString(), user.id);
       changed.push('email');
     }
     await platformAudit(req, identity, 'platform.user.update', 'user', user.id, changed);
@@ -299,9 +299,9 @@ authConsoleRouter.put('/users/:id/role', platformHandler(async (req, res, identi
   if (user.id === identity.userId) throw new ApiError(403, 'INSUFFICIENT_PERMISSION', 'You cannot change your own platform role.');
   await sql.tx(async () => {
     if (user.role === 'superuser' && platformRole !== 'superuser') await assertSuperusersRemainWithout(sql, user.id);
-    await sql.run('UPDATE "user" SET role = ?, updatedAt = ? WHERE id = ?', platformRole, new Date().toISOString(), user.id);
+    await sql.run('UPDATE "user" SET role = ?, "updatedAt" = ? WHERE id = ?', platformRole, new Date().toISOString(), user.id);
     // Cached privileges end with the role change.
-    await sql.run('DELETE FROM session WHERE userId = ?', user.id);
+    await sql.run('DELETE FROM session WHERE "userId" = ?', user.id);
     await platformAudit(req, identity, 'platform.user.role.update', 'user', user.id, ['platformRole']);
   });
   res.json({ success: true, user: platformUserDto(await loadUser(user.id)) });
@@ -354,18 +354,18 @@ authConsoleRouter.get('/accounts', async (req: Request, res: Response) => {
     const accounts = await sql.all(`
       SELECT 
         a.id, 
-        a.accountId, 
-        a.providerId, 
-        a.userId, 
-        a.createdAt, 
-        a.updatedAt,
-        CASE WHEN a.password IS NOT NULL THEN 1 ELSE 0 END as hasPassword,
-        u.name as userName,
-        u.email as userEmail,
-        CASE WHEN u.role = 'superuser' THEN 'superuser' ELSE 'user' END as platformRole
+        a."accountId", 
+        a."providerId", 
+        a."userId", 
+        a."createdAt", 
+        a."updatedAt",
+        CASE WHEN a.password IS NOT NULL THEN 1 ELSE 0 END as "hasPassword",
+        u.name as "userName",
+        u.email as "userEmail",
+        CASE WHEN u.role = 'superuser' THEN 'superuser' ELSE 'user' END as "platformRole"
       FROM account a
-      LEFT JOIN user u ON a.userId = u.id
-      ORDER BY a.createdAt DESC
+      LEFT JOIN "user" u ON a."userId" = u.id
+      ORDER BY a."createdAt" DESC
     `);
 
     return res.json({
@@ -387,20 +387,20 @@ authConsoleRouter.get('/sessions', async (req: Request, res: Response) => {
     const sessions = await sql.all(`
       SELECT 
         s.id, 
-        s.createdAt, 
-        s.updatedAt, 
-        s.expiresAt, 
-        s.ipAddress, 
-        s.userAgent, 
-        s.userId,
-        s.impersonatedBy,
-        s.activeOrganizationId,
-        u.name as userName,
-        u.email as userEmail,
-        CASE WHEN u.role = 'superuser' THEN 'superuser' ELSE 'user' END as platformRole
+        s."createdAt", 
+        s."updatedAt", 
+        s."expiresAt", 
+        s."ipAddress", 
+        s."userAgent", 
+        s."userId",
+        s."impersonatedBy",
+        s."activeOrganizationId",
+        u.name as "userName",
+        u.email as "userEmail",
+        CASE WHEN u.role = 'superuser' THEN 'superuser' ELSE 'user' END as "platformRole"
       FROM session s
-      LEFT JOIN user u ON s.userId = u.id
-      ORDER BY s.createdAt DESC
+      LEFT JOIN "user" u ON s."userId" = u.id
+      ORDER BY s."createdAt" DESC
     `);
 
     const now = new Date();
@@ -436,7 +436,7 @@ authConsoleRouter.post('/sessions/revoke-user', async (req: Request, res: Respon
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
     }
-    await sql.run('DELETE FROM session WHERE userId = ?', userId);
+    await sql.run('DELETE FROM session WHERE "userId" = ?', userId);
     return res.json({ success: true, message: `All sessions revoked for user ${userId}` });
   } catch (err: any) {
     console.error('Error revoking user sessions:', err);
@@ -448,7 +448,7 @@ authConsoleRouter.post('/sessions/revoke-user', async (req: Request, res: Respon
 authConsoleRouter.post('/sessions/revoke-all/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    await sql.run('DELETE FROM session WHERE userId = ?', userId);
+    await sql.run('DELETE FROM session WHERE "userId" = ?', userId);
     return res.json({ success: true, message: `All sessions revoked for user ${userId}` });
   } catch (err: any) {
     console.error('Error revoking user sessions:', err);
@@ -464,10 +464,10 @@ authConsoleRouter.post('/sessions/revoke-all/:userId', async (req: Request, res:
 authConsoleRouter.get('/organizations', platformHandler(async (req, res, identity) => {
   const accessible = new Set((await accessibleOrganizations(sql, identity)).map((o) => o.organizationId));
   const rows = await sql.all(`
-    SELECT o.id, o.name, o.slug, o.logo, o.createdAt,
-      (SELECT COUNT(*) FROM member WHERE organizationId = o.id AND status = 'active') AS memberCount,
-      (SELECT COUNT(*) FROM team WHERE organizationId = o.id) AS teamCount
-    FROM organization o ORDER BY o.name COLLATE NOCASE, o.id
+    SELECT o.id, o.name, o.slug, o.logo, o."createdAt",
+      (SELECT COUNT(*) FROM member WHERE "organizationId" = o.id AND status = 'active') AS "memberCount",
+      (SELECT COUNT(*) FROM team WHERE "organizationId" = o.id) AS "teamCount"
+    FROM organization o ORDER BY lower(o.name), o.id
   `) as any[];
   const isPlatform = identity.platformPermissions.includes('platform.organization.read');
   const organizations = [];
@@ -554,9 +554,9 @@ authConsoleRouter.delete('/organizations/:id', platformHandler(async (req, res, 
     .some((key) => (globalDbRef?.[key] || []).some((row: any) => row?.organizationId === id));
   if (owned) throw new ApiError(409, 'ORGANIZATION_IN_USE', "Move or remove this organization's records first.");
   await sql.tx(async () => {
-    await sql.run('DELETE FROM teamMember WHERE teamId IN (SELECT id FROM team WHERE organizationId = ?)', id);
-    for (const table of ['member', 'team', 'invitation', 'organization_settings', 'organization_integrations']) await sql.run(`DELETE FROM ${table} WHERE organizationId = ?`, id);
-    await sql.run('UPDATE session SET activeOrganizationId = NULL WHERE activeOrganizationId = ?', id);
+    await sql.run('DELETE FROM "teamMember" WHERE "teamId" IN (SELECT id FROM team WHERE "organizationId" = ?)', id);
+    for (const table of ['member', 'team', 'invitation', 'organization_settings', 'organization_integrations']) await sql.run(`DELETE FROM ${table} WHERE "organizationId" = ?`, id);
+    await sql.run('UPDATE session SET "activeOrganizationId" = NULL WHERE "activeOrganizationId" = ?', id);
     await sql.run('DELETE FROM organization WHERE id = ?', id);
     await appendAudit(sql, auditActorFor(req, identity), { organizationId: id, action: 'organization.delete', targetType: 'organization', targetId: id, outcome: 'success', changedFields: [] });
   });
@@ -583,9 +583,9 @@ authConsoleRouter.post('/invitations/accept', platformHandler(async (req, res, i
 authConsoleRouter.get('/api-keys', async (req: Request, res: Response) => {
   try {
     const keys = await sql.all(`
-      SELECT id, name, keyPreview, scopes, createdAt, expiresAt, status
+      SELECT id, name, "keyPreview", scopes, "createdAt", "expiresAt", status
       FROM apikey
-      ORDER BY createdAt DESC
+      ORDER BY "createdAt" DESC
     `);
 
     return res.json({
@@ -619,7 +619,7 @@ authConsoleRouter.post('/api-keys', async (req: Request, res: Response) => {
     const scopeString = Array.isArray(scopes) ? scopes.join(',') : String(scopes);
 
     await sql.run(`
-      INSERT INTO apikey (id, name, keyPreview, keyHash, scopes, createdAt, expiresAt, status)
+      INSERT INTO apikey (id, name, "keyPreview", "keyHash", scopes, "createdAt", "expiresAt", status)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
     `, keyId, name, keyPreview, keyHash, scopeString, now.toISOString(), expires ? expires.toISOString() : null);
 

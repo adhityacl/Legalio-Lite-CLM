@@ -1,6 +1,5 @@
-import { normalizedCoreReady, resetSyncCache, synchronizeBusinessRows } from './normalizedCoreStore';
+import { resetSyncCache, synchronizeBusinessRows } from './normalizedCoreStore';
 import { ENTITIES } from './normalizedSchema';
-import { migratePartnerContact } from './partnerContact';
 import type { Sql } from './db';
 
 export function normalizeSqliteId(row: any, fallback: string) {
@@ -22,74 +21,49 @@ export function isValidAllowedUserRow(row: any) {
   return email.length > 0;
 }
 
-async function synchronizeCoreDataTransaction(sqliteDb: Sql, data: any) {
+async function synchronizeCoreDataTransaction(db: Sql, data: any) {
   if (!data || typeof data !== 'object') return;
 
-  const normalized = await normalizedCoreReady(sqliteDb);
-  const syncTable = async (table: string, rows: any[] = []) => {
-    if (normalized && ENTITIES.some(entity => entity.table === table)) return;
-    await sqliteDb.tx(async () => {
-      const existing = new Map((await sqliteDb.all(`SELECT id, payload FROM ${table}`) as { id: string; payload: string }[])
-        .map(row => [row.id, row.payload]));
-      const seen = new Set<string>();
-      const isUserTable = table === 'allowed_users';
-      const remove = (id: string) => sqliteDb.run(`DELETE FROM ${table} WHERE id = ?`, id);
-      // Remove changed users first so valid email swaps retain the previous full-replacement behavior.
-      if (isUserTable) {
-        const incoming = new Map(rows.filter(isValidAllowedUserRow).map(row => [normalizeSqliteId(row, ''), JSON.stringify(row)]));
-        for (const [id, payload] of existing) if (incoming.get(id) !== payload) await remove(id);
-      }
-      const columns = isUserTable
-        ? ['id', 'email', 'name', 'role', 'status', 'organizationId', 'payload', 'createdAt', 'updatedAt']
-        : ['id', 'organizationId', 'payload', 'createdAt', 'updatedAt'];
-      const insert = (record: object) => sqliteDb.run(`INSERT INTO ${table} (${columns.join(', ')})
-        VALUES (${columns.map(column => `@${column}`).join(', ')})
-        ON CONFLICT(id) DO UPDATE SET ${columns.slice(1).map(column => `${column}=excluded.${column}`).join(', ')}`, record);
-      for (const row of Array.isArray(rows) ? rows : []) {
-        if (isUserTable && !isValidAllowedUserRow(row)) continue;
-        const id = normalizeSqliteId(row, `${table}-${Math.random().toString(36).slice(2, 10)}`);
-        if (seen.has(id)) throw new Error(`Duplicate id in ${table}: ${id}`);
-        seen.add(id);
-        if (table === 'partners') migratePartnerContact(row);
-        const payload = JSON.stringify(row);
-        if (existing.get(id) === payload) continue;
-        const record = {
-          id, organizationId: row?.organizationId ?? null, payload,
-          createdAt: row?.createdAt ?? row?.created_at ?? new Date().toISOString(),
-          updatedAt: row?.updatedAt ?? row?.updated_at ?? new Date().toISOString(),
-        };
-        await insert(isUserTable ? {
-          ...record, email: String(row.email || row.emailAddress || row.userEmail || '').trim(),
-          name: row.name ?? row.fullName ?? null, role: row.role ?? null, status: row.status ?? null,
-        } : record);
-      }
-      for (const id of existing.keys()) if (!seen.has(id)) await remove(id);
+  // Business collections live in the normalized tables; only the onboarding allowlist is still a payload table.
+  await synchronizeBusinessRows(db, data);
+  const users = Array.isArray(data.allowedUsers) ? data.allowedUsers.filter(isValidAllowedUserRow) : [];
+  const existing = new Map((await db.all(`SELECT id, payload FROM allowed_users`) as { id: string; payload: string }[])
+    .map(row => [row.id, row.payload]));
+  const seen = new Set<string>();
+  const remove = (id: string) => db.run(`DELETE FROM allowed_users WHERE id = ?`, id);
+  // Remove changed users first so valid email swaps retain the previous full-replacement behavior.
+  const incoming = new Map(users.map(row => [normalizeSqliteId(row, ''), JSON.stringify(row)]));
+  for (const [id, payload] of existing) if (incoming.get(id) !== payload) await remove(id);
+  for (const row of users) {
+    const id = normalizeSqliteId(row, `allowed_users-${Math.random().toString(36).slice(2, 10)}`);
+    if (seen.has(id)) throw new Error(`Duplicate id in allowed_users: ${id}`);
+    seen.add(id);
+    const payload = JSON.stringify(row);
+    if (existing.get(id) === payload) continue;
+    await db.run(`
+      INSERT INTO allowed_users (id, email, name, role, status, "organizationId", payload, "createdAt", "updatedAt")
+      VALUES (@id, @email, @name, @role, @status, @organizationId, @payload, @createdAt, @updatedAt)
+      ON CONFLICT (id) DO UPDATE SET email = excluded.email, name = excluded.name, role = excluded.role, status = excluded.status,
+        "organizationId" = excluded."organizationId", payload = excluded.payload, "createdAt" = excluded."createdAt", "updatedAt" = excluded."updatedAt"
+    `, {
+      id, organizationId: row?.organizationId ?? null, payload,
+      createdAt: row?.createdAt ?? row?.created_at ?? new Date().toISOString(),
+      updatedAt: row?.updatedAt ?? row?.updated_at ?? new Date().toISOString(),
+      email: String(row.email || row.emailAddress || row.userEmail || '').trim(),
+      name: row.name ?? row.fullName ?? null, role: row.role ?? null, status: row.status ?? null,
     });
-  };
-
-  if (normalized) await synchronizeBusinessRows(sqliteDb, data);
-  await syncTable('allowed_users', Array.isArray(data.allowedUsers) ? data.allowedUsers.filter(isValidAllowedUserRow) : []);
-  await syncTable('partners', Array.isArray(data.partners) ? data.partners : []);
-  await syncTable('contracts', Array.isArray(data.contracts) ? data.contracts : []);
-  await syncTable('insertion_orders', Array.isArray(data.ios) ? data.ios : []);
-  await syncTable('notifications', Array.isArray(data.notifications) ? data.notifications : []);
-  await syncTable('activity_logs', Array.isArray(data.activityLogs) ? data.activityLogs : []);
-  await syncTable('evaluations', Array.isArray(data.evaluations) ? data.evaluations : []);
-  await syncTable('spendings', Array.isArray(data.spendings) ? data.spendings : []);
-  // `tenants`/`departments` are legacy projections of the canonical
-  // organization/team rows (tenant-boundaries PRD §7.3): never snapshot-
-  // replaced from memory, so they stay intact as migration input.
-  await syncTable('templates', Array.isArray(data.templates) ? data.templates : []);
+  }
+  for (const id of existing.keys()) if (!seen.has(id)) await remove(id);
 
   if (data.branding) {
-    await sqliteDb.run(`
-      INSERT INTO branding (id, organizationId, payload, updatedAt)
+    await db.run(`
+      INSERT INTO branding (id, "organizationId", payload, "updatedAt")
       VALUES (@id, @organizationId, @payload, @updatedAt)
-      ON CONFLICT(id) DO UPDATE SET
-        organizationId = excluded.organizationId,
+      ON CONFLICT (id) DO UPDATE SET
+        "organizationId" = excluded."organizationId",
         payload = excluded.payload,
-        updatedAt = excluded.updatedAt
-      WHERE branding.payload IS NOT excluded.payload
+        "updatedAt" = excluded."updatedAt"
+      WHERE branding.payload IS DISTINCT FROM excluded.payload
     `, {
       id: 'branding',
       organizationId: data.branding.organizationId ?? null,
@@ -100,14 +74,14 @@ async function synchronizeCoreDataTransaction(sqliteDb: Sql, data: any) {
 
   const googleConfigPayload = data.googleConfig ?? data.appSettings ?? null;
   if (googleConfigPayload) {
-    await sqliteDb.run(`
-      INSERT INTO app_settings (id, organizationId, payload, updatedAt)
+    await db.run(`
+      INSERT INTO app_settings (id, "organizationId", payload, "updatedAt")
       VALUES (@id, @organizationId, @payload, @updatedAt)
-      ON CONFLICT(id) DO UPDATE SET
-        organizationId = excluded.organizationId,
+      ON CONFLICT (id) DO UPDATE SET
+        "organizationId" = excluded."organizationId",
         payload = excluded.payload,
-        updatedAt = excluded.updatedAt
-      WHERE app_settings.payload IS NOT excluded.payload
+        "updatedAt" = excluded."updatedAt"
+      WHERE app_settings.payload IS DISTINCT FROM excluded.payload
     `, {
       id: 'google_config',
       organizationId: googleConfigPayload.organizationId ?? null,
@@ -117,13 +91,13 @@ async function synchronizeCoreDataTransaction(sqliteDb: Sql, data: any) {
   }
 
   if (data.newsTicker) {
-    await sqliteDb.run(`
-      INSERT INTO news_ticker (id, payload, updatedAt)
+    await db.run(`
+      INSERT INTO news_ticker (id, payload, "updatedAt")
       VALUES (@id, @payload, @updatedAt)
-      ON CONFLICT(id) DO UPDATE SET
+      ON CONFLICT (id) DO UPDATE SET
         payload = excluded.payload,
-        updatedAt = excluded.updatedAt
-      WHERE news_ticker.payload IS NOT excluded.payload
+        "updatedAt" = excluded."updatedAt"
+      WHERE news_ticker.payload IS DISTINCT FROM excluded.payload
     `, {
       id: 'default',
       payload: JSON.stringify(data.newsTicker),
@@ -132,8 +106,8 @@ async function synchronizeCoreDataTransaction(sqliteDb: Sql, data: any) {
   }
 }
 
-export async function synchronizeCoreData(sqliteDb: Sql, data: any) {
-  await sqliteDb.tx(() => synchronizeCoreDataTransaction(sqliteDb, data));
+export async function synchronizeCoreData(db: Sql, data: any) {
+  await db.tx(() => synchronizeCoreDataTransaction(db, data));
 }
 
 /** Parts of the in-memory projection that synchronizeCoreData persists. */

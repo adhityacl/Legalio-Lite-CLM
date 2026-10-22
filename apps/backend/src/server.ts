@@ -1,9 +1,5 @@
 import { createMailTemplateStore } from "./mailTemplateStore";
 import { forwardAsyncRouteErrors } from './asyncRoutes';
-import { migrateNormalizedCore } from './migrations/003_normalized_core';
-import { removeLegacyCoreTables } from './migrations/004_remove_legacy_core';
-import { addStatusIndexes } from './migrations/005_status_indexes';
-import { renameFieldsToEnglish } from './migrations/006_english_field_names';
 import { renameLegacyKeys, renameLegacyKeyTokens } from '@legalio/shared/fieldNames';
 import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
 import { readBusinessRows, searchBusinessRows } from './normalizedCoreStore';
@@ -23,14 +19,14 @@ import { buildMatrix as buildRbacMatrix, can, hasOrganizationScope, type OrgCont
 import {
   RequestDenied, accessibleOrganizations, identityOf, isIdentityBanned, resolveIdentity, resolveLegacyContext, resolveOrganizationContext, sendError,
 } from "./identity";
-import { isUniqueViolation, sql } from "./db";
+import { connect, isConstraintViolation, isUniqueViolation, resolveDatabaseConfig, sql } from "./db";
+import { ensureSchema } from "./schema";
 import { BETTER_AUTH_ALLOWED, createAuthorizationMiddleware, isBetterAuthPathAllowed } from "./routePolicies";
 import { createOrganizationScope, filterRecords, recordVisible, normalizeDepartmentName, teamsOf, type RecordKind } from "./recordScope";
-import { IS_TEST_MODE, LEGACY_DATA_FILE, REPOSITORY_DIR, APP_DATA_DIR } from "./runtimePaths";
+import { IS_TEST_MODE, REPOSITORY_DIR, APP_DATA_DIR } from "./runtimePaths";
 import { cosStore, keyFromLink, memoryStore, type CosConfig, type ObjectStore } from "./objectStore";
 import {
-  ApiError, appendAudit, buildTenantProjection, ensureTenantBoundarySchema, isEmptyInstall, markMigrationApplied,
-  migrationApplied, readIntegration, writeIntegrationRow, patchOrganizationSettings, readOrganizationSettings, patchIntegration,
+  ApiError, appendAudit, buildTenantProjection, isEmptyInstall, readIntegration, writeIntegrationRow, patchOrganizationSettings, readOrganizationSettings, patchIntegration,
 } from "./organizationSettingsStore";
 import { auditActorFor, capabilitiesOf, createOrganizationAdminRouter, hasApprovalInvitation, identityResponse, selectActiveOrganization } from "./organizationAdminRoutes";
 import { createOrganizationRecord, seedOrganizationsFromDataset } from "./organizationProvisioning";
@@ -40,11 +36,8 @@ import { toNodeHandler } from "better-auth/node";
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import {
   auth as betterAuthInstance,
-  initAuthDatabase,
-  sqliteDb,
-  hydrateCoreDataFromJson,
-  syncDbToSqlite,
-  loadCoreDataFromSqlite,
+  saveCoreData,
+  loadCoreData,
   setVerificationMailer,
   reloadAuthConfiguration,
 } from "./lib/auth";
@@ -53,8 +46,8 @@ import {
   setConsoleDbReference,
   ensureUserAccountsExist,
 } from "./authConsoleRoutes";
-import { createDocumentRouter, ensureDocumentSchema } from "./documentRoutes";
-import { createApprovalRouter, ensureApprovalSchema } from "./approvalRoutes";
+import { createDocumentRouter } from "./documentRoutes";
+import { createApprovalRouter } from "./approvalRoutes";
 import { createCoreSaver } from "./coreDataStore";
 import { resetSyncCache } from "./normalizedCoreStore";
 import { isDemoAccountEmail, removeDemoAccounts } from "./demoAccounts";
@@ -168,10 +161,8 @@ app.use("/api", localizeApiMessages);
  * routes are denied in favour of the canonical services. Every other /api
  * operation passes the declared route policy (server/routePolicies.ts).
  */
-let migrationBlock: string | null = null;
 app.all(["/api/auth", "/api/auth/*"], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (req.path.startsWith("/api/auth/google/")) return next();
-  if (migrationBlock) return sendError(req, res, 503, migrationBlock, "The database must be migrated before this version can serve requests.");
   const path = req.path.replace(/\/$/, "");
   if (!isBetterAuthPathAllowed(path)) return sendError(req, res, 404, "RESOURCE_NOT_FOUND");
   if (BETTER_AUTH_ALLOWED[path] === "self") {
@@ -184,7 +175,7 @@ app.all(["/api/auth", "/api/auth/*"], async (req: express.Request, res: express.
   }
   return toNodeHandler(betterAuthInstance)(req, res);
 });
-app.use(createAuthorizationMiddleware(sql, { blocked: () => migrationBlock }));
+app.use(createAuthorizationMiddleware(sql));
 
 /** Verified organization context attached by the route policy (tenant/orgParam routes only). */
 function orgContextOf(req: express.Request): OrgContext {
@@ -227,7 +218,7 @@ app.post("/api/rbac/check", async (req: express.Request, res: express.Response) 
 async function persistTenantFolder(tenantId: string, folderId: string) {
   try {
     const current = await readIntegration(sql, tenantId);
-    const claimed = await sql.get("SELECT 1 FROM organization_integrations WHERE driveFolderId = ? AND organizationId <> ?", folderId, tenantId);
+    const claimed = await sql.get('SELECT 1 FROM organization_integrations WHERE "driveFolderId" = ? AND "organizationId" <> ?', folderId, tenantId);
     if (claimed) return;
     await writeIntegrationRow(sql, { ...current, driveFolderId: folderId, version: current.version + 1 }, null);
     await refreshTenantProjection();
@@ -409,7 +400,6 @@ function uploadOwners(urlPath: string) {
   return uploadIndex.get(urlPath) || [];
 }
 async function authorizeUpload(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (migrationBlock) return res.status(503).end();
   let identity;
   try {
     identity = await resolveIdentity(sql, req);
@@ -693,7 +683,6 @@ async function ensureAllPartnersFolders(token?: string, targetTenantId?: string)
   }
   return { driveFoldersCreated };
 }
-const dataFilePath = LEGACY_DATA_FILE;
 const DEFAULT_BRANDING = {
   appName: "Legalio CLM",
   logoUrl: "/favicon.png",
@@ -749,7 +738,6 @@ bindTenantStore(() => db);
 
 /** Rebuilds the read-only `db.tenants` projection from canonical organization rows (PRD §7.3). */
 async function refreshTenantProjection() {
-  if (migrationBlock) return;
   db.tenants = await buildTenantProjection(sql);
 }
 setInvalidTokenCallback((badToken) => {
@@ -1157,81 +1145,53 @@ __name(
   "computeContractEndDateFromDuration",
 );
 /*
- * Startup (PRD §14.1): a fresh install initializes the canonical schema
- * directly; an existing database must have run 002_tenant_boundaries,
- * otherwise the API stays in a controlled MIGRATION_REQUIRED state and no
- * legacy administrative projection is hydrated or saved.
+ * Startup (PRD §14.1): connects, creates or completes the schema, and on a fresh install seeds the demo workspace.
  * Everything that reads or writes the database runs here; startServer() awaits it before listening.
  */
 export async function init() {
-  await initAuthDatabase();
+  // Phase F replaces this with the onboarding database step.
+  const config = resolveDatabaseConfig();
+  if (!config) throw new Error("No database configured. Set DATABASE_URL to a PostgreSQL connection string.");
+  connect(config);
+  await ensureSchema();
+  await reloadAuthConfiguration();
   await googleCredentials.init();
-  await mailTemplates.init();
-  await ensureDocumentSchema(sql);
-  await ensureApprovalSchema(sql);
-  await ensureTenantBoundarySchema(sql);
   const freshInstall = await isEmptyInstall(sql);
-  if (freshInstall) {
-    if (!IS_TEST_MODE) {
-      await seedOrganizationsFromDataset(sql, demoData, {
-        bootstrapSuperuser: shouldSeedDemoAdmin && demoAdminEmail && demoAdminPassword
-          ? { id: "demo-admin", email: demoAdminEmail, name: "Legalio Admin" }
-          : undefined,
-      });
-    }
-    await markMigrationApplied(sql, { freshInstall: true });
-  } else if (!await migrationApplied(sql)) {
-    migrationBlock = "MIGRATION_REQUIRED";
-    console.error("[startup] Legacy data found without migration 002_tenant_boundaries. Run `npm run tenant-boundaries:migrate` (dry-run, then --apply) before starting this version.");
+  if (freshInstall && !IS_TEST_MODE) {
+    await seedOrganizationsFromDataset(sql, demoData, {
+      bootstrapSuperuser: shouldSeedDemoAdmin && demoAdminEmail && demoAdminPassword
+        ? { id: "demo-admin", email: demoAdminEmail, name: "Legalio Admin" }
+        : undefined,
+    });
   }
-  if (!migrationBlock && !IS_TEST_MODE && shouldSeedDemoAdmin && demoAdminEmail && demoAdminPassword
+  if (!IS_TEST_MODE && shouldSeedDemoAdmin && demoAdminEmail && demoAdminPassword
     && !await sql.get(`SELECT 1 FROM "user" WHERE id = 'demo-admin' OR LOWER(email) = ?`, demoAdminEmail)) {
     await seedOrganizationsFromDataset(sql, { tenants: [], departments: [], allowedUsers: [] }, {
       bootstrapSuperuser: { id: "demo-admin", email: demoAdminEmail, name: "Legalio Admin" },
     });
     console.log(`Seeded bootstrap superuser: ${demoAdminEmail}`);
   }
-  if (!migrationBlock) {
-    const result = await migrateNormalizedCore(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-normalized-core-${Date.now()}.db`));
-    if (result.applied) console.log('Normalized SQLite business schema:', result.counts);
-    const cleanup = removeLegacyCoreTables(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-remove-legacy-core-${Date.now()}.db`));
-    if (cleanup.applied) console.log('Removed legacy SQLite snapshots:', cleanup.tables);
-    // Before the status indexes: those are declared with the English column names.
-    const english = renameFieldsToEnglish(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-english-field-names-${Date.now()}.db`));
-    if (english.applied) console.log('Renamed Indonesian data columns to English:', english.renamed);
-    if (addStatusIndexes(sqliteDb).applied) console.log('Added status indexes for dashboard and list queries.');
-  }
-  const sqliteInitialData = await loadCoreDataFromSqlite();
-  const sqliteHasCoreData = ["partners", "contracts", "ios", "spendings", "evaluations", "notifications", "templates", "activityLogs"]
-    .some((key) => Array.isArray((sqliteInitialData as any)[key]) && (sqliteInitialData as any)[key].length > 0);
+  const initialData = await loadCoreData();
+  const hasCoreData = ["partners", "contracts", "ios", "spendings", "evaluations", "notifications", "templates", "activityLogs"]
+    .some((key) => Array.isArray((initialData as any)[key]) && (initialData as any)[key].length > 0);
 
   // An initialized workspace may intentionally contain no business records after a reset.
-  if (sqliteHasCoreData || !freshInstall) {
-    db = { ...db, ...sqliteInitialData,
-      branding: sqliteInitialData.branding ?? db.branding,
-      googleConfig: sqliteInitialData.googleConfig ?? db.googleConfig,
-      newsTicker: sqliteInitialData.newsTicker ?? db.newsTicker,
+  if (hasCoreData || !freshInstall) {
+    db = { ...db, ...initialData,
+      branding: initialData.branding ?? db.branding,
+      googleConfig: initialData.googleConfig ?? db.googleConfig,
+      newsTicker: initialData.newsTicker ?? db.newsTicker,
     };
-    console.log("Database loaded from SQLite as the source of truth.");
-  } else if (!IS_TEST_MODE && fs.existsSync(dataFilePath)) {
-    try {
-      const raw = fs.readFileSync(dataFilePath, "utf-8");
-      const parsed = renameLegacyKeys(JSON.parse(raw));
-      db = { ...db, ...parsed };
-      if (!migrationBlock) await hydrateCoreDataFromJson(db);
-      console.log("Imported legacy data_store.json into SQLite.");
-    } catch (err) {
-      console.error("Error importing data_store.json, using seed defaults", err);
-    }
+    console.log("Database loaded from PostgreSQL as the source of truth.");
   } else {
     db = {
       ...db,
-      allowedUsers: sqliteInitialData.allowedUsers || [],
-      branding: sqliteInitialData.branding || db.branding,
-      googleConfig: sqliteInitialData.googleConfig || db.googleConfig,
-      newsTicker: sqliteInitialData.newsTicker || db.newsTicker,
+      allowedUsers: initialData.allowedUsers || [],
+      branding: initialData.branding || db.branding,
+      googleConfig: initialData.googleConfig || db.googleConfig,
+      newsTicker: initialData.newsTicker || db.newsTicker,
     };
-    console.log("SQLite is empty; using seed defaults for the first initialization.");
+    console.log("The database is empty; using seed defaults for the first initialization.");
   }
   // Only the canonical tables define organizations; legacy snapshot rows are migration input.
   db.tenants = [];
@@ -1253,7 +1213,7 @@ export async function init() {
     if (organizationId) await onOrganizationChanged(organizationId);
     else await refreshTenantProjection();
   });
-  if (!IS_TEST_MODE && !migrationBlock) {
+  if (!IS_TEST_MODE) {
     await ensureUserAccountsExist();
     ensureAllPartnersFolders().catch((err) =>
       console.error("Startup category folder provisioning error:", err),
@@ -1437,17 +1397,16 @@ function sanitizeIdentifiers(value: unknown): Array<{ scheme: string; value: str
       country: sanitizeCountryCode(item.country),
     }));
 }
-const coreSaver = createCoreSaver(sql, () => db, async () => { Object.assign(db, await loadCoreDataFromSqlite()); });
+const coreSaver = createCoreSaver(sql, () => db, async () => { Object.assign(db, await loadCoreData()); });
 /** Persists the in-memory projection: one writer at a time, never inside sql.tx. */
 async function saveDb() {
   uploadIndex = null;
   lifecyclesFreshUntil = 0;
-  if (migrationBlock) return; // never persist legacy projections before migration
   try {
     await coreSaver.save();
   } catch (err) {
-    console.error("Failed to save core data to SQLite", err);
-    if (String((err as any)?.code || '').startsWith('SQLITE_CONSTRAINT')) (err as any).status = 409;
+    console.error("Failed to save core data", err);
+    if (isConstraintViolation(err)) (err as any).status = 409;
     throw err;
   }
 }
@@ -1661,8 +1620,8 @@ async function recalculateStatuses() {
   // Active admin/manager emails per organization, read once so the reminder pass below stays synchronous.
   const adminEmails = new Map<string, string[]>();
   for (const row of await sql.all(`
-    SELECT m.organizationId, u.email FROM member m JOIN "user" u ON u.id = m.userId
-    WHERE m.status = 'active' AND m.role IN ('admin', 'manager') AND COALESCE(u.banned, 0) = 0
+    SELECT m."organizationId", u.email FROM member m JOIN "user" u ON u.id = m."userId"
+    WHERE m.status = 'active' AND m.role IN ('admin', 'manager') AND u.banned IS NOT TRUE
   `)) adminEmails.set(row.organizationId, [...(adminEmails.get(row.organizationId) || []), row.email]);
   const emitReminder = (kind: "contract" | "commercial", record: any, daysRemaining: number) => {
     const tenantId = record.organizationId;
@@ -1943,7 +1902,7 @@ app.get("/api/dashboard/news-ticker", async (req: express.Request, res: express.
 /** Department names for operational forms: the verified organization, scoped to the caller (no fallback). */
 app.get("/api/departments", async (req: express.Request, res: express.Response) => {
   const ctx = orgContextOf(req);
-  const rows = await sql.all("SELECT id, name FROM team WHERE organizationId = ? ORDER BY name COLLATE NOCASE, id", ctx.organizationId) as any[];
+  const rows = await sql.all('SELECT id, name FROM team WHERE "organizationId" = ? ORDER BY lower(name), id', ctx.organizationId) as any[];
   const visible = hasOrganizationScope(ctx) ? rows : rows.filter((r) => ctx.departmentIds.includes(r.id));
   res.json({ success: true, departments: visible.map((r) => r.name), items: visible });
 });
@@ -2182,7 +2141,7 @@ app.post("/api/user/reset-password", async (req: express.Request, res: express.R
   try {
     const authDb = sql;
     const trimmedEmail = email.trim().toLowerCase();
-    let targetUser: any = await authDb.get("SELECT id, name, email FROM user WHERE LOWER(email) = ?", trimmedEmail);
+    let targetUser: any = await authDb.get('SELECT id, name, email FROM "user" WHERE LOWER(email) = ?', trimmedEmail);
     const hashedPassword = await hashPassword(newPassword.trim());
     const nowIso = new Date().toISOString();
     if (!targetUser) {
@@ -2193,27 +2152,27 @@ app.post("/api/user/reset-password", async (req: express.Request, res: express.R
       const userName = allowedUser?.name || email.split("@")[0];
       const userRole = "user"; // platform role only; organization access comes from memberships
       await authDb.run(`
-        INSERT INTO user (id, name, email, emailVerified, role, banned, createdAt, updatedAt)
-        VALUES (?, ?, ?, 1, ?, 0, ?, ?)
+        INSERT INTO "user" (id, name, email, "emailVerified", role, banned, "createdAt", "updatedAt")
+        VALUES (?, ?, ?, true, ?, false, ?, ?)
       `, userId, userName, trimmedEmail, userRole, nowIso, nowIso);
       const accountId = `acc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       await authDb.run(`
-        INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer)
-        VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')
+        INSERT INTO account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt")
+        VALUES (?, ?, 'credential', ?, ?, ?, ?)
       `, accountId, userId, userId, hashedPassword, nowIso, nowIso);
       targetUser = { id: userId, name: userName, email: trimmedEmail };
     } else {
-      const existingAccount: any = await authDb.get("SELECT id FROM account WHERE userId = ? AND providerId = 'credential'", targetUser.id);
+      const existingAccount: any = await authDb.get(`SELECT id FROM account WHERE "userId" = ? AND "providerId" = 'credential'`, targetUser.id);
       if (existingAccount) {
-        await authDb.run("UPDATE account SET password = ?, updatedAt = ? WHERE id = ?", hashedPassword, nowIso, existingAccount.id);
+        await authDb.run('UPDATE account SET password = ?, "updatedAt" = ? WHERE id = ?', hashedPassword, nowIso, existingAccount.id);
       } else {
         const accountId = `acc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         await authDb.run(`
-          INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer)
-          VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')
+          INSERT INTO account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt")
+          VALUES (?, ?, 'credential', ?, ?, ?, ?)
         `, accountId, targetUser.id, targetUser.id, hashedPassword, nowIso, nowIso);
       }
-      await authDb.run("UPDATE user SET banned = 0, banReason = NULL, updatedAt = ? WHERE id = ?", nowIso, targetUser.id);
+      await authDb.run('UPDATE "user" SET banned = false, "banReason" = NULL, "updatedAt" = ? WHERE id = ?', nowIso, targetUser.id);
     }
     await addActivityLog(
       adminCheck.adminEmail || "admin@app",
@@ -5490,7 +5449,7 @@ app.get("/api/notification-logs", async (req: express.Request, res: express.Resp
   res.json(await scopedRecords(req, "notification", db.notifications));
 });
 /**
- * Matches in-memory notifications the caller may touch. scopedRecords re-reads rows from SQLite,
+ * Matches in-memory notifications the caller may touch. scopedRecords re-reads rows from the database,
  * so this matches by organization + notif_id; object identity never matches db.notifications.
  */
 async function visibleNotificationFilter(req: express.Request) {
@@ -5666,21 +5625,21 @@ app.post(
       // Google proved the email above; invitations satisfy account approval,
       // while membership is still granted only by explicit invitation acceptance.
       const invited = await hasApprovalInvitation(sql, cleanEmail, req.get('x-invitation-token'));
-      let existingUser: any = await sql.get(`SELECT id, name, role, banned, banReason, banExpires FROM "user" WHERE LOWER(email) = ?`, cleanEmail);
+      let existingUser: any = await sql.get(`SELECT id, name, role, banned, "banReason", "banExpires" FROM "user" WHERE LOWER(email) = ?`, cleanEmail);
       if (!existingUser) {
         try {
           await sql.run(`
-            INSERT INTO "user" (id, name, email, emailVerified, image, role, banned, banReason, createdAt, updatedAt)
-            VALUES (?, ?, ?, 1, ?, 'user', ?, ?, ?, ?)
-          `, `usr_${crypto.randomUUID()}`, userName, cleanEmail, photoURL || null, invited ? 0 : 1, invited ? null : 'PENDING_APPROVAL', now, now);
+            INSERT INTO "user" (id, name, email, "emailVerified", image, role, banned, "banReason", "createdAt", "updatedAt")
+            VALUES (?, ?, ?, true, ?, 'user', ?, ?, ?, ?)
+          `, `usr_${crypto.randomUUID()}`, userName, cleanEmail, photoURL || null, !invited, invited ? null : 'PENDING_APPROVAL', now, now);
         } catch (err) {
           if (!isUniqueViolation(err)) throw err; // a concurrent sign-in of the same address created it first
         }
-        existingUser = await sql.get(`SELECT id, name, role, banned, banReason, banExpires FROM "user" WHERE LOWER(email) = ?`, cleanEmail);
+        existingUser = await sql.get(`SELECT id, name, role, banned, "banReason", "banExpires" FROM "user" WHERE LOWER(email) = ?`, cleanEmail);
       }
       if (existingUser.banReason === 'PENDING_APPROVAL' && invited) {
-        await sql.run('UPDATE "user" SET banned = 0, banReason = NULL, banExpires = NULL, updatedAt = ? WHERE id = ?', now, existingUser.id);
-        existingUser.banned = 0;
+        await sql.run('UPDATE "user" SET banned = false, "banReason" = NULL, "banExpires" = NULL, "updatedAt" = ? WHERE id = ?', now, existingUser.id);
+        existingUser.banned = false;
         existingUser.banReason = null;
         existingUser.banExpires = null;
       }
@@ -5690,19 +5649,19 @@ app.post(
           message: pending ? "Your account is waiting for manual superuser approval." : "This account is disabled." });
       }
       // Google verified this address, so the identity's email is verified.
-      await sql.run(`UPDATE "user" SET image = COALESCE(?, image), emailVerified = 1, updatedAt = ? WHERE id = ?`, photoURL || null, now, existingUser.id);
+      await sql.run(`UPDATE "user" SET image = COALESCE(?, image), "emailVerified" = true, "updatedAt" = ? WHERE id = ?`, photoURL || null, now, existingUser.id);
       const userId = existingUser.id;
-      const existingAcc: any = await sql.get("SELECT id FROM account WHERE userId = ? AND providerId = 'google'", userId);
+      const existingAcc: any = await sql.get(`SELECT id FROM account WHERE "userId" = ? AND "providerId" = 'google'`, userId);
       if (!existingAcc) {
         await sql.run(`
-          INSERT INTO account (id, accountId, providerId, userId, idToken, createdAt, updatedAt, issuer)
-          VALUES (?, ?, 'google', ?, ?, ?, ?, 'google')
+          INSERT INTO account (id, "accountId", "providerId", "userId", "idToken", "createdAt", "updatedAt")
+          VALUES (?, ?, 'google', ?, ?, ?, ?)
         `, `acc_${crypto.randomUUID()}`, cleanEmail, userId, idToken || null, now, now);
       }
       const sessionToken = crypto.randomBytes(32).toString("hex");
       const sessionExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       await sql.run(`
-        INSERT INTO session (id, expiresAt, token, createdAt, updatedAt, ipAddress, userAgent, userId, activeOrganizationId)
+        INSERT INTO session (id, "expiresAt", token, "createdAt", "updatedAt", "ipAddress", "userAgent", "userId", "activeOrganizationId")
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
       `, `sess_${crypto.randomUUID()}`, sessionExpiry, sessionToken, now, now, req.ip || "", String(req.headers["user-agent"] || ""), userId);
 
@@ -6343,22 +6302,20 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
   try {
     await coreSaver.withSaveLock(() => sql.tx(async () => {
       // Clear editor data and extraction caches with the same reset.
-      for (const table of ["contract_comments", "document_metadata", "contract_drafts", "contract_documents", "metadata_fields", "ai_ocr_cache", "tenants", "departments", "search_records"]) {
-        if (await sql.get("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", table)) {
-          await sql.run(`DELETE FROM "${table}"`);
-        }
+      for (const table of ["contract_comments", "document_metadata", "contract_drafts", "contract_documents", "metadata_fields", "ai_ocr_cache", "search_records"]) {
+        await sql.run(`DELETE FROM "${table}"`);
       }
       await removeDemoAccounts(sql, [], identity.userId);
       for (const table of ["invitation", "apikey", "teamMember", "team", "member", "organization_settings", "organization_integrations", "organization"]) {
-        await sql.run(`DELETE FROM ${table}`);
+        await sql.run(`DELETE FROM "${table}"`);
       }
       await seedOrganizationsFromDataset(sql, {
         tenants: dataset.tenants,
         departments: dataset.departments,
         allowedUsers: mode === "demo" && process.env.NODE_ENV !== "production" ? dataset.allowedUsers : [],
       });
-      await sql.run("UPDATE session SET activeOrganizationId = NULL, activeTeamId = NULL");
-      const tenants = migrationBlock ? [] : await buildTenantProjection(sql);
+      await sql.run('UPDATE session SET "activeOrganizationId" = NULL, "activeTeamId" = NULL');
+      const tenants = await buildTenantProjection(sql);
 
       // Built on `db` (tenant policy and migrateLegacyRecords read it), then swapped back before the next await:
       // other handlers keep the committed state until this transaction commits.
@@ -6409,7 +6366,7 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       }
       // search_records was emptied above, so no fingerprint may skip a row; the replacement and its business records commit together.
       resetSyncCache(sql);
-      await syncDbToSqlite(snapshot);
+      await saveCoreData(snapshot);
       await appendAudit(sql, auditActorFor(req, identity), {
         organizationId: null, action: "platform.application.reset", targetType: "installation", targetId: "installation",
         outcome: "success", changedFields: [`mode:${mode}`],
@@ -7065,7 +7022,12 @@ app.put("/api/tenants/:id", async (req: express.Request, res: express.Response) 
       const slug = body.domainSlug.trim().toLowerCase();
       if (!/^[a-z0-9-]{1,48}$/.test(slug)) return sendError(req, res, 400, "INVALID_INPUT", "Slug may contain lowercase letters, digits and dashes.");
       if (await sql.get("SELECT 1 FROM organization WHERE slug = ? AND id <> ?", slug, req.params.id)) return sendError(req, res, 409, "SLUG_EXISTS");
-      await sql.run("UPDATE organization SET slug = ? WHERE id = ?", slug, req.params.id);
+      try {
+        await sql.run("UPDATE organization SET slug = ? WHERE id = ?", slug, req.params.id);
+      } catch (err) {
+        if (isUniqueViolation(err)) return sendError(req, res, 409, "SLUG_EXISTS"); // taken between the check and the write
+        throw err;
+      }
     }
     if (patch.name !== undefined || patch.profile || patch.policy) {
       await patchOrganizationSettings(sql, req.params.id, patch, auditActorFor(req, identity));
@@ -7086,11 +7048,11 @@ app.delete("/api/tenants/:id", async (req: express.Request, res: express.Respons
     .some((key) => (db[key] || []).some((row: any) => row?.organizationId === id));
   if (owned) return sendError(req, res, 409, "ORGANIZATION_IN_USE", "Move or remove this organization's records first.");
   await sql.tx(async () => {
-    await sql.run("DELETE FROM teamMember WHERE teamId IN (SELECT id FROM team WHERE organizationId = ?)", id);
+    await sql.run('DELETE FROM "teamMember" WHERE "teamId" IN (SELECT id FROM team WHERE "organizationId" = ?)', id);
     for (const table of ["member", "team", "invitation", "organization_settings", "organization_integrations"]) {
-      await sql.run(`DELETE FROM ${table} WHERE organizationId = ?`, id);
+      await sql.run(`DELETE FROM ${table} WHERE "organizationId" = ?`, id);
     }
-    await sql.run("UPDATE session SET activeOrganizationId = NULL WHERE activeOrganizationId = ?", id);
+    await sql.run('UPDATE session SET "activeOrganizationId" = NULL WHERE "activeOrganizationId" = ?', id);
     await sql.run("DELETE FROM organization WHERE id = ?", id);
     await appendAudit(sql, auditActorFor(req, identity), {
       organizationId: id, action: "organization.delete", targetType: "organization", targetId: id, outcome: "success", changedFields: [],
@@ -7326,7 +7288,7 @@ app.get("/api/health", (_req: express.Request, res: express.Response) => {
 async function isBootstrapPasswordActive(): Promise<boolean> {
   try {
     const row: any = await sql.get(`
-      SELECT password FROM account WHERE userId = 'demo-admin' AND providerId = 'credential' LIMIT 1
+      SELECT password FROM account WHERE "userId" = 'demo-admin' AND "providerId" = 'credential' LIMIT 1
     `);
     if (!row?.password) return false;
     return await verifyPassword({ hash: row.password, password: LEGACY_DEFAULT_ADMIN_PASSWORD });
@@ -7342,9 +7304,8 @@ const needsFirstRunSetup = async () => !await sql.get(`SELECT 1 FROM "user" WHER
 app.get("/api/system/public-status", async (_req: express.Request, res: express.Response) => {
   res.set('Cache-Control', 'no-store').json({
     appName: db.branding?.appName || DEFAULT_BRANDING.appName,
-    needsSetup: !migrationBlock && await needsFirstRunSetup(),
+    needsSetup: await needsFirstRunSetup(),
     publicUrl: getPublicBaseUrl(),
-    migrationRequired: Boolean(migrationBlock),
   });
 });
 
@@ -7374,21 +7335,23 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
   try {
     // Re-checked inside the transaction: hashing above yields, so a second request could have won.
     const created = await sql.tx(async () => {
+      // Serializes concurrent setups: the loser sees the winner's superuser below.
+      await sql.get(`SELECT pg_advisory_xact_lock(hashtext('legalio:setup'))`);
       if (!await needsFirstRunSetup()) return false;
-      if (await sql.get(`SELECT 1 FROM user WHERE LOWER(email) = ?`, email)) {
+      if (await sql.get(`SELECT 1 FROM "user" WHERE LOWER(email) = ?`, email)) {
         throw Object.assign(new Error("That email is already used by another account."), { status: 409 });
       }
       await sql.run(`
-        INSERT INTO user (id, name, email, emailVerified, role, banned, createdAt, updatedAt)
-        VALUES (?, ?, ?, 1, 'superuser', 0, ?, ?)
+        INSERT INTO "user" (id, name, email, "emailVerified", role, banned, "createdAt", "updatedAt")
+        VALUES (?, ?, ?, true, 'superuser', false, ?, ?)
       `, id, name, email, now, now);
       await sql.run(`
-        INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer)
-        VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')
+        INSERT INTO account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt")
+        VALUES (?, ?, 'credential', ?, ?, ?, ?)
       `, `acc_${id}`, id, id, hashed, now, now);
       await saveInstallationPublicUrl(sql, publicUrl);
       return true;
-    }); // the facade serializes transactions, so concurrent setups cannot both pass the check
+    });
     if (!created) {
       return res.status(409).json({ error: "ALREADY_SET_UP", message: "An administrator already exists. Please sign in." });
     }

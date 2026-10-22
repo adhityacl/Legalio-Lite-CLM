@@ -110,11 +110,11 @@ export async function resolveIdentity(db: DB, req: express.Request): Promise<Ide
   if (cached) return cached;
   const { token, viaCookie } = readSessionToken(req);
   if (!token || token.length > 512) throw new RequestDenied(401, 'UNAUTHENTICATED');
-  const session = await db.get(`SELECT id, userId, expiresAt, activeOrganizationId FROM session WHERE token = ?`, token) as any;
+  const session = await db.get(`SELECT id, "userId", "expiresAt", "activeOrganizationId" FROM session WHERE token = ?`, token) as any;
   if (!session) throw new RequestDenied(401, 'UNAUTHENTICATED');
   const expires = parseTimestamp(session.expiresAt);
   if (expires === null || expires <= Date.now()) throw new RequestDenied(401, 'UNAUTHENTICATED');
-  const user = await db.get(`SELECT id, email, name, image, emailVerified, role, banned, banReason, banExpires FROM "user" WHERE id = ?`, session.userId) as any;
+  const user = await db.get(`SELECT id, email, name, image, "emailVerified", role, banned, "banReason", "banExpires" FROM "user" WHERE id = ?`, session.userId) as any;
   if (!user) throw new RequestDenied(401, 'UNAUTHENTICATED');
   if (isIdentityBanned(user)) throw new RequestDenied(403, user.banReason === 'PENDING_APPROVAL' ? 'ACCOUNT_PENDING_APPROVAL' : 'ACCOUNT_DISABLED');
   const platformRole = platformRoleOf(user.role);
@@ -182,8 +182,8 @@ export function collectSelectors(req: express.Request, options: { includeBody?: 
 
 export async function departmentIdsOf(db: DB, userId: string, organizationId: string): Promise<string[]> {
   return (await db.all(`
-    SELECT t.id FROM teamMember tm JOIN team t ON t.id = tm.teamId
-    WHERE tm.userId = ? AND t.organizationId = ? ORDER BY t.createdAt ASC, t.id ASC
+    SELECT t.id FROM "teamMember" tm JOIN team t ON t.id = tm."teamId"
+    WHERE tm."userId" = ? AND t."organizationId" = ? ORDER BY t."createdAt" ASC, t.id ASC
   `, userId, organizationId) as Array<{ id: string }>).map((r) => r.id);
 }
 
@@ -196,12 +196,12 @@ export interface MembershipRow {
 }
 
 export async function membershipOf(db: DB, userId: string, organizationId: string): Promise<MembershipRow | null> {
-  return (await db.get(`SELECT id, organizationId, userId, role, status FROM member WHERE userId = ? AND organizationId = ?`, userId, organizationId) as MembershipRow | undefined) || null;
+  return (await db.get(`SELECT id, "organizationId", "userId", role, status FROM member WHERE "userId" = ? AND "organizationId" = ?`, userId, organizationId) as MembershipRow | undefined) || null;
 }
 
 /**
  * Context for one explicit organization. Ordinary identities need a current
- * active membership with a valid tenant role (checked in SQLite on every
+ * active membership with a valid tenant role (checked in the database on every
  * request); a superuser gets explicit platform-management context. Anything
  * else is indistinguishable from a missing organization (404).
  */
@@ -286,14 +286,14 @@ export async function accessibleOrganizations(db: DB, identity: Identity) {
   // A superuser always works in platform-management context (§5.3), so its
   // switcher is the deduplicated directory rather than membership rows.
   if (identity.platformRole === 'superuser') {
-    return (await db.all(`SELECT id, name, slug, logo FROM organization ORDER BY name COLLATE NOCASE, id`) as any[])
+    return (await db.all(`SELECT id, name, slug, logo FROM organization ORDER BY lower(name), id`) as any[])
       .map((o) => ({ organizationId: o.id as string, organizationName: o.name as string, slug: (o.slug || '') as string, logoUrl: (o.logo || null) as string | null, tenantRole: null, accessMode: 'platform' as const }));
   }
   const own = await db.all(`
-    SELECT o.id, o.name, o.slug, o.logo, m.role AS tenantRole
-    FROM member m JOIN organization o ON o.id = m.organizationId
-    WHERE m.userId = ? AND m.status = 'active'
-    ORDER BY o.name COLLATE NOCASE, o.id
+    SELECT o.id, o.name, o.slug, o.logo, m.role AS "tenantRole"
+    FROM member m JOIN organization o ON o.id = m."organizationId"
+    WHERE m."userId" = ? AND m.status = 'active'
+    ORDER BY lower(o.name), o.id
   `, identity.userId) as any[];
   return own.filter((r) => isTenantRole(r.tenantRole)).map((r) => ({
     organizationId: r.id as string, organizationName: r.name as string, slug: (r.slug || '') as string, logoUrl: (r.logo || null) as string | null,

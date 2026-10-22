@@ -1,4 +1,4 @@
-/** SQLite business schema. API names stay stable at the storage boundary. */
+/** Business schema. API names stay stable at the storage boundary. */
 export type FieldKind = 'text' | 'number' | 'boolean' | 'json' | 'money';
 export interface Field { api: string; sql: string; kind: FieldKind }
 export interface EntitySchema { table: string; key: string; collection: string; fields: Field[]; search: string[] }
@@ -43,4 +43,3 @@ export const entityFor = (table: string) => {
   if (!entity) throw new Error(`Unknown business table: ${table}`);
   return entity;
 };
-export const NORMALIZED_MIGRATION = '003_normalized_core';

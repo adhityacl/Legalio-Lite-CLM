@@ -23,19 +23,15 @@
     "start": "npm run start --workspace @legalio/backend",
     "clean": "node scripts/clean-build.mjs",
     "lint": "turbo run lint --concurrency=1 && tsc --noEmit",
-    "auth:generate": "npm run auth:generate --workspace @legalio/backend",
-    "auth:migrate": "npm run auth:migrate --workspace @legalio/backend",
     "build:sys": "npm run build:console --workspace @legalio/backend",
     "dev:sys": "npm run dev:console --workspace @legalio/backend",
-    "test:sqlite": "node --import tsx --test apps/backend/src/db.test.ts apps/backend/src/normalizedCore.test.ts apps/backend/src/installationSettings.test.ts apps/backend/src/mailTemplateStore.test.ts apps/backend/src/invitationApproval.test.ts apps/backend/src/partnerContact.test.ts apps/backend/src/approvalRoutes.test.ts apps/backend/src/objectStore.test.ts apps/backend/src/secretBox.test.ts packages/platform-console/src/lib/appRoutes.test.ts packages/shared/src/bulkParse.test.ts packages/shared/src/fieldNames.test.ts packages/shared/src/pageLayout.test.ts apps/frontend/src/lib/documentsApi.test.ts apps/frontend/src/lib/serviceOrderChecks.test.ts apps/frontend/src/lib/serviceOrderSort.test.ts apps/frontend/src/lib/tablePreferences.test.ts apps/frontend/src/lib/partnerChecks.test.ts apps/frontend/src/lib/spendingChecks.test.ts apps/frontend/src/lib/evaluationSnapshot.test.ts packages/platform-console/src/lib/organizationSelection.test.ts",
-    "test:pg": "node --import tsx --test apps/backend/src/db.pg.test.ts apps/backend/src/schema.test.ts",
+    "test": "node --import tsx --test apps/backend/src/db.pg.test.ts apps/backend/src/schema.test.ts apps/backend/src/normalizedCore.test.ts apps/backend/src/installationSettings.test.ts apps/backend/src/mailTemplateStore.test.ts apps/backend/src/invitationApproval.test.ts apps/backend/src/partnerContact.test.ts apps/backend/src/approvalRoutes.test.ts apps/backend/src/objectStore.test.ts apps/backend/src/secretBox.test.ts packages/platform-console/src/lib/appRoutes.test.ts packages/shared/src/bulkParse.test.ts packages/shared/src/fieldNames.test.ts packages/shared/src/pageLayout.test.ts apps/frontend/src/lib/documentsApi.test.ts apps/frontend/src/lib/serviceOrderChecks.test.ts apps/frontend/src/lib/serviceOrderSort.test.ts apps/frontend/src/lib/tablePreferences.test.ts apps/frontend/src/lib/partnerChecks.test.ts apps/frontend/src/lib/spendingChecks.test.ts apps/frontend/src/lib/evaluationSnapshot.test.ts packages/platform-console/src/lib/organizationSelection.test.ts",
     "test:e2e:data-entry": "npm run build --workspace @legalio/backend && node --import tsx apps/backend/src/dataEntry.e2e.ts",
-    "test:e2e:sqlite": "npm run build --workspace @legalio/backend && node --import tsx apps/backend/src/normalizedCore.e2e.ts"
+    "test:e2e:postgres": "npm run build --workspace @legalio/backend && node --import tsx apps/backend/src/normalizedCore.e2e.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.14.0",
-    "@types/better-sqlite3": "^9.6.0",
     "@types/express": "^4.17.21",
     "esbuild": "^0.25.0",
     "tsx": "^4.21.0",

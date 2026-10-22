@@ -272,17 +272,13 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  * /api/auth/* endpoints are filtered separately (betterAuthBoundary).
  * It also loads the organization's departments once (`req.teams`) so record scoping stays synchronous.
  */
-export function createAuthorizationMiddleware(db: Sql, options: { blocked?: () => string | null } = {}) {
+export function createAuthorizationMiddleware(db: Sql) {
   const run = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (!req.path.startsWith('/api/')) return next();
     if (req.method === 'OPTIONS') return res.status(204).end();
     const found = findPolicy(req.method, req.path);
     if (!found) return sendError(req, res, 404, 'RESOURCE_NOT_FOUND', 'Unknown or unclassified API route.');
     const { policy, params } = found;
-    const blocked = options.blocked?.();
-    if (blocked && !(policy.kind === 'public' && (req.path === '/api/health' || req.path === '/api/system/public-status'))) {
-      return sendError(req, res, 503, blocked, 'The database must be migrated before this version can serve requests.');
-    }
     if (policy.kind === 'public') return next();
     try {
       const identity = await resolveIdentity(db, req);

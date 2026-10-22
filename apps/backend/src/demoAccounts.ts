@@ -33,7 +33,7 @@ export async function removeDemoAccounts<T extends { id?: unknown; email?: unkno
   await auth.tx(async () => {
     for (const { id } of doomed) {
       for (const table of ["session", "account", "member", "teamMember"]) {
-        await auth.run(`DELETE FROM "${table}" WHERE userId = ?`, id);
+        await auth.run(`DELETE FROM "${table}" WHERE "userId" = ?`, id);
       }
       await auth.run(`DELETE FROM "user" WHERE id = ?`, id);
     }

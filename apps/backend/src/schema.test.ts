@@ -6,8 +6,8 @@ import path from 'node:path';
 
 // Needs PostgreSQL at TEST_DATABASE_URL (default postgres://legalio:legalio@127.0.0.1:5432/legalio).
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'legalio-schema-'));
-Object.assign(process.env, { APP_TEST_MODE: '1', AUTH_DB_PATH: path.join(dir, 'kaelyn.db'), APP_DATA_DIR: dir, BETTER_AUTH_ENABLE_INFRA: 'false' });
-const { pgSql: sql } = await import('./db');
+Object.assign(process.env, { APP_TEST_MODE: '1', APP_DATA_DIR: dir, BETTER_AUTH_ENABLE_INFRA: 'false' });
+const { sql } = await import('./db');
 const { createTestDatabase } = await import('./testDatabase');
 const { ensureSchema } = await import('./schema');
 

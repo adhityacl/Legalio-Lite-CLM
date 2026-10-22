@@ -9,8 +9,6 @@
     "build": "npm run build:server && npm run build:console",
     "start": "node dist/server.cjs",
     "lint": "node --max-old-space-size=2048 ../../node_modules/typescript/bin/tsc --noEmit && node --max-old-space-size=2048 ../../node_modules/typescript/bin/tsc --noEmit --project console/tsconfig.json",
-    "auth:generate": "better-auth generate --config ./auth.config.ts",
-    "auth:migrate": "better-auth migrate --config ./auth.config.ts",
     "build:server": "esbuild src/server.ts --bundle --platform=node --format=cjs --packages=external --alias:@legalio/shared=../../packages/shared/src --alias:@legalio/types=../../packages/types/src --sourcemap --outfile=dist/server.cjs",
     "build:console": "vite build --config console/vite.config.ts",
     "dev:console": "vite build --watch --config console/vite.config.ts"
@@ -19,7 +17,6 @@
     "@better-auth/infra": "^0.4.9",
     "@google/genai": "^2.4.0",
     "better-auth": "^1.7.1",
-    "better-sqlite3": "^12.11.1",
     "cos-nodejs-sdk-v5": "^3.0.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
@@ -40,8 +37,6 @@
     "@legalio/platform-console": "*"
   },
   "devDependencies": {
-    "@better-auth/cli": "^1.4.21",
-    "@types/better-sqlite3": "^9.6.0",
     "@types/express": "^4.17.21",
     "@types/multer": "^2.2.0",
     "@types/nodemailer": "^8.0.1",

@@ -19,15 +19,11 @@ export function getPublicBaseUrl(): string {
 }
 
 export async function loadInstallationSettings(db: Sql): Promise<void> {
-  await db.exec(`CREATE TABLE IF NOT EXISTS installation_settings (
-    id TEXT PRIMARY KEY CHECK(id = 'installation'),
-    publicUrl TEXT NOT NULL
-  )`);
-  const row = await db.get("SELECT publicUrl FROM installation_settings WHERE id = 'installation'") as { publicUrl: string } | undefined;
+  const row = await db.get(`SELECT "publicUrl" FROM installation_settings WHERE id = 'installation'`) as { publicUrl: string } | undefined;
   storedPublicUrl = row ? normalizePublicUrl(row.publicUrl) : '';
 }
 
 /** Called inside the first-superuser transaction; loading happens after commit. */
 export async function saveInstallationPublicUrl(db: Sql, publicUrl: string): Promise<void> {
-  await db.run("INSERT INTO installation_settings (id, publicUrl) VALUES ('installation', ?)", normalizePublicUrl(publicUrl));
+  await db.run(`INSERT INTO installation_settings (id, "publicUrl") VALUES ('installation', ?)`, normalizePublicUrl(publicUrl));
 }

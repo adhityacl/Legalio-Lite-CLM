@@ -2,7 +2,9 @@
 
 Status per 22 Oktober 2026. Branch: `PostgreSQL`.
 
-Pekerjaan dibagi menjadi 7 fase (A–G). Fase D dipecah menjadi D1 (backend pg dan skema, sifatnya hanya menambah) dan D2 (pindah engine). **Fase A, B, C dan D1 selesai.** Review keamanan fase B sudah dilakukan dan 10 temuannya sudah diperbaiki; semua tes hijau. **Fase D2, E, F dan G belum dikerjakan.** File ini di-update dan di-push setiap kali satu fase selesai. Dokumen ini berisi semua yang perlu diketahui untuk melanjutkan. Catatan kerja sebelumnya (rencana arsitek dan review) hanya disimpan di `/tmp` dan sudah hilang, jadi isinya dirangkum ulang di sini.
+Pekerjaan dibagi menjadi 7 fase (A–G). Fase D dipecah menjadi D1 (backend pg dan skema, sifatnya hanya menambah) dan D2 (pindah engine). **Fase A, B, C, D1 dan D2 selesai: aplikasi sekarang hanya berjalan di PostgreSQL.** Review keamanan fase B sudah dilakukan dan 10 temuannya sudah diperbaiki; semua tes hijau. **Fase E, F dan G belum dikerjakan.**
+
+> Sampai fase F selesai, backend butuh env `DATABASE_URL` (atau `APP_DATA_DIR/database.json`) untuk start. Contoh untuk dev: `DATABASE_URL=postgres://legalio:legalio@127.0.0.1:5432/legalio`. File ini di-update dan di-push setiap kali satu fase selesai. Dokumen ini berisi semua yang perlu diketahui untuk melanjutkan. Catatan kerja sebelumnya (rencana arsitek dan review) hanya disimpan di `/tmp` dan sudah hilang, jadi isinya dirangkum ulang di sini.
 
 > **Jangan merge ke `main` sebelum fase G selesai.** `.github/workflows/deploy.yml` men-deploy `main` ke produksi secara otomatis. Fase A dan B tidak aman dideploy sendirian (lihat §6). Setelah merge, produksi akan mulai dengan PostgreSQL kosong. Itu memang keputusannya, tetapi **jangan hapus `/data/kaelyn.db`** di server; biarkan sebagai arsip.
 
@@ -47,9 +49,15 @@ docker run -d --name legalio-pg -e POSTGRES_USER=legalio -e POSTGRES_PASSWORD=le
 ```bash
 npm run lint
 npm run build
-npm run test:sqlite          # diganti nama menjadi `npm test` di fase D
-npm run test:e2e:sqlite      # menjadi test:e2e:postgres di fase D; perlu Playwright Chromium
+npm test                     # semua unit test; butuh container pg (database legalio_test_* dibuat lalu dihapus)
+npm run build:sys            # wajib sebelum e2e, kalau tidak halaman /sys gagal ("System Console has not been built")
+npm run test:e2e:postgres    # perlu Playwright Chromium
 npm run test:e2e:data-entry
+```
+
+Di codespace ini, e2e yang dijalankan langsung di shell agen kadang dihentikan paksa (exit 137). Jalankan di background, lalu baca exit code-nya. Setelah run yang terputus, hapus database `legalio_test_*` yang tertinggal:
+```bash
+docker exec legalio-pg psql -U legalio -tAc "select datname from pg_database where datname like 'legalio_test_%'"
 ```
 
 Ditambah **cek promise** (lihat §7). Tsconfig repo ini tidak strict, sehingga `tsc` tidak menangkap promise yang dipakai sebagai boolean. Akibatnya bisa berupa **bypass otorisasi**.
@@ -164,6 +172,30 @@ Gate: lint ✅, build ✅, unit 66/66 ✅, e2e sqlite 32 ✅, data-entry 41 ✅,
 - `toPg` tidak memahami komentar SQL, jadi jangan menulis `'` atau kata camelCase di komentar `--`.
 - `connect()` melempar error jika pool sudah ada. Panggil `end()` sebelum retry (penting untuk fase F).
 
+### Fase D2: aplikasi pindah ke PostgreSQL ✅
+- **Dihapus:** `better-sqlite3` dan `@types/better-sqlite3`, `@better-auth/cli`, `auth.config.ts`, script `auth:*`, `db.test.ts` (versi SQLite), `indexedConfiguration.ts`, migrasi 003–006, semua DDL modul (sekarang di `schema.ts`), probe `sqlite_master`/PRAGMA, `migrationBlock` dan watch-ignore `*.db`.
+- **`db.ts`:**
+  - `sql` sekarang facade pg.
+  - `isConstraintViolation` (`/^23/`) dipetakan ke 409.
+  - `isUniqueViolation` (`23505`).
+- **`server.ts` `init()`:** `connect(resolveDatabaseConfig())` → `ensureSchema()`, lalu data dimuat. better-auth memakai `pool()`.
+- **Terjemahan SQL sesuai §4 Fase D langkah 5:**
+  - camelCase dan `"user"` / `"teamMember"` dikutip.
+  - Boolean better-auth.
+  - Tanpa `issuer`.
+  - `ON CONFLICT`, `IS DISTINCT FROM`, `lower()` dan `ILIKE`.
+  - `seq` dan `COUNT(*) FILTER` di approval.
+  - Pencarian memakai ILIKE di `search_records`, dengan komentar `shortcut:`.
+- **Lock:**
+  - Advisory xact lock untuk setup, kode approval per org, dan invariant admin/superuser (`organizationAdminRoutes.ts`).
+  - `FOR UPDATE` pada baris organisasi untuk `patchOrganizationSettings` / `patchIntegration`, dan pada template email.
+  - Submit approval mengunci baris dokumen terlebih dulu, lalu mengecek ulang dokumen dan approval yang masih pending.
+- **Tes:**
+  - Semua unit test memakai `createTestDatabase()`. Script `npm test` menggabungkan semuanya.
+  - E2E men-spawn server dengan `DATABASE_URL` dari database tes.
+  - Script menjadi `test:e2e:postgres` dan `test:e2e:data-entry`.
+- **Gate:** lint ✅, build ✅, unit 73/73 ✅, e2e postgres 32 ✅, data-entry 41 ✅, cek promise tanpa temuan baru ✅, grep `better-sqlite3|sqliteDb|.prepare(|sqlite_master|PRAGMA` kosong ✅.
+
 > **Perilaku baru di dev:** di luar `APP_TEST_MODE`, upload mengembalikan 503 sampai superuser menyimpan COS di /sys (tab Google credentials) atau, setelah fase F, di onboarding. File lama di `uploads/` tidak lagi dilayani; ini sesuai keputusan "tanpa impor".
 
 ---
@@ -219,7 +251,7 @@ Hasilnya ada di §3. Spesifikasi asli disimpan di bawah sebagai referensi. Penyi
    - Bagian reset organisasi di `normalizedCore.test.ts` memakai `memoryStore`.
    - E2E memeriksa upload lewat `GET /uploads/...` (200, atau 404 setelah reset), bukan dengan membaca disk.
 
-### Fase D: ganti engine ke PostgreSQL (D1 ✅, D2 belum)
+### Fase D: ganti engine ke PostgreSQL ✅ SELESAI (D1 + D2; lihat §3)
 
 **Checklist D2, berurutan** (dari hasil D1; melengkapi spesifikasi di bawah):
 1. Hapus `better-sqlite3` dan `@types/better-sqlite3` (di backend **dan** root), `@better-auth/cli`, `apps/backend/auth.config.ts`, serta script `auth:generate`/`auth:migrate`.

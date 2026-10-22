@@ -32,7 +32,7 @@ export interface OrganizationResetOptions {
   memory: Record<string, any[]>;
   organizationId: string;
   storage: ObjectStore;
-  /** Persists the projection to SQLite. */
+  /** Persists the projection to the database. */
   save: () => Promise<void>;
 }
 
@@ -56,7 +56,6 @@ export async function resetOrganizationData(options: OrganizationResetOptions) {
 
   await db.tx(async () => {
     for (const step of SQL_STEPS) {
-      if (!await db.get("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", step.table)) continue;
       removed[step.table] = (await db.run(step.sql, organizationId)).changes;
     }
   });

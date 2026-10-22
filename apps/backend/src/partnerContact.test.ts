@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import Database from 'better-sqlite3';
+import { after, before, test } from 'node:test';
 import { migratePartnerContact } from './partnerContact';
 import { synchronizeCoreData } from './coreDataStore';
-import { createSql } from './db';
+import { sql } from './db';
+import { readBusinessRows } from './normalizedCoreStore';
+import { ensureSchema } from './schema';
+import { createTestDatabase } from './testDatabase';
+
+let database: Awaited<ReturnType<typeof createTestDatabase>>;
+before(async () => { database = await createTestDatabase(); await ensureSchema(); });
+after(() => database?.drop());
 
 test('migrates legacy contacts, preserves explicit fields, and is idempotent', () => {
   const partner = migratePartnerContact({ pic_partner: 'Budi Santoso (budi@example.com | +628123456)', pic_email: 'new@example.com' });
@@ -13,22 +19,14 @@ test('migrates legacy contacts, preserves explicit fields, and is idempotent', (
 });
 
 test('persistence removes the legacy field while retaining contacts and unrelated data', async () => {
-  const db = new Database(':memory:');
-  try {
-    for (const table of ['allowed_users', 'partners', 'contracts', 'insertion_orders', 'notifications', 'activity_logs', 'evaluations', 'spendings', 'templates']) {
-      db.exec(`CREATE TABLE ${table} (id TEXT PRIMARY KEY, organizationId TEXT, payload TEXT, createdAt TEXT, updatedAt TEXT, email TEXT, name TEXT, role TEXT, status TEXT)`);
-    }
-    const data = { partners: [{ partner_id: 'p1', organizationId: 'org1', pic_partner: 'Jane (jane@example.com | +6512345678)', notes: 'Keep this' }] };
-    await synchronizeCoreData(createSql(db), data);
-    const payload = JSON.parse((db.prepare('SELECT payload FROM partners').get() as { payload: string }).payload);
-    assert.equal('pic_partner' in payload, false);
-    assert.equal(payload.pic_email, 'jane@example.com');
-    assert.equal(payload.notes, 'Keep this');
-    assert.equal(payload.organizationId, 'org1');
-    assert.deepEqual(payload, data.partners[0]);
-    await synchronizeCoreData(createSql(db), data);
-    assert.equal((db.prepare('SELECT COUNT(*) AS n FROM partners').get() as { n: number }).n, 1);
-  } finally {
-    db.close();
-  }
+  await sql.run(`INSERT INTO organization (id, name, slug, "createdAt") VALUES ('org1', 'Org', 'org1', now())`);
+  const data = { partners: [{ partner_id: 'p1', organizationId: 'org1', pic_partner: 'Jane (jane@example.com | +6512345678)', notes: 'Keep this' }] };
+  await synchronizeCoreData(sql, data);
+  const [partner] = await readBusinessRows(sql, 'partners');
+  assert.equal('pic_partner' in partner, false);
+  assert.equal(partner.pic_email, 'jane@example.com');
+  assert.equal(partner.notes, 'Keep this');
+  assert.equal(partner.organizationId, 'org1');
+  await synchronizeCoreData(sql, data);
+  assert.equal((await sql.get('SELECT COUNT(*) AS n FROM partners')).n, 1);
 });

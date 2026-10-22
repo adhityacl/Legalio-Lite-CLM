@@ -1,10 +1,9 @@
 /**
  * Single source for mutable runtime locations (tenant-boundaries PRD §15).
  *
- * - AUTH_DB_PATH: absolute SQLite path; development default is ./kaelyn.db.
- * - APP_DATA_DIR: absolute directory for database.json, the Drive backup index and legacy data_store.json;
+ * - APP_DATA_DIR: absolute directory for database.json and the Drive backup index;
  *   development default is the working directory.
- * - APP_TEST_MODE=1: both paths must be explicit, absolute and inside the OS
+ * - APP_TEST_MODE=1: the path must be explicit, absolute and inside the OS
  *   temp directory, and startup side effects (demo reseeding, Google
  *   provisioning, SMTP/AI/Google calls, periodic jobs) are disabled.
  */
@@ -16,7 +15,7 @@ export const REPOSITORY_DIR = path.resolve(typeof __dirname === 'string' ? __dir
 
 export const IS_TEST_MODE = process.env.APP_TEST_MODE === '1';
 
-function resolveExplicit(name: 'AUTH_DB_PATH' | 'APP_DATA_DIR', fallback: string): string {
+function resolveExplicit(name: 'APP_DATA_DIR', fallback: string): string {
   const raw = (process.env[name] || '').trim();
   if (!raw) {
     if (IS_TEST_MODE) throw new Error(`${name} must be set when APP_TEST_MODE=1.`);
@@ -33,7 +32,5 @@ function resolveExplicit(name: 'AUTH_DB_PATH' | 'APP_DATA_DIR', fallback: string
   return resolved;
 }
 
-export const AUTH_DB_PATH = resolveExplicit('AUTH_DB_PATH', path.join(REPOSITORY_DIR, 'kaelyn.db'));
 export const APP_DATA_DIR = resolveExplicit('APP_DATA_DIR', REPOSITORY_DIR);
-export const LEGACY_DATA_FILE = path.join(APP_DATA_DIR, 'data_store.json');
 export const DATABASE_CONFIG_FILE = path.join(APP_DATA_DIR, 'database.json');

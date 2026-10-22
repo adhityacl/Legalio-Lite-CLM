@@ -7,35 +7,35 @@ import net from 'node:net';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { generateKeyPairSync } from 'node:crypto';
-import Database from 'better-sqlite3';
 import { chromium, expect } from '@playwright/test';
 import { hashPassword } from 'better-auth/crypto';
 import { buildDemoDataset } from '@legalio/shared/data/demoDataset';
 const repository=path.resolve(import.meta.dirname,'../../..');
-const directory=mkdtempSync(path.join(os.tmpdir(),'legalio-sqlite-e2e-'));
+const directory=mkdtempSync(path.join(os.tmpdir(),'legalio-e2e-'));
 const freePort=()=>new Promise<number>((resolve,reject)=>{const s=net.createServer();s.on('error',reject);s.listen(0,'127.0.0.1',()=>{const p=(s.address() as net.AddressInfo).port;s.close(()=>resolve(p));});});
 const backendPort=await freePort();const frontendPort=await freePort();
 const backendURL=`http://127.0.0.1:${backendPort}`;const frontendURL=`http://127.0.0.1:${frontendPort}`;
-Object.assign(process.env,{APP_TEST_MODE:'1',AUTH_DB_PATH:path.join(directory,'kaelyn.db'),APP_DATA_DIR:directory,BETTER_AUTH_URL:frontendURL,TRUSTED_ORIGINS:`${backendURL},${frontendURL}`,BETTER_AUTH_ENABLE_INFRA:'false',API_ONLY:'true',SEED_DEMO_ADMIN:'false',PORT:String(backendPort),DISABLE_HMR:'true',BETTER_AUTH_SECRET:'test-only-secret-for-isolated-sqlite-e2e-123456789',GEMINI_API_KEY:'',GOOGLE_CLIENT_ID:'',GOOGLE_CLIENT_SECRET:'',GOOGLE_APPLICATION_CREDENTIALS:''});
-const {sqliteDb:fixtureDb,hydrateCoreDataFromJson,initAuthDatabase}=await import('./lib/auth');
+Object.assign(process.env,{APP_TEST_MODE:'1',APP_DATA_DIR:directory,BETTER_AUTH_URL:frontendURL,TRUSTED_ORIGINS:`${backendURL},${frontendURL}`,BETTER_AUTH_ENABLE_INFRA:'false',API_ONLY:'true',SEED_DEMO_ADMIN:'false',PORT:String(backendPort),DISABLE_HMR:'true',BETTER_AUTH_SECRET:'test-only-secret-for-isolated-sqlite-e2e-123456789',GEMINI_API_KEY:'',GOOGLE_CLIENT_ID:'',GOOGLE_CLIENT_SECRET:'',GOOGLE_APPLICATION_CREDENTIALS:''});
+const {createTestDatabase}=await import('./testDatabase');
+// A throwaway legalio_test_* database; every server this test spawns inherits DATABASE_URL.
+const database=await createTestDatabase();process.env.DATABASE_URL=database.url;
 const {sql:fixtureSql}=await import('./db');
 const {seedOrganizationsFromDataset,createOrganizationRecord}=await import('./organizationProvisioning');
-const {markMigrationApplied}=await import('./organizationSettingsStore');
-await initAuthDatabase();
-const dataset=buildDemoDataset();await seedOrganizationsFromDataset(fixtureSql,dataset);await markMigrationApplied(fixtureSql,{fixture:true});await hydrateCoreDataFromJson(dataset);
-fixtureDb.exec("UPDATE insertion_orders SET id=json_extract(payload,'$.contract_id')");
+const {synchronizeCoreData}=await import('./coreDataStore');
+await (await import('./schema')).ensureSchema();
+const dataset=buildDemoDataset();await seedOrganizationsFromDataset(fixtureSql,dataset);await synchronizeCoreData(fixtureSql,dataset);
 const now=new Date().toISOString();const password='E2e-local-password-1234';const hash=await hashPassword(password);
 for(const [id,email,role] of [['e2e-root','root@example.com','superuser'],['e2e-admin','admin@example.com','user'],['e2e-editor','editor@example.com','user']]){
- fixtureDb.prepare('INSERT INTO "user"(id,name,email,emailVerified,role,banned,createdAt,updatedAt) VALUES(?,?,?,1,?,0,?,?)').run(id,id,email,role,now,now);
- fixtureDb.prepare("INSERT INTO account(id,accountId,providerId,userId,password,createdAt,updatedAt) VALUES(?,?,'credential',?,?,?,?)").run(`account-${id}`,id,id,hash,now,now);
+ await fixtureSql.run('INSERT INTO "user"(id,name,email,"emailVerified",role,banned,"createdAt","updatedAt") VALUES(?,?,?,true,?,false,?,?)',id,id,email,role,now,now);
+ await fixtureSql.run(`INSERT INTO account(id,"accountId","providerId","userId",password,"createdAt","updatedAt") VALUES(?,?,'credential',?,?,?,?)`,`account-${id}`,id,id,hash,now,now);
 }
 const org=dataset.tenants[0].id;
 const otherOrg='e2e-other-org';
 await createOrganizationRecord(fixtureSql,{id:otherOrg,name:'Other Organization'});
-for(const [id,role] of [['e2e-admin','admin'],['e2e-editor','editor']])fixtureDb.prepare("INSERT INTO member(id,organizationId,userId,role,status) VALUES(?,?,?,?,'active')").run(`${id}-member`,org,id,role);
-const teams=fixtureDb.prepare('SELECT id,name FROM team WHERE organizationId=? ORDER BY name').all(org) as any[];
+for(const [id,role] of [['e2e-admin','admin'],['e2e-editor','editor']])await fixtureSql.run(`INSERT INTO member(id,"organizationId","userId",role,status,"createdAt") VALUES(?,?,?,?,'active',?)`,`${id}-member`,org,id,role,now);
+const teams=await fixtureSql.all('SELECT id,name FROM team WHERE "organizationId"=? ORDER BY name',org);
 const owner=teams[0];const otherOwner=teams[1];
-fixtureDb.prepare("INSERT INTO teamMember(id,teamId,userId) VALUES('e2e-editor-team',?,'e2e-editor')").run(owner.id);fixtureDb.close();
+await fixtureSql.run(`INSERT INTO "teamMember"(id,"teamId","userId","createdAt") VALUES('e2e-editor-team',?,'e2e-editor',?)`,owner.id,now);
 let server:ChildProcess|undefined;let frontend:ChildProcess|undefined;let browser:Awaited<ReturnType<typeof chromium.launch>>|undefined;
 const logs:string[]=[];const checks:string[]=[];
 const appTabs=['dashboard','hierarchy','partners','contracts','create-contract','ios','partner-spending','partner-evaluation','notifikasi','settings-organization','settings-access'];
@@ -52,11 +52,8 @@ try{
  server=run(['apps/backend/dist/server.cjs']);await waitFor(backendURL+'/api/health',server);
  token=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'root@example.com',password},token:''})).token;assert.ok(token);
  assert.equal((await call('/api/init-data',{org})).partners.length,dataset.partners.filter((p:any)=>p.organizationId===org).length);
- const sql=new Database(path.join(directory,'kaelyn.db'));
- assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM schema_migrations WHERE id='003_normalized_core'").get() as any).n,1);
- assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM schema_migrations WHERE id='004_remove_legacy_core'").get() as any).n,1);
- assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name GLOB '_legacy_003_*'").get() as any).n,0);
- assert.equal((sql.prepare('SELECT COUNT(*) AS n FROM insertion_orders WHERE io_id IS NULL').get() as any).n,0);
+ const sql=fixtureSql;
+ assert.equal((await sql.get('SELECT COUNT(*) AS n FROM insertion_orders WHERE io_id IS NULL')).n,0);
  const mailerUserToken=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'admin@example.com',password},token:''})).token;
  await call('/api/mailer/templates',{token:mailerUserToken,status:403});
  await call('/api/mailer/templates/verification',{method:'PUT',token:mailerUserToken,body:{},status:403});
@@ -69,7 +66,7 @@ try{
  await call('/api/mailer/templates/verification', {method:'PUT', body:{subject:'Stale',html:verificationTemplate.html,expectedVersion:0},status:409});
  assert.equal((await call('/api/mailer/templates')).templates.find((t:any)=>t.id==='verification').subject,'Welcome {{name}}');
  checks.push('Mailer catalog, authentication, validation, persistence and concurrent update protection');
- checks.push('legacy migration and authenticated API reload');
+ checks.push('fixture data and authenticated API reload');
 
  const partner=(await call('/api/partners',{method:'POST',org,body:{partner_name:'E2E Indexed Orchard',country:'ID',pic_name:'Test Contact',pic_email:'private-index@example.com',pic_phone:'+62123456',internal_pic:owner.name,tags:['Supplier']}})).partner;
  assert.ok(partner.partner_id);assert.equal('pic_partner' in partner,false);
@@ -78,7 +75,7 @@ try{
  const ios=[];
  for(let i=1;i<=2;i++)ios.push((await call('/api/ios',{method:'POST',org,body:{partner_id:partner.partner_id,contract_id:contract.contract_id,io_number:`E2E-IO-${i}`,io_title:`E2E Order ${i}`,start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',io_value:0.29,media_channel:'Digital',pricing_model:'Fixed',charging_type:'Postpaid'}})).io);
  assert.ok(ios.every(io=>io?.io_id));assert.notEqual(ios[0].io_id,ios[1].io_id);
- assert.equal((sql.prepare('SELECT COUNT(*) AS n FROM insertion_orders WHERE contract_id=?').get(contract.contract_id) as any).n,2);
+ assert.equal((await sql.get('SELECT COUNT(*) AS n FROM insertion_orders WHERE contract_id=?',contract.contract_id)).n,2);
  checks.push('partner and contract CRUD; two IOs in one contract');
 
 
@@ -201,14 +198,14 @@ try{
  const imported=await call('/api/bulk-import',{method:'POST',org,body:{type:'partners',rows:[{partner_name:'E2E CSV Imported',internal_pic:owner.name,pic_name:'CSV Contact',pic_email:'csv@example.com',pic_phone:'+62111',pic_partner:'obsolete',tags:'Supplier'}]}});
  assert.equal(imported.succeeded.length,1);
  const csvPartner=(await call('/api/partners',{org})).find((p:any)=>p.partner_name==='E2E CSV Imported');assert.equal(csvPartner.pic_name,'CSV Contact');assert.equal('pic_partner' in csvPartner,false);
- assert.equal((sql.prepare('PRAGMA table_info(partners)').all() as any[]).some(c=>c.name==='payload'),false);
+ assert.equal(await sql.get(`SELECT 1 FROM information_schema.columns WHERE table_name='partners' AND column_name='payload'`),undefined);
  checks.push('CSV import into SQL columns without pic_partner');
  const contractImport=await call('/api/bulk-import',{method:'POST',org,body:{type:'contracts',userRole:'Forged',userEmail:'forged@example.com',rows:[
   {contract_number:'E2E/IMP/001',contract_title:'Known partner',partner_name:'E2E CSV Imported',document_type:'Master Agreement',start_date:'2026-01-01',end_date:'2027-01-01',contract_value:'1000'},
   {contract_number:'E2E/IMP/002',contract_title:'Unknown partner',partner_name:'No Such Partner',document_type:'Master Agreement',start_date:'2026-01-01',end_date:'2027-01-01',contract_value:'1000'}]}});
  assert.equal(contractImport.succeeded.length,1);assert.equal(contractImport.failed.length,1);assert.match(contractImport.failed[0].message,/Partner "No Such Partner"/);
  const importedContract=(await call('/api/contracts',{org})).find((c:any)=>c.contract_number==='E2E/IMP/001');assert.equal('partner_name' in importedContract,false);assert.equal(importedContract.partner_id,csvPartner.partner_id);
- assert.equal((sql.prepare("SELECT count(*) n FROM contracts WHERE contract_number='E2E/IMP/002'").get() as any).n,0);
+ assert.equal((await sql.get("SELECT count(*) n FROM contracts WHERE contract_number='E2E/IMP/002'")).n,0);
  checks.push('Contract import links partner and rejects unknown partner names');
  // Drive is backup only: an upload is always stored locally and the record keeps the local link.
  const uploaded=(await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,contract_number:'E2E-UPLOAD-001',contract_title:'E2E Upload',start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,internal_pic:owner.name,fileName:'e2e-upload.pdf',fileData:'data:application/pdf;base64,'+Buffer.from('%PDF-1.4 e2e').toString('base64')}})).contract;
@@ -220,9 +217,8 @@ try{
  assert.equal('partner_name' in initContract,false);assert.equal(initContract.partner_id,partner.partner_id);
  const driveBackup=await call('/api/google-integration/backup',{method:'POST',org});assert.equal(driveBackup.success,true);assert.equal(driveBackup.backedUpCount,0);
  await call('/api/google-integration/backup',{method:'POST',org,token:'',status:401});
- assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM schema_migrations WHERE id='005_status_indexes'").get() as any).n,1);
- assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='index' AND name LIKE 'idx_v5_%'").get() as any).n,3);
- checks.push('upload stored and served privately by its link, no partner_name alias, Drive backup endpoint authorization, status index migration');
+ assert.equal((await sql.get("SELECT COUNT(*) AS n FROM pg_indexes WHERE indexname LIKE 'idx\\_v5\\_%'")).n,3);
+ checks.push('upload stored and served privately by its link, no partner_name alias, Drive backup endpoint authorization, status indexes');
  // Six soon-to-expire contracts: the dashboard must show only the five nearest, with partner names.
  const extraContractIds=[uploaded.contract_id];
  for(let i=1;i<=6;i++) extraContractIds.push((await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,contract_number:`E2E-EXP-${i}`,contract_title:`E2E Expiring ${i}`,start_date:'2026-01-01',end_date:new Date(Date.now()+(5+i)*86400000).toISOString().slice(0,10),currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,internal_pic:owner.name}})).contract.contract_id);
@@ -248,7 +244,6 @@ try{
  checks.push('search update; failed write rollback; API stays available');
  await stop(server);server=run(['--import','tsx','apps/backend/src/server.ts']);await waitFor(backendURL+'/api/health',server); // dev path (tsx, real ESM): the bundle hides initialisation-order bugs
  assert.equal((await call('/api/ios',{org})).filter((io:any)=>io.contract_id===contract.contract_id).length,2);
- assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name GLOB '_legacy_003_*'").get() as any).n,0);
  checks.push('persistence after backend restart');
  frontend=run(['../../node_modules/vite/bin/vite.js','--config','vite.config.ts','--host','127.0.0.1','--port',String(frontendPort)],path.join(repository,'apps/frontend'));await waitFor(frontendURL,frontend);
  browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage']});const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
@@ -464,8 +459,7 @@ try{
  checks.push('Chromium all 14 Sys pages render without runtime or API 500 errors');
  // Organization reset (superuser): empties one organization's business data; other organizations and the organization itself stay.
  {
-  const readOnly=new Database(path.join(directory,'kaelyn.db'),{readonly:true});
-  const resetSlug=(readOnly.prepare('SELECT slug FROM organization WHERE id=?').get(otherOrg) as any).slug;readOnly.close();
+  const resetSlug=(await sql.get('SELECT slug FROM organization WHERE id=?',otherOrg)).slug;
   const resetPartner=(await call('/api/partners',{method:'POST',org:otherOrg,body:{partner_name:'E2E Reset Partner'}})).partner;
   const resetContract=(await call('/api/contracts',{method:'POST',org:otherOrg,body:{partner_id:resetPartner.partner_id,contract_number:'E2E-RESET-C1',contract_title:'Reset me',start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,fileName:'reset.pdf',fileData:'data:application/pdf;base64,'+Buffer.from('%PDF-1.4 reset').toString('base64')}})).contract;
   assert.equal(await uploadStatus(resetContract.contract_file_link,token),200);
@@ -492,38 +486,38 @@ try{
   assert.equal(await uploadStatus(resetContract.contract_file_link,token),404,'its own uploaded file is gone');
   assert.equal((await call('/api/partners',{org})).length,partnersElsewhere);
   assert.equal((await call('/api/contracts',{org})).length,contractsElsewhere);
-  const after=new Database(path.join(directory,'kaelyn.db'),{readonly:true});
-  assert.equal((after.prepare('SELECT COUNT(*) AS n FROM organization WHERE id=?').get(otherOrg) as any).n,1,'the organization itself stays');
-  assert.equal((after.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='organization.reset' AND tenant_id=?").get(otherOrg) as any).n,1);
-  after.close();
+  assert.equal((await sql.get('SELECT COUNT(*) AS n FROM organization WHERE id=?',otherOrg)).n,1,'the organization itself stays');
+  assert.equal((await sql.get("SELECT COUNT(*) AS n FROM audit_log WHERE action='organization.reset' AND tenant_id=?",otherOrg)).n,1);
   await orgPage.close();
   checks.push('Chromium superuser organization reset: refused without the slug or without platform rights, empties only that organization and its files, keeps the organization, audited');
  }
  await call(`/api/contracts/${contract.contract_id}`,{method:'DELETE',org});assert.equal((await call('/api/ios',{org})).find((io:any)=>io.io_id===ios[0].io_id).contract_id,null);
  await call(`/api/partners/${partner.partner_id}`,{method:'DELETE',org});assert.equal((await call('/api/search?q=Renamed',{org})).results.length,0);
- assert.deepEqual(sql.prepare('PRAGMA foreign_key_check').all(),[]);assert.equal((sql.prepare('PRAGMA integrity_check').get() as any).integrity_check,'ok');sql.close();checks.push('deletion/detachment and final SQLite integrity');
- // Reset runs only against this test's temporary database and upload directory.
- const resetSql=new Database(path.join(directory,'kaelyn.db'));
+ checks.push('deletion/detachment');
+ // Reset runs only against this test's throwaway database and in-memory uploads.
+ const resetSql=fixtureSql;
  await call('/api/google-integration',{method:'POST',body:{geminiApiKey:'synthetic-reset-ai-key',smtpHost:'smtp.example.com',smtpUser:'fixture-user',smtpPassword:'synthetic-reset-smtp-password',smtpEnabled:false}});
  await call('/api/documents',{method:'POST',org,status:201,body:{name:'Reset regression document',content:'<p>fixture</p>',type:'contract'}});
- resetSql.prepare('INSERT INTO ai_ocr_cache(cache_key,payload,createdAt) VALUES(?,?,?)').run('reset-fixture',JSON.stringify({text:'Cached private text'}),now);
+ await resetSql.run('INSERT INTO ai_ocr_cache(cache_key,payload,"createdAt") VALUES(?,?,?)','reset-fixture',JSON.stringify({text:'Cached private text'}),now);
  const fixtureUpload=(await call('/api/contracts',{method:'POST',org,body:{partner_id:csvPartner.partner_id,contract_number:'E2E-RESET-FIXTURE',contract_title:'Reset fixture',start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,fileName:'reset-fixture.pdf',fileData:'data:application/pdf;base64,'+Buffer.from('reset fixture').toString('base64')}})).contract.contract_file_link;
- const keptAccounts=resetSql.prepare("SELECT id,userId,password FROM account WHERE userId LIKE 'e2e-%' ORDER BY id").all();
- const keptProvider=JSON.parse((resetSql.prepare("SELECT payload FROM app_settings WHERE id='google_config'").get() as any).payload);
- const beforeReset={organizations:resetSql.prepare('SELECT * FROM organization ORDER BY id').all(),partners:resetSql.prepare('SELECT * FROM partners ORDER BY partner_id').all(),contracts:resetSql.prepare('SELECT * FROM contracts ORDER BY contract_id').all(),audit:(resetSql.prepare('SELECT COUNT(*) AS n FROM audit_log').get() as any).n};
+ const accountsSql=`SELECT id,"userId",password FROM account WHERE "userId" LIKE 'e2e-%' ORDER BY id`;
+ const keptAccounts=await resetSql.all(accountsSql);
+ const keptProvider=JSON.parse((await resetSql.get("SELECT payload FROM app_settings WHERE id='google_config'")).payload);
+ const beforeReset={organizations:await resetSql.all('SELECT * FROM organization ORDER BY id'),partners:await resetSql.all('SELECT * FROM partners ORDER BY partner_id'),contracts:await resetSql.all('SELECT * FROM contracts ORDER BY contract_id'),audit:(await resetSql.get('SELECT COUNT(*) AS n FROM audit_log')).n};
  await call('/api/admin/reset-database',{method:'POST',body:{confirmKeyword:'WRONG',mode:'empty'},status:400});
  await call('/api/admin/reset-database',{method:'POST',body:{confirmKeyword:'RESET NOW',mode:'unknown'},status:400});
  const adminToken=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'admin@example.com',password},token:''})).token;
  await call('/api/admin/reset-database',{method:'POST',token:adminToken,body:{confirmKeyword:'RESET NOW',mode:'empty'},status:403});
- resetSql.exec("CREATE TRIGGER test_fail_reset_audit BEFORE INSERT ON audit_log WHEN NEW.action='platform.application.reset' BEGIN SELECT RAISE(ABORT,'injected reset failure'); END");
+ await resetSql.exec(`CREATE FUNCTION test_fail_reset_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'platform.application.reset' THEN RAISE EXCEPTION 'injected reset failure'; END IF; RETURN NEW; END $$;
+  CREATE TRIGGER test_fail_reset_audit BEFORE INSERT ON audit_log FOR EACH ROW EXECUTE FUNCTION test_fail_reset_audit()`);
  await call('/api/admin/reset-database',{method:'POST',body:{confirmKeyword:'RESET NOW',mode:'empty',organization:{name:'Should Roll Back',countryCode:'INTL',industry:'general'}},status:500});
- resetSql.exec('DROP TRIGGER test_fail_reset_audit');
- assert.deepEqual(resetSql.prepare('SELECT * FROM organization ORDER BY id').all(),beforeReset.organizations);
- assert.deepEqual(resetSql.prepare('SELECT * FROM partners ORDER BY partner_id').all(),beforeReset.partners);
- assert.deepEqual(resetSql.prepare('SELECT * FROM contracts ORDER BY contract_id').all(),beforeReset.contracts);
- assert.equal((resetSql.prepare('SELECT COUNT(*) AS n FROM audit_log').get() as any).n,beforeReset.audit);
+ await resetSql.exec('DROP TRIGGER test_fail_reset_audit ON audit_log; DROP FUNCTION test_fail_reset_audit()');
+ assert.deepEqual(await resetSql.all('SELECT * FROM organization ORDER BY id'),beforeReset.organizations);
+ assert.deepEqual(await resetSql.all('SELECT * FROM partners ORDER BY partner_id'),beforeReset.partners);
+ assert.deepEqual(await resetSql.all('SELECT * FROM contracts ORDER BY contract_id'),beforeReset.contracts);
+ assert.equal((await resetSql.get('SELECT COUNT(*) AS n FROM audit_log')).n,beforeReset.audit);
  assert.equal((await call('/api/init-data',{org})).partners.length,beforeReset.partners.filter((p:any)=>p.organization_id===org).length);
- assert.equal((resetSql.prepare('SELECT COUNT(*) AS n FROM contract_documents').get() as any).n,1);
+ assert.equal((await resetSql.get('SELECT COUNT(*) AS n FROM contract_documents')).n,1);
  assert.equal(await uploadStatus(fixtureUpload,token),200);
  checks.push('reset rejects invalid confirmation/unauthorized users and rolls back SQL plus memory on injected failure');
  const resetPage=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
@@ -541,45 +535,36 @@ try{
  await expect(resetDialog).toHaveCount(0);await resetPage.screenshot({path:path.join(directory,'reset-success.png'),fullPage:true});
  assert.deepEqual(resetErrors,[]);
  const emptyOrg=emptyReset.defaultOrgId;
- assert.equal((resetSql.prepare('SELECT name FROM organization WHERE id=?').get(emptyOrg) as any).name,'ITS');
- const resetPolicy=JSON.parse((resetSql.prepare('SELECT payload FROM organization_settings WHERE organizationId=?').get(emptyOrg) as any).payload).policy;
+ assert.equal((await resetSql.get('SELECT name FROM organization WHERE id=?',emptyOrg)).name,'ITS');
+ const resetPolicy=JSON.parse((await resetSql.get('SELECT payload FROM organization_settings WHERE "organizationId"=?',emptyOrg)).payload).policy;
  assert.equal(resetPolicy.countryCode,'INTL');assert.equal(resetPolicy.industry,'general');
- const assertEmptyReset=()=>{
-  for(const table of ['partners','contracts','insertion_orders','spendings','evaluations','notifications','activity_logs','templates','contract_comments','document_metadata','contract_drafts','contract_documents','metadata_fields','ai_ocr_cache','tenants','departments','search_records'])assert.equal((resetSql.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as any).n,0,table);
-  assert.equal((resetSql.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name GLOB '_legacy_003_*'").get() as any).n,0);
-  assert.deepEqual(resetSql.prepare('PRAGMA foreign_key_check').all(),[]);
+ const assertEmptyReset=async()=>{
+  for(const table of ['partners','contracts','insertion_orders','spendings','evaluations','notifications','activity_logs','templates','contract_comments','document_metadata','contract_drafts','contract_documents','metadata_fields','ai_ocr_cache','search_records'])assert.equal((await resetSql.get(`SELECT COUNT(*) AS n FROM ${table}`)).n,0,table);
  };
- assertEmptyReset();assert.equal(await uploadStatus(fixtureUpload,token),404);
- assert.deepEqual(resetSql.prepare("SELECT id,userId,password FROM account WHERE userId LIKE 'e2e-%' ORDER BY id").all(),keptAccounts);
- const afterProvider=JSON.parse((resetSql.prepare("SELECT payload FROM app_settings WHERE id='google_config'").get() as any).payload);
+ await assertEmptyReset();assert.equal(await uploadStatus(fixtureUpload,token),404);
+ assert.deepEqual(await resetSql.all(accountsSql),keptAccounts);
+ const afterProvider=JSON.parse((await resetSql.get("SELECT payload FROM app_settings WHERE id='google_config'")).payload);
  for(const key of ['geminiApiKey','smtpHost','smtpUser','smtpPassword','smtpEnabled'])assert.equal(afterProvider[key],keptProvider[key],key);
- assert.equal((resetSql.prepare("SELECT COUNT(*) AS n FROM member WHERE userId LIKE 'e2e-%'").get() as any).n,0);
+ assert.equal((await resetSql.get(`SELECT COUNT(*) AS n FROM member WHERE "userId" LIKE 'e2e-%'`)).n,0);
  checks.push('Chromium reset to ITS / International / General clears business/editor/cache/legacy data and keeps accounts/providers');
  const afterResetPartner=(await call('/api/partners',{method:'POST',org:emptyOrg,body:{partner_name:'Writable After Reset'}})).partner;
  assert.ok(afterResetPartner.partner_id);assert.equal((await call('/api/partners',{org:emptyOrg})).length,1);
  const demoReset=await call('/api/admin/reset-database',{method:'POST',body:{confirmKeyword:'RESET NOW',mode:'demo'}});
  assert.equal((await call('/api/init-data',{org:demoReset.defaultOrgId})).partners.length,dataset.partners.length);
- assert.equal((resetSql.prepare('SELECT COUNT(*) AS n FROM insertion_orders').get() as any).n,dataset.ios.length);
- assert.equal((resetSql.prepare('SELECT COUNT(*) AS n FROM spendings').get() as any).n,dataset.spendings.length);
+ assert.equal((await resetSql.get('SELECT COUNT(*) AS n FROM insertion_orders')).n,dataset.ios.length);
+ assert.equal((await resetSql.get('SELECT COUNT(*) AS n FROM spendings')).n,dataset.spendings.length);
  assert.equal((await call('/api/search?q=Writable',{org:demoReset.defaultOrgId})).results.length,0);
- assert.deepEqual(resetSql.prepare('PRAGMA foreign_key_check').all(),[]);
  checks.push('demo reset reloads normalized data and accepts subsequent reads/writes');
  const repeated=await call('/api/admin/reset-database',{method:'POST',body:{confirmKeyword:'RESET NOW',mode:'empty',organization:{name:'ITS',countryCode:'INTL',industry:'general'}}});
- assertEmptyReset();await stop(server);server=run(['apps/backend/dist/server.cjs']);await waitFor(backendURL+'/api/health',server);
+ await assertEmptyReset();await stop(server);server=run(['apps/backend/dist/server.cjs']);await waitFor(backendURL+'/api/health',server);
  assert.equal((await call('/api/init-data',{org:repeated.defaultOrgId})).partners.length,0);
  const reSigned=await call('/api/auth/sign-in/email',{method:'POST',body:{email:'root@example.com',password},token:''});assert.ok(reSigned.token);
- assert.equal((resetSql.prepare('PRAGMA integrity_check').get() as any).integrity_check,'ok');resetSql.close();
  checks.push('repeated reset persists after restart and retained root account can sign in');
  // Exercise normal startup too: APP_TEST_MODE suppresses demo defaults and hid this regression.
  await stop(server);
  const normalDirectory=mkdtempSync(path.join(directory,'normal-startup-'));
- const source=new Database(path.join(directory,'kaelyn.db'));
- try {source.prepare('VACUUM INTO ?').run(path.join(normalDirectory,'kaelyn.db'));} finally {source.close();}
- const normalSql=new Database(path.join(normalDirectory,'kaelyn.db'));
- try {normalSql.exec('DELETE FROM app_settings; DELETE FROM integration_credentials');} finally {normalSql.close();}
- // A stale JSON export must not override an initialized, deliberately empty workspace.
- writeFileSync(path.join(normalDirectory,'data_store.json'),JSON.stringify(dataset));
- const normalEnv={...process.env,APP_TEST_MODE:'0',APP_DATA_DIR:normalDirectory,AUTH_DB_PATH:path.join(normalDirectory,'kaelyn.db'),NODE_ENV:'development'};
+ await sql.exec('DELETE FROM app_settings; DELETE FROM integration_credentials');
+ const normalEnv={...process.env,APP_TEST_MODE:'0',APP_DATA_DIR:normalDirectory,NODE_ENV:'development'};
  const normalLogStart=logs.length;
  server=run([path.join(repository,'apps/backend/dist/server.cjs')],normalDirectory,normalEnv);
  await waitFor(backendURL+'/api/health',server);
@@ -587,14 +572,9 @@ try{
  for(const entity of ['partners','contracts','ios','spendings','evaluations','notifications'])assert.equal(normalData[entity].length,0,entity);
  const normalLogin=await call('/api/auth/sign-in/email',{method:'POST',body:{email:'root@example.com',password},token:''});assert.ok(normalLogin.token);
  const consoleResponse=await fetch(backendURL+'/sys?tab=admin-system-google-credentials');assert.equal(consoleResponse.status,200);
- assert.equal(logs.slice(normalLogStart).join('').includes('FOREIGN KEY constraint failed'),false);
- const persisted=new Database(path.join(normalDirectory,'kaelyn.db'),{readonly:true});
- try {
-  assert.equal((persisted.prepare('SELECT name FROM organization WHERE id=?').get(repeated.defaultOrgId) as any).name,'ITS');
-  for(const table of ['partners','contracts','insertion_orders','spendings','evaluations','notifications','templates','activity_logs'])assert.equal((persisted.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as any).n,0,table);
-  assert.deepEqual(persisted.prepare('PRAGMA foreign_key_check').all(),[]);
-  assert.equal(persisted.pragma('integrity_check',{simple:true}),'ok');
- } finally {persisted.close();}
- checks.push('normal startup after empty reset ignores stale JSON, preserves organization/accounts, serves /sys and keeps all business tables empty');
+ assert.equal(/violates foreign key constraint/.test(logs.slice(normalLogStart).join('')),false);
+ assert.equal((await sql.get('SELECT name FROM organization WHERE id=?',repeated.defaultOrgId)).name,'ITS');
+ for(const table of ['partners','contracts','insertion_orders','spendings','evaluations','notifications','templates','activity_logs'])assert.equal((await sql.get(`SELECT COUNT(*) AS n FROM ${table}`)).n,0,table);
+ checks.push('normal startup after empty reset preserves organization/accounts, serves /sys and keeps all business tables empty');
  const report={passed:checks.length,checks,directory};writeFileSync(path.join(directory,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
-}catch(error){console.error("E2E failure:",error);const failedPage=browser?.contexts()[0]?.pages()[0];if(failedPage){await failedPage.screenshot({path:path.join(directory,"failure.png"),fullPage:true}).catch(()=>{});try{writeFileSync(path.join(directory,"failure.html"),await failedPage.content());}catch{/* a crashed page has no content; the error above is the cause */}}console.error(`E2E artifacts: ${directory}`);throw error;}finally{writeFileSync(path.join(directory,'servers.log'),logs.join(''));await browser?.close();await stop(frontend);await stop(server);}
+}catch(error){console.error("E2E failure:",error);const failedPage=browser?.contexts()[0]?.pages()[0];if(failedPage){await failedPage.screenshot({path:path.join(directory,"failure.png"),fullPage:true}).catch(()=>{});try{writeFileSync(path.join(directory,"failure.html"),await failedPage.content());}catch{/* a crashed page has no content; the error above is the cause */}}console.error(`E2E artifacts: ${directory}`);throw error;}finally{writeFileSync(path.join(directory,'servers.log'),logs.join(''));await browser?.close();await stop(frontend);await stop(server);await database.drop();}

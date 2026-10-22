@@ -1,7 +1,6 @@
-import { normalizedCoreReady, readBusinessRows, resetSyncCache } from '../normalizedCoreStore';
+import { readBusinessRows } from '../normalizedCoreStore';
 import { migratePartnerContact } from '../partnerContact';
 import { synchronizeCoreData } from '../coreDataStore';
-import { ensureTenantBoundarySchema } from '../organizationSettingsStore';
 import { betterAuth, type BetterAuthOptions, type BetterAuthPlugin } from "better-auth";
 import { APIError } from "better-auth/api";
 import { hasApprovalInvitation } from "../organizationAdminRoutes";
@@ -9,11 +8,8 @@ import { admin, organization } from "better-auth/plugins";
 import { dash, sentinel } from "@better-auth/infra";
 import { createAccessControl } from "better-auth/plugins/access";
 import { adminAc, defaultStatements, memberAc } from "better-auth/plugins/organization/access";
-import Database from "better-sqlite3";
-import { AUTH_DB_PATH } from "../runtimePaths";
 import { getPublicBaseUrl, loadInstallationSettings } from '../installationSettings';
-import { sql, useSqlite } from '../db';
-import { renameLegacyKeys } from '@legalio/shared/fieldNames';
+import { pool, sql } from '../db';
 
 const googleClientId = (process.env.GOOGLE_CLIENT_ID || "").trim();
 const googleClientSecret = (process.env.GOOGLE_CLIENT_SECRET || "").trim();
@@ -108,310 +104,9 @@ const orgRoles = {
   viewer: orgAc.newRole(memberAc.statements),
 };
 
-// --- Database & Schema Initialization ---
-export const sqliteDb = new Database(AUTH_DB_PATH);
-sqliteDb.pragma("journal_mode = WAL");
-sqliteDb.pragma("foreign_keys = ON");
-sqliteDb.pragma("synchronous = NORMAL");
-sqliteDb.pragma("busy_timeout = 5000");
-useSqlite(sqliteDb);
-
-/** Creates and upgrades the auth, tenant and core tables; server init() awaits it before anything reads them. */
-export async function initAuthDatabase() {
-// Initialize Better Auth & Organization / Console tables if not exist.
-// The core Better Auth tables (user/session/account/verification) are created
-// here too, so a fresh clone boots without running `npm run auth:migrate`
-// first — Better Auth refuses to start on a schema mismatch.
-await sql.exec(`
-CREATE TABLE IF NOT EXISTS "user" ("id" text not null primary key, "name" text not null, "email" text not null unique, "emailVerified" integer not null, "image" text, "createdAt" date not null, "updatedAt" date not null, "role" text, "banned" integer, "banReason" text, "banExpires" date);
-CREATE TABLE IF NOT EXISTS "session" ("id" text not null primary key, "expiresAt" date not null, "token" text not null unique, "createdAt" date not null, "updatedAt" date not null, "ipAddress" text, "userAgent" text, "userId" text not null references "user" ("id") on delete cascade, "impersonatedBy" text, "activeOrganizationId" text, "activeTeamId" text);
-CREATE TABLE IF NOT EXISTS "account" ("id" text not null primary key, "accountId" text not null, "providerId" text not null, "userId" text not null references "user" ("id") on delete cascade, "accessToken" text, "refreshToken" text, "idToken" text, "accessTokenExpiresAt" date, "refreshTokenExpiresAt" date, "scope" text, "password" text, "createdAt" date not null, "updatedAt" date not null, "issuer" text);
-CREATE TABLE IF NOT EXISTS "verification" ("id" text not null primary key, "identifier" text not null, "value" text not null, "expiresAt" date not null, "createdAt" date not null, "updatedAt" date not null);
-CREATE INDEX IF NOT EXISTS "session_userId_idx" on "session" ("userId");
-CREATE INDEX IF NOT EXISTS "account_userId_idx" on "account" ("userId");
-CREATE INDEX IF NOT EXISTS "verification_identifier_idx" on "verification" ("identifier");
-CREATE TABLE IF NOT EXISTS organization (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  slug TEXT UNIQUE,
-  logo TEXT,
-  createdAt date,
-  metadata TEXT
-);
-CREATE TABLE IF NOT EXISTS team (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  memberCount INTEGER DEFAULT 0,
-  organizationId TEXT NOT NULL,
-  createdAt date,
-  updatedAt date
-);
-CREATE TABLE IF NOT EXISTS teamMember (
-  id TEXT PRIMARY KEY,
-  teamId TEXT NOT NULL,
-  userId TEXT NOT NULL,
-  membershipKey TEXT,
-  createdAt date
-);
-CREATE TABLE IF NOT EXISTS member (
-  id TEXT PRIMARY KEY,
-  organizationId TEXT NOT NULL,
-  userId TEXT NOT NULL,
-  role TEXT NOT NULL,
-  createdAt date
-);
-CREATE TABLE IF NOT EXISTS invitation (
-  id TEXT PRIMARY KEY,
-  organizationId TEXT NOT NULL,
-  email TEXT NOT NULL,
-  role TEXT,
-  teamId TEXT,
-  status TEXT NOT NULL,
-  expiresAt date,
-  createdAt date,
-  inviterId TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS apikey (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  keyPreview TEXT NOT NULL,
-  keyHash TEXT NOT NULL,
-  scopes TEXT NOT NULL,
-  createdAt date,
-  expiresAt date,
-  status TEXT DEFAULT 'active'
-);
-`);
-
-// Ensure session table has activeOrganizationId and activeTeamId columns
-try {
-  const sessionCols = (await sql.all("PRAGMA table_info(session)")).map((c: any) => c.name);
-  if (!sessionCols.includes('activeOrganizationId')) {
-    await sql.exec("ALTER TABLE session ADD COLUMN activeOrganizationId TEXT");
-  }
-  if (!sessionCols.includes('activeTeamId')) {
-    await sql.exec("ALTER TABLE session ADD COLUMN activeTeamId TEXT");
-  }
-} catch (err) {
-  // Session table may not exist yet if fresh
-}
-
-await initializeCoreDataSchema();
-// Canonical tenant-boundary tables + member.status / invitation.departmentIds
-// must exist before Better Auth reads the plugin schema.
-await ensureTenantBoundarySchema(sql);
-
-// Better Auth 1.7.3 no longer writes account.issuer for every provider.
-// Keep older databases compatible by making the legacy column nullable.
-try {
-  const accountColumns = await sql.all<{
-    name: string;
-    notnull: number;
-  }>("PRAGMA table_info(account)");
-  const issuerColumn = accountColumns.find((column) => column.name === "issuer");
-
-  // `npm run auth:migrate` on Better Auth 1.7.x creates account without issuer,
-  // but ensureUserAccountsExist() still writes it — add it back as nullable.
-  if (!issuerColumn) {
-    await sql.exec("ALTER TABLE account ADD COLUMN issuer TEXT");
-  } else if (issuerColumn.notnull === 1) {
-    await sql.tx(() => sql.exec(`
-        ALTER TABLE account RENAME TO account_legacy_schema;
-        CREATE TABLE account (
-          id TEXT NOT NULL PRIMARY KEY,
-          accountId TEXT NOT NULL,
-          providerId TEXT NOT NULL,
-          userId TEXT NOT NULL REFERENCES "user" ("id") ON DELETE CASCADE,
-          accessToken TEXT,
-          refreshToken TEXT,
-          idToken TEXT,
-          accessTokenExpiresAt date,
-          refreshTokenExpiresAt date,
-          scope TEXT,
-          password TEXT,
-          createdAt date NOT NULL,
-          updatedAt date NOT NULL,
-          issuer TEXT
-        );
-        INSERT INTO account (
-          id, accountId, providerId, userId, accessToken, refreshToken, idToken,
-          accessTokenExpiresAt, refreshTokenExpiresAt, scope, password,
-          createdAt, updatedAt, issuer
-        )
-        SELECT
-          id, accountId, providerId, userId, accessToken, refreshToken, idToken,
-          accessTokenExpiresAt, refreshTokenExpiresAt, scope, password,
-          createdAt, updatedAt, issuer
-        FROM account_legacy_schema;
-        DROP TABLE account_legacy_schema;
-        CREATE INDEX account_userId_idx ON account (userId);
-        CREATE UNIQUE INDEX account_issuer_accountId_uidx
-          ON account (issuer, accountId);
-      `));
-  }
-} catch (err) {
-  console.error("Could not migrate the Better Auth account schema:", err);
-  throw err;
-}
-
-// Existing databases gain the optional personal bio without changing account data.
-if (!(await sql.all<{ name: string }>('PRAGMA table_info("user")')).some(column => column.name === 'bio')) {
-  await sql.exec('ALTER TABLE "user" ADD COLUMN bio TEXT');
-}
-
-await reloadAuthConfiguration();
-}
-
-export async function initializeCoreDataSchema() {
-  if (await normalizedCoreReady(sql)) return;
-  await sql.exec(`
-    CREATE TABLE IF NOT EXISTS allowed_users (
-      id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
-      name TEXT,
-      role TEXT,
-      status TEXT,
-      organizationId TEXT,
-      payload TEXT,
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS partners (
-      id TEXT PRIMARY KEY,
-      partner_id TEXT,
-      organizationId TEXT,
-      payload TEXT NOT NULL,
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS contracts (
-      id TEXT PRIMARY KEY,
-      contract_id TEXT,
-      organizationId TEXT,
-      payload TEXT NOT NULL,
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS insertion_orders (
-      id TEXT PRIMARY KEY,
-      io_id TEXT,
-      organizationId TEXT,
-      payload TEXT NOT NULL,
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS notifications (
-      id TEXT PRIMARY KEY,
-      organizationId TEXT,
-      payload TEXT NOT NULL,
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS activity_logs (
-      id TEXT PRIMARY KEY,
-      organizationId TEXT,
-      payload TEXT NOT NULL,
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS evaluations (
-      id TEXT PRIMARY KEY,
-      organizationId TEXT,
-      payload TEXT NOT NULL,
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS spendings (
-      id TEXT PRIMARY KEY,
-      organizationId TEXT,
-      payload TEXT NOT NULL,
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS tenants (
-      id TEXT PRIMARY KEY,
-      organizationId TEXT,
-      payload TEXT NOT NULL,
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS departments (
-      id TEXT PRIMARY KEY,
-      organizationId TEXT,
-      payload TEXT NOT NULL,
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS templates (
-      id TEXT PRIMARY KEY,
-      organizationId TEXT,
-      payload TEXT NOT NULL,
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS branding (
-      id TEXT PRIMARY KEY CHECK(id = 'branding'),
-      organizationId TEXT,
-      payload TEXT NOT NULL,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS app_settings (
-      id TEXT PRIMARY KEY CHECK(id IN ('app_settings', 'google_config')),
-      organizationId TEXT,
-      payload TEXT NOT NULL,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS news_ticker (
-      id TEXT PRIMARY KEY,
-      payload TEXT NOT NULL,
-      updatedAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS ai_ocr_cache (
-      cache_key TEXT PRIMARY KEY,
-      payload TEXT NOT NULL,
-      createdAt TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_allowed_users_org ON allowed_users (organizationId);
-    CREATE INDEX IF NOT EXISTS idx_partners_org ON partners (organizationId);
-    CREATE INDEX IF NOT EXISTS idx_contracts_org ON contracts (organizationId);
-    CREATE INDEX IF NOT EXISTS idx_ios_org ON insertion_orders (organizationId);
-    CREATE INDEX IF NOT EXISTS idx_notifications_org ON notifications (organizationId);
-    CREATE INDEX IF NOT EXISTS idx_activity_logs_org ON activity_logs (organizationId);
-    CREATE INDEX IF NOT EXISTS idx_evaluations_org ON evaluations (organizationId);
-    CREATE INDEX IF NOT EXISTS idx_spendings_org ON spendings (organizationId);
-    CREATE INDEX IF NOT EXISTS idx_tenants_org ON tenants (organizationId);
-    CREATE INDEX IF NOT EXISTS idx_departments_org ON departments (organizationId);
-    CREATE INDEX IF NOT EXISTS idx_templates_org ON templates (organizationId);
-    CREATE INDEX IF NOT EXISTS idx_partners_partner_id ON partners (partner_id);
-    CREATE INDEX IF NOT EXISTS idx_contracts_contract_id ON contracts (contract_id);
-    CREATE INDEX IF NOT EXISTS idx_ios_io_id ON insertion_orders (io_id);
-  `);
-}
-
-export function hydrateCoreDataFromJson(data: any) {
-  // A rolled-back import must not leave fingerprints of rows it never committed.
-  return synchronizeCoreData(sql, renameLegacyKeys(data)).catch((err) => { resetSyncCache(sql); throw err; });
-}
-
-export async function loadCoreDataFromSqlite() {
-  const normalized = await normalizedCoreReady(sql);
+export async function loadCoreData() {
   const payloads = async (table: string) => (await sql.all(`SELECT payload FROM ${table}`)).map((r: any) => JSON.parse(r.payload));
-  const business = (table: string) => normalized ? readBusinessRows(sql, table) : payloads(table);
+  const business = (table: string) => readBusinessRows(sql, table);
   const single = async (text: string) => { const row = await sql.get(text); return row ? JSON.parse(row.payload) : null; };
   const rows = {
     allowedUsers: await payloads('allowed_users'),
@@ -422,8 +117,6 @@ export async function loadCoreDataFromSqlite() {
     activityLogs: await business('activity_logs'),
     evaluations: await business('evaluations'),
     spendings: await business('spendings'),
-    tenants: await payloads('tenants'),
-    departments: await payloads('departments'),
     templates: await business('templates'),
     branding: await single(`SELECT payload FROM branding WHERE id = 'branding'`),
     googleConfig: await single(`SELECT payload FROM app_settings WHERE id = 'google_config'`),
@@ -432,7 +125,7 @@ export async function loadCoreDataFromSqlite() {
   return rows;
 }
 
-export function syncDbToSqlite(data: any) {
+export function saveCoreData(data: any) {
   return synchronizeCoreData(sql, data);
 }
 
@@ -453,7 +146,7 @@ const invitationApprovalPlugin = {
   id: 'invitation-approval',
   init: () => ({ options: { databaseHooks: {
     session: { create: { before: async (session, ctx) => {
-      const user = await sql.get<{ email: string; banned: number | null; banReason: string | null }>('SELECT email, banned, banReason FROM "user" WHERE id = ?', session.userId);
+      const user = await sql.get<{ email: string; banned: boolean | null; banReason: string | null }>('SELECT email, banned, "banReason" FROM "user" WHERE id = ?', session.userId);
       if (user?.banned && user.banReason === 'PENDING_APPROVAL' &&
           await hasApprovalInvitation(sql, user.email, ctx?.headers?.get('x-invitation-token'))) {
         await ctx?.context.internalAdapter.updateUser(session.userId, { banned: false, banReason: null, banExpires: null });
@@ -543,9 +236,10 @@ export const authOptions = (database: BetterAuthOptions["database"]) => ({
   secret: authSecret || "insecure-development-secret-change-me",
 }) satisfies BetterAuthOptions;
 
-const createAuth = () => betterAuth(authOptions(sqliteDb));
+const createAuth = () => betterAuth(authOptions(pool()));
 
-export let auth = createAuth();
+// Built by reloadAuthConfiguration() in server init(), once the pool is connected.
+export let auth: ReturnType<typeof createAuth>;
 
 /** Apply first-run URL configuration before the new administrator signs in. */
 export async function reloadAuthConfiguration(): Promise<void> {

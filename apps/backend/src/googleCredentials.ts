@@ -34,14 +34,6 @@ export function createGoogleCredentialStore(db: Sql) {
   // Rows mirrored in memory so token callbacks and status reads stay synchronous; only save/remove write them.
   const rows = new Map<string, StoredRow<unknown>>();
   const init = async () => {
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS integration_credentials (
-        id TEXT PRIMARY KEY,
-        payload TEXT NOT NULL,
-        updated_by TEXT,
-        updated_at TEXT NOT NULL
-      );
-    `);
     const stored = await db.all<{ id: string; payload: string; updated_at: string }>(`SELECT id, payload, updated_at FROM integration_credentials`);
     rows.clear();
     for (const row of stored) {

@@ -18,55 +18,6 @@ const NEAR_SLA_MS = 6 * 60 * 60 * 1000;
 const MAX_APPROVERS = 10;
 const MAX_TEXT = 2000;
 
-/** Approval tables live beside the document tables; foreign keys are not enforced, so deletes cascade by hand. */
-export async function ensureApprovalSchema(db: Sql) {
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS approval_requests (
-      id TEXT PRIMARY KEY,
-      organization_id TEXT NOT NULL,
-      code TEXT NOT NULL,
-      title TEXT NOT NULL,
-      category TEXT NOT NULL,
-      note TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'pending',
-      current_step INTEGER NOT NULL DEFAULT 1,
-      source TEXT NOT NULL,
-      document_id TEXT,
-      file_name TEXT NOT NULL,
-      file_mime TEXT NOT NULL DEFAULT '',
-      file_size INTEGER NOT NULL DEFAULT 0,
-      file_data BLOB,
-      created_by TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      due_at TEXT NOT NULL,
-      decided_at TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_approval_requests_org ON approval_requests (organization_id, status);
-
-    CREATE TABLE IF NOT EXISTS approval_steps (
-      id TEXT PRIMARY KEY,
-      request_id TEXT NOT NULL,
-      step_no INTEGER NOT NULL,
-      approver_id TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'waiting',
-      comment TEXT NOT NULL DEFAULT '',
-      decided_at TEXT,
-      UNIQUE (request_id, step_no)
-    );
-    CREATE INDEX IF NOT EXISTS idx_approval_steps_approver ON approval_steps (approver_id, status);
-
-    CREATE TABLE IF NOT EXISTS approval_events (
-      id TEXT PRIMARY KEY,
-      request_id TEXT NOT NULL,
-      actor_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      message TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_approval_events_request ON approval_events (request_id, created_at);
-  `);
-}
-
 /**
  * My Approval owns `pending_review` and `approved`: returns why a manual document status change
  * (or a delete, when `next` is null) is refused, or null when it is allowed.
@@ -131,8 +82,8 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
   // Viewers cannot open My Approval, so they cannot be approvers either.
   const activeMembers = async (org: string) =>
     await db.all(`
-      SELECT u.id, u.name, m.role FROM member m JOIN "user" u ON u.id = m.userId
-      WHERE m.organizationId = ? AND m.status = 'active' AND m.role <> 'viewer' ORDER BY u.name COLLATE NOCASE
+      SELECT u.id, u.name, m.role FROM member m JOIN "user" u ON u.id = m."userId"
+      WHERE m."organizationId" = ? AND m.status = 'active' AND m.role <> 'viewer' ORDER BY lower(u.name)
     `, org) as Array<{ id: string; name: string; role: string }>;
 
   const isApprover = async (requestId: string, userId: string) =>
@@ -170,7 +121,7 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
 
     const search = str(req.query.search);
     if (search) {
-      where.push(`(r.title LIKE @search OR r.code LIKE @search OR ${FILE_NAME} LIKE @search OR ${nameOf("r.created_by")} LIKE @search)`);
+      where.push(`(r.title ILIKE @search OR r.code ILIKE @search OR ${FILE_NAME} ILIKE @search OR ${nameOf("r.created_by")} ILIKE @search)`);
       params.search = `%${search}%`;
     }
     const category = str(req.query.category);
@@ -182,7 +133,7 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
 
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const counts = await db.get(`SELECT COUNT(*) AS waiting, COALESCE(SUM(r.due_at <= @soon), 0) AS near FROM approval_requests r WHERE r.organization_id = @org AND ${inbox}`, { org: params.org, me: params.me, soon: new Date(now.getTime() + NEAR_SLA_MS).toISOString() }) as { waiting: number; near: number };
+    const counts = await db.get(`SELECT COUNT(*) AS waiting, COUNT(*) FILTER (WHERE r.due_at <= @soon) AS near FROM approval_requests r WHERE r.organization_id = @org AND ${inbox}`, { org: params.org, me: params.me, soon: new Date(now.getTime() + NEAR_SLA_MS).toISOString() }) as { waiting: number; near: number };
     const done = await db.get(`
         SELECT COUNT(*) AS n FROM approval_steps s JOIN approval_requests r ON r.id = s.request_id
         WHERE r.organization_id = ? AND s.approver_id = ? AND s.decided_at >= ?
@@ -239,7 +190,16 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
     const id = newId("apr");
     const now = new Date();
     const at = now.toISOString();
-    await db.tx(async () => {
+    const refused = await db.tx(async () => {
+      if (documentId) {
+        // Row lock first: a concurrent submit or delete of this document waits, then the checks below see its commit.
+        await db.run(`UPDATE contract_documents SET id = id WHERE id = ?`, documentId);
+        const doc = await db.get(`SELECT status FROM contract_documents WHERE id = ? AND organization_id = ?`, documentId, org) as { status: string } | undefined;
+        if (!doc || doc.status === "archived") return "DOCUMENT_NOT_FOUND";
+        if (await db.get(`SELECT 1 FROM approval_requests WHERE document_id = ? AND status = 'pending'`, documentId)) return "APPROVAL_PENDING";
+      }
+      // Serializes code allocation per organization; without it two submits read the same MAX.
+      await db.get(`SELECT pg_advisory_xact_lock(hashtext('approval:' || ?))`, org);
       const year = now.getFullYear();
       // MAX, not COUNT: deleting an earlier request must not make the next code repeat.
       const { n } = await db.get(`SELECT COALESCE(MAX(CAST(substr(code, 9) AS INTEGER)), 0) AS n FROM approval_requests WHERE organization_id = ? AND code LIKE ?`, org, `OA-${year}-%`) as { n: number };
@@ -252,7 +212,10 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
       await db.run(`INSERT INTO approval_events (id, request_id, actor_id, kind, message, created_at) VALUES (?, ?, ?, 'submitted', ?, ?)`, newId("ape"), id, ctx.userId, note, at);
       if (documentId) await db.run(`UPDATE contract_documents SET status = 'pending_review' WHERE id = ?`, documentId);
       await audit(req, ctx, "approval.submit", id);
+      return null;
     });
+    if (refused === "DOCUMENT_NOT_FOUND") return bad(res, "Document not found.");
+    if (refused) return res.status(409).json({ error: refused, message: "This document is already in an approval flow." });
     res.status(201).json({ id });
   });
 
@@ -260,12 +223,12 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
     const detail = await db.get(`SELECT ${SUMMARY_COLUMNS}, r.note, r.source, r.document_id, r.file_mime, COALESCE(d.file_size, r.file_size) AS file_size FROM ${FROM_REQUESTS} WHERE r.id = ?`, row.id);
     const steps = await db.all(`
       SELECT s.step_no, s.approver_id, s.status, s.comment, s.decided_at, ${nameOf("s.approver_id")} AS approver_name,
-        (SELECT m.role FROM member m WHERE m.userId = s.approver_id AND m.organizationId = @org) AS approver_role
+        (SELECT m.role FROM member m WHERE m."userId" = s.approver_id AND m."organizationId" = @org) AS approver_role
       FROM approval_steps s WHERE s.request_id = @id ORDER BY s.step_no
     `, { id: row.id, org: row.organization_id });
     const events = await db.all(`
       SELECT e.id, e.actor_id, e.kind, e.message, e.created_at, ${nameOf("e.actor_id")} AS actor_name
-      FROM approval_events e WHERE e.request_id = ? ORDER BY e.created_at, e.rowid
+      FROM approval_events e WHERE e.request_id = ? ORDER BY e.created_at, e.seq
     `, row.id);
     res.json({ ...(detail as object), steps, events });
   }));

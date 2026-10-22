@@ -5,7 +5,7 @@
  * verified identity plus a current membership (or explicit superuser
  * platform management). Resource lookups always match organization ID and
  * resource ID together, batch inputs are validated before any write, and
- * each mutation commits with its audit event in one SQLite transaction.
+ * each mutation commits with its audit event in one transaction.
  * Email delivery happens only after commit and is reported honestly.
  */
 import express from 'express';
@@ -78,7 +78,7 @@ export async function validateDepartmentIds(db: DB, organizationId: string, valu
   const ids = value as string[];
   if (new Set(ids).size !== ids.length) throw invalid('departmentIds must be unique.');
   for (const id of ids) {
-    if (!await db.get(`SELECT 1 FROM team WHERE id = ? AND organizationId = ?`, id, organizationId)) {
+    if (!await db.get(`SELECT 1 FROM team WHERE id = ? AND "organizationId" = ?`, id, organizationId)) {
       throw invalid('A department does not belong to this organization.');
     }
   }
@@ -92,15 +92,19 @@ export async function validateDepartmentIds(db: DB, organizationId: string, valu
 /** Active admin memberships whose identity exists and is not banned. */
 export async function usableAdminIds(db: DB, organizationId: string): Promise<string[]> {
   const rows = await db.all(`
-    SELECT u.id, u.banned, u.banExpires FROM member m JOIN "user" u ON u.id = m.userId
-    WHERE m.organizationId = ? AND m.role = 'admin' AND m.status = 'active'
+    SELECT u.id, u.banned, u."banExpires" FROM member m JOIN "user" u ON u.id = m."userId"
+    WHERE m."organizationId" = ? AND m.role = 'admin' AND m.status = 'active'
   `, organizationId) as any[];
   return rows.filter((u) => !isIdentityBanned(u)).map((u) => u.id);
 }
 
+/** Serializes the invariant checks below until commit: two concurrent demotions cannot both see the other as the remaining one. Callers run inside sql.tx. */
+const lockAdminInvariants = (db: DB) => db.get(`SELECT pg_advisory_xact_lock(hashtext('legalio:admin-invariants'))`);
+
 /** Throws LAST_ADMIN_REQUIRED when removing `userId`'s admin usability would leave an organization without one. */
 export async function assertAdminsRemainWithout(db: DB, userId: string, organizationIds?: string[]) {
-  const orgs = organizationIds ?? (await db.all(`SELECT organizationId FROM member WHERE userId = ? AND role = 'admin' AND status = 'active'`, userId) as any[]).map((r) => r.organizationId);
+  await lockAdminInvariants(db);
+  const orgs = organizationIds ?? (await db.all(`SELECT "organizationId" FROM member WHERE "userId" = ? AND role = 'admin' AND status = 'active'`, userId) as any[]).map((r) => r.organizationId);
   for (const orgId of orgs) {
     const admins = await usableAdminIds(db, orgId);
     if (admins.includes(userId) && admins.length <= 1) throw new ApiError(409, 'LAST_ADMIN_REQUIRED', 'Every organization needs at least one active administrator.');
@@ -108,7 +112,8 @@ export async function assertAdminsRemainWithout(db: DB, userId: string, organiza
 }
 
 export async function assertSuperusersRemainWithout(db: DB, userId: string) {
-  const rows = await db.all(`SELECT id, banned, banExpires FROM "user" WHERE role = 'superuser'`) as any[];
+  await lockAdminInvariants(db);
+  const rows = await db.all(`SELECT id, banned, "banExpires" FROM "user" WHERE role = 'superuser'`) as any[];
   const usable = rows.filter((u) => !isIdentityBanned(u)).map((u) => u.id);
   if (usable.includes(userId) && usable.length <= 1) throw new ApiError(409, 'LAST_SUPERUSER_REQUIRED', 'At least one active platform superuser is required.');
 }
@@ -134,10 +139,10 @@ async function memberDto(db: DB, organizationId: string, row: MemberRow) {
   };
 }
 
-const memberSelect = `SELECT m.id, m.userId, u.name, u.email, m.role, m.status, m.createdAt FROM member m JOIN "user" u ON u.id = m.userId`;
+const memberSelect = `SELECT m.id, m."userId", u.name, u.email, m.role, m.status, m."createdAt" FROM member m JOIN "user" u ON u.id = m."userId"`;
 
 async function loadMember(db: DB, organizationId: string, membershipId: string): Promise<MemberRow> {
-  const row = await db.get(`${memberSelect} WHERE m.id = ? AND m.organizationId = ?`, membershipId, organizationId) as MemberRow | undefined;
+  const row = await db.get(`${memberSelect} WHERE m.id = ? AND m."organizationId" = ?`, membershipId, organizationId) as MemberRow | undefined;
   if (!row) throw new ApiError(404, 'RESOURCE_NOT_FOUND');
   return row;
 }
@@ -156,17 +161,17 @@ export async function listMembers(db: DB, ctx: OrgContext, query: any) {
   const { limit, offset, search } = parseListParams(query);
   const status = query.status === undefined ? 'active' : query.status;
   if (!isMembershipStatus(status)) throw invalid('status must be active or suspended.');
-  const where = ['m.organizationId = ?', 'm.status = ?'];
+  const where = ['m."organizationId" = ?', 'm.status = ?'];
   const params: unknown[] = [ctx.organizationId, status];
   if (!hasOrganizationScope(ctx)) {
     const scope = ctx.departmentIds;
-    where.push(`(m.userId = ? OR EXISTS (SELECT 1 FROM teamMember tm JOIN team t ON t.id = tm.teamId
-      WHERE tm.userId = m.userId AND t.organizationId = m.organizationId AND tm.teamId IN (${scope.map(() => '?').join(',') || "''"})))`);
+    where.push(`(m."userId" = ? OR EXISTS (SELECT 1 FROM "teamMember" tm JOIN team t ON t.id = tm."teamId"
+      WHERE tm."userId" = m."userId" AND t."organizationId" = m."organizationId" AND tm."teamId" IN (${scope.map(() => '?').join(',') || "''"})))`);
     params.push(ctx.userId, ...scope);
   }
   if (query.departmentId !== undefined) {
     if (typeof query.departmentId !== 'string' || !query.departmentId) throw invalid('departmentId is invalid.');
-    where.push(`EXISTS (SELECT 1 FROM teamMember tm WHERE tm.userId = m.userId AND tm.teamId = ?)`);
+    where.push(`EXISTS (SELECT 1 FROM "teamMember" tm WHERE tm."userId" = m."userId" AND tm."teamId" = ?)`);
     params.push(query.departmentId);
   }
   if (search) {
@@ -174,15 +179,15 @@ export async function listMembers(db: DB, ctx: OrgContext, query: any) {
     params.push(likeEscape(search), likeEscape(search));
   }
   const clause = where.join(' AND ');
-  const total = (await db.get(`SELECT COUNT(*) AS n FROM member m JOIN "user" u ON u.id = m.userId WHERE ${clause}`, ...params) as any).n;
-  const rows = await db.all(`${memberSelect} WHERE ${clause} ORDER BY m.createdAt DESC, m.id ASC LIMIT ? OFFSET ?`, ...params, limit, offset) as MemberRow[];
+  const total = (await db.get(`SELECT COUNT(*) AS n FROM member m JOIN "user" u ON u.id = m."userId" WHERE ${clause}`, ...params) as any).n;
+  const rows = await db.all(`${memberSelect} WHERE ${clause} ORDER BY m."createdAt" DESC, m.id ASC LIMIT ? OFFSET ?`, ...params, limit, offset) as MemberRow[];
   return { members: await Promise.all(rows.map((r) => memberDto(db, ctx.organizationId, r))), total };
 }
 
 async function replaceAssignments(db: DB, organizationId: string, userId: string, departmentIds: string[]) {
-  await db.run(`DELETE FROM teamMember WHERE userId = ? AND teamId IN (SELECT id FROM team WHERE organizationId = ?)`, userId, organizationId);
+  await db.run(`DELETE FROM "teamMember" WHERE "userId" = ? AND "teamId" IN (SELECT id FROM team WHERE "organizationId" = ?)`, userId, organizationId);
   const now = new Date().toISOString();
-  for (const teamId of departmentIds) await db.run(`INSERT INTO teamMember (id, teamId, userId, createdAt) VALUES (?, ?, ?, ?)`, `tm_${crypto.randomUUID()}`, teamId, userId, now);
+  for (const teamId of departmentIds) await db.run(`INSERT INTO "teamMember" (id, "teamId", "userId", "createdAt") VALUES (?, ?, ?, ?)`, `tm_${crypto.randomUUID()}`, teamId, userId, now);
 }
 
 export async function updateMember(db: DB, ctx: OrgContext, actor: AuditActor, membershipId: string, body: unknown) {
@@ -198,7 +203,7 @@ export async function updateMember(db: DB, ctx: OrgContext, actor: AuditActor, m
     if (losesAdmin) await assertAdminsRemainWithout(db, row.userId, [ctx.organizationId]);
     const changed: string[] = [];
     if (patch.tenantRole !== undefined && patch.tenantRole !== row.role) {
-      await db.run(`UPDATE member SET role = ? WHERE id = ? AND organizationId = ?`, nextRole, row.id, ctx.organizationId);
+      await db.run(`UPDATE member SET role = ? WHERE id = ? AND "organizationId" = ?`, nextRole, row.id, ctx.organizationId);
       changed.push('tenantRole');
     }
     if (nextRole === 'admin') {
@@ -208,7 +213,7 @@ export async function updateMember(db: DB, ctx: OrgContext, actor: AuditActor, m
       changed.push('departmentIds');
     }
     if (patch.status !== undefined && patch.status !== row.status) {
-      await db.run(`UPDATE member SET status = ? WHERE id = ? AND organizationId = ?`, nextStatus, row.id, ctx.organizationId);
+      await db.run(`UPDATE member SET status = ? WHERE id = ? AND "organizationId" = ?`, nextStatus, row.id, ctx.organizationId);
       changed.push('status');
     }
     await appendAudit(db, actor, {
@@ -226,7 +231,7 @@ export async function removeMember(db: DB, ctx: OrgContext, actor: AuditActor, m
     enforce(checkMemberRemove(ctx, target));
     if (target.tenantRole === 'admin' && target.status === 'active') await assertAdminsRemainWithout(db, row.userId, [ctx.organizationId]);
     await replaceAssignments(db, ctx.organizationId, row.userId, []);
-    await db.run(`DELETE FROM member WHERE id = ? AND organizationId = ?`, row.id, ctx.organizationId);
+    await db.run(`DELETE FROM member WHERE id = ? AND "organizationId" = ?`, row.id, ctx.organizationId);
     await appendAudit(db, actor, {
       organizationId: ctx.organizationId, action: 'membership.remove', targetType: 'membership', targetId: row.id,
       outcome: 'success', changedFields: [],
@@ -248,14 +253,14 @@ function departmentName(value: unknown): string {
 }
 
 async function assertUniqueDepartmentName(db: DB, organizationId: string, name: string, exceptId?: string) {
-  const clash = await db.get(`SELECT id FROM team WHERE organizationId = ? AND LOWER(name) = LOWER(?) AND id <> ?`, organizationId, name, exceptId || '');
+  const clash = await db.get(`SELECT id FROM team WHERE "organizationId" = ? AND LOWER(name) = LOWER(?) AND id <> ?`, organizationId, name, exceptId || '');
   if (clash) throw new ApiError(409, 'DEPARTMENT_EXISTS', 'A department with this name already exists.');
 }
 
 export async function listDepartments(db: DB, ctx: OrgContext, query: any) {
   requirePermission(ctx, 'department.view');
   const { limit, offset, search } = parseListParams(query, { limit: 100 });
-  const where = ['organizationId = ?'];
+  const where = ['"organizationId" = ?'];
   const params: unknown[] = [ctx.organizationId];
   if (!hasOrganizationScope(ctx)) {
     where.push(`id IN (${ctx.departmentIds.map(() => '?').join(',') || "''"})`);
@@ -264,7 +269,7 @@ export async function listDepartments(db: DB, ctx: OrgContext, query: any) {
   if (search) { where.push(`LOWER(name) LIKE ? ESCAPE '\\'`); params.push(likeEscape(search)); }
   const clause = where.join(' AND ');
   const total = (await db.get(`SELECT COUNT(*) AS n FROM team WHERE ${clause}`, ...params) as any).n;
-  const rows = await db.all(`SELECT id, organizationId, name, createdAt FROM team WHERE ${clause} ORDER BY name COLLATE NOCASE, id LIMIT ? OFFSET ?`, ...params, limit, offset);
+  const rows = await db.all(`SELECT id, "organizationId", name, "createdAt" FROM team WHERE ${clause} ORDER BY lower(name), id LIMIT ? OFFSET ?`, ...params, limit, offset);
   return { departments: rows.map(departmentDto), total };
 }
 
@@ -281,14 +286,14 @@ export async function createDepartment(db: DB, ctx: OrgContext, actor: AuditActo
     await assertUniqueDepartmentName(db, ctx.organizationId, name);
     const id = `team_${crypto.randomUUID()}`;
     const now = new Date().toISOString();
-    await db.run(`INSERT INTO team (id, name, memberCount, organizationId, createdAt, updatedAt) VALUES (?, ?, 0, ?, ?, ?)`, id, name, ctx.organizationId, now, now);
+    await db.run(`INSERT INTO team (id, name, "memberCount", "organizationId", "createdAt", "updatedAt") VALUES (?, ?, 0, ?, ?, ?)`, id, name, ctx.organizationId, now, now);
     await appendAudit(db, actor, { organizationId: ctx.organizationId, action: 'department.create', targetType: 'department', targetId: id, outcome: 'success', changedFields: ['name'] });
     return departmentDto(await db.get(`SELECT * FROM team WHERE id = ?`, id));
   });
 }
 
 async function loadDepartment(db: DB, organizationId: string, departmentId: string) {
-  const row = await db.get(`SELECT id, organizationId, name, createdAt FROM team WHERE id = ? AND organizationId = ?`, departmentId, organizationId) as any;
+  const row = await db.get(`SELECT id, "organizationId", name, "createdAt" FROM team WHERE id = ? AND "organizationId" = ?`, departmentId, organizationId) as any;
   if (!row) throw new ApiError(404, 'RESOURCE_NOT_FOUND');
   return row;
 }
@@ -303,7 +308,7 @@ export async function renameDepartment(db: DB, ctx: OrgContext, actor: AuditActo
     await assertUniqueDepartmentName(db, ctx.organizationId, name, row.id);
     // Legacy records point at departments by name; renaming would silently detach them.
     if (hooks.departmentReferenced(ctx.organizationId, row)) throw new ApiError(409, 'DEPARTMENT_IN_USE', 'Records still reference this department.');
-    await db.run(`UPDATE team SET name = ?, updatedAt = ? WHERE id = ? AND organizationId = ?`, name, new Date().toISOString(), row.id, ctx.organizationId);
+    await db.run(`UPDATE team SET name = ?, "updatedAt" = ? WHERE id = ? AND "organizationId" = ?`, name, new Date().toISOString(), row.id, ctx.organizationId);
     await appendAudit(db, actor, { organizationId: ctx.organizationId, action: 'department.update', targetType: 'department', targetId: row.id, outcome: 'success', changedFields: ['name'] });
     return departmentDto(await loadDepartment(db, ctx.organizationId, departmentId));
   });
@@ -313,13 +318,13 @@ export async function deleteDepartment(db: DB, ctx: OrgContext, actor: AuditActo
   requirePermission(ctx, 'department.delete');
   await db.tx(async () => {
     const row = await loadDepartment(db, ctx.organizationId, departmentId);
-    const hasMembers = await db.get(`SELECT 1 FROM teamMember WHERE teamId = ? LIMIT 1`, row.id);
-    const pendingInvites = (await db.all(`SELECT departmentIds, teamId FROM invitation WHERE organizationId = ? AND status = 'pending'`, ctx.organizationId) as any[])
+    const hasMembers = await db.get(`SELECT 1 FROM "teamMember" WHERE "teamId" = ? LIMIT 1`, row.id);
+    const pendingInvites = (await db.all(`SELECT "departmentIds", "teamId" FROM invitation WHERE "organizationId" = ? AND status = 'pending'`, ctx.organizationId) as any[])
       .some((inv) => invitationDepartmentIds(inv).includes(row.id));
     if (hasMembers || pendingInvites || hooks.departmentReferenced(ctx.organizationId, row)) {
       throw new ApiError(409, 'DEPARTMENT_IN_USE', 'Members, invitations or records still reference this department.');
     }
-    await db.run(`DELETE FROM team WHERE id = ? AND organizationId = ?`, row.id, ctx.organizationId);
+    await db.run(`DELETE FROM team WHERE id = ? AND "organizationId" = ?`, row.id, ctx.organizationId);
     await appendAudit(db, actor, { organizationId: ctx.organizationId, action: 'department.delete', targetType: 'department', targetId: row.id, outcome: 'success', changedFields: [] });
   });
 }
@@ -370,7 +375,7 @@ export async function listInvitations(db: DB, ctx: OrgContext, query: any) {
   const { limit, offset, search } = parseListParams(query);
   const status = query.status === undefined ? 'pending' : query.status;
   if (!['pending', 'accepted', 'canceled', 'expired'].includes(status)) throw invalid('Unknown invitation status.');
-  const rows = (await db.all(`SELECT * FROM invitation WHERE organizationId = ? ORDER BY createdAt DESC, id ASC`, ctx.organizationId) as any[])
+  const rows = (await db.all(`SELECT * FROM invitation WHERE "organizationId" = ? ORDER BY "createdAt" DESC, id ASC`, ctx.organizationId) as any[])
     .filter((row) => invitationStatus(row) === status)
     .filter((row) => checkInvitationAction(ctx, invitationTarget(row), 'read').ok)
     .filter((row) => !search || String(row.email).toLowerCase().includes(search.toLowerCase()));
@@ -406,16 +411,16 @@ export async function createInvitation(db: DB, ctx: OrgContext, actor: AuditActo
   enforce(checkInvite(ctx, input.tenantRole, departmentIds));
   return db.tx(async () => {
     const existingMember = await db.get(`
-      SELECT 1 FROM member m JOIN "user" u ON u.id = m.userId WHERE m.organizationId = ? AND LOWER(u.email) = ?
+      SELECT 1 FROM member m JOIN "user" u ON u.id = m."userId" WHERE m."organizationId" = ? AND LOWER(u.email) = ?
     `, ctx.organizationId, email);
     if (existingMember) throw new ApiError(409, 'MEMBERSHIP_EXISTS', 'This person is already a member of the organization.');
-    const pending = (await db.all(`SELECT status, expiresAt FROM invitation WHERE organizationId = ? AND LOWER(email) = ? AND status = 'pending'`, ctx.organizationId, email) as any[])
+    const pending = (await db.all(`SELECT status, "expiresAt" FROM invitation WHERE "organizationId" = ? AND LOWER(email) = ? AND status = 'pending'`, ctx.organizationId, email) as any[])
       .some((row) => invitationStatus(row) === 'pending');
     if (email && pending) throw new ApiError(409, 'INVITATION_EXISTS', 'A pending invitation already exists for this email.');
     const id = crypto.randomBytes(24).toString('base64url'); // 192-bit opaque token
     const now = new Date();
     await db.run(`
-      INSERT INTO invitation (id, organizationId, email, role, teamId, status, expiresAt, createdAt, inviterId, departmentIds)
+      INSERT INTO invitation (id, "organizationId", email, role, "teamId", status, "expiresAt", "createdAt", "inviterId", "departmentIds")
       VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
     `, id, ctx.organizationId, email, input.tenantRole, departmentIds[0] ?? null, new Date(now.getTime() + INVITATION_TTL_MS).toISOString(), now.toISOString(), ctx.userId, JSON.stringify(departmentIds));
     await appendAudit(db, actor, { organizationId: ctx.organizationId, action: 'invitation.create', targetType: 'invitation', targetId: id, outcome: 'success', changedFields: ['tenantRole', 'departmentIds'] });
@@ -424,7 +429,7 @@ export async function createInvitation(db: DB, ctx: OrgContext, actor: AuditActo
 }
 
 async function loadInvitation(db: DB, organizationId: string, invitationId: string) {
-  const row = await db.get(`SELECT * FROM invitation WHERE id = ? AND organizationId = ?`, invitationId, organizationId) as any;
+  const row = await db.get(`SELECT * FROM invitation WHERE id = ? AND "organizationId" = ?`, invitationId, organizationId) as any;
   if (!row) throw new ApiError(404, 'RESOURCE_NOT_FOUND');
   return row;
 }
@@ -436,7 +441,7 @@ export async function resendInvitation(db: DB, ctx: OrgContext, actor: AuditActo
     if (!read.ok) throw new ApiError(404, 'RESOURCE_NOT_FOUND');
     enforce(checkInvitationAction(ctx, invitationTarget(row), 'resend'));
     if (!['pending', 'expired'].includes(invitationStatus(row))) throw new ApiError(409, 'INVITATION_NOT_ACCEPTABLE', 'Only pending or expired invitations can be resent.');
-    await db.run(`UPDATE invitation SET status = 'pending', expiresAt = ? WHERE id = ? AND organizationId = ?`, new Date(Date.now() + INVITATION_TTL_MS).toISOString(), row.id, ctx.organizationId);
+    await db.run(`UPDATE invitation SET status = 'pending', "expiresAt" = ? WHERE id = ? AND "organizationId" = ?`, new Date(Date.now() + INVITATION_TTL_MS).toISOString(), row.id, ctx.organizationId);
     await appendAudit(db, actor, { organizationId: ctx.organizationId, action: 'invitation.resend', targetType: 'invitation', targetId: row.id, outcome: 'success', changedFields: ['expiresAt'] });
     return loadInvitation(db, ctx.organizationId, invitationId);
   });
@@ -448,7 +453,7 @@ export async function cancelInvitation(db: DB, ctx: OrgContext, actor: AuditActo
     if (!checkInvitationAction(ctx, invitationTarget(row), 'read').ok) throw new ApiError(404, 'RESOURCE_NOT_FOUND');
     enforce(checkInvitationAction(ctx, invitationTarget(row), 'cancel'));
     if (!['pending', 'expired'].includes(invitationStatus(row))) throw new ApiError(409, 'INVITATION_NOT_ACCEPTABLE', 'This invitation can no longer be canceled.');
-    await db.run(`UPDATE invitation SET status = 'canceled' WHERE id = ? AND organizationId = ?`, row.id, ctx.organizationId);
+    await db.run(`UPDATE invitation SET status = 'canceled' WHERE id = ? AND "organizationId" = ?`, row.id, ctx.organizationId);
     await appendAudit(db, actor, { organizationId: ctx.organizationId, action: 'invitation.cancel', targetType: 'invitation', targetId: row.id, outcome: 'success', changedFields: ['status'] });
   });
 }
@@ -458,14 +463,14 @@ const tokenOk = (token: unknown): token is string => typeof token === 'string' &
 /** Minimal token preview (§8.3). No mutation. */
 export async function previewInvitation(db: DB, token: string) {
   if (!tokenOk(token)) throw new ApiError(404, 'RESOURCE_NOT_FOUND');
-  const row = await db.get(`SELECT i.email, i.role, i.status, i.expiresAt, o.name AS organizationName FROM invitation i JOIN organization o ON o.id = i.organizationId WHERE i.id = ?`, token) as any;
+  const row = await db.get(`SELECT i.email, i.role, i.status, i."expiresAt", o.name AS "organizationName" FROM invitation i JOIN organization o ON o.id = i."organizationId" WHERE i.id = ?`, token) as any;
   if (!row) throw new ApiError(404, 'RESOURCE_NOT_FOUND');
   return { organizationName: row.organizationName, email: row.email || null, tenantRole: row.role, expiresAt: row.expiresAt, status: invitationStatus(row) };
 }
 
 /** Whether the inviter could still issue this invitation today (§8.3: revoked/demoted inviters lose outstanding invitations). */
 async function inviterStillAuthorized(db: DB, row: any): Promise<boolean> {
-  const inviter = await db.get(`SELECT id, role, banned, banExpires FROM "user" WHERE id = ?`, row.inviterId) as any;
+  const inviter = await db.get(`SELECT id, role, banned, "banExpires" FROM "user" WHERE id = ?`, row.inviterId) as any;
   if (!inviter || isIdentityBanned(inviter)) return false;
   if (inviter.role === 'superuser') return true;
   const membership = await membershipOf(db, inviter.id, row.organizationId);
@@ -484,7 +489,7 @@ async function invitationIsUsable(db: DB, row: any): Promise<boolean> {
   if (!await db.get('SELECT 1 FROM organization WHERE id = ?', row.organizationId)) return false;
   const departmentIds = invitationDepartmentIds(row);
   for (const id of departmentIds) {
-    if (!await db.get(`SELECT 1 FROM team WHERE id = ? AND organizationId = ?`, id, row.organizationId)) return false;
+    if (!await db.get(`SELECT 1 FROM team WHERE id = ? AND "organizationId" = ?`, id, row.organizationId)) return false;
   }
   const comboValid = row.role === 'admin' ? departmentIds.length === 0 : departmentIds.length > 0;
   return comboValid && await inviterStillAuthorized(db, row);
@@ -520,7 +525,7 @@ export async function acceptInvitation(db: DB, identity: Identity, token: string
     const claimed = await db.run(`UPDATE invitation SET status = 'accepted' WHERE id = ? AND status = 'pending'`, row.id);
     if (claimed.changes !== 1) throw new ApiError(409, 'INVITATION_NOT_ACCEPTABLE', 'This invitation can no longer be accepted.');
     const membershipId = `mem_${crypto.randomUUID()}`;
-    await db.run(`INSERT INTO member (id, organizationId, userId, role, createdAt, status) VALUES (?, ?, ?, ?, ?, 'active')`, membershipId, row.organizationId, identity.userId, row.role, new Date().toISOString());
+    await db.run(`INSERT INTO member (id, "organizationId", "userId", role, "createdAt", status) VALUES (?, ?, ?, ?, ?, 'active')`, membershipId, row.organizationId, identity.userId, row.role, new Date().toISOString());
     await replaceAssignments(db, row.organizationId, identity.userId, departmentIds);
     await appendAudit(db, { actorId: identity.userId, actorPlatformRole: identity.platformRole, accessMode: 'membership', requestId: requestIdOf(req) }, {
       organizationId: row.organizationId, action: 'invitation.accept', targetType: 'invitation', targetId: row.id, outcome: 'success', changedFields: ['status'],
@@ -539,9 +544,9 @@ export async function acceptInvitation(db: DB, identity: Identity, token: string
 
 export async function identityResponse(db: DB, identity: Identity) {
   const rows = (await db.all(`
-    SELECT m.id, m.organizationId, o.name AS organizationName, m.role, m.status
-    FROM member m JOIN organization o ON o.id = m.organizationId
-    WHERE m.userId = ? ORDER BY o.name COLLATE NOCASE, m.id
+    SELECT m.id, m."organizationId", o.name AS "organizationName", m.role, m.status
+    FROM member m JOIN organization o ON o.id = m."organizationId"
+    WHERE m."userId" = ? ORDER BY lower(o.name), m.id
   `, identity.userId) as any[])
     .filter((m) => isTenantRole(m.role));
   const memberships = [];
@@ -552,7 +557,7 @@ export async function identityResponse(db: DB, identity: Identity) {
   });
   const defaultOrganizationId = identity.sessionDefaultOrganizationId && await canAccessOrganization(db, identity, identity.sessionDefaultOrganizationId)
     ? identity.sessionDefaultOrganizationId : null;
-  const signInMethods = (await db.all(`SELECT DISTINCT providerId FROM account WHERE userId = ?`, identity.userId) as any[])
+  const signInMethods = (await db.all(`SELECT DISTINCT "providerId" FROM account WHERE "userId" = ?`, identity.userId) as any[])
     .map((r) => (r.providerId === 'credential' ? 'password' : String(r.providerId)));
   const profile = await db.get('SELECT * FROM "user" WHERE id = ?', identity.userId) as { bio?: string | null } | undefined;
   return {
@@ -589,7 +594,7 @@ export async function selectActiveOrganization(db: DB, identity: Identity, req: 
   if (headerSelectors.some((s) => s !== organizationId)) throw new ApiError(400, 'ORGANIZATION_SELECTOR_CONFLICT');
   await resolveOrganizationContext(db, identity, organizationId); // 404 when not accessible
 
-  await db.run(`UPDATE session SET activeOrganizationId = ?, updatedAt = ? WHERE id = ?`, organizationId, new Date().toISOString(), identity.sessionId);
+  await db.run(`UPDATE session SET "activeOrganizationId" = ?, "updatedAt" = ? WHERE id = ?`, organizationId, new Date().toISOString(), identity.sessionId);
   return { organizationId };
 }
 
@@ -650,7 +655,7 @@ export function createOrganizationAdminRouter(options: OrganizationAdminRouterOp
     const { profile } = validateProfilePatch({ legalEntity: body.legalEntity, brandName: body.brandName }, defaults.profile);
     const { policy } = validatePolicyPatch({ countryCode: body.countryCode, industry: body.industry, language: body.language }, defaults.policy);
     const organizationId = await db.tx(async () => {
-      if (await db.get("SELECT 1 FROM member WHERE userId = ? AND status = 'active'", identity.userId)) {
+      if (await db.get(`SELECT 1 FROM member WHERE "userId" = ? AND status = 'active'`, identity.userId)) {
         throw new ApiError(409, 'MEMBERSHIP_EXISTS', 'You already have an organization.');
       }
       const id = await createOrganizationRecord(db, { name, legalEntity: profile.legalEntity, brandName: profile.brandName,
@@ -668,12 +673,12 @@ export function createOrganizationAdminRouter(options: OrganizationAdminRouterOp
   /* Account Security: the caller's own sessions only (PRD §6.7). */
   router.get('/me/sessions', handle(async (req, res) => {
     const identity = identityOf(req);
-    const rows = await db.all(`SELECT id, createdAt, updatedAt, expiresAt, ipAddress, userAgent FROM session WHERE userId = ? ORDER BY updatedAt DESC`, identity.userId) as any[];
+    const rows = await db.all(`SELECT id, "createdAt", "updatedAt", "expiresAt", "ipAddress", "userAgent" FROM session WHERE "userId" = ? ORDER BY "updatedAt" DESC`, identity.userId) as any[];
     res.json({ sessions: rows.map((r) => ({ ...r, current: r.id === identity.sessionId })) });
   }));
   router.delete('/me/sessions/:sessionId', handle(async (req, res) => {
     const identity = identityOf(req);
-    const result = await db.run(`DELETE FROM session WHERE id = ? AND userId = ?`, req.params.sessionId, identity.userId);
+    const result = await db.run(`DELETE FROM session WHERE id = ? AND "userId" = ?`, req.params.sessionId, identity.userId);
     if (result.changes !== 1) throw new ApiError(404, 'RESOURCE_NOT_FOUND');
     res.status(204).end();
   }));

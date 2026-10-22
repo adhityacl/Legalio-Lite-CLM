@@ -25,7 +25,7 @@ export interface RecordCollections {
 }
 
 export type Team = { id: string; name: string };
-export const teamsOf = (db: Sql, organizationId: string) => db.all<Team>(`SELECT id, name FROM team WHERE organizationId = ?`, organizationId);
+export const teamsOf = (db: Sql, organizationId: string) => db.all<Team>(`SELECT id, name FROM team WHERE "organizationId" = ?`, organizationId);
 
 /** Request-local resolver for one organization (`teams` from teamsOf). Build once per request; it memoizes lookups. */
 export function createOrganizationScope(teams: Team[], organizationId: string, collections: RecordCollections) {

@@ -23,91 +23,11 @@ const AUTOSAVE_COALESCE_MS = 10 * 60 * 1000;
 const MAX_TEXT = 5000;
 
 /**
- * Document tables live beside (not inside) the core `contracts` table: that one holds
- * repository records and is rewritten wholesale by syncDbToSqlite on every save.
- * Foreign keys are not enforced by this database, so deletes cascade by hand below.
+ * Document tables (created in schema.ts) live beside, not inside, the core `contracts` table: that one holds
+ * repository records and is rewritten by saveCoreData on every save. They have no foreign keys, so deletes cascade by hand below.
  */
 /** Stored page setup: validated, null when the request carries none. */
 const pageLayoutJson = (value: unknown) => (value === undefined || value === null ? null : JSON.stringify(sanitizePageLayout(value)));
-
-export async function ensureDocumentSchema(db: Sql) {
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS contract_documents (
-      id TEXT PRIMARY KEY,
-      organization_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'contract',
-      status TEXT NOT NULL DEFAULT 'draft',
-      content TEXT NOT NULL DEFAULT '',
-      current_version INTEGER NOT NULL DEFAULT 1,
-      file_size INTEGER NOT NULL DEFAULT 0,
-      created_by TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      modified_by TEXT,
-      modified_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_contract_documents_org_status ON contract_documents (organization_id, status);
-    CREATE INDEX IF NOT EXISTS idx_contract_documents_org_modified ON contract_documents (organization_id, modified_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_contract_documents_org_created ON contract_documents (organization_id, created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_contract_documents_org_creator ON contract_documents (organization_id, created_by);
-
-    CREATE TABLE IF NOT EXISTS contract_drafts (
-      id TEXT PRIMARY KEY,
-      contract_id TEXT NOT NULL,
-      version_number INTEGER NOT NULL,
-      content TEXT NOT NULL,
-      content_hash TEXT NOT NULL,
-      file_size INTEGER NOT NULL,
-      save_kind TEXT NOT NULL DEFAULT 'manual',
-      restored_from INTEGER,
-      draft_name TEXT,
-      labels TEXT NOT NULL DEFAULT '[]',
-      saved_by TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      saved_at TEXT NOT NULL,
-      UNIQUE (contract_id, version_number)
-    );
-
-    CREATE TABLE IF NOT EXISTS metadata_fields (
-      id TEXT PRIMARY KEY,
-      organization_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      field_type TEXT NOT NULL,
-      options TEXT NOT NULL DEFAULT '[]',
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_metadata_fields_org ON metadata_fields (organization_id);
-
-    CREATE TABLE IF NOT EXISTS document_metadata (
-      contract_id TEXT NOT NULL,
-      field_id TEXT NOT NULL,
-      field_value TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      PRIMARY KEY (contract_id, field_id)
-    );
-    CREATE INDEX IF NOT EXISTS idx_document_metadata_field ON document_metadata (field_id);
-
-    CREATE TABLE IF NOT EXISTS contract_comments (
-      id TEXT PRIMARY KEY,
-      contract_id TEXT NOT NULL,
-      parent_id TEXT,
-      comment_type TEXT NOT NULL,
-      body TEXT NOT NULL DEFAULT '',
-      quote TEXT NOT NULL DEFAULT '',
-      new_text TEXT,
-      status TEXT NOT NULL DEFAULT 'open',
-      author_id TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      resolved_by TEXT,
-      resolved_at TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_contract_comments_contract ON contract_comments (contract_id, status);
-  `);
-  // Page setup (paper, margins, header, footer) as JSON; null means the defaults.
-  if (!(await db.all('PRAGMA table_info(contract_documents)') as { name: string }[]).some((column) => column.name === 'page_layout')) {
-    await db.exec('ALTER TABLE contract_documents ADD COLUMN page_layout TEXT');
-  }
-}
 
 interface Actor {
   id: string;
@@ -147,17 +67,17 @@ export interface DocumentRouterOptions {
   tenantOf: (req: express.Request) => string;
 }
 
+const nameOf = (column: string) => `(SELECT u.name FROM "user" u WHERE u.id = ${column})`;
 const SORT_SQL: Record<DocumentSortKey, string> = {
-  name: "d.name COLLATE NOCASE",
+  name: "lower(d.name)",
   type: "d.type",
   status: "d.status",
   created_at: "d.created_at",
   modified_at: "d.modified_at",
-  created_by: "created_by_name COLLATE NOCASE",
+  created_by: `lower(${nameOf("d.created_by")})`,
   file_size: "d.file_size",
 };
 
-const nameOf = (column: string) => `(SELECT u.name FROM "user" u WHERE u.id = ${column})`;
 const str = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 const byteSize = (text: string) => Buffer.byteLength(text, "utf8");
 const sha256 = (text: string) => crypto.createHash("sha256").update(text).digest("hex");
@@ -190,8 +110,8 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
       return handler(req, res, doc, actorOf(req)!);
     };
 
-  // First statement of a tx that checks then writes one document: on pg the row lock queues other writers of it
-  // and later statements see their commits (FOR UPDATE equivalent); SQLite already runs one tx at a time.
+  // First statement of a tx that checks then writes one document: the row lock queues other writers of it
+  // and later statements see their commits (FOR UPDATE equivalent).
   const lockDocument = (id: string) => db.run(`UPDATE contract_documents SET id = id WHERE id = ?`, id);
 
   const latestDraft = async (contractId: string) =>
@@ -241,8 +161,8 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
 
     const search = str(req.query.search);
     if (search) {
-      where.push(`(d.name LIKE @search OR EXISTS (
-        SELECT 1 FROM document_metadata m WHERE m.contract_id = d.id AND m.field_value LIKE @search))`);
+      where.push(`(d.name ILIKE @search OR EXISTS (
+        SELECT 1 FROM document_metadata m WHERE m.contract_id = d.id AND m.field_value ILIKE @search))`);
       params.search = `%${search}%`;
     }
     const status = str(req.query.status);
@@ -275,7 +195,7 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
     const metaValue = str(req.query.meta_value);
     if (metaField && metaValue) {
       where.push(`EXISTS (SELECT 1 FROM document_metadata m
-        WHERE m.contract_id = d.id AND m.field_id = @metaField AND m.field_value LIKE @metaValue)`);
+        WHERE m.contract_id = d.id AND m.field_id = @metaField AND m.field_value ILIKE @metaValue)`);
       params.metaField = metaField;
       params.metaValue = `%${metaValue}%`;
     }

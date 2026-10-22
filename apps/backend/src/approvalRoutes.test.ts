@@ -1,30 +1,27 @@
-import { test } from 'node:test';
+import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import express from 'express';
-import Database from 'better-sqlite3';
 import { approvalStatusLock, createApprovalRouter } from './approvalRoutes';
-import { ensureDocumentSchema } from './documentRoutes';
-import { ensureApprovalSchema } from './approvalRoutes';
-import { createSql } from './db';
+import { sql } from './db';
+import { ensureSchema } from './schema';
+import { createTestDatabase } from './testDatabase';
+
+let database: Awaited<ReturnType<typeof createTestDatabase>>;
+before(async () => { database = await createTestDatabase(); await ensureSchema(); });
+after(() => database?.drop());
+
+const addUser = async (id: string, name: string, org: string, role = 'editor') => {
+  await sql.run(`INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES (?, ?, ?, true, now(), now())`, id, name, `${id}@example.com`);
+  await sql.run(`INSERT INTO member (id, "organizationId", "userId", role, status, "createdAt") VALUES (?, ?, ?, ?, 'active', now())`, `m-${id}`, org, id, role);
+};
 
 /** Stands in for the authorization middleware: `x-user` + `x-org` become the verified context. */
 async function setup() {
-  const db = new Database(':memory:');
-  db.exec(`
-    CREATE TABLE "user" (id TEXT PRIMARY KEY, name TEXT);
-    CREATE TABLE member (id TEXT PRIMARY KEY, organizationId TEXT, userId TEXT, role TEXT, status TEXT DEFAULT 'active');
-    CREATE TABLE audit_log (id TEXT PRIMARY KEY, actor_id TEXT, action TEXT, target_type TEXT, target_id TEXT, tenant_id TEXT,
-      department_id TEXT, impersonated_by TEXT, metadata TEXT, created_at TEXT);
-  `);
-  for (const [id, name] of [['al', 'Adhityarul'], ['as', 'Apriliyana'], ['bw', 'Bian'], ['x', 'Outsider']]) {
-    db.prepare(`INSERT INTO "user" VALUES (?, ?)`).run(id, name);
-    db.prepare(`INSERT INTO member VALUES (?, ?, ?, 'editor', 'active')`).run(`m-${id}`, id === 'x' ? 'org-b' : 'org-a', id);
-  }
-  const sql = createSql(db);
-  await ensureDocumentSchema(sql);
-  await ensureApprovalSchema(sql);
-  db.prepare(`INSERT INTO contract_documents (id, organization_id, name, created_by, created_at, modified_at) VALUES ('doc-1', 'org-a', 'ITS-Done', 'al', 'now', 'now')`).run();
+  await sql.exec(`TRUNCATE "user", organization, audit_log, contract_documents, approval_requests, approval_steps, approval_events CASCADE`);
+  await sql.exec(`INSERT INTO organization (id, name, slug, "createdAt") VALUES ('org-a', 'A', 'a', now()), ('org-b', 'B', 'b', now())`);
+  for (const [id, name] of [['al', 'Adhityarul'], ['as', 'Apriliyana'], ['bw', 'Bian'], ['x', 'Outsider']]) await addUser(id, name, id === 'x' ? 'org-b' : 'org-a');
+  await sql.run(`INSERT INTO contract_documents (id, organization_id, name, created_by, created_at, modified_at) VALUES ('doc-1', 'org-a', 'ITS-Done', 'al', 'now', 'now')`);
 
   const app = express();
   app.use(express.json({ limit: '25mb' }));
@@ -52,24 +49,24 @@ async function setup() {
     });
     return { status: res.status, body: (res.headers.get('content-type')?.includes('json') ? await res.json() : await res.text()) as any };
   };
-  return { db, call, hooks, close: () => { server.close(); db.close(); } };
+  return { call, hooks, close: () => { server.close(); } };
 }
 
-const docStatus = (db: Database.Database) => (db.prepare(`SELECT status FROM contract_documents WHERE id = 'doc-1'`).get() as any).status;
+const docStatus = async () => (await sql.get(`SELECT status FROM contract_documents WHERE id = 'doc-1'`)).status;
 
 test('sequential approval of a My Documents item', async () => {
-  const { db, call, close } = await setup();
+  const { call, close } = await setup();
   try {
     const created = await call('al', 'POST', '/approvals', { title: 'ITS Done', category: 'nda', approverIds: ['as', 'bw'], documentId: 'doc-1' });
     assert.equal(created.status, 201);
     const id = created.body.id;
-    assert.equal(docStatus(db), 'pending_review');
+    assert.equal(await docStatus(), 'pending_review');
     // While the flow runs, My Approval owns the document status and blocks deletes.
-    assert.ok(await approvalStatusLock(createSql(db), 'doc-1', 'pending_review', 'draft'));
-    assert.ok(await approvalStatusLock(createSql(db), 'doc-1', 'pending_review', null));
+    assert.ok(await approvalStatusLock(sql, 'doc-1', 'pending_review', 'draft'));
+    assert.ok(await approvalStatusLock(sql, 'doc-1', 'pending_review', null));
     // Type and name follow the attached document, even after it changes.
     assert.equal((await call('al', 'GET', `/approvals/${id}`)).body.category, 'contract');
-    db.prepare(`UPDATE contract_documents SET type = 'agreement', name = 'ITS-Done v2' WHERE id = 'doc-1'`).run();
+    await sql.run(`UPDATE contract_documents SET type = 'agreement', name = 'ITS-Done v2' WHERE id = 'doc-1'`);
     const live = (await call('al', 'GET', `/approvals/${id}`)).body;
     assert.deepEqual([live.category, live.file_name], ['agreement', 'ITS-Done v2']);
     assert.equal((await call('al', 'GET', '/approvals?category=agreement')).body.items.length, 1);
@@ -87,12 +84,12 @@ test('sequential approval of a My Documents item', async () => {
     assert.equal(detail.status, 'approved');
     assert.match(detail.code, /^OA-\d{4}-00001$/);
     assert.deepEqual(detail.events.map((e: any) => e.kind), ['submitted', 'approved', 'approved']);
-    assert.equal(docStatus(db), 'approved');
-    assert.ok(await approvalStatusLock(createSql(db), 'doc-1', 'approved', 'draft'));
-    assert.ok(await approvalStatusLock(createSql(db), 'doc-1', 'draft', 'approved'));
-    assert.equal(await approvalStatusLock(createSql(db), 'doc-1', 'approved', 'archived'), null);
-    assert.equal(await approvalStatusLock(createSql(db), 'doc-1', 'approved', null), null);
-    assert.equal((db.prepare(`SELECT COUNT(*) AS n FROM audit_log`).get() as any).n, 3);
+    assert.equal(await docStatus(), 'approved');
+    assert.ok(await approvalStatusLock(sql, 'doc-1', 'approved', 'draft'));
+    assert.ok(await approvalStatusLock(sql, 'doc-1', 'draft', 'approved'));
+    assert.equal(await approvalStatusLock(sql, 'doc-1', 'approved', 'archived'), null);
+    assert.equal(await approvalStatusLock(sql, 'doc-1', 'approved', null), null);
+    assert.equal((await sql.get(`SELECT COUNT(*) AS n FROM audit_log`)).n, 3);
   } finally { close(); }
 });
 
@@ -135,10 +132,9 @@ test('uploaded file: validation, rejection stops the chain, file is served to pa
 });
 
 test('viewers are not offered or accepted as approvers', async () => {
-  const { db, call, close } = await setup();
+  const { call, close } = await setup();
   try {
-    db.prepare(`INSERT INTO "user" VALUES ('vw', 'Viewer')`).run();
-    db.prepare(`INSERT INTO member VALUES ('m-vw', 'org-a', 'vw', 'viewer', 'active')`).run();
+    await addUser('vw', 'Viewer', 'org-a', 'viewer');
     const approvers = (await call('al', 'GET', '/approvals/approvers')).body.approvers.map((a: { id: string }) => a.id);
     assert.ok(approvers.includes('as'));
     assert.ok(!approvers.includes('vw'));
@@ -163,12 +159,27 @@ test('a double-submitted decision cannot skip the next approver', async () => {
 });
 
 test('an approval decided while its delete is in flight is kept', async () => {
-  const { db, call, hooks, close } = await setup();
+  const { call, hooks, close } = await setup();
   try {
     const { id } = (await call('al', 'POST', '/approvals', { title: 'NDA', category: 'nda', approverIds: ['as'], documentId: 'doc-1' })).body;
     hooks.beforeTx = () => call('as', 'POST', `/approvals/${id}/decision`, { decision: 'approve' });
     assert.equal((await call('al', 'DELETE', `/approvals/${id}`)).status, 409);
     assert.equal((await call('al', 'GET', `/approvals/${id}`)).body.status, 'approved');
-    assert.equal(docStatus(db), 'approved');
+    assert.equal(await docStatus(), 'approved');
+  } finally { close(); }
+});
+
+test('two submits of one document: the one landing after the checks is refused, codes never repeat', async () => {
+  const { call, hooks, close } = await setup();
+  try {
+    const submit = () => call('al', 'POST', '/approvals', { title: 'NDA', category: 'nda', approverIds: ['as'], documentId: 'doc-1' });
+    let twin: Awaited<ReturnType<typeof call>> | undefined;
+    hooks.beforeTx = async () => { twin = await submit(); };
+    const first = await submit();
+    assert.deepEqual([twin?.status, first.status, first.body.error], [201, 409, 'APPROVAL_PENDING']);
+    const pdf = { name: 'a.pdf', base64: Buffer.from('%PDF').toString('base64') };
+    const uploads = await Promise.all([1, 2, 3].map(() => call('al', 'POST', '/approvals', { title: 'Up', category: 'nda', approverIds: ['as'], file: pdf })));
+    assert.deepEqual(uploads.map((u) => u.status), [201, 201, 201]);
+    assert.equal((await sql.get(`SELECT COUNT(DISTINCT code) AS n FROM approval_requests`)).n, 4);
   } finally { close(); }
 });

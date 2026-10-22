@@ -3,11 +3,10 @@ import { MAIL_CATALOG, isMailTemplateId, renderMailTemplate, validateMailTemplat
 
 export function createMailTemplateStore(db: Sql) {
   const get = async (id: MailTemplateId) => {
-    const row = await db.get('SELECT subject, html, version, updated_at AS updatedAt FROM mail_templates WHERE id = ?', id) as (MailTemplate & { version: number; updatedAt: string }) | undefined;
+    const row = await db.get('SELECT subject, html, version, updated_at AS "updatedAt" FROM mail_templates WHERE id = ?', id) as (MailTemplate & { version: number; updatedAt: string }) | undefined;
     return row || { ...MAIL_CATALOG[id].defaults, version: 0, updatedAt: null };
   };
   return {
-    init: () => db.exec(`CREATE TABLE IF NOT EXISTS mail_templates (id TEXT PRIMARY KEY, subject TEXT NOT NULL, html TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL)`),
     get,
     list: async () => {
       const templates = [];
@@ -19,8 +18,11 @@ export function createMailTemplateStore(db: Sql) {
       try { validateMailTemplate(id, template); } catch (error) { throw Object.assign(error as Error, { status: 400 }); }
       if (!Number.isInteger(expectedVersion) || (expectedVersion as number) < 0) throw Object.assign(new Error('Versi template tidak valid.'), { status: 400 });
       return db.tx(async () => {
-        if ((await get(id)).version !== expectedVersion) throw Object.assign(new Error('Template telah diubah admin lain. Muat ulang sebelum menyimpan.'), { status: 409 });
-        await db.run(`INSERT INTO mail_templates (id, subject, html, version, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET subject=excluded.subject, html=excluded.html, version=excluded.version, updated_at=excluded.updated_at`, id, template.subject, template.html, (expectedVersion as number) + 1, new Date().toISOString());
+        const conflict = () => Object.assign(new Error('Template telah diubah admin lain. Muat ulang sebelum menyimpan.'), { status: 409 });
+        if (((await db.get('SELECT version FROM mail_templates WHERE id = ? FOR UPDATE', id))?.version ?? 0) !== expectedVersion) throw conflict();
+        // FOR UPDATE cannot lock a row that does not exist yet; the WHERE makes a concurrent first save lose instead of overwrite.
+        const { changes } = await db.run(`INSERT INTO mail_templates (id, subject, html, version, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET subject=excluded.subject, html=excluded.html, version=excluded.version, updated_at=excluded.updated_at WHERE mail_templates.version = ?`, id, template.subject, template.html, (expectedVersion as number) + 1, new Date().toISOString(), expectedVersion);
+        if (changes !== 1) throw conflict();
         return get(id);
       });
     },

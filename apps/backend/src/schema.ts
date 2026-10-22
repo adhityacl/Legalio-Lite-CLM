@@ -1,10 +1,9 @@
 /**
  * PostgreSQL schema, created at boot and safe to run again: better-auth's own migrations first (the module tables
- * reference organization and "user"), then the module tables. Phase D2 calls it from init() and deletes the SQLite DDL
- * still living in lib/auth.ts, the route modules and the stores.
+ * reference organization and "user"), then the module tables. server.ts init() runs it before anything reads them.
  */
 import { getMigrations } from 'better-auth/db/migration';
-import { pgSql as sql, pool } from './db';
+import { sql, pool } from './db';
 import { authOptions } from './lib/auth';
 import { createNormalizedCoreSchema } from './normalizedCoreStore';
 
@@ -44,7 +43,7 @@ export async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_audit_log_tenant ON audit_log (tenant_id, created_at);
     CREATE TABLE IF NOT EXISTS schema_migrations (id text PRIMARY KEY, "appliedAt" text NOT NULL, summary text);
   `);
-  await createNormalizedCoreSchema(sql, true);
+  await createNormalizedCoreSchema(sql);
   await sql.exec(`
     CREATE INDEX IF NOT EXISTS idx_v5_contracts_status ON contracts (organization_id, status, end_date);
     CREATE INDEX IF NOT EXISTS idx_v5_ios_status ON insertion_orders (organization_id, status, end_date);
@@ -89,7 +88,7 @@ export async function ensureSchema() {
       id text PRIMARY KEY, request_id text NOT NULL, step_no integer NOT NULL, approver_id text NOT NULL,
       status text NOT NULL DEFAULT 'waiting', comment text NOT NULL DEFAULT '', decided_at text, UNIQUE (request_id, step_no));
     CREATE INDEX IF NOT EXISTS idx_approval_steps_approver ON approval_steps (approver_id, status);
-    -- seq replaces the SQLite rowid as tie-break for events sharing a created_at.
+    -- seq orders events that share a created_at.
     CREATE TABLE IF NOT EXISTS approval_events (
       id text PRIMARY KEY, seq bigint GENERATED ALWAYS AS IDENTITY, request_id text NOT NULL, actor_id text NOT NULL,
       kind text NOT NULL, message text NOT NULL DEFAULT '', created_at text NOT NULL);

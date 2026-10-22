@@ -59,7 +59,7 @@ export function computeInputSha256(input: string | Buffer): string {
 }
 
 /**
- * SQLite-backed (table `ai_ocr_cache`, src/lib/auth.ts) instead of an
+ * Database-backed (table `ai_ocr_cache`, src/schema.ts) instead of an
  * in-memory Map, so a cached OCR/AI result survives a server restart —
  * previously every deploy silently threw away every cached result and
  * forced the next request for an already-analyzed file to re-run OCR/Gemini
@@ -76,7 +76,7 @@ class OcrMemoryCache {
   async get(hash: string, taskType: string): Promise<any | null> {
     if (!hash) return null;
     const key = this.makeKey(hash, taskType);
-    const row = await sql.get(`SELECT payload, createdAt FROM ai_ocr_cache WHERE cache_key = ?`, key) as
+    const row = await sql.get(`SELECT payload, "createdAt" FROM ai_ocr_cache WHERE cache_key = ?`, key) as
       | { payload: string; createdAt: string }
       | undefined;
     if (!row) return null;
@@ -99,10 +99,10 @@ class OcrMemoryCache {
     const count = (await sql.get(`SELECT COUNT(*) AS n FROM ai_ocr_cache`) as { n: number }).n;
     if (count >= this.maxEntries) {
       await sql.run(`DELETE FROM ai_ocr_cache WHERE cache_key IN (
-            SELECT cache_key FROM ai_ocr_cache ORDER BY createdAt ASC LIMIT ?
+            SELECT cache_key FROM ai_ocr_cache ORDER BY "createdAt" ASC LIMIT ?
           )`, count - this.maxEntries + 1);
     }
-    await sql.run(`INSERT OR REPLACE INTO ai_ocr_cache (cache_key, payload, createdAt) VALUES (?, ?, ?)`, key, JSON.stringify(data), new Date().toISOString());
+    await sql.run(`INSERT INTO ai_ocr_cache (cache_key, payload, "createdAt") VALUES (?, ?, ?) ON CONFLICT (cache_key) DO UPDATE SET payload = excluded.payload, "createdAt" = excluded."createdAt"`, key, JSON.stringify(data), new Date().toISOString());
   }
 
   async clear(): Promise<void> {

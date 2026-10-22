@@ -43,7 +43,7 @@ export async function createOrganizationRecord(db: DB, seed: OrganizationSeed, a
     legalEntity: seed.legalEntity, brandName: seed.brandName, tagline: seed.tagline,
     logoUrl: seed.logoUrl && seed.logoUrl !== '/favicon.png' ? seed.logoUrl : '', primaryColor: seed.primaryColor, policy: seed.settings,
   });
-  await db.run(`INSERT INTO organization (id, name, slug, logo, createdAt, metadata) VALUES (?, ?, ?, ?, ?, NULL)`, id, name, await uniqueSlug(db, name, seed.slug), payload.profile.logoUrl || null, seed.createdAt || new Date().toISOString());
+  await db.run(`INSERT INTO organization (id, name, slug, logo, "createdAt", metadata) VALUES (?, ?, ?, ?, ?, NULL)`, id, name, await uniqueSlug(db, name, seed.slug), payload.profile.logoUrl || null, seed.createdAt || new Date().toISOString());
   await writeSettingsRow(db, id, payload, 1, actorId);
   await writeIntegrationRow(db, { organizationId: id, driveFolderId: null, spreadsheetId: null, legacyAutoSync: 0, version: 1 }, actorId);
   return id;
@@ -52,7 +52,7 @@ export async function createOrganizationRecord(db: DB, seed: OrganizationSeed, a
 export async function createTeamRecord(db: DB, organizationId: string, name: string, id?: string, createdAt?: string): Promise<string> {
   const teamId = id || `team_${crypto.randomUUID()}`;
   const at = createdAt || new Date().toISOString();
-  await db.run(`INSERT INTO team (id, name, memberCount, organizationId, createdAt, updatedAt) VALUES (?, ?, 0, ?, ?, ?)`, teamId, name.trim(), organizationId, at, at);
+  await db.run(`INSERT INTO team (id, name, "memberCount", "organizationId", "createdAt", "updatedAt") VALUES (?, ?, 0, ?, ?, ?)`, teamId, name.trim(), organizationId, at, at);
   return teamId;
 }
 
@@ -60,18 +60,18 @@ export async function createIdentityRecord(db: DB, input: { id?: string; name: s
   const id = input.id || `usr_${crypto.randomUUID()}`;
   const now = new Date().toISOString();
   await db.run(`
-    INSERT INTO "user" (id, name, email, emailVerified, role, banned, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, 0, ?, ?)
-  `, id, input.name || input.email.split('@')[0], input.email.trim().toLowerCase(), input.emailVerified === false ? 0 : 1, input.platformRole, now, now);
+    INSERT INTO "user" (id, name, email, "emailVerified", role, banned, "createdAt", "updatedAt")
+    VALUES (?, ?, ?, ?, ?, false, ?, ?)
+  `, id, input.name || input.email.split('@')[0], input.email.trim().toLowerCase(), input.emailVerified !== false, input.platformRole, now, now);
   return id;
 }
 
 export async function addMembershipRecord(db: DB, input: { userId: string; organizationId: string; tenantRole: TenantRole; departmentIds?: string[] }): Promise<string> {
   const id = `mem_${crypto.randomUUID()}`;
   const now = new Date().toISOString();
-  await db.run(`INSERT INTO member (id, organizationId, userId, role, createdAt, status) VALUES (?, ?, ?, ?, ?, 'active')`, id, input.organizationId, input.userId, input.tenantRole, now);
+  await db.run(`INSERT INTO member (id, "organizationId", "userId", role, "createdAt", status) VALUES (?, ?, ?, ?, ?, 'active')`, id, input.organizationId, input.userId, input.tenantRole, now);
   if (input.tenantRole !== 'admin') {
-    for (const teamId of input.departmentIds || []) await db.run(`INSERT INTO teamMember (id, teamId, userId, createdAt) VALUES (?, ?, ?, ?)`, `tm_${crypto.randomUUID()}`, teamId, input.userId, now);
+    for (const teamId of input.departmentIds || []) await db.run(`INSERT INTO "teamMember" (id, "teamId", "userId", "createdAt") VALUES (?, ?, ?, ?)`, `tm_${crypto.randomUUID()}`, teamId, input.userId, now);
   }
   return id;
 }
@@ -108,7 +108,7 @@ export async function seedOrganizationsFromDataset(db: DB, dataset: DatasetSeed,
       const userId = await createIdentityRecord(db, { id: u.id, name: u.name, email, platformRole: isSuper ? 'superuser' : 'user' });
       const tenantRole = legacyMembershipRole(u.role);
       if (isSuper || !tenantRole || !dataset.tenants.some((t) => t.id === u.organizationId)) continue;
-      const teamId = (await db.all(`SELECT id, name FROM team WHERE organizationId = ?`, u.organizationId) as any[])
+      const teamId = (await db.all(`SELECT id, name FROM team WHERE "organizationId" = ?`, u.organizationId) as any[])
         .find((t) => normalizeDepartmentName(t.name) === normalizeDepartmentName(u.department))?.id;
       await addMembershipRecord(db, { userId, organizationId: u.organizationId, tenantRole, departmentIds: teamId ? [teamId] : [] });
     }
