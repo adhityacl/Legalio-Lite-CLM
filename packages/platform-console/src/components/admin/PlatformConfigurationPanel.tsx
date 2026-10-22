@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GoogleSheetsConfig, Tenant } from '@legalio/types';
 import { useAuth } from '../../context/AuthContext';
 import { GoogleCredentialsForm } from '../settings/GoogleCredentialsDialog';
+import { CosStorageForm } from '../settings/CosStorageForm';
 import { useLanguage } from '../../context/LanguageContext';
 import { useConfirm } from '../../context/ConfirmDialogContext';
 import { getAuthHeaders } from '../../lib/apiFetch';
@@ -1189,6 +1190,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                     {t('google_setup.description', 'Unggah dua file JSON yang diekspor dari Google Cloud Console. File disimpan di server, menggantikan variabel GOOGLE_* di .env, dan isinya yang rahasia tidak pernah ditampilkan lagi.')}
                   </Text>
                   <GoogleCredentialsForm />
+                  <CosStorageForm />
                 </section>
               )}
             </div>

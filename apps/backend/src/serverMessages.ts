@@ -274,6 +274,7 @@ const MESSAGES: Entry[] = [
   ['Comment not found.', 'Komentar tidak ditemukan.', '未找到评论。'],
   ['Cannot {0} a {1} {2}.', 'Tidak dapat melakukan {0} pada {2} berstatus {1}.', '无法对状态为 {1} 的{2}执行 {0}。'],
   ['Only a superuser can manage Google credentials.', 'Hanya superuser yang dapat mengelola kredensial Google.', '只有超级用户可以管理 Google 凭据。'],
+  ['Only a superuser can manage file storage.', 'Hanya superuser yang dapat mengelola penyimpanan file.', '只有超级用户可以管理文件存储。'],
   ['Unknown credential kind.', 'Jenis kredensial tidak dikenal.', '未知的凭据类型。'],
   ['RBAC: non-superuser actor without tenantId (scope required).', 'RBAC: actor non-superuser tanpa tenantId (scope wajib).', 'RBAC：非超级用户操作者缺少 tenantId（必须指定范围）。'],
   ['RBAC: department-scoped actor without departmentId.', 'RBAC: actor ber-scope departemen tanpa departmentId.', 'RBAC：部门范围的操作者缺少 departmentId。'],

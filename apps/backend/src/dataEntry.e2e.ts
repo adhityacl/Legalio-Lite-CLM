@@ -1,6 +1,6 @@
 /** Real HTTP + Chromium check, isolated from the development database and external services. */
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
@@ -67,7 +67,7 @@ const send=async(name:string,route:string,method:string,body:any,want:Want,orgId
  return {status:s,json};
 };
 const pdf=(text='%PDF-1.4 data-entry')=>'data:application/pdf;base64,'+Buffer.from(text).toString('base64');
-const uploadsPath=(link:string)=>path.join(directory,'uploads',...decodeURIComponent(link.slice('/uploads/'.length)).split('/'));
+const uploadText=async(link:string)=>{const response=await fetch(backendURL+link,{headers:{Authorization:`Bearer ${token}`}});assert.equal(response.status,200,link);return response.text();};
 const initData=async()=>(await call('/api/init-data',{org}));
 const errorLogPattern=/Failed to save|TypeError|ReferenceError|SQLITE_|UnhandledPromise|Unhandled rejection|Cannot read prop/i;
 try{
@@ -164,9 +164,9 @@ try{
  const byId=(rows:any[],key:string,id:string)=>rows.find((r:any)=>r[key]===id);
  assert.equal(byId(data.partners,'partner_id',pB.partner_id).partner_name,unicodeName);
  const rA=byId(data.partners,'partner_id',pA.partner_id);assert.equal(rA.pic_name,'Siti');assert.deepEqual(rA.tags,['Supplier','Media']);assert.equal(rA.identifiers[0].value,'01.234.567.8-901.000');
- const ddFile=rA.dd_documents.find((d:any)=>d.name===ddName).files?.[0];assert.match(ddFile.linkDrive,/^\/uploads\//);assert.ok(existsSync(uploadsPath(ddFile.linkDrive)),'DD file on disk');
+ const ddFile=rA.dd_documents.find((d:any)=>d.name===ddName).files?.[0];assert.match(ddFile.linkDrive,/^\/uploads\//);await uploadText(ddFile.linkDrive);
  const rM=byId(data.contracts,'contract_id',cMaster.contract_id);assert.equal(rM.contract_value,2000000.25);assert.equal(rM.contract_title,'Master updated');assert.deepEqual(rM.cooperation_categories,['Media','Tech']);assert.equal(rM.auto_renewal,true);
- assert.match(rM.contract_file_link,/^\/uploads\//);assert.equal(readFileSync(uploadsPath(rM.contract_file_link),'utf8'),'%PDF-1.4 v2');
+ assert.match(rM.contract_file_link,/^\/uploads\//);assert.equal(await uploadText(rM.contract_file_link),'%PDF-1.4 v2');
  assert.equal(byId(data.contracts,'contract_id',cAdd.contract_id).parent_contract_id,cMaster.contract_id);
  assert.equal(byId(data.ios,'io_id',ioA.io_id).io_value,999.99);assert.match(byId(data.ios,'io_id',ioA.io_id).io_file_link,/^\/uploads\//);
  const rS=byId(data.spendings,'id',sA.id);assert.equal(rS.total_amount,15000001.25);assert.match(rS.invoice_file_url,/^\/uploads\//);assert.match(rS.billing_file_url,/^\/uploads\//);

@@ -1,6 +1,5 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import type { Sql } from './db';
+import { keyFromLink, type ObjectStore } from './objectStore';
 
 /** Collections of the in-memory projection that belong to an organization. */
 const COLLECTIONS = ['partners', 'contracts', 'ios', 'spendings', 'evaluations', 'notifications', 'templates', 'activityLogs'] as const;
@@ -32,11 +31,9 @@ export interface OrganizationResetOptions {
   /** The in-memory projection (`db` in server.ts). */
   memory: Record<string, any[]>;
   organizationId: string;
-  uploadsDir: string;
+  storage: ObjectStore;
   /** Persists the projection to SQLite. */
   save: () => Promise<void>;
-  /** Where to write a database copy first; omit only for in-memory databases. */
-  backupPath?: string;
 }
 
 /**
@@ -44,12 +41,7 @@ export interface OrganizationResetOptions {
  * invitations and integrations stay. Only upload files that this organization's own records pointed to are removed.
  */
 export async function resetOrganizationData(options: OrganizationResetOptions) {
-  const { db, memory, organizationId, uploadsDir, save, backupPath } = options;
-  if (backupPath) {
-    fs.mkdirSync(path.dirname(backupPath), { recursive: true, mode: 0o700 });
-    await db.run('VACUUM INTO ?', backupPath);
-    fs.chmodSync(backupPath, 0o600);
-  }
+  const { db, memory, organizationId, storage, save } = options;
 
   const removed: Record<string, number> = {};
   const links = new Set<string>();
@@ -70,15 +62,16 @@ export async function resetOrganizationData(options: OrganizationResetOptions) {
   });
 
   let files = 0;
-  const root = path.resolve(uploadsDir);
   for (const link of links) {
+    const key = keyFromLink(link); // null for `..` and other links that could reach another object
+    if (!key) continue;
     try {
-      const target = path.resolve(root, decodeURIComponent(link.slice('/uploads/'.length)));
-      if (target.startsWith(root + path.sep) && fs.existsSync(target)) {
-        fs.unlinkSync(target);
-        files++;
-      }
-    } catch { /* a file that cannot be removed must not undo a completed reset */ }
+      await storage.delete(key);
+      files++;
+    } catch (err) {
+      // A file that cannot be removed must not undo a completed reset.
+      console.error('[organization reset] Cannot delete upload', key, err);
+    }
   }
   return { removed, files };
 }

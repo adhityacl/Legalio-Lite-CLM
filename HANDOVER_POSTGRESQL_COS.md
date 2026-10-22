@@ -2,7 +2,7 @@
 
 Status per 22 Oktober 2026. Branch: `PostgreSQL`.
 
-Pekerjaan dibagi menjadi 7 fase (A–G). **Fase A dan B selesai**, review keamanan fase B juga selesai dan 10 temuannya sudah diperbaiki, semua tes hijau. **Fase C–G belum dikerjakan.** File ini di-update dan di-push setiap kali satu fase selesai. Dokumen ini berisi semua yang perlu diketahui untuk melanjutkan. Catatan kerja sebelumnya (rencana arsitek dan review) hanya disimpan di `/tmp` dan sudah hilang, jadi isinya dirangkum ulang di sini.
+Pekerjaan dibagi menjadi 7 fase (A–G). **Fase A, B dan C selesai.** Review keamanan fase B sudah dilakukan dan 10 temuannya sudah diperbaiki; semua tes hijau. **Fase D–G belum dikerjakan.** File ini di-update dan di-push setiap kali satu fase selesai. Dokumen ini berisi semua yang perlu diketahui untuk melanjutkan. Catatan kerja sebelumnya (rencana arsitek dan review) hanya disimpan di `/tmp` dan sudah hilang, jadi isinya dirangkum ulang di sini.
 
 > **Jangan merge ke `main` sebelum fase G selesai.** `.github/workflows/deploy.yml` men-deploy `main` ke produksi secara otomatis. Fase A dan B tidak aman dideploy sendirian (lihat §6). Setelah merge, produksi akan mulai dengan PostgreSQL kosong. Itu memang keputusannya, tetapi **jangan hapus `/data/kaelyn.db`** di server; biarkan sebagai arsip.
 
@@ -110,11 +110,42 @@ Review menemukan bahwa di SQLite tidak ada bug aktif, karena request tidak perna
 
 Gate: lint ✅, build ✅, unit 66/66 ✅, e2e sqlite 32 ✅, data-entry 41 ✅, cek promise tanpa temuan baru ✅.
 
+### Fase C: Tencent COS dan enkripsi kredensial ✅
+- **`objectStore.ts`:** `ObjectStore` (put/get/delete/list, berbasis Buffer), `memoryStore()`, `parseCosConfig()` (validasi bucket/region/prefix; prefix selalu diakhiri `/`), `cosStore(cfg, client?)`, `probe(store)`, `keyFromLink(link)`.
+  - `cosStore` memberi prefix pada key, membuangnya saat `list`, dan mengikuti halaman (`IsTruncated`/`NextMarker`).
+  - Parameter `client` bisa diganti dengan client palsu untuk tes.
+  - SDK: `cos-nodejs-sdk-v5` 3.0.0.
+- **`secretBox.ts`:** `seal`/`open`, AES-256-GCM, format `'v1:'+base64(iv|tag|ct)`. Kunci di-HKDF dari `BETTER_AUTH_SECRET`, dengan fallback yang sama seperti `lib/auth.ts`.
+- **`googleCredentials.ts`:**
+  - Semua baris dienkripsi saat ditulis. Baris lama yang belum dienkripsi dibaca sebagai JSON biasa. Baris yang gagal didekripsi dicatat ke log lalu dilewati, jadi server tetap bisa start.
+  - Baris `tencent_cos`, dengan fungsi `getCos`/`saveCos`/`storageStatus()`.
+  - `GET` dan `PUT /api/integrations/storage/cos` (superuser): validasi → probe → simpan. `secretKey` tidak pernah dikembalikan.
+- **`server.ts`:**
+  - `getStore()` mengembalikan `memoryStore()` di `APP_TEST_MODE` tanpa COS; selain itu 503 `STORAGE_NOT_CONFIGURED`.
+  - `saveUpload` async, dengan key = `keyFromLink(link)`, dan melempar error jika gagal. Semua `generateNext*Id()` tetap setelah `await`.
+  - `/uploads`: `authorizeUpload` menyimpan key yang lolos cek di `res.locals.uploadKey`, lalu `serveUpload` mengambil objek dengan key itu (404 jika tidak ada). Content type ditentukan dari ekstensi. Segmen yang diawali `.` ditolak dengan 400.
+  - Backup Drive memakai `storage.list/get` dengan stamp ETag, dan index-nya di `APP_DATA_DIR/drive-backup.json`.
+  - Reset aplikasi menghapus semua key setelah commit.
+- **`organizationReset.ts`:** memakai `storage.delete(keyFromLink(link))`. Langkah `VACUUM INTO` dihapus. Tanpa COS di luar mode tes, hasilnya 503 sebelum ada yang dihapus.
+- **`runtimePaths.ts`:** `UPLOADS_DIR` dihapus.
+- **/sys:** kartu `CosStorageForm.tsx` di bawah form kredensial Google, dengan i18n en/id/zh.
+- **Tes:** `objectStore.test.ts` (5), `secretBox.test.ts` (3, termasuk store kredensial), reset org di `memoryStore`, upload di e2e dicek lewat HTTP, dan endpoint COS di e2e (400/401/403/404).
+- **Gate:** lint ✅, build ✅, unit 74/74 ✅, e2e sqlite 32 ✅, data-entry 41 ✅, cek promise tanpa temuan baru ✅, grep `UPLOADS_DIR` kosong ✅.
+
+> **Perilaku baru di dev:** di luar `APP_TEST_MODE`, upload mengembalikan 503 sampai superuser menyimpan COS di /sys (tab Google credentials) atau, setelah fase F, di onboarding. File lama di `uploads/` tidak lagi dilayani; ini sesuai keputusan "tanpa impor".
+
 ---
 
 ## 4. Yang belum dikerjakan (urutan wajib: C, D, E, F, G)
 
-### Fase C: Tencent COS dan enkripsi kredensial
+### Fase C: Tencent COS dan enkripsi kredensial ✅ SELESAI
+
+Hasilnya ada di §3. Spesifikasi asli disimpan di bawah sebagai referensi. Penyimpangan dari spesifikasi:
+- Status COS memakai `storageStatus()` dan `GET /api/integrations/storage/cos` terpisah, bukan bagian dari `status()`.
+- Baris yang gagal didekripsi dilewati, tidak membuat start gagal.
+- Reset org langsung 503 jika COS belum diatur.
+- Content type tidak dikirim ke COS.
+
 1. Tambahkan `cos-nodejs-sdk-v5@^3` di `apps/backend/package.json`.
 2. **`apps/backend/src/objectStore.ts`** dengan 4 method:
    - `put(key, body: Buffer, contentType?)`
@@ -204,7 +235,7 @@ Gate: lint ✅, build ✅, unit 66/66 ✅, e2e sqlite 32 ✅, data-entry 41 ✅,
    - **Submit approval** (`POST /approvals`) masih mengecek dokumen di luar tx. Panggil `lockDocument` lebih dulu di tx submit, lalu cek ulang bahwa dokumen ada dan belum punya approval pending. Tanpa ini, dua submit bisa lolos bersamaan, atau approval bisa menunjuk dokumen yang sudah dihapus.
    - `isUniqueViolation` di `db.ts` perlu ditambah `|| err.code === '23505'`. Pemetaan constraint ke 409 di `saveDb` menjadi `/^23/`.
    - Jika menambah FK di tabel approval, gunakan `ON DELETE CASCADE` atau `DEFERRABLE`. DELETE approval sekarang menghapus parent lebih dulu.
-7. **Hapus:** migrasi 003–006, `indexedConfiguration.ts`, `normalizedCoreReady`/`normalizedCoreApplied` (probe `sqlite_master`), import `sqliteDb` mentah di `server.ts`, `migrationBlock`/`MIGRATION_REQUIRED`, impor `data_store.json` (`LEGACY_DATA_FILE`), `AUTH_DB_PATH`, dan watch-ignore `*.db` di `apps/frontend/vite.config.ts`. better-auth diberi `database: pool()`.
+7. **Hapus:** probe `sqlite_master` untuk tabel opsional di `organizationReset.ts`, migrasi 003–006, `indexedConfiguration.ts`, `normalizedCoreReady`/`normalizedCoreApplied` (probe `sqlite_master`), import `sqliteDb` mentah di `server.ts`, `migrationBlock`/`MIGRATION_REQUIRED`, impor `data_store.json` (`LEGACY_DATA_FILE`), `AUTH_DB_PATH`, dan watch-ignore `*.db` di `apps/frontend/vite.config.ts`. better-auth diberi `database: pool()`.
 8. Tes:
    - Ganti nama script root: `test:sqlite` menjadi `test`, `test:e2e:sqlite` menjadi `test:e2e:postgres`.
    - Unit test dan e2e berjalan di database `legalio_test_*`.
@@ -249,7 +280,10 @@ Kunjungan pertama
 - `server.ts` menjadi `export { app, init }` dan tidak lagi memanggil `listen`. Esbuild tidak mendukung top-level await di cjs, karena itu `init()` dibuat async.
 - Entry esbuild pindah ke `src/main.ts`, tetapi **outfile tetap `dist/server.cjs`**, jadi `start`, Dockerfile dan e2e tidak berubah. Script `dev`/`dev:combined` juga pindah ke `src/main.ts`.
 - `public-status` di `server.ts` (sekitar L7345): hapus `migrationRequired` dan tambahkan `needsDatabase: false`. Tidak perlu `needsStorage`.
-- `POST /api/system/setup` (sekitar L7355) menerima `storage: { secretId, secretKey, bucket, region, prefix }`. Field ini wajib, kecuali di `IS_TEST_MODE`. Jalankan `probe(cosStore(cfg))` **sebelum** transaksi (tidak boleh ada I/O jaringan di dalam tx). Baris terenkripsinya ditulis di dalam transaksi setup yang sama, setelah advisory lock.
+- `POST /api/system/setup` (sekitar L7355) menerima `storage: { secretId, secretKey, bucket, region, prefix }`. Field ini wajib, kecuali di `IS_TEST_MODE`.
+  - Jalankan `parseCosConfig` lalu `probe(cosStore(cfg))` **sebelum** transaksi (tidak boleh ada I/O jaringan di dalam tx).
+  - Baris terenkripsinya ditulis di dalam transaksi setup yang sama, setelah advisory lock. `write()` di store kredensial bersifat internal, jadi pakai `saveCos` dari dalam `sql.tx`. Fungsi itu hanya satu `db.run` ditambah set map, sehingga aman di dalam tx; pastikan cache map tidak berubah jika tx di-rollback.
+  - Pakai ulang potongan yang sama dengan route `PUT /api/integrations/storage/cos`.
 - `.gitignore`: tambahkan `database.json` dan `drive-backup.json`.
 
 **Frontend: `packages/platform-console/src/components/SignInForm.tsx`**
@@ -282,6 +316,10 @@ Komponen ini dipakai oleh app (`apps/frontend/src/components/SignInForm.tsx`) da
   - catatan bahwa aplikasi hanya boleh berjalan satu instance
   - `pg_dump` untuk backup
   - **jangan hapus `/data/kaelyn.db`**
+  - Layout key COS: `<prefix><Org>/<Partner>/<Folder …>/<file>`. Objek probe `<prefix>.legalio-probe-<uuid>` langsung dihapus.
+  - Reset aplikasi menghapus seluruh isi prefix, satu request per objek. Ada komentar `shortcut:` yang merujuk ke `deleteMultipleObject`.
+  - Jika `BETTER_AUTH_SECRET` diganti, kredensial Google/COS tidak bisa dibaca (tercatat di log saat boot). Isi ulang di /sys.
+  - File lama `uploads.drive-backup.json` sudah tidak dipakai.
 - `README.md`: badge SQLite, kalimat "database browser, backup and restore" dan "SQLite database file", teks onboarding (sekitar L50–56 dan L93–96), dan kebutuhan Postgres serta COS di bagian Installation.
 - Gate akhir: `docker compose up --build` dengan volume bersih sampai ke langkah superuser + COS. Langkah DB terlewati karena `DATABASE_URL` sudah diisi.
 

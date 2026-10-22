@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
@@ -9,6 +9,7 @@ import { removeLegacyCoreTables } from './migrations/004_remove_legacy_core';
 import { addStatusIndexes } from './migrations/005_status_indexes';
 import { renameFieldsToEnglish } from './migrations/006_english_field_names';
 import { resetOrganizationData } from './organizationReset';
+import { memoryStore } from './objectStore';
 import { ensureDocumentSchema } from './documentRoutes';
 import { ensureApprovalSchema } from './approvalRoutes';
 import { ENTITIES } from './normalizedSchema';
@@ -218,17 +219,14 @@ test('field-name migration renames columns, extra_json aliases, views and indexe
 
 test('organization reset empties one organization\'s business data, editor documents, approvals and own files only', async () => {
   const {db,rows,s} = fixture();
-  const uploads = mkdtempSync(path.join(os.tmpdir(),'reset-uploads-'));
-  const outside = path.join(path.dirname(uploads),`outside-${path.basename(uploads)}.txt`);
+  const storage = memoryStore();
   try {
     await migrateNormalizedCore(db);
     await ensureDocumentSchema(s);
     await ensureApprovalSchema(s);
-    writeFileSync(path.join(uploads,'proof.pdf'),'a');
-    writeFileSync(path.join(uploads,'other-org.pdf'),'b');
-    writeFileSync(outside,'c');
+    for (const key of ['proof.pdf','other-org.pdf','../outside.txt']) await storage.put(key,Buffer.from(key));
     rows.partners[1].dd_documents = [{ key:'x', name:'Doc', required:false, expires:false, status:'Available', files:[{ id:'f2', fileName:'b.pdf', linkDrive:'/uploads/other-org.pdf' }] }];
-    rows.partners[0].custom_extension = { escape:`/uploads/../${path.basename(outside)}` }; // must never delete outside the uploads dir
+    rows.partners[0].custom_extension = { escape:'/uploads/../outside.txt' }; // must never reach a key outside the uploads
     await synchronizeBusinessRows(s,rows);
     const insert = (sql:string,...values:unknown[]) => db.prepare(sql).run(...values);
     for (const [id,org] of [['d-a','org-a'],['d-b','org-b']]) {
@@ -238,7 +236,7 @@ test('organization reset empties one organization\'s business data, editor docum
       insert("INSERT INTO approval_steps(id,request_id,step_no,approver_id) VALUES(?,?,?,?)",`s-${id}`,`r-${id}`,1,'u');
     }
     let saved = 0;
-    const result = await resetOrganizationData({ db: s, memory: rows, organizationId:'org-a', uploadsDir: uploads, save: async () => { saved++; await synchronizeBusinessRows(s,rows); } });
+    const result = await resetOrganizationData({ db: s, memory: rows, organizationId:'org-a', storage, save: async () => { saved++; await synchronizeBusinessRows(s,rows); } });
 
     assert.equal(saved,1);
     assert.equal(result.removed.partners,1);
@@ -252,11 +250,9 @@ test('organization reset empties one organization\'s business data, editor docum
     assert.equal((db.prepare('SELECT COUNT(*) AS n FROM contract_documents').get() as any).n,1);
     assert.equal((db.prepare('SELECT organization_id AS o FROM approval_requests').get() as any).o,'org-b');
     assert.equal(result.files,1);
-    assert.equal(existsSync(path.join(uploads,'proof.pdf')),false);
-    assert.equal(existsSync(path.join(uploads,'other-org.pdf')),true);
-    assert.equal(existsSync(outside),true);
+    assert.deepEqual((await storage.list('')).map(o=>o.key).sort(),['../outside.txt','other-org.pdf']);
     assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
-  } finally { rmSync(uploads,{recursive:true,force:true}); rmSync(outside,{force:true}); db.close(); }
+  } finally { db.close(); }
 });
 
 test('status index migration is idempotent and serves status filters', async () => {

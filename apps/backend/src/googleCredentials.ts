@@ -4,6 +4,8 @@ import type { Sql } from "./db";
 import { forwardAsyncRouteErrors } from "./asyncRoutes";
 import type { Identity } from "./identity";
 import { loadServiceAccountCredentials, type ServiceAccountCredentials } from "./lib/googleServiceAccountAuth";
+import { cosStore, parseCosConfig, probe, type CosConfig } from "./objectStore";
+import { open, seal } from "./secretBox";
 import {
   parseOAuthClientFile,
   parseServiceAccountFile,
@@ -17,6 +19,7 @@ const ROW_ID: Record<GoogleCredentialKind, string> = {
   "service-account": "google_service_account",
   "oauth-client": "google_oauth_client",
 };
+const COS_ROW = "tencent_cos";
 
 interface StoredRow<T> {
   value: T;
@@ -24,9 +27,8 @@ interface StoredRow<T> {
 }
 
 /**
- * Google credentials uploaded by a superuser, stored in kaelyn.db and preferred over .env.
- * ponytail: stored unencrypted, same exposure as the .env file they replace; encrypt the payload
- * (e.g. KMS or a BETTER_AUTH_SECRET-derived key) if copies of kaelyn.db ever leave the server.
+ * Integration credentials set by a superuser: Google JSON files (preferred over .env) and Tencent COS.
+ * Every payload is sealed with a BETTER_AUTH_SECRET-derived key (secretBox.ts).
  */
 export function createGoogleCredentialStore(db: Sql) {
   // Rows mirrored in memory so token callbacks and status reads stay synchronous; only save/remove write them.
@@ -42,7 +44,15 @@ export function createGoogleCredentialStore(db: Sql) {
     `);
     const stored = await db.all<{ id: string; payload: string; updated_at: string }>(`SELECT id, payload, updated_at FROM integration_credentials`);
     rows.clear();
-    for (const row of stored) rows.set(row.id, { value: JSON.parse(row.payload), updated_at: row.updated_at });
+    for (const row of stored) {
+      try {
+        // Rows written before encryption are plain JSON; they are sealed on their next save.
+        rows.set(row.id, { value: JSON.parse(row.payload.startsWith("v1:") ? open(row.payload) : row.payload), updated_at: row.updated_at });
+      } catch (err) {
+        // Most likely BETTER_AUTH_SECRET changed: the row counts as not configured until it is saved again.
+        console.error(`[credentials] Cannot read stored ${row.id}:`, (err as Error).message);
+      }
+    }
   };
 
   const read = <T>(kind: GoogleCredentialKind): StoredRow<T> | null => (rows.get(ROW_ID[kind]) as StoredRow<T> | undefined) ?? null;
@@ -59,13 +69,27 @@ export function createGoogleCredentialStore(db: Sql) {
     };
   };
 
-  const save = async (kind: GoogleCredentialKind, value: ServiceAccountFile | OAuthClientFile, actorId: string) => {
+  const write = async (id: string, value: unknown, actorId: string) => {
     const updated_at = new Date().toISOString();
     await db.run(`
       INSERT INTO integration_credentials (id, payload, updated_by, updated_at) VALUES (?, ?, ?, ?)
       ON CONFLICT (id) DO UPDATE SET payload = excluded.payload, updated_by = excluded.updated_by, updated_at = excluded.updated_at
-    `, ROW_ID[kind], JSON.stringify(value), actorId, updated_at);
-    rows.set(ROW_ID[kind], { value, updated_at });
+    `, id, seal(JSON.stringify(value)), actorId, updated_at);
+    rows.set(id, { value, updated_at });
+  };
+
+  const save = (kind: GoogleCredentialKind, value: ServiceAccountFile | OAuthClientFile, actorId: string) => write(ROW_ID[kind], value, actorId);
+
+  /** A new object after every save, so callers can cache a client per returned config. */
+  const getCos = (): CosConfig | null => (rows.get(COS_ROW)?.value as CosConfig | undefined) ?? null;
+  const saveCos = (value: CosConfig, actorId: string) => write(COS_ROW, value, actorId);
+
+  /** Never includes the secret key; the SecretId only by its last 4 characters. */
+  const storageStatus = () => {
+    const row = rows.get(COS_ROW) as StoredRow<CosConfig> | undefined;
+    if (!row) return { configured: false as const };
+    const { bucket, region, prefix, secretId } = row.value;
+    return { configured: true as const, bucket, region, prefix, secretIdLast4: secretId.slice(-4), updated_at: row.updated_at };
   };
 
   const remove = async (kind: GoogleCredentialKind) => {
@@ -97,7 +121,7 @@ export function createGoogleCredentialStore(db: Sql) {
     };
   };
 
-  return { init, getServiceAccount, getOAuthClient, save, remove, status };
+  return { init, getServiceAccount, getOAuthClient, save, remove, status, getCos, saveCos, storageStatus };
 }
 
 export type GoogleCredentialStore = ReturnType<typeof createGoogleCredentialStore>;
@@ -150,6 +174,33 @@ export function createGoogleCredentialsRouter(store: GoogleCredentialStore) {
     if (!KINDS.includes(kind)) return res.status(404).json({ error: "Unknown credential kind." });
     await store.remove(kind);
     res.json(store.status());
+  });
+
+  const storage = "/integrations/storage/cos";
+  router.use(storage, (req, res, next) => {
+    const identity = (req as unknown as { identity?: Identity }).identity;
+    if (identity?.platformRole === "superuser") return next();
+    res.status(403).json({ error: "INSUFFICIENT_PERMISSION", message: "Only a superuser can manage file storage." });
+  });
+
+  router.get(storage, (_req, res) => res.json(store.storageStatus()));
+
+  // Saving replaces the credentials (key rotation); there is deliberately no DELETE, uploads need storage.
+  router.put(storage, async (req, res) => {
+    let config: CosConfig;
+    try {
+      config = parseCosConfig(req.body);
+    } catch (err) {
+      return res.status(400).json({ error: "invalid_storage_config", message: (err as Error).message });
+    }
+    try {
+      await probe(cosStore(config));
+    } catch (err: any) {
+      return res.status(400).json({ error: "storage_probe_failed", message: `Tencent COS test failed: ${err?.message || err?.code || "unknown error"}` });
+    }
+    const identity = (req as unknown as { identity: Identity }).identity;
+    await store.saveCos(config, identity.userId);
+    res.json(store.storageStatus());
   });
 
   return router;

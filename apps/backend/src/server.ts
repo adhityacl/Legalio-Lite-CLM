@@ -26,7 +26,8 @@ import {
 import { isUniqueViolation, sql } from "./db";
 import { BETTER_AUTH_ALLOWED, createAuthorizationMiddleware, isBetterAuthPathAllowed } from "./routePolicies";
 import { createOrganizationScope, filterRecords, recordVisible, normalizeDepartmentName, teamsOf, type RecordKind } from "./recordScope";
-import { IS_TEST_MODE, LEGACY_DATA_FILE, UPLOADS_DIR, REPOSITORY_DIR, APP_DATA_DIR } from "./runtimePaths";
+import { IS_TEST_MODE, LEGACY_DATA_FILE, REPOSITORY_DIR, APP_DATA_DIR } from "./runtimePaths";
+import { cosStore, keyFromLink, memoryStore, type CosConfig, type ObjectStore } from "./objectStore";
 import {
   ApiError, appendAudit, buildTenantProjection, ensureTenantBoundarySchema, isEmptyInstall, markMigrationApplied,
   migrationApplied, readIntegration, writeIntegrationRow, patchOrganizationSettings, readOrganizationSettings, patchIntegration,
@@ -353,9 +354,15 @@ async function getPartnerCategoryFolderId(partner: any, category: string, token?
     return vendorFolderId;
   }
 }
-const uploadsDir = UPLOADS_DIR;
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+let storageCache: { config: CosConfig | null; store: ObjectStore } | null = null;
+/** Upload storage: Tencent COS from the saved credentials (rebuilt after every save); in-memory only for APP_TEST_MODE. */
+function getStore(): ObjectStore {
+  const config = googleCredentials.getCos();
+  if (!storageCache || storageCache.config !== config) {
+    if (!config && !IS_TEST_MODE) throw new ApiError(503, "STORAGE_NOT_CONFIGURED", "File storage (Tencent COS) is not configured.");
+    storageCache = { config, store: config ? cosStore(config) : memoryStore() };
+  }
+  return storageCache.store;
 }
 /*
  * Uploaded evidence is private (PRD §11.5). A file is served only when it
@@ -377,7 +384,7 @@ function normalizeUploadPath(value: string): string | null {
     const at = raw.indexOf("/uploads/");
     if (at < 0) return null;
     const decoded = decodeURIComponent(raw.slice(at));
-    if (decoded.includes("\0") || decoded.split("/").some((seg) => seg === "..")) return null;
+    if (decoded.includes("\0") || decoded.slice("/uploads/".length).split("/").some((seg) => seg.startsWith("."))) return null;
     return decoded;
   } catch {
     return null;
@@ -415,6 +422,8 @@ async function authorizeUpload(req: express.Request, res: express.Response, next
   res.setHeader("Cache-Control", "private, no-store");
   const key = normalizeUploadPath(`/uploads${req.path}`);
   if (!key) return res.status(400).end();
+  // The object served is the one whose key passed the checks below, never re-derived from the request.
+  res.locals.uploadKey = key.slice("/uploads/".length);
   const scopes = new Map<string, any>();
   for (const { kind, record } of uploadOwners(key)) {
     if (!record?.organizationId) continue;
@@ -430,57 +439,42 @@ async function authorizeUpload(req: express.Request, res: express.Response, next
   }
   return res.status(404).end();
 }
+async function serveUpload(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (req.method !== "GET" && req.method !== "HEAD") return next();
+  const key: string = res.locals.uploadKey;
+  const object = await getStore().get(key);
+  if (!object) return res.status(404).end();
+  // By extension, like the static file server this replaces; a stored content type is client-supplied.
+  res.type(path.extname(key) || "application/octet-stream").send(object.body);
+}
 app.use("/uploads", (req: express.Request, res: express.Response, next: express.NextFunction) => { authorizeUpload(req, res, next).catch(next); },
-  express.static(uploadsDir, { dotfiles: "deny", index: false }));
-function saveLocalFile(
+  (req: express.Request, res: express.Response, next: express.NextFunction) => { serveUpload(req, res, next).catch(next); });
+/** Stores an upload and returns its `/uploads/...` link. Throws rather than return a link to a file that was not stored. */
+async function saveUpload(
   partnerName: any,
   category: string,
   safeFileName: string,
   base64Data: string,
   orgName?: string,
 ) {
-  try {
-    const cleanOrg = (orgName || "Organization")
-      .replace(/[/\\?%*:|"<>]/g, "_")
-      .replace(/^\.+$/, "_")
-      .trim();
-    const cleanVendor = (partnerName || "Vendor")
-      .replace(/[/\\?%*:|"<>]/g, "_")
-      .replace(/^\.+$/, "_")
-      .trim();
-    const subDir = path.join(uploadsDir, cleanOrg, cleanVendor, category);
-    if (!fs.existsSync(subDir)) {
-      fs.mkdirSync(subDir, { recursive: true });
-    }
-    const filePath = path.join(subDir, safeFileName);
-    const cleanContent = base64Data.includes("base64,")
-      ? base64Data.split("base64,")[1]
-      : base64Data;
-    fs.writeFileSync(filePath, Buffer.from(cleanContent, "base64"));
-    scheduleDriveBackup(filePath);
-    return `/uploads/${encodeURIComponent(cleanOrg)}/${encodeURIComponent(cleanVendor)}/${encodeURIComponent(category)}/${safeFileName}`;
-  } catch (err) {
-    console.error("Error saving local file in hierarchical subfolder:", err);
-    const rootPath = path.join(uploadsDir, safeFileName);
-    const cleanContent = base64Data.includes("base64,")
-      ? base64Data.split("base64,")[1]
-      : base64Data;
-    fs.writeFileSync(rootPath, Buffer.from(cleanContent, "base64"));
-    return `/uploads/${safeFileName}`;
-  }
-}
-function deleteLocalFileFromUrl(url) {
-  if (!url || typeof url !== "string" || !url.includes("/uploads/")) return;
-  try {
-    const rawRel = url.substring(url.indexOf("/uploads/") + "/uploads/".length);
-    const decodedRel = decodeURIComponent(rawRel);
-    const fullPath = path.join(uploadsDir, decodedRel);
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath);
-    }
-  } catch (err) {
-    console.error("Error deleting temporary local file:", url, err);
-  }
+  const cleanOrg = (orgName || "Organization")
+    .replace(/[/\\?%*:|"<>]/g, "_")
+    .replace(/^\.+$/, "_")
+    .trim();
+  const cleanVendor = (partnerName || "Vendor")
+    .replace(/[/\\?%*:|"<>]/g, "_")
+    .replace(/^\.+$/, "_")
+    .trim();
+  const link = `/uploads/${encodeURIComponent(cleanOrg)}/${encodeURIComponent(cleanVendor)}/${encodeURIComponent(category)}/${safeFileName}`;
+  // The key is derived from the link so /uploads can always find what was stored.
+  const key = keyFromLink(link);
+  if (!key) throw new ApiError(400, "INVALID_FILE_NAME", "This file name cannot be stored.");
+  const cleanContent = base64Data.includes("base64,")
+    ? base64Data.split("base64,")[1]
+    : base64Data;
+  await getStore().put(key, Buffer.from(cleanContent, "base64"));
+  scheduleDriveBackup(key);
+  return link;
 }
 function getMimeType(fileName) {
   const ext = fileName.toLowerCase().split(".").pop();
@@ -493,22 +487,27 @@ function getMimeType(fileName) {
   if (ext === "csv") return "text/csv";
   return "application/pdf";
 }
-// Kept beside (not inside) the uploads dir so it is never served as an upload.
-const DRIVE_BACKUP_INDEX = `${uploadsDir}.drive-backup.json`;
+const DRIVE_BACKUP_INDEX = path.join(APP_DATA_DIR, "drive-backup.json");
 let driveBackupRunning = false;
 let driveBackupTimer: NodeJS.Timeout | null = null;
 /**
- * Mirrors the local uploads tree (Org/Partner/Category) to Drive under the master root.
- * Local files stay the source of truth: links and files are never touched here.
- * `only` limits the pass to those files (relative paths); without it the whole tree is checked.
+ * Mirrors the uploaded objects (Org/Partner/Category keys) to Drive under the master root.
+ * Object storage stays the source of truth: links and objects are never touched here. An object's ETag is its stamp.
+ * `only` limits the pass to those keys; without it every object is checked.
  * shortcut: a file edited in place is uploaded again as a new Drive file, no version replace.
  * shortcut: a file that fails in an `only` pass is retried by the next full pass (connect, config save, Backup Sekarang).
  */
-async function backupLocalFilesToGoogleDrive(token?, only?: string[][]) {
+async function backupLocalFilesToGoogleDrive(token?, only?: string[]) {
   const rootId = sanitizeParentFolderId(db.googleConfig?.driveFolderId);
   const activeToken = await resolveActiveGoogleToken(token);
   if (!rootId) return { backedUpCount: 0, failedCount: 0, skipped: "no_root_folder" };
   if (!activeToken) return { backedUpCount: 0, failedCount: 0, skipped: "not_connected" };
+  let storage: ObjectStore;
+  try {
+    storage = getStore();
+  } catch {
+    return { backedUpCount: 0, failedCount: 0, skipped: "storage_not_configured" };
+  }
   if (driveBackupRunning) return { backedUpCount: 0, failedCount: 0, busy: true };
   driveBackupRunning = true;
   let backedUpCount = 0;
@@ -528,24 +527,24 @@ async function backupLocalFilesToGoogleDrive(token?, only?: string[][]) {
     }
     return parent;
   };
-  const walk = (dir: string, rel: string[]): string[][] =>
-    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-      e.name.startsWith(".") ? [] : e.isDirectory() ? walk(path.join(dir, e.name), [...rel, e.name]) : [[...rel, e.name]],
-    );
   try {
-    for (const parts of only ?? walk(uploadsDir, [])) {
-      const key = parts.join("/");
-      const full = path.join(uploadsDir, ...parts);
+    const objects = only
+      ? (await Promise.all(only.map((key) => storage.list(key)))).flat().filter((o) => only.includes(o.key))
+      : await storage.list("");
+    for (const { key, etag: stamp } of objects) {
+      const parts = key.split("/");
+      if (parts.some((part) => part.startsWith("."))) continue;
       try {
-        const stamp = String(fs.statSync(full).mtimeMs);
         if (done[key] === stamp) {
           alreadyBackedUpCount++;
           continue;
         }
+        const object = await storage.get(key);
+        if (!object) throw new Error("Objek tidak ditemukan");
         const driveUrl = await uploadFileToDrive(
           parts[parts.length - 1],
-          fs.readFileSync(full).toString("base64"),
-          getMimeType(full),
+          object.body.toString("base64"),
+          getMimeType(key),
           await folderFor(parts.slice(0, -1)),
           activeToken,
         );
@@ -568,23 +567,22 @@ async function backupLocalFilesToGoogleDrive(token?, only?: string[][]) {
   if (backedUpCount) console.log(`[Drive Backup] ${backedUpCount} file dicadangkan ke Google Drive.`);
   return { backedUpCount, failedCount, alreadyBackedUpCount };
 }
-const pendingDriveBackups = new Map<string, string[]>();
-/** Debounced so a burst of uploads becomes one pass over just the new files. */
-function scheduleDriveBackup(savedFile: string) {
+const pendingDriveBackups = new Set<string>();
+/** Debounced so a burst of uploads becomes one pass over just the new objects. */
+function scheduleDriveBackup(key: string) {
   if (IS_TEST_MODE) return;
-  const parts = path.relative(uploadsDir, savedFile).split(path.sep);
-  pendingDriveBackups.set(parts.join("/"), parts);
+  pendingDriveBackups.add(key);
   if (driveBackupTimer) clearTimeout(driveBackupTimer);
   driveBackupTimer = setTimeout(async () => {
-    const batch = [...pendingDriveBackups.values()];
+    const batch = [...pendingDriveBackups];
     pendingDriveBackups.clear();
     try {
       const result = await backupLocalFilesToGoogleDrive(undefined, batch);
-      if (result.busy) for (const parts of batch) pendingDriveBackups.set(parts.join("/"), parts);
+      if (result.busy) for (const key of batch) pendingDriveBackups.add(key);
     } catch (e) {
       console.warn("[Drive Backup]", e?.message);
     }
-    if (pendingDriveBackups.size) scheduleDriveBackup(path.join(uploadsDir, ...[...pendingDriveBackups.values()][0]));
+    if (pendingDriveBackups.size) scheduleDriveBackup([...pendingDriveBackups][0]);
   }, 5000);
 }
 /** Exact canonical ownership. Records without an organization belong to nobody (PRD §14.3). */
@@ -631,7 +629,6 @@ function getRequestTenantId(req: express.Request): string {
   return orgContextOf(req).organizationId;
 }
 async function ensureAllPartnersFolders(token?: string, targetTenantId?: string) {
-  let localFoldersCreated = 0;
   let driveFoldersCreated = 0;
   const activeToken = await resolveActiveGoogleToken(token);
   const partnersToProcess = targetTenantId
@@ -647,22 +644,6 @@ async function ensureAllPartnersFolders(token?: string, targetTenantId?: string)
     const cleanOrg = (tenant?.name || "Organization")
       .replace(/[/\\?%*:|"<>]/g, "_")
       .trim();
-    const cleanVendor = partner.partner_name
-      .replace(/[/\\?%*:|"<>]/g, "_")
-      .trim();
-    const categories = [
-      "Folder Contract",
-      "Folder Invoice & Billing",
-      "Folder IO",
-      "Folder DD",
-    ];
-    for (const cat of categories) {
-      const dirPath = path.join(uploadsDir, cleanOrg, cleanVendor, cat);
-      if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-        localFoldersCreated++;
-      }
-    }
     if (activeToken || hasServiceAccountCredentials()) {
       try {
         const vendorFolderId = await getPartnerFolderId(
@@ -710,7 +691,7 @@ async function ensureAllPartnersFolders(token?: string, targetTenantId?: string)
   if (activeToken) {
     await backupLocalFilesToGoogleDrive(activeToken);
   }
-  return { localFoldersCreated, driveFoldersCreated };
+  return { driveFoldersCreated };
 }
 const dataFilePath = LEGACY_DATA_FILE;
 const DEFAULT_BRANDING = {
@@ -1268,7 +1249,7 @@ export async function init() {
   await saveDb();
   // The auth console reads platform configuration (SMTP) from `db`; it no longer
   // hydrates identities, memberships or organizations from this projection.
-  setConsoleDbReference(db, saveDb, async (organizationId?: string) => {
+  setConsoleDbReference(db, saveDb, getStore, async (organizationId?: string) => {
     if (organizationId) await onOrganizationChanged(organizationId);
     else await refreshTenantProjection();
   });
@@ -3359,7 +3340,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
     });
     invoice_file_name = targetInvoiceName;
     if (!invoice_file_url) {
-      invoice_file_url = saveLocalFile(
+      invoice_file_url = await saveUpload(
         partner?.partner_name || vendor_name,
         "Folder Invoice & Billing",
         targetInvoiceName,
@@ -3387,7 +3368,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
     });
     billing_file_name = targetBillingName;
     if (!billing_file_url) {
-      billing_file_url = saveLocalFile(
+      billing_file_url = await saveUpload(
         partner?.partner_name || vendor_name,
         "Folder Invoice & Billing",
         targetBillingName,
@@ -3538,7 +3519,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
     updated.invoice_file_name = targetInvoiceName;
     let invoice_file_url = "";
     if (!invoice_file_url) {
-      invoice_file_url = saveLocalFile(
+      invoice_file_url = await saveUpload(
         partner?.partner_name || updated.vendor_name,
         "Folder Invoice & Billing",
         targetInvoiceName,
@@ -3568,7 +3549,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
     updated.billing_file_name = targetBillingName;
     let billing_file_url = "";
     if (!billing_file_url) {
-      billing_file_url = saveLocalFile(
+      billing_file_url = await saveUpload(
         partner?.partner_name || updated.vendor_name,
         "Folder Invoice & Billing",
         targetBillingName,
@@ -3665,7 +3646,7 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
     typeof fileData === "string" &&
     fileData.includes("base64,")
   ) {
-    driveLink = saveLocalFile(
+    driveLink = await saveUpload(
       partner.partner_name,
       "Folder DD",
       finalFileName,
@@ -4582,7 +4563,7 @@ async function persistContractTerminationFile(req: express.Request, record: { or
   const partner = db.partners.find(p => p.partner_id === record.partner_id);
   const tenant = findTenant(record.organizationId);
   const storedName = `termination-${randomUUID()}.${file.extension}`;
-  const url = saveLocalFile(partner?.partner_name, 'Folder Termination', storedName, file.fileData, tenant?.name);
+  const url = await saveUpload(partner?.partner_name, 'Folder Termination', storedName, file.fileData, tenant?.name);
   return { fileName: file.fileName, url };
 }
 
@@ -4702,7 +4683,7 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
     fileData.includes("base64,")
   ) {
     if (!contract_file_link) {
-      contract_file_link = saveLocalFile(
+      contract_file_link = await saveUpload(
         partner?.partner_name,
         "Folder Contract",
         targetFileName,
@@ -4896,7 +4877,7 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
     );
     let contract_file_link = "";
     if (!contract_file_link) {
-      contract_file_link = saveLocalFile(
+      contract_file_link = await saveUpload(
         partner?.partner_name,
         "Folder Contract",
         targetFileName,
@@ -5286,7 +5267,7 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
     fileData.includes("base64,")
   ) {
     if (!io_file_link) {
-      io_file_link = saveLocalFile(
+      io_file_link = await saveUpload(
         partner?.partner_name,
         "Folder IO",
         targetFileName,
@@ -5421,7 +5402,7 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
     );
     let io_file_link = "";
     if (!io_file_link) {
-      io_file_link = saveLocalFile(
+      io_file_link = await saveUpload(
         partner?.partner_name,
         "Folder IO",
         targetFileName,
@@ -6442,14 +6423,15 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
   // Mutate `db` in place: the auth console holds a reference to this object.
   Object.assign(db, nextState);
 
-  if (fs.existsSync(uploadsDir)) {
-    try {
-      for (const item of fs.readdirSync(uploadsDir)) {
-        fs.rmSync(path.join(uploadsDir, item), { recursive: true, force: true });
-      }
-    } catch (e) {
-      console.error("Error cleaning uploads during reset:", e);
+  // After commit: a failed delete leaves an orphaned object, never a record pointing at a missing one.
+  // shortcut: one request per object; switch to COS deleteMultipleObject if large buckets make resets slow.
+  try {
+    const storage = getStore();
+    for (const { key } of await storage.list("")) {
+      await storage.delete(key).catch((e) => console.error("Error deleting upload during reset:", key, e));
     }
+  } catch (e) {
+    console.error("Error cleaning uploads during reset:", e);
   }
 
   await recalculateStatuses();

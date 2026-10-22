@@ -114,6 +114,8 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/integrations/google/credentials', platform('platform.configuration.read')],
   ['PUT', '/api/integrations/google/credentials/:kind', platform('platform.configuration.update')],
   ['DELETE', '/api/integrations/google/credentials/:kind', platform('platform.configuration.update')],
+  ['GET', '/api/integrations/storage/cos', platform('platform.configuration.read')],
+  ['PUT', '/api/integrations/storage/cos', platform('platform.configuration.update')],
   ['POST', '/api/admin/reset-database', platform('platform.application.reset', 'explicit confirmation retained')],
   ['POST', '/api/cron/trigger-check', platform('platform.database.optimize', 'all-organization system job')],
   ['GET', '/api/user/allowed-users', platform('platform.user.read', 'onboarding allowlist')],

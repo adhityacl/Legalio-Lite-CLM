@@ -13,9 +13,8 @@ import { hashPassword } from 'better-auth/crypto';
 import crypto from 'crypto';
 import { buildMatrix, isPlatformRole } from './rbac';
 import { RequestDenied, accessibleOrganizations, identityOf, sendError, type Identity } from './identity';
-import { APP_DATA_DIR, UPLOADS_DIR } from './runtimePaths';
-import path from 'node:path';
 import { resetOrganizationData } from './organizationReset';
+import type { ObjectStore } from './objectStore';
 import { isDemoAccountEmail } from './demoAccounts';
 import { ApiError, appendAudit, patchOrganizationSettings, readOrganizationSettings } from './organizationSettingsStore';
 import { assertAdminsRemainWithout, assertSuperusersRemainWithout, auditActorFor, previewInvitation, acceptInvitation } from './organizationAdminRoutes';
@@ -27,11 +26,13 @@ forwardAsyncRouteErrors(authConsoleRouter);
 let globalDbRef: any = null;
 let saveDbFnRef: (() => Promise<void>) | null = null;
 let organizationChangedRef: ((organizationId?: string) => Promise<void>) | null = null;
+let storeRef: (() => ObjectStore) | null = null;
 
-/** server.ts shares its projection (for SMTP/branding reads) and a refresh hook. No hydration happens here. */
-export function setConsoleDbReference(dbStore: any, saveFn: () => Promise<void>, onOrganizationsChanged?: (organizationId?: string) => Promise<void>) {
+/** server.ts shares its projection (for SMTP/branding reads), upload storage and a refresh hook. No hydration happens here. */
+export function setConsoleDbReference(dbStore: any, saveFn: () => Promise<void>, getStore: () => ObjectStore, onOrganizationsChanged?: (organizationId?: string) => Promise<void>) {
   globalDbRef = dbStore;
   saveDbFnRef = saveFn;
+  storeRef = getStore;
   organizationChangedRef = onOrganizationsChanged || null;
 }
 
@@ -527,7 +528,7 @@ authConsoleRouter.put('/organizations/:id', platformHandler(async (req, res, ide
 authConsoleRouter.post('/organizations/:id/reset', platformHandler(async (req, res, identity) => {
   const id = req.params.id;
   await readOrganizationSettings(sql, id); // 404 for unknown IDs
-  if (!globalDbRef || !saveDbFnRef) throw new ApiError(503, 'NOT_READY', 'Business data is not ready.');
+  if (!globalDbRef || !saveDbFnRef || !storeRef) throw new ApiError(503, 'NOT_READY', 'Business data is not ready.');
   const organization = await sql.get('SELECT slug FROM organization WHERE id = ?', id) as { slug?: string } | undefined;
   const confirmation = String(req.body?.confirm ?? '').trim().toLowerCase();
   if (!organization?.slug || confirmation !== organization.slug.toLowerCase()) throw bad('Type the organization slug to confirm the reset.');
@@ -535,9 +536,8 @@ authConsoleRouter.post('/organizations/:id/reset', platformHandler(async (req, r
     db: sql,
     memory: globalDbRef,
     organizationId: id,
-    uploadsDir: UPLOADS_DIR,
+    storage: storeRef(),
     save: saveDbFnRef,
-    backupPath: path.join(APP_DATA_DIR, 'backups', `before-organization-reset-${id}-${Date.now()}.db`),
   });
   await appendAudit(sql, auditActorFor(req, identity), {
     organizationId: id, action: 'organization.reset', targetType: 'organization', targetId: id, outcome: 'success',

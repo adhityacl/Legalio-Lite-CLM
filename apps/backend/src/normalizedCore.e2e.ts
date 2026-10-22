@@ -1,6 +1,6 @@
 /** Real HTTP + Chromium check, isolated from the development database and external services. */
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
@@ -185,7 +185,14 @@ try{
  assert.equal((await call('/api/integrations/google/credentials')).serviceAccount.source,'upload');
  await call('/api/integrations/google/credentials/service-account',{method:'DELETE'});
  assert.equal((await call('/api/integrations/google/credentials')).serviceAccount.source,null);
- checks.push('Sys API key, platform configuration and Google credential lifecycle');
+ // Tencent COS: test mode runs on in-memory storage; bad input never reaches the network, only a superuser may set it.
+ assert.deepEqual(await call('/api/integrations/storage/cos'),{configured:false});
+ const cosInput={secretId:'AKIDe2e',secretKey:'e2e-secret',bucket:'legalio-1250000000',region:'ap-jakarta',prefix:''};
+ for(const bad of [{bucket:'evil.example.com/x-1'},{region:'ap-jakarta.evil.example.com'},{prefix:'../x'},{secretKey:''}])await call('/api/integrations/storage/cos',{method:'PUT',body:{...cosInput,...bad},status:400});
+ await call('/api/integrations/storage/cos',{method:'PUT',body:cosInput,token:mailerUserToken,status:403});
+ await call('/api/integrations/storage/cos',{method:'PUT',body:cosInput,token:'',status:401});
+ await call('/api/integrations/storage/cos',{method:'DELETE',status:404});
+ checks.push('Sys API key, platform configuration, Google credential lifecycle and COS storage validation');
 
  await call(`/api/auth-console/users/${invitedUser.id}`,{method:'DELETE'});
  await call(`/api/auth-console/users/${managedUser.id}`,{method:'DELETE'});
@@ -206,14 +213,16 @@ try{
  // Drive is backup only: an upload is always stored locally and the record keeps the local link.
  const uploaded=(await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,contract_number:'E2E-UPLOAD-001',contract_title:'E2E Upload',start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,internal_pic:owner.name,fileName:'e2e-upload.pdf',fileData:'data:application/pdf;base64,'+Buffer.from('%PDF-1.4 e2e').toString('base64')}})).contract;
  assert.match(uploaded.contract_file_link,/^\/uploads\//);
- assert.equal(readFileSync(path.join(directory,'uploads',...decodeURIComponent(uploaded.contract_file_link.slice('/uploads/'.length)).split('/')),'utf8'),'%PDF-1.4 e2e');
+ const servedUpload=await fetch(backendURL+uploaded.contract_file_link,{headers:{Authorization:`Bearer ${token}`}});
+ assert.equal(servedUpload.status,200);assert.equal(await servedUpload.text(),'%PDF-1.4 e2e');
+ assert.equal(servedUpload.headers.get('content-type'),'application/pdf');assert.equal(servedUpload.headers.get('x-content-type-options'),'nosniff');assert.equal(servedUpload.headers.get('content-security-policy'),'sandbox');assert.match(servedUpload.headers.get('cache-control')||'',/no-store/);
  const initContract=(await call('/api/init-data',{org})).contracts.find((c:any)=>c.contract_id===uploaded.contract_id);
  assert.equal('partner_name' in initContract,false);assert.equal(initContract.partner_id,partner.partner_id);
  const driveBackup=await call('/api/google-integration/backup',{method:'POST',org});assert.equal(driveBackup.success,true);assert.equal(driveBackup.backedUpCount,0);
  await call('/api/google-integration/backup',{method:'POST',org,token:'',status:401});
  assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM schema_migrations WHERE id='005_status_indexes'").get() as any).n,1);
  assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='index' AND name LIKE 'idx_v5_%'").get() as any).n,3);
- checks.push('local-only upload with local link, no partner_name alias, Drive backup endpoint authorization, status index migration');
+ checks.push('upload stored and served privately by its link, no partner_name alias, Drive backup endpoint authorization, status index migration');
  // Six soon-to-expire contracts: the dashboard must show only the five nearest, with partner names.
  const extraContractIds=[uploaded.contract_id];
  for(let i=1;i<=6;i++) extraContractIds.push((await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,contract_number:`E2E-EXP-${i}`,contract_title:`E2E Expiring ${i}`,start_date:'2026-01-01',end_date:new Date(Date.now()+(5+i)*86400000).toISOString().slice(0,10),currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,internal_pic:owner.name}})).contract.contract_id);
@@ -459,8 +468,7 @@ try{
   const resetSlug=(readOnly.prepare('SELECT slug FROM organization WHERE id=?').get(otherOrg) as any).slug;readOnly.close();
   const resetPartner=(await call('/api/partners',{method:'POST',org:otherOrg,body:{partner_name:'E2E Reset Partner'}})).partner;
   const resetContract=(await call('/api/contracts',{method:'POST',org:otherOrg,body:{partner_id:resetPartner.partner_id,contract_number:'E2E-RESET-C1',contract_title:'Reset me',start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,fileName:'reset.pdf',fileData:'data:application/pdf;base64,'+Buffer.from('%PDF-1.4 reset').toString('base64')}})).contract;
-  const resetFile=path.join(directory,'uploads',...decodeURIComponent(resetContract.contract_file_link.slice('/uploads/'.length)).split('/'));
-  assert.ok(existsSync(resetFile));
+  assert.equal(await uploadStatus(resetContract.contract_file_link,token),200);
   const partnersElsewhere=(await call('/api/partners',{org})).length;const contractsElsewhere=(await call('/api/contracts',{org})).length;
   const resetRoute=`/api/auth-console/organizations/${otherOrg}/reset`;
   await call(resetRoute,{method:'POST',body:{confirm:'not-the-slug'},status:400});
@@ -481,16 +489,15 @@ try{
   await confirmReset.click();
   await expect.poll(async()=>(await call('/api/partners',{org:otherOrg})).length,{timeout:30000}).toBe(0);
   assert.equal((await call('/api/contracts',{org:otherOrg})).length,0);
-  assert.equal(existsSync(resetFile),false,'its own uploaded file is removed');
+  assert.equal(await uploadStatus(resetContract.contract_file_link,token),404,'its own uploaded file is gone');
   assert.equal((await call('/api/partners',{org})).length,partnersElsewhere);
   assert.equal((await call('/api/contracts',{org})).length,contractsElsewhere);
   const after=new Database(path.join(directory,'kaelyn.db'),{readonly:true});
   assert.equal((after.prepare('SELECT COUNT(*) AS n FROM organization WHERE id=?').get(otherOrg) as any).n,1,'the organization itself stays');
   assert.equal((after.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='organization.reset' AND tenant_id=?").get(otherOrg) as any).n,1);
   after.close();
-  assert.equal(readdirSync(path.join(directory,'backups')).filter(file=>file.startsWith('before-organization-reset-')).length,1);
   await orgPage.close();
-  checks.push('Chromium superuser organization reset: refused without the slug or without platform rights, empties only that organization and its files, keeps the organization, audited and backed up');
+  checks.push('Chromium superuser organization reset: refused without the slug or without platform rights, empties only that organization and its files, keeps the organization, audited');
  }
  await call(`/api/contracts/${contract.contract_id}`,{method:'DELETE',org});assert.equal((await call('/api/ios',{org})).find((io:any)=>io.io_id===ios[0].io_id).contract_id,null);
  await call(`/api/partners/${partner.partner_id}`,{method:'DELETE',org});assert.equal((await call('/api/search?q=Renamed',{org})).results.length,0);
@@ -500,7 +507,7 @@ try{
  await call('/api/google-integration',{method:'POST',body:{geminiApiKey:'synthetic-reset-ai-key',smtpHost:'smtp.example.com',smtpUser:'fixture-user',smtpPassword:'synthetic-reset-smtp-password',smtpEnabled:false}});
  await call('/api/documents',{method:'POST',org,status:201,body:{name:'Reset regression document',content:'<p>fixture</p>',type:'contract'}});
  resetSql.prepare('INSERT INTO ai_ocr_cache(cache_key,payload,createdAt) VALUES(?,?,?)').run('reset-fixture',JSON.stringify({text:'Cached private text'}),now);
- const fixtureUpload=path.join(directory,'uploads','reset-fixture.txt');writeFileSync(fixtureUpload,'reset fixture');
+ const fixtureUpload=(await call('/api/contracts',{method:'POST',org,body:{partner_id:csvPartner.partner_id,contract_number:'E2E-RESET-FIXTURE',contract_title:'Reset fixture',start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,fileName:'reset-fixture.pdf',fileData:'data:application/pdf;base64,'+Buffer.from('reset fixture').toString('base64')}})).contract.contract_file_link;
  const keptAccounts=resetSql.prepare("SELECT id,userId,password FROM account WHERE userId LIKE 'e2e-%' ORDER BY id").all();
  const keptProvider=JSON.parse((resetSql.prepare("SELECT payload FROM app_settings WHERE id='google_config'").get() as any).payload);
  const beforeReset={organizations:resetSql.prepare('SELECT * FROM organization ORDER BY id').all(),partners:resetSql.prepare('SELECT * FROM partners ORDER BY partner_id').all(),contracts:resetSql.prepare('SELECT * FROM contracts ORDER BY contract_id').all(),audit:(resetSql.prepare('SELECT COUNT(*) AS n FROM audit_log').get() as any).n};
@@ -517,7 +524,7 @@ try{
  assert.equal((resetSql.prepare('SELECT COUNT(*) AS n FROM audit_log').get() as any).n,beforeReset.audit);
  assert.equal((await call('/api/init-data',{org})).partners.length,beforeReset.partners.filter((p:any)=>p.organization_id===org).length);
  assert.equal((resetSql.prepare('SELECT COUNT(*) AS n FROM contract_documents').get() as any).n,1);
- assert.equal(existsSync(fixtureUpload),true);
+ assert.equal(await uploadStatus(fixtureUpload,token),200);
  checks.push('reset rejects invalid confirmation/unauthorized users and rolls back SQL plus memory on injected failure');
  const resetPage=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
  const resetErrors:string[]=[];resetPage.on('pageerror',error=>resetErrors.push(error.message));
@@ -542,7 +549,7 @@ try{
   assert.equal((resetSql.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name GLOB '_legacy_003_*'").get() as any).n,0);
   assert.deepEqual(resetSql.prepare('PRAGMA foreign_key_check').all(),[]);
  };
- assertEmptyReset();assert.equal(existsSync(fixtureUpload),false);
+ assertEmptyReset();assert.equal(await uploadStatus(fixtureUpload,token),404);
  assert.deepEqual(resetSql.prepare("SELECT id,userId,password FROM account WHERE userId LIKE 'e2e-%' ORDER BY id").all(),keptAccounts);
  const afterProvider=JSON.parse((resetSql.prepare("SELECT payload FROM app_settings WHERE id='google_config'").get() as any).payload);
  for(const key of ['geminiApiKey','smtpHost','smtpUser','smtpPassword','smtpEnabled'])assert.equal(afterProvider[key],keptProvider[key],key);
