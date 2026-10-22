@@ -8,7 +8,7 @@
  * substring or fuzzy match. A record without a verifiable department is
  * visible only to organization-scope contexts (tenant admin / platform).
  */
-import type Database from 'better-sqlite3';
+import type { Sql } from './db';
 import { departmentScope, type OrgContext } from './rbac';
 
 export type RecordKind = 'partner' | 'contract' | 'io' | 'spending' | 'evaluation' | 'notification';
@@ -24,9 +24,11 @@ export interface RecordCollections {
   ios: any[];
 }
 
-/** Request-local resolver for one organization. Build once per request; it memoizes lookups. */
-export function createOrganizationScope(db: Database.Database, organizationId: string, collections: RecordCollections) {
-  const teams = db.prepare(`SELECT id, name FROM team WHERE organizationId = ?`).all(organizationId) as Array<{ id: string; name: string }>;
+export type Team = { id: string; name: string };
+export const teamsOf = (db: Sql, organizationId: string) => db.all<Team>(`SELECT id, name FROM team WHERE organizationId = ?`, organizationId);
+
+/** Request-local resolver for one organization (`teams` from teamsOf). Build once per request; it memoizes lookups. */
+export function createOrganizationScope(teams: Team[], organizationId: string, collections: RecordCollections) {
   const teamByName = new Map<string, string | null>();
   for (const team of teams) {
     const key = normalizeDepartmentName(team.name);

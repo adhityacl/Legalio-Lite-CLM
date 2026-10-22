@@ -15,7 +15,6 @@ import {
   Upload,
   Sliders,
   Mail,
-  Database,
   Languages,
   ShieldAlert,
   Radio,
@@ -133,10 +132,6 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
       systemLeaf('google', t('settings.google_auth_title', 'Google Workspace Account Authentication'), Globe2),
       systemLeaf('google-drive', t('settings.penyimpanan_file_dokumen_google_drive', 'Document Backup (Google Drive)'), FileText),
       systemLeaf('google-credentials', t('google_setup.settings_title', 'Google Cloud Credentials'), Settings),
-    ]),
-    systemGroup('system-database', t('sys.nav_database', 'Database'), Database, [
-      systemLeaf('database', t('sqlite.sqlite_database', 'SQLite Database'), Database),
-      systemLeaf('backups', t('backup.title', 'Backup & Restore'), Database),
     ]),
     systemLeaf('ai', t('sys.nav_ai', 'AI Model'), AiIcon),
     systemLeaf('mailer', t('mailer.nav', 'Mailer'), Mail),

@@ -7,7 +7,6 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useConfirm } from '../../context/ConfirmDialogContext';
 import { getAuthHeaders } from '../../lib/apiFetch';
 import { UITextManagerModal } from '../UITextManagerModal';
-import { SQLiteDatabaseCard } from '../SQLiteDatabaseCard';
 import { AiIcon } from '../icons/AiIcon';
 import {
   Globe2,
@@ -90,14 +89,14 @@ import { NumberInput, NumberInputControl, NumberInputDecrementTrigger, NumberInp
 import { CloseButton } from '@legalio/ui-components/close-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
-export type PlatformConfigurationSection = 'google' | 'google-drive' | 'google-credentials' | 'database' | 'ai' | 'notifications' | 'language' | 'security';
+export type PlatformConfigurationSection = 'google' | 'google-drive' | 'google-credentials' | 'ai' | 'notifications' | 'language' | 'security';
 
 const EMPTY_CONFIG: GoogleSheetsConfig = { driveFolderId: '', spreadsheetId: '', isConnected: false, autoSync: false };
 
 /**
  * System Admin configuration pages (PRD §6.6): deployment-wide Google
  * credentials and master resources, AI provider/model, SMTP relay, the
- * browser-local UI text tool, SQLite maintenance and the application-wide
+ * browser-local UI text tool and the application-wide
  * reset. Platform-only; secrets are write-only and never prefilled.
  * Organization-specific settings live in each organization's Settings.
  */
@@ -879,7 +878,6 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     { id: 'google', label: t('settings.google_auth_title', 'Google Workspace Account Authentication') },
     { id: 'google-drive', label: t('settings.penyimpanan_file_dokumen_google_drive', 'Document Backup (Google Drive)') },
     { id: 'google-credentials', label: t('google_setup.settings_title', 'Google Cloud Credentials') },
-    { id: 'database', label: t('sqlite.sqlite_database', 'SQLite Database') },
     { id: 'ai', label: t('sys.nav_ai', 'AI Model') },
     { id: 'notifications', label: t('tb.config_smtp', 'SMTP relay') },
     { id: 'language', label: t('tb.config_texts_short', 'UI texts') },
@@ -1195,8 +1193,6 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
               )}
             </div>
           )}
-
-          {activeSection === 'database' && isAdmin && <SQLiteDatabaseCard />}
 
           {/* GROUP 2: AI & SMART AUTOMATION */}
           {activeSection === 'ai' && (

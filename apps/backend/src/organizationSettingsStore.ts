@@ -7,7 +7,7 @@
  * checks `expectedVersion` and appends its audit event inside the same
  * transaction, so a mutation and its audit commit together or not at all.
  */
-import type Database from 'better-sqlite3';
+import type { Sql } from './db';
 import crypto from 'crypto';
 import { listCountryPacks, listIndustryPacks, resolveTenantSettings } from '@legalio/shared/policy';
 import type { TenantSettings } from '@legalio/types/policy';
@@ -16,7 +16,7 @@ export type { OrganizationProfile, OrganizationNotifications, OrganizationSettin
 import { SUPPORTED_CURRENCIES } from '@legalio/shared/currencyUtils';
 import type { AccessMode, PlatformRole } from './rbac';
 
-type DB = Database.Database;
+type DB = Sql;
 
 /* ------------------------------------------------------------------ */
 /* Errors                                                               */
@@ -35,13 +35,13 @@ export const invalid = (message = 'Invalid input.') => new ApiError(400, 'INVALI
 
 export const TENANT_BOUNDARIES_MIGRATION_ID = '002_tenant_boundaries';
 
-const columnsOf = (db: DB, table: string): string[] =>
-  (db.prepare(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>).map((c) => c.name);
+const columnsOf = async (db: DB, table: string): Promise<string[]> =>
+  (await db.all(`PRAGMA table_info("${table}")`) as Array<{ name: string }>).map((c) => c.name);
 
 /** Idempotent, additive schema for the canonical tables. Never rewrites existing data. */
-export function ensureTenantBoundarySchema(db: DB): void {
-  db.pragma('foreign_keys = ON');
-  db.exec(`
+export async function ensureTenantBoundarySchema(db: DB): Promise<void> {
+  await db.exec('PRAGMA foreign_keys = ON');
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS organization_settings (
       organizationId TEXT PRIMARY KEY REFERENCES organization(id) ON DELETE CASCADE,
       payload TEXT NOT NULL,
@@ -84,37 +84,36 @@ export function ensureTenantBoundarySchema(db: DB): void {
       summary TEXT
     );
   `);
-  if (!columnsOf(db, 'member').includes('status')) {
-    db.exec(`ALTER TABLE member ADD COLUMN status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended'))`);
+  if (!(await columnsOf(db, 'member')).includes('status')) {
+    await db.exec(`ALTER TABLE member ADD COLUMN status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended'))`);
   }
-  if (!columnsOf(db, 'invitation').includes('departmentIds')) {
-    db.exec(`ALTER TABLE invitation ADD COLUMN departmentIds TEXT`);
+  if (!(await columnsOf(db, 'invitation')).includes('departmentIds')) {
+    await db.exec(`ALTER TABLE invitation ADD COLUMN departmentIds TEXT`);
   }
   // Unique constraints only once the data is conflict-free (the migration resolves duplicates).
-  const tryUnique = (sql: string, duplicateProbe: string) => {
-    if (!db.prepare(duplicateProbe).get()) db.exec(sql);
+  const tryUnique = async (sql: string, duplicateProbe: string) => {
+    if (!await db.get(duplicateProbe)) await db.exec(sql);
   };
-  tryUnique(
+  await tryUnique(
     `CREATE UNIQUE INDEX IF NOT EXISTS uq_member_org_user ON member(organizationId, userId)`,
     `SELECT 1 FROM member GROUP BY organizationId, userId HAVING COUNT(*) > 1 LIMIT 1`,
   );
-  tryUnique(
+  await tryUnique(
     `CREATE UNIQUE INDEX IF NOT EXISTS uq_team_member ON teamMember(teamId, userId)`,
     `SELECT 1 FROM teamMember GROUP BY teamId, userId HAVING COUNT(*) > 1 LIMIT 1`,
   );
 }
 
-export const migrationApplied = (db: DB, id = TENANT_BOUNDARIES_MIGRATION_ID): boolean =>
-  Boolean(db.prepare(`SELECT 1 FROM schema_migrations WHERE id = ?`).get(id));
+export const migrationApplied = async (db: DB, id = TENANT_BOUNDARIES_MIGRATION_ID): Promise<boolean> =>
+  Boolean(await db.get(`SELECT 1 FROM schema_migrations WHERE id = ?`, id));
 
-export function markMigrationApplied(db: DB, summary: unknown, id = TENANT_BOUNDARIES_MIGRATION_ID): void {
-  db.prepare(`INSERT OR IGNORE INTO schema_migrations (id, appliedAt, summary) VALUES (?, ?, ?)`)
-    .run(id, new Date().toISOString(), JSON.stringify(summary ?? {}));
+export async function markMigrationApplied(db: DB, summary: unknown, id = TENANT_BOUNDARIES_MIGRATION_ID): Promise<void> {
+  await db.run(`INSERT OR IGNORE INTO schema_migrations (id, appliedAt, summary) VALUES (?, ?, ?)`, id, new Date().toISOString(), JSON.stringify(summary ?? {}));
 }
 
 /** True when the database holds no organizations or identities yet (fresh install or test). */
-export const isEmptyInstall = (db: DB): boolean =>
-  !db.prepare(`SELECT 1 FROM organization LIMIT 1`).get() && !db.prepare(`SELECT 1 FROM "user" LIMIT 1`).get();
+export const isEmptyInstall = async (db: DB): Promise<boolean> =>
+  !await db.get(`SELECT 1 FROM organization LIMIT 1`) && !await db.get(`SELECT 1 FROM "user" LIMIT 1`);
 
 /* ------------------------------------------------------------------ */
 /* Validation (§7.4)                                                    */
@@ -356,25 +355,25 @@ export function parseStoredPayload(raw: string): OrganizationSettingsPayload {
   };
 }
 
-export const organizationExists = (db: DB, organizationId: string): boolean =>
+export const organizationExists = async (db: DB, organizationId: string): Promise<boolean> =>
   typeof organizationId === 'string' && organizationId.length > 0 && organizationId.length <= 200 &&
-  Boolean(db.prepare(`SELECT 1 FROM organization WHERE id = ?`).get(organizationId));
+  Boolean(await db.get(`SELECT 1 FROM organization WHERE id = ?`, organizationId));
 
-export function readOrganizationSettings(db: DB, organizationId: string): OrganizationSettingsDto {
-  const org = db.prepare(`SELECT id, name, slug FROM organization WHERE id = ?`).get(organizationId) as any;
+export async function readOrganizationSettings(db: DB, organizationId: string): Promise<OrganizationSettingsDto> {
+  const org = await db.get(`SELECT id, name, slug FROM organization WHERE id = ?`, organizationId) as any;
   if (!org) throw new ApiError(404, 'RESOURCE_NOT_FOUND', 'Resource not found.');
-  const row = db.prepare(`SELECT payload, version FROM organization_settings WHERE organizationId = ?`).get(organizationId) as any;
+  const row = await db.get(`SELECT payload, version FROM organization_settings WHERE organizationId = ?`, organizationId) as any;
   const payload = row ? parseStoredPayload(row.payload) : defaultSettingsPayload();
   return { organizationId: org.id, name: org.name, slug: org.slug || '', version: row ? row.version : 0, ...payload };
 }
 
-export function writeSettingsRow(db: DB, organizationId: string, payload: OrganizationSettingsPayload, version: number, actorId: string | null) {
-  db.prepare(`
+export async function writeSettingsRow(db: DB, organizationId: string, payload: OrganizationSettingsPayload, version: number, actorId: string | null) {
+  await db.run(`
     INSERT INTO organization_settings (organizationId, payload, version, updatedAt, updatedBy)
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(organizationId) DO UPDATE SET payload = excluded.payload, version = excluded.version,
       updatedAt = excluded.updatedAt, updatedBy = excluded.updatedBy
-  `).run(organizationId, JSON.stringify(payload), version, new Date().toISOString(), actorId);
+  `, organizationId, JSON.stringify(payload), version, new Date().toISOString(), actorId);
 }
 
 export interface AuditActor {
@@ -397,12 +396,12 @@ function expectVersion(value: unknown): number {
   return value;
 }
 
-export function patchOrganizationSettings(db: DB, organizationId: string, body: unknown, actor: AuditActor): OrganizationSettingsDto {
+export async function patchOrganizationSettings(db: DB, organizationId: string, body: unknown, actor: AuditActor): Promise<OrganizationSettingsDto> {
   const patch = onlyKeys(body, ['expectedVersion', 'name', 'profile', 'policy', 'notifications'], 'body') as SettingsPatch;
   const expectedVersion = expectVersion(patch.expectedVersion);
   if (!['name', 'profile', 'policy', 'notifications'].some((k) => k in patch)) throw invalid('Nothing to update.');
-  return db.transaction(() => {
-    const current = readOrganizationSettings(db, organizationId);
+  return db.tx(async () => {
+    const current = await readOrganizationSettings(db, organizationId);
     if (current.version !== expectedVersion) throw new ApiError(409, 'VERSION_CONFLICT', 'These settings were changed by someone else. Reload to continue.');
     const changed: string[] = [];
     let name = current.name;
@@ -416,14 +415,14 @@ export function patchOrganizationSettings(db: DB, organizationId: string, body: 
     if ('policy' in patch) { const r = validatePolicyPatch(patch.policy, policy); policy = r.policy; changed.push(...r.changed); }
     if ('notifications' in patch) { const r = validateNotificationsPatch(patch.notifications, notifications); notifications = r.notifications; changed.push(...r.changed); }
     const version = current.version + 1;
-    writeSettingsRow(db, organizationId, { profile, policy, notifications }, version, actor.actorId);
-    db.prepare(`UPDATE organization SET name = ?, logo = ? WHERE id = ?`).run(name, profile.logoUrl || null, organizationId);
-    appendAudit(db, actor, {
+    await writeSettingsRow(db, organizationId, { profile, policy, notifications }, version, actor.actorId);
+    await db.run(`UPDATE organization SET name = ?, logo = ? WHERE id = ?`, name, profile.logoUrl || null, organizationId);
+    await appendAudit(db, actor, {
       organizationId, action: 'organization.settings.update', targetType: 'organization', targetId: organizationId,
       outcome: 'success', changedFields: changed,
     });
     return readOrganizationSettings(db, organizationId);
-  })();
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -438,9 +437,9 @@ export interface IntegrationRow {
   version: number;
 }
 
-export function readIntegration(db: DB, organizationId: string): IntegrationRow {
-  if (!organizationExists(db, organizationId)) throw new ApiError(404, 'RESOURCE_NOT_FOUND', 'Resource not found.');
-  const row = db.prepare(`SELECT organizationId, driveFolderId, spreadsheetId, legacyAutoSync, version FROM organization_integrations WHERE organizationId = ?`).get(organizationId) as IntegrationRow | undefined;
+export async function readIntegration(db: DB, organizationId: string): Promise<IntegrationRow> {
+  if (!await organizationExists(db, organizationId)) throw new ApiError(404, 'RESOURCE_NOT_FOUND', 'Resource not found.');
+  const row = await db.get(`SELECT organizationId, driveFolderId, spreadsheetId, legacyAutoSync, version FROM organization_integrations WHERE organizationId = ?`, organizationId) as IntegrationRow | undefined;
   return row || { organizationId, driveFolderId: null, spreadsheetId: null, legacyAutoSync: 0, version: 0 };
 }
 
@@ -457,42 +456,42 @@ export function integrationDto(row: IntegrationRow, providerConfigured: boolean)
   };
 }
 
-export function writeIntegrationRow(db: DB, row: IntegrationRow, actorId: string | null) {
-  db.prepare(`
+export async function writeIntegrationRow(db: DB, row: IntegrationRow, actorId: string | null) {
+  await db.run(`
     INSERT INTO organization_integrations (organizationId, driveFolderId, spreadsheetId, legacyAutoSync, version, updatedAt, updatedBy)
     VALUES (@organizationId, @driveFolderId, @spreadsheetId, @legacyAutoSync, @version, @updatedAt, @updatedBy)
     ON CONFLICT(organizationId) DO UPDATE SET driveFolderId = excluded.driveFolderId, spreadsheetId = excluded.spreadsheetId,
       legacyAutoSync = excluded.legacyAutoSync, version = excluded.version, updatedAt = excluded.updatedAt, updatedBy = excluded.updatedBy
-  `).run({ ...row, updatedAt: new Date().toISOString(), updatedBy: actorId });
+  `, { ...row, updatedAt: new Date().toISOString(), updatedBy: actorId });
 }
 
-export function patchIntegration(db: DB, organizationId: string, body: unknown, actor: AuditActor): IntegrationRow {
+export async function patchIntegration(db: DB, organizationId: string, body: unknown, actor: AuditActor): Promise<IntegrationRow> {
   const patch = onlyKeys(body, ['expectedVersion', 'driveFolderId', 'spreadsheetId'], 'body');
   const expectedVersion = expectVersion(patch.expectedVersion);
   if (!('driveFolderId' in patch) && !('spreadsheetId' in patch)) throw invalid('Nothing to update.');
   const drive = 'driveFolderId' in patch ? validateResourceId(patch.driveFolderId, 'Drive folder ID') : undefined;
   const sheet = 'spreadsheetId' in patch ? validateResourceId(patch.spreadsheetId, 'Spreadsheet ID') : undefined;
-  return db.transaction(() => {
-    const current = readIntegration(db, organizationId);
+  return db.tx(async () => {
+    const current = await readIntegration(db, organizationId);
     if (current.version !== expectedVersion) throw new ApiError(409, 'VERSION_CONFLICT', 'The integration was changed by someone else. Reload to continue.');
-    const claimed = (column: 'driveFolderId' | 'spreadsheetId', value: string | null | undefined) =>
-      value && db.prepare(`SELECT 1 FROM organization_integrations WHERE ${column} = ? AND organizationId <> ?`).get(value, organizationId);
+    const claimed = async (column: 'driveFolderId' | 'spreadsheetId', value: string | null | undefined) =>
+      value && await db.get(`SELECT 1 FROM organization_integrations WHERE ${column} = ? AND organizationId <> ?`, value, organizationId);
     // Another organization's resource is rejected without disclosing whose it is.
-    if (claimed('driveFolderId', drive) || claimed('spreadsheetId', sheet)) throw invalid('This resource cannot be used for this organization.');
+    if (await claimed('driveFolderId', drive) || await claimed('spreadsheetId', sheet)) throw invalid('This resource cannot be used for this organization.');
     const next: IntegrationRow = {
       ...current,
       driveFolderId: drive === undefined ? current.driveFolderId : drive,
       spreadsheetId: sheet === undefined ? current.spreadsheetId : sheet,
       version: current.version + 1,
     };
-    writeIntegrationRow(db, next, actor.actorId);
-    appendAudit(db, actor, {
+    await writeIntegrationRow(db, next, actor.actorId);
+    await appendAudit(db, actor, {
       organizationId, action: 'organization.integration.update', targetType: 'organization', targetId: organizationId,
       outcome: 'success',
       changedFields: [...(drive !== undefined ? ['driveFolderId'] : []), ...(sheet !== undefined ? ['spreadsheetId'] : [])],
     });
     return readIntegration(db, organizationId);
-  })();
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -508,7 +507,7 @@ export interface AuditEntry {
   changedFields?: string[];
 }
 
-export function appendAudit(db: DB, actor: AuditActor, entry: AuditEntry): void {
+export async function appendAudit(db: DB, actor: AuditActor, entry: AuditEntry): Promise<void> {
   const metadata = {
     schemaVersion: 1,
     requestId: actor.requestId,
@@ -517,13 +516,10 @@ export function appendAudit(db: DB, actor: AuditActor, entry: AuditEntry): void 
     outcome: entry.outcome,
     changedFields: (entry.changedFields || []).filter((f) => typeof f === 'string').slice(0, 100),
   };
-  db.prepare(`
+  await db.run(`
     INSERT INTO audit_log (id, actor_id, action, target_type, target_id, tenant_id, department_id, impersonated_by, metadata, created_at)
     VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)
-  `).run(
-    `aud_${crypto.randomUUID()}`, actor.actorId, entry.action, entry.targetType, entry.targetId,
-    entry.organizationId, JSON.stringify(metadata), new Date().toISOString(),
-  );
+  `, `aud_${crypto.randomUUID()}`, actor.actorId, entry.action, entry.targetType, entry.targetId, entry.organizationId, JSON.stringify(metadata), new Date().toISOString());
 }
 
 export interface AuditQuery {
@@ -535,20 +531,20 @@ export interface AuditQuery {
 }
 
 /** Sanitized read projection (§12): no raw metadata, actor email, IP or session details. */
-export function listAudit(db: DB, query: AuditQuery) {
+export async function listAudit(db: DB, query: AuditQuery) {
   const where: string[] = [];
   const params: unknown[] = [];
   if (query.organizationId !== undefined) { where.push('a.tenant_id IS ?'); params.push(query.organizationId); }
   if (query.action) { where.push('a.action = ?'); params.push(query.action); }
   if (query.targetType) { where.push('a.target_type = ?'); params.push(query.targetType); }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const total = (db.prepare(`SELECT COUNT(*) AS n FROM audit_log a ${clause}`).get(...params) as any).n as number;
-  const rows = db.prepare(`
+  const total = (await db.get(`SELECT COUNT(*) AS n FROM audit_log a ${clause}`, ...params) as any).n as number;
+  const rows = await db.all(`
     SELECT a.id, a.created_at, a.actor_id, a.action, a.target_type, a.target_id, a.tenant_id, a.metadata,
       (SELECT u.name FROM "user" u WHERE u.id = a.actor_id) AS actor_name
     FROM audit_log a ${clause}
     ORDER BY a.created_at DESC, a.id ASC LIMIT ? OFFSET ?
-  `).all(...params, query.limit, query.offset) as any[];
+  `, ...params, query.limit, query.offset) as any[];
   const events = rows.map((r) => {
     let meta: any = {};
     try { meta = r.metadata ? JSON.parse(r.metadata) : {}; } catch { meta = {}; }
@@ -574,13 +570,14 @@ export function listAudit(db: DB, query: AuditQuery) {
 /* ------------------------------------------------------------------ */
 
 /** Rebuilds the legacy `db.tenants` shape from canonical rows. Never written back. */
-export function buildTenantProjection(db: DB): any[] {
-  const orgs = db.prepare(`SELECT id, name, slug, logo, createdAt FROM organization ORDER BY createdAt ASC, id ASC`).all() as any[];
-  return orgs.map((org, index) => {
+export async function buildTenantProjection(db: DB): Promise<any[]> {
+  const orgs = await db.all(`SELECT id, name, slug, logo, createdAt FROM organization ORDER BY createdAt ASC, id ASC`) as any[];
+  const tenants: any[] = [];
+  for (const [index, org] of orgs.entries()) {
     let settings: OrganizationSettingsDto;
-    try { settings = readOrganizationSettings(db, org.id); } catch { settings = { organizationId: org.id, name: org.name, slug: org.slug, version: 0, ...defaultSettingsPayload() }; }
-    const integration = readIntegration(db, org.id);
-    return {
+    try { settings = await readOrganizationSettings(db, org.id); } catch { settings = { organizationId: org.id, name: org.name, slug: org.slug, version: 0, ...defaultSettingsPayload() }; }
+    const integration = await readIntegration(db, org.id);
+    tenants.push({
       id: org.id,
       name: org.name,
       legalEntity: settings.profile.legalEntity,
@@ -598,6 +595,7 @@ export function buildTenantProjection(db: DB): any[] {
       spreadsheetId: integration.spreadsheetId || undefined,
       spreadsheetUrl: integration.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${integration.spreadsheetId}/edit` : undefined,
       created_at: org.createdAt,
-    };
-  });
+    });
+  }
+  return tenants;
 }

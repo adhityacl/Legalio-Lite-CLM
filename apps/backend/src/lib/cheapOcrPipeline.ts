@@ -1,7 +1,7 @@
 import { PDFDocument } from 'pdf-lib';
 import { PDFParse } from 'pdf-parse';
 import crypto from 'crypto';
-import { sqliteDb } from './auth';
+import { sql } from '../db';
 
 export interface PdfInspectionReport {
   isScanned: boolean;
@@ -73,16 +73,16 @@ class OcrMemoryCache {
     return `${taskType}:${hash}`;
   }
 
-  get(hash: string, taskType: string): any | null {
+  async get(hash: string, taskType: string): Promise<any | null> {
     if (!hash) return null;
     const key = this.makeKey(hash, taskType);
-    const row = sqliteDb.prepare(`SELECT payload, createdAt FROM ai_ocr_cache WHERE cache_key = ?`).get(key) as
+    const row = await sql.get(`SELECT payload, createdAt FROM ai_ocr_cache WHERE cache_key = ?`, key) as
       | { payload: string; createdAt: string }
       | undefined;
     if (!row) return null;
 
     if (Date.now() - new Date(row.createdAt).getTime() > this.ttlMs) {
-      sqliteDb.prepare(`DELETE FROM ai_ocr_cache WHERE cache_key = ?`).run(key);
+      await sql.run(`DELETE FROM ai_ocr_cache WHERE cache_key = ?`, key);
       return null;
     }
 
@@ -93,30 +93,24 @@ class OcrMemoryCache {
     }
   }
 
-  set(hash: string, taskType: string, data: any): void {
+  async set(hash: string, taskType: string, data: any): Promise<void> {
     if (!hash || !data) return;
     const key = this.makeKey(hash, taskType);
-    const count = (sqliteDb.prepare(`SELECT COUNT(*) AS n FROM ai_ocr_cache`).get() as { n: number }).n;
+    const count = (await sql.get(`SELECT COUNT(*) AS n FROM ai_ocr_cache`) as { n: number }).n;
     if (count >= this.maxEntries) {
-      sqliteDb
-        .prepare(
-          `DELETE FROM ai_ocr_cache WHERE cache_key IN (
+      await sql.run(`DELETE FROM ai_ocr_cache WHERE cache_key IN (
             SELECT cache_key FROM ai_ocr_cache ORDER BY createdAt ASC LIMIT ?
-          )`,
-        )
-        .run(count - this.maxEntries + 1);
+          )`, count - this.maxEntries + 1);
     }
-    sqliteDb
-      .prepare(`INSERT OR REPLACE INTO ai_ocr_cache (cache_key, payload, createdAt) VALUES (?, ?, ?)`)
-      .run(key, JSON.stringify(data), new Date().toISOString());
+    await sql.run(`INSERT OR REPLACE INTO ai_ocr_cache (cache_key, payload, createdAt) VALUES (?, ?, ?)`, key, JSON.stringify(data), new Date().toISOString());
   }
 
-  clear(): void {
-    sqliteDb.prepare(`DELETE FROM ai_ocr_cache`).run();
+  async clear(): Promise<void> {
+    await sql.run(`DELETE FROM ai_ocr_cache`);
   }
 
-  size(): number {
-    return (sqliteDb.prepare(`SELECT COUNT(*) AS n FROM ai_ocr_cache`).get() as { n: number }).n;
+  async size(): Promise<number> {
+    return (await sql.get(`SELECT COUNT(*) AS n FROM ai_ocr_cache`) as { n: number }).n;
   }
 }
 
@@ -132,9 +126,9 @@ export const globalOcrCache = new OcrMemoryCache();
  * a burst of unrelated writes could in theory evict a transcript early —
  * give transcripts their own table/quota if that's ever observed in practice.
  */
-export function getCachedTranscript(hash: string): string | null {
+export async function getCachedTranscript(hash: string): Promise<string | null> {
   if (!hash) return null;
-  const row = sqliteDb.prepare(`SELECT payload FROM ai_ocr_cache WHERE cache_key = ?`).get(`transcript:${hash}`) as
+  const row = await sql.get(`SELECT payload FROM ai_ocr_cache WHERE cache_key = ?`, `transcript:${hash}`) as
     | { payload: string }
     | undefined;
   if (!row) return null;
@@ -145,9 +139,9 @@ export function getCachedTranscript(hash: string): string | null {
   }
 }
 
-export function setCachedTranscript(hash: string, text: string): void {
+export async function setCachedTranscript(hash: string, text: string): Promise<void> {
   if (!hash || !text.trim()) return;
-  globalOcrCache.set(hash, 'transcript', text);
+  await globalOcrCache.set(hash, 'transcript', text);
 }
 
 // Legal keyword taxonomy and category definitions
@@ -580,7 +574,7 @@ export async function buildCheapOcrContents(
   // re-running PDF inspection/page-scoring or a fresh Gemini vision call.
   if (!options?.forceVision) {
     const earlyHash = computeInputSha256(rawInput);
-    const cachedTranscript = getCachedTranscript(earlyHash);
+    const cachedTranscript = await getCachedTranscript(earlyHash);
     if (cachedTranscript) {
       const cleanedText = cleanExtractedTextForLLM(cachedTranscript);
       const formattedContent = `${systemPrompt}\n\n=== DOKUMEN (TRANSKRIP TERSIMPAN / CACHED TRANSCRIPT) ===\n${cleanedText}`;
@@ -620,7 +614,7 @@ export async function buildCheapOcrContents(
       // Free byproduct: local extraction already produced this text at no
       // extra (Gemini) cost, so cache it too — the next call for a different
       // task skips even the local pdf-parse/page-scoring work above.
-      setCachedTranscript(fileHash, opt.extractedText);
+      await setCachedTranscript(fileHash, opt.extractedText);
 
       return {
         contents: [{ text: formattedContent }],

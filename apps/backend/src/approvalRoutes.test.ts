@@ -5,6 +5,8 @@ import express from 'express';
 import Database from 'better-sqlite3';
 import { approvalStatusLock, createApprovalRouter } from './approvalRoutes';
 import { ensureDocumentSchema } from './documentRoutes';
+import { ensureApprovalSchema } from './approvalRoutes';
+import { createSql } from './db';
 
 /** Stands in for the authorization middleware: `x-user` + `x-org` become the verified context. */
 async function setup() {
@@ -19,7 +21,9 @@ async function setup() {
     db.prepare(`INSERT INTO "user" VALUES (?, ?)`).run(id, name);
     db.prepare(`INSERT INTO member VALUES (?, ?, ?, 'editor', 'active')`).run(`m-${id}`, id === 'x' ? 'org-b' : 'org-a', id);
   }
-  ensureDocumentSchema(db);
+  const sql = createSql(db);
+  await ensureDocumentSchema(sql);
+  await ensureApprovalSchema(sql);
   db.prepare(`INSERT INTO contract_documents (id, organization_id, name, created_by, created_at, modified_at) VALUES ('doc-1', 'org-a', 'ITS-Done', 'al', 'now', 'now')`).run();
 
   const app = express();
@@ -34,7 +38,7 @@ async function setup() {
     }
     next();
   });
-  app.use('/api', createApprovalRouter({ db, tenantOf: (req) => (req as any).orgContext.organizationId }));
+  app.use('/api', createApprovalRouter({ db: sql, tenantOf: (req) => (req as any).orgContext.organizationId }));
   const server = app.listen(0);
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
   const call = async (user: string, method: string, path: string, body?: unknown, org = 'org-a') => {
@@ -58,8 +62,8 @@ test('sequential approval of a My Documents item', async () => {
     const id = created.body.id;
     assert.equal(docStatus(db), 'pending_review');
     // While the flow runs, My Approval owns the document status and blocks deletes.
-    assert.ok(approvalStatusLock(db, 'doc-1', 'pending_review', 'draft'));
-    assert.ok(approvalStatusLock(db, 'doc-1', 'pending_review', null));
+    assert.ok(await approvalStatusLock(createSql(db), 'doc-1', 'pending_review', 'draft'));
+    assert.ok(await approvalStatusLock(createSql(db), 'doc-1', 'pending_review', null));
     // Type and name follow the attached document, even after it changes.
     assert.equal((await call('al', 'GET', `/approvals/${id}`)).body.category, 'contract');
     db.prepare(`UPDATE contract_documents SET type = 'agreement', name = 'ITS-Done v2' WHERE id = 'doc-1'`).run();
@@ -81,10 +85,10 @@ test('sequential approval of a My Documents item', async () => {
     assert.match(detail.code, /^OA-\d{4}-00001$/);
     assert.deepEqual(detail.events.map((e: any) => e.kind), ['submitted', 'approved', 'approved']);
     assert.equal(docStatus(db), 'approved');
-    assert.ok(approvalStatusLock(db, 'doc-1', 'approved', 'draft'));
-    assert.ok(approvalStatusLock(db, 'doc-1', 'draft', 'approved'));
-    assert.equal(approvalStatusLock(db, 'doc-1', 'approved', 'archived'), null);
-    assert.equal(approvalStatusLock(db, 'doc-1', 'approved', null), null);
+    assert.ok(await approvalStatusLock(createSql(db), 'doc-1', 'approved', 'draft'));
+    assert.ok(await approvalStatusLock(createSql(db), 'doc-1', 'draft', 'approved'));
+    assert.equal(await approvalStatusLock(createSql(db), 'doc-1', 'approved', 'archived'), null);
+    assert.equal(await approvalStatusLock(createSql(db), 'doc-1', 'approved', null), null);
     assert.equal((db.prepare(`SELECT COUNT(*) AS n FROM audit_log`).get() as any).n, 3);
   } finally { close(); }
 });

@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3';
+import type { Sql } from './db';
 
 let storedPublicUrl = '';
 
@@ -18,16 +18,16 @@ export function getPublicBaseUrl(): string {
   return override ? normalizePublicUrl(override) : storedPublicUrl;
 }
 
-export function loadInstallationSettings(db: Database.Database): void {
-  db.exec(`CREATE TABLE IF NOT EXISTS installation_settings (
+export async function loadInstallationSettings(db: Sql): Promise<void> {
+  await db.exec(`CREATE TABLE IF NOT EXISTS installation_settings (
     id TEXT PRIMARY KEY CHECK(id = 'installation'),
     publicUrl TEXT NOT NULL
   )`);
-  const row = db.prepare("SELECT publicUrl FROM installation_settings WHERE id = 'installation'").get() as { publicUrl: string } | undefined;
+  const row = await db.get("SELECT publicUrl FROM installation_settings WHERE id = 'installation'") as { publicUrl: string } | undefined;
   storedPublicUrl = row ? normalizePublicUrl(row.publicUrl) : '';
 }
 
 /** Called inside the first-superuser transaction; loading happens after commit. */
-export function saveInstallationPublicUrl(db: Database.Database, publicUrl: string): void {
-  db.prepare("INSERT INTO installation_settings (id, publicUrl) VALUES ('installation', ?)").run(normalizePublicUrl(publicUrl));
+export async function saveInstallationPublicUrl(db: Sql, publicUrl: string): Promise<void> {
+  await db.run("INSERT INTO installation_settings (id, publicUrl) VALUES ('installation', ?)", normalizePublicUrl(publicUrl));
 }

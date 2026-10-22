@@ -17,10 +17,12 @@ const freePort=()=>new Promise<number>((resolve,reject)=>{const s=net.createServ
 const backendPort=await freePort();const frontendPort=await freePort();
 const backendURL=`http://127.0.0.1:${backendPort}`;const frontendURL=`http://127.0.0.1:${frontendPort}`;
 Object.assign(process.env,{APP_TEST_MODE:'1',AUTH_DB_PATH:path.join(directory,'kaelyn.db'),APP_DATA_DIR:directory,BETTER_AUTH_URL:frontendURL,TRUSTED_ORIGINS:`${backendURL},${frontendURL}`,BETTER_AUTH_ENABLE_INFRA:'false',API_ONLY:'true',SEED_DEMO_ADMIN:'false',PORT:String(backendPort),DISABLE_HMR:'true',BETTER_AUTH_SECRET:'test-only-secret-for-isolated-sqlite-e2e-123456789',GEMINI_API_KEY:'',GOOGLE_CLIENT_ID:'',GOOGLE_CLIENT_SECRET:'',GOOGLE_APPLICATION_CREDENTIALS:''});
-const {sqliteDb:fixtureDb,hydrateCoreDataFromJson}=await import('./lib/auth');
+const {sqliteDb:fixtureDb,hydrateCoreDataFromJson,initAuthDatabase}=await import('./lib/auth');
+const {sql:fixtureSql}=await import('./db');
 const {seedOrganizationsFromDataset,createOrganizationRecord}=await import('./organizationProvisioning');
 const {markMigrationApplied}=await import('./organizationSettingsStore');
-const dataset=buildDemoDataset();seedOrganizationsFromDataset(fixtureDb,dataset);markMigrationApplied(fixtureDb,{fixture:true});hydrateCoreDataFromJson(dataset);
+await initAuthDatabase();
+const dataset=buildDemoDataset();await seedOrganizationsFromDataset(fixtureSql,dataset);await markMigrationApplied(fixtureSql,{fixture:true});await hydrateCoreDataFromJson(dataset);
 fixtureDb.exec("UPDATE insertion_orders SET id=json_extract(payload,'$.contract_id')");
 const now=new Date().toISOString();const password='E2e-local-password-1234';const hash=await hashPassword(password);
 for(const [id,email,role] of [['e2e-root','root@example.com','superuser'],['e2e-admin','admin@example.com','user'],['e2e-editor','editor@example.com','user']]){
@@ -29,7 +31,7 @@ for(const [id,email,role] of [['e2e-root','root@example.com','superuser'],['e2e-
 }
 const org=dataset.tenants[0].id;
 const otherOrg='e2e-other-org';
-createOrganizationRecord(fixtureDb,{id:otherOrg,name:'Other Organization'});
+await createOrganizationRecord(fixtureSql,{id:otherOrg,name:'Other Organization'});
 for(const [id,role] of [['e2e-admin','admin'],['e2e-editor','editor']])fixtureDb.prepare("INSERT INTO member(id,organizationId,userId,role,status) VALUES(?,?,?,?,'active')").run(`${id}-member`,org,id,role);
 const teams=fixtureDb.prepare('SELECT id,name FROM team WHERE organizationId=? ORDER BY name').all(org) as any[];
 const owner=teams[0];const otherOwner=teams[1];
@@ -37,7 +39,7 @@ fixtureDb.prepare("INSERT INTO teamMember(id,teamId,userId) VALUES('e2e-editor-t
 let server:ChildProcess|undefined;let frontend:ChildProcess|undefined;let browser:Awaited<ReturnType<typeof chromium.launch>>|undefined;
 const logs:string[]=[];const checks:string[]=[];
 const appTabs=['dashboard','hierarchy','partners','contracts','create-contract','ios','partner-spending','partner-evaluation','notifikasi','settings-organization','settings-access'];
-const systemTabs=['dashboard','users','accounts','sessions','organizations','apikeys','google','google-drive','google-credentials','ai','smtp','mailer','ui-texts','database','backups','reset'];
+const systemTabs=['dashboard','users','accounts','sessions','organizations','apikeys','google','google-drive','google-credentials','ai','smtp','mailer','ui-texts','reset'];
 const run=(args:string[],cwd=repository,env=process.env)=>{const child=spawn('node',args,{cwd,env,stdio:['ignore','pipe','pipe']});child.stdout?.on('data',c=>logs.push(String(c)));child.stderr?.on('data',c=>logs.push(String(c)));return child;};
 const waitFor=async(url:string,child:ChildProcess)=>{const deadline=Date.now()+60000;while(Date.now()<deadline){if(child.exitCode!==null)throw new Error(`Server exited ${child.exitCode}`);try{if((await fetch(url)).ok)return;}catch{}await new Promise(r=>setTimeout(r,200));}throw new Error(`Timed out ${url}`);};
 const stop=async(child?:ChildProcess)=>{if(!child||child.exitCode!==null)return;child.kill('SIGTERM');await Promise.race([once(child,'exit'),new Promise(r=>setTimeout(r,5000))]);if(child.exitCode===null)child.kill('SIGKILL');};
@@ -55,13 +57,6 @@ try{
  assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM schema_migrations WHERE id='004_remove_legacy_core'").get() as any).n,1);
  assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name GLOB '_legacy_003_*'").get() as any).n,0);
  assert.equal((sql.prepare('SELECT COUNT(*) AS n FROM insertion_orders WHERE io_id IS NULL').get() as any).n,0);
- const browsed=await call('/api/auth-console/sqlite/table-data?table=partners');
- assert.ok(browsed.columns.some((c:any)=>c.name==='partner_name'));
- assert.ok(browsed.rows.every((row:any)=>row.partner_id));
- const tableList=await call('/api/auth-console/sqlite/tables');
- assert.equal(tableList.tables.some((table:any)=>table.name.startsWith('_legacy_003_')),false);
- const configBrowser=await call('/api/auth-console/sqlite/table-data?table=organization_settings');
- assert.ok(configBrowser.columns.some((c:any)=>c.name==='country_code'));
  const mailerUserToken=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'admin@example.com',password},token:''})).token;
  await call('/api/mailer/templates',{token:mailerUserToken,status:403});
  await call('/api/mailer/templates/verification',{method:'PUT',token:mailerUserToken,body:{},status:403});
@@ -74,21 +69,7 @@ try{
  await call('/api/mailer/templates/verification', {method:'PUT', body:{subject:'Stale',html:verificationTemplate.html,expectedVersion:0},status:409});
  assert.equal((await call('/api/mailer/templates')).templates.find((t:any)=>t.id==='verification').subject,'Welcome {{name}}');
  checks.push('Mailer catalog, authentication, validation, persistence and concurrent update protection');
- checks.push('legacy migration, authenticated API reload and SQLite browser');
- for (const direction of ['asc', 'desc']) {
-  const sorted = await call(`/api/auth-console/sqlite/table-data?table=partners&sort=partner_name&direction=${direction}&limit=5&offset=5`);
-  const expected = sql.prepare(`SELECT partner_id FROM partners ORDER BY partner_name ${direction}, partner_id LIMIT 5 OFFSET 5`).all() as any[];
-  assert.deepEqual(sorted.rows.map((row:any)=>row.partner_id), expected.map(row=>row.partner_id));
- }
- await call('/api/auth-console/sqlite/table-data?table=partners&sort=missing', {status:400});
- await call('/api/auth-console/sqlite/table-data?table=partners&sort=partner_id%22%3BDROP%20TABLE%20partners', {status:400});
- await call('/api/auth-console/sqlite/table-data?table=partners&sort=partner_id&direction=invalid', {status:400});
- await call('/api/auth-console/sqlite/table-data?table=session&sort=token', {status:400});
- await call('/api/auth-console/sqlite/table-data?table=partners', {token:'',status:401});
- const sessionsBrowser=await call('/api/auth-console/sqlite/table-data?table=session');
- assert.equal(sessionsBrowser.columns.find((column:any)=>column.name==='token').sortable,false);
- assert.ok(sessionsBrowser.rows.every((row:any)=>row.token==='[redacted]'));
- checks.push('SQLite explorer server-side sorting, stable pagination, validation and credential protection');
+ checks.push('legacy migration and authenticated API reload');
 
  const partner=(await call('/api/partners',{method:'POST',org,body:{partner_name:'E2E Indexed Orchard',country:'ID',pic_name:'Test Contact',pic_email:'private-index@example.com',pic_phone:'+62123456',internal_pic:owner.name,tags:['Supplier']}})).partner;
  assert.ok(partner.partner_id);assert.equal('pic_partner' in partner,false);
@@ -99,35 +80,6 @@ try{
  assert.ok(ios.every(io=>io?.io_id));assert.notEqual(ios[0].io_id,ios[1].io_id);
  assert.equal((sql.prepare('SELECT COUNT(*) AS n FROM insertion_orders WHERE contract_id=?').get(contract.contract_id) as any).n,2);
  checks.push('partner and contract CRUD; two IOs in one contract');
- const editableRow=(await call(`/api/auth-console/sqlite/table-data?table=partners&search=${partner.partner_id}`)).rows.find((row:any)=>row.partner_id===partner.partner_id);
- const editBody={table:'partners',key:partner.partner_id,original:editableRow,changes:{notes:'ExplorerSearchProof',pic_name:null}};
- await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody,token:'',status:401});
- const ordinaryToken=(await call('/api/auth/sign-in/email',{method:'POST',body:{email:'admin@example.com',password},token:''})).token;
- await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody,token:ordinaryToken,status:403});
- for(const table of ['session','account','business_search_idx','audit_log','activity_logs']) {
-  await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:{...editBody,table},status:403});
- }
- for(const changes of [{partner_id:'changed-key'},{organization_id:otherOrg},{extra_json:'{}'},{record_position:999}]) {
-  await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:{...editBody,changes},status:400});
- }
- const auditBefore=(sql.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='platform.database.row.update'").get() as any).n;
- sql.exec("CREATE TRIGGER fail_explorer_audit BEFORE INSERT ON audit_log WHEN NEW.action='platform.database.row.update' BEGIN SELECT RAISE(ABORT,'injected failure'); END");
- await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody,status:409});
- sql.exec('DROP TRIGGER fail_explorer_audit');
- assert.equal((sql.prepare('SELECT notes FROM partners WHERE partner_id=?').get(partner.partner_id) as any).notes,editableRow.notes);
- await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody});
- await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:editBody,status:409});
- assert.equal((sql.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='platform.database.row.update'").get() as any).n,auditBefore+1);
- assert.equal((await call('/api/partners',{org})).find((row:any)=>row.partner_id===partner.partner_id).pic_name,null);
- assert.ok((await call('/api/search?q=ExplorerSearchProof',{org})).results.some((hit:any)=>hit.entity_id===partner.partner_id));
- await call(`/api/partners/${partner.partner_id}`,{method:'PUT',org,body:{pic_phone:'+62123456'}});
- const persistedEdit=(await call('/api/partners',{org})).find((row:any)=>row.partner_id===partner.partner_id);
- assert.equal(persistedEdit.notes,'ExplorerSearchProof');assert.equal(persistedEdit.pic_name,null);
- const contractRow=(await call(`/api/auth-console/sqlite/table-data?table=contracts&search=${contract.contract_id}`)).rows.find((row:any)=>row.contract_id===contract.contract_id);
- for(const changes of [{auto_renewal:2},{notice_period_days:'not-a-number'},{redline_analysis:'{invalid-json'},{risk_level:'Low'},{contract_value_minor:100}]) {
-  await call('/api/auth-console/sqlite/table-data',{method:'PATCH',body:{table:'contracts',key:contract.contract_id,original:contractRow,changes},status:400});
- }
- checks.push('SQLite editor permissions, locked fields, audit rollback, stale-write rejection, NULL, search and in-memory persistence');
 
 
  const updatedContract=(await call(`/api/contracts/${contract.contract_id}`,{method:'PUT',org,body:{contract_title:'E2E Agreement Updated',contract_value:456.78,currency:'USD'}})).contract;
@@ -233,14 +185,7 @@ try{
  assert.equal((await call('/api/integrations/google/credentials')).serviceAccount.source,'upload');
  await call('/api/integrations/google/credentials/service-account',{method:'DELETE'});
  assert.equal((await call('/api/integrations/google/credentials')).serviceAccount.source,null);
- await call('/api/auth-console/sqlite/optimize',{method:'POST'});
- assert.equal((await call('/api/auth-console/sqlite/status')).success,true);
- const backup=await call('/api/auth-console/backups',{method:'POST',status:201});
- assert.equal((await call('/api/auth-console/backups')).backups.some((item:any)=>item.id===backup.id),true);
- const backupPayload=path.join(directory,'backups',backup.id,'payload');
- assert.equal(existsSync(path.join(backupPayload,'kaelyn.db')),true);
- assert.equal(existsSync(path.join(backupPayload,'auth.db')),false);
- checks.push('Sys API key, platform configuration, Google credential, kaelyn.db backup and SQLite maintenance lifecycle');
+ checks.push('Sys API key, platform configuration and Google credential lifecycle');
 
  await call(`/api/auth-console/users/${invitedUser.id}`,{method:'DELETE'});
  await call(`/api/auth-console/users/${managedUser.id}`,{method:'DELETE'});
@@ -279,6 +224,14 @@ try{
  assert.equal((await call('/api/search?q=E2E',{org:otherOrg})).results.length,0);
  await call('/api/partners',{org:otherOrg,token:editorToken,status:404});
  checks.push('search organization/department authorization and contact exclusion');
+ // A file is readable only through a record the caller may see: own department yes, another department's 404, no session 401.
+ const hiddenUpload=(await call('/api/contracts',{method:'POST',org,body:{partner_id:hidden.partner_id,contract_number:'E2E-UPLOAD-HIDDEN',contract_title:'E2E Hidden Upload',start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,internal_pic:otherOwner.name,fileName:'e2e-hidden.pdf',fileData:'data:application/pdf;base64,'+Buffer.from('%PDF-1.4 hidden').toString('base64')}})).contract;
+ const uploadStatus=async(link:string,bearer:string)=>(await fetch(backendURL+link,{headers:bearer?{Authorization:`Bearer ${bearer}`}:{}})).status;
+ assert.equal(await uploadStatus(uploaded.contract_file_link,editorToken),200);
+ assert.equal(await uploadStatus(hiddenUpload.contract_file_link,editorToken),404);
+ assert.equal(await uploadStatus(hiddenUpload.contract_file_link,token),200);
+ assert.equal(await uploadStatus(hiddenUpload.contract_file_link,''),401);
+ checks.push('upload access follows the owning record and its department');
  await call(`/api/partners/${partner.partner_id}`,{method:'PUT',org,body:{partner_name:'E2E Renamed Orchard'}});
  assert.equal((await call('/api/search?q=Renamed',{org})).results[0].entity_id,partner.partner_id);
  await call(`/api/ios/${ios[0].io_id}`,{method:'PUT',org,body:{contract_id:'missing-contract'},status:409});
@@ -494,79 +447,12 @@ try{
  await htmlField.fill(styledEmail);
  checks.push('Mailer ID/EN/ZH live switching, translated toolbar/dialog/validation and preservation of unsaved drafts');
  checks.push('Mailer WYSIWYG formatting, cursor variable insertion, lossless Visual/HTML switch, save/reload, mobile and preview');
- await systemPage.goto(backendURL+'/sys?tab=admin-system-database');
- const explorer=systemPage.locator('#sqlite-database-tables');
- const tableNav=explorer.getByRole('navigation');
- await expect(tableNav.getByRole('button',{name:'partners',exact:true})).toHaveAttribute('aria-current','true');
- await expect(explorer.locator('#sqlite-table-edit-status')).toHaveText(/Editable fields|Field dapat diedit/);
- await expect(systemPage.locator('#sqlite-database-summary')).not.toContainText(/Read only|Hanya baca/);
- await tableNav.getByRole('button',{name:'partners',exact:true}).click();
- const grid=explorer.getByRole('table',{name:'partners',exact:true});
- await expect(grid).toBeVisible();
- await grid.getByRole('columnheader',{name:/partner_name/}).getByRole('button').click();
- await expect(grid.getByRole('columnheader',{name:/partner_name/})).toHaveAttribute('aria-sort','ascending');
- await grid.getByRole('columnheader',{name:/partner_name/}).getByRole('button').click();
- await expect(grid.getByRole('columnheader',{name:/partner_name/})).toHaveAttribute('aria-sort','descending');
- await grid.getByRole('row').nth(1).getByRole('button').first().click();
- const detail=systemPage.locator('#sqlite-row-details');
- await expect(detail.locator('#sqlite-field-partner_id')).not.toHaveValue('');
- await detail.getByRole('textbox',{name:/Find a field|Cari field/}).fill('partner_name');
- await expect(detail.locator('textarea')).toHaveCount(1);
- await detail.getByRole('textbox',{name:/Find a field|Cari field/}).fill('');
- await systemPage.context().grantPermissions(['clipboard-read','clipboard-write']);
- await detail.getByRole('button',{name:/Copy row JSON|Salin baris JSON/}).click();
- const clipboard=await systemPage.evaluate<string>("navigator.clipboard.readText()");
- assert.ok(JSON.parse(clipboard).partner_id);
- const [pageExport]=await Promise.all([systemPage.waitForEvent('download'),explorer.getByRole('button',{name:/Export page CSV|Ekspor halaman CSV/}).click()]);
- const exported=readFileSync((await pageExport.path())!,'utf8');assert.ok(exported.includes('"partner_id"'));assert.ok(exported.includes('"partner_name"'));
- await explorer.getByRole('button',{name:/^Structure$|^Struktur$/}).click();
- await expect(explorer.getByRole('columnheader',{name:/Constraints|Batasan/})).toBeVisible();
- await explorer.getByRole('button',{name:'Data',exact:true}).click();
- await explorer.getByRole('textbox',{name:/^Search table\.\.\.$|^Cari tabel\.\.\.$/}).fill('E2E Browser CSV');
- await explorer.locator('form').getByRole('button').click();
- await expect(grid.getByRole('row')).toHaveCount(2);
- await expect(grid.getByRole('button',{name:'E2E Browser CSV',exact:true})).toBeVisible();
- await grid.getByRole('button',{name:'E2E Browser CSV',exact:true}).click();
- await expect(detail.locator('#sqlite-field-partner_name')).toHaveValue('E2E Browser CSV');
-
- await detail.getByRole('button',{name:/^Edit row$|^Edit baris$/}).click();
- await expect(detail.locator('#sqlite-field-partner_id')).toHaveAttribute('readonly','');
- await detail.locator('#sqlite-field-partner_name').fill('Canceled database edit');
- await detail.getByRole('button',{name:/^Cancel$|^Batal$/}).click();
- await expect(detail.locator('#sqlite-field-partner_name')).toHaveValue('E2E Browser CSV');
- await detail.getByRole('button',{name:/^Edit row$|^Edit baris$/}).click();
- await detail.locator('#sqlite-field-notes').fill('Saved from explorer UI');
- await detail.getByRole('button',{name:/^Save$|^Simpan$/}).click();
- await expect(systemPage.getByRole('status').filter({hasText:/Changes saved|Perubahan disimpan/})).toBeVisible();
- await expect(grid.getByRole('button',{name:'E2E Browser CSV',exact:true})).toBeVisible();
- await grid.getByRole('button',{name:'E2E Browser CSV',exact:true}).click();
- await expect(detail.locator('#sqlite-field-notes')).toHaveValue('Saved from explorer UI');
- assert.equal((await call('/api/partners',{org})).find((item:any)=>item.partner_name==='E2E Browser CSV').notes,'Saved from explorer UI');
- checks.push('Chromium row edit, locked identity, cancel, save and API persistence');
- await systemPage.screenshot({path:path.join(directory,'sys-database-explorer-desktop.png'),fullPage:true});
- await explorer.getByRole('textbox',{name:/^Find a table$|^Cari tabel$/}).fill('session');
- await tableNav.getByRole('button',{name:'session',exact:true}).click();
- const sessionGrid=explorer.getByRole('table',{name:'session',exact:true});
- await expect(sessionGrid.getByRole('columnheader',{name:/^token/}).getByRole('button')).toBeDisabled();
- await expect(explorer.locator('#sqlite-table-edit-status')).toHaveText(/Read-only table|Tabel hanya baca/);
- await expect(detail.getByText(/Editing is disabled for this table|Pengeditan dinonaktifkan untuk tabel ini/)).toBeVisible();
- await expect(detail.getByRole('button',{name:/^Edit row$|^Edit baris$/})).toHaveCount(0);
- await expect(sessionGrid.getByRole('button',{name:'[redacted]',exact:true}).first()).toBeVisible();
- await explorer.getByRole('textbox',{name:/^Find a table$|^Cari tabel$/}).fill('partners');
- await tableNav.getByRole('button',{name:'partners',exact:true}).click();
- await expect(grid).toBeVisible();
- await grid.getByRole('row').nth(1).getByRole('button').first().click();
- await systemPage.setViewportSize({width:390,height:844});
- await systemPage.screenshot({path:path.join(directory,'sys-database-explorer-mobile.png'),fullPage:true});
- assert.ok(await systemPage.evaluate<boolean>("document.documentElement.scrollWidth <= innerWidth"));
- await systemPage.setViewportSize({width:1440,height:1000});
- checks.push('Chromium database explorer sorting, selection, field search, copy, CSV export, schema, redaction and mobile');
  await systemPage.goto(backendURL+'/sys?tab=admin-system-google-credentials');
  await expect(systemPage.getByText(/Service Account \(JSON\)/).first()).toBeVisible({timeout:30000});
  await systemPage.screenshot({path:path.join(directory,'sys-google-credentials.png'),fullPage:true});
  assert.deepEqual(systemErrors,[]);assert.deepEqual(failedSystemAPI,[]);
  await systemPage.close();
- checks.push('Chromium all 15 Sys pages render without runtime or API 500 errors');
+ checks.push('Chromium all 14 Sys pages render without runtime or API 500 errors');
  // Organization reset (superuser): empties one organization's business data; other organizations and the organization itself stay.
  {
   const readOnly=new Database(path.join(directory,'kaelyn.db'),{readonly:true});

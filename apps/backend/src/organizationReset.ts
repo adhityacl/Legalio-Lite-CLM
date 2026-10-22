@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type Database from 'better-sqlite3';
+import type { Sql } from './db';
 
 /** Collections of the in-memory projection that belong to an organization. */
 const COLLECTIONS = ['partners', 'contracts', 'ios', 'spendings', 'evaluations', 'notifications', 'templates', 'activityLogs'] as const;
@@ -28,14 +28,14 @@ function collectUploadLinks(value: unknown, found: Set<string>) {
 }
 
 export interface OrganizationResetOptions {
-  db: Database.Database;
+  db: Sql;
   /** The in-memory projection (`db` in server.ts). */
   memory: Record<string, any[]>;
   organizationId: string;
   uploadsDir: string;
   /** Persists the projection to SQLite. */
-  save: () => void;
-  /** Where to write a database copy first; required for file databases. */
+  save: () => Promise<void>;
+  /** Where to write a database copy first; omit only for in-memory databases. */
   backupPath?: string;
 }
 
@@ -43,12 +43,11 @@ export interface OrganizationResetOptions {
  * Empties one organization's business data and nothing else: the organization, its settings, members, departments,
  * invitations and integrations stay. Only upload files that this organization's own records pointed to are removed.
  */
-export function resetOrganizationData(options: OrganizationResetOptions) {
+export async function resetOrganizationData(options: OrganizationResetOptions) {
   const { db, memory, organizationId, uploadsDir, save, backupPath } = options;
-  if (db.name !== ':memory:') {
-    if (!backupPath) throw new Error('A SQLite backup path is required before resetting an organization.');
+  if (backupPath) {
     fs.mkdirSync(path.dirname(backupPath), { recursive: true, mode: 0o700 });
-    db.prepare('VACUUM INTO ?').run(backupPath);
+    await db.run('VACUUM INTO ?', backupPath);
     fs.chmodSync(backupPath, 0o600);
   }
 
@@ -61,14 +60,14 @@ export function resetOrganizationData(options: OrganizationResetOptions) {
     mine.forEach(row => collectUploadLinks(row, links));
     memory[collection] = rows.filter(row => row?.organizationId !== organizationId);
   }
-  save();
+  await save();
 
-  db.transaction(() => {
+  await db.tx(async () => {
     for (const step of SQL_STEPS) {
-      if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(step.table)) continue;
-      removed[step.table] = db.prepare(step.sql).run(organizationId).changes;
+      if (!await db.get("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", step.table)) continue;
+      removed[step.table] = (await db.run(step.sql, organizationId)).changes;
     }
-  })();
+  });
 
   let files = 0;
   const root = path.resolve(uploadsDir);

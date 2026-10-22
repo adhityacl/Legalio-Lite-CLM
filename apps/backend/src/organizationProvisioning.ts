@@ -7,18 +7,18 @@
  * always explicit — an identity never gains organization access because it
  * exists, signed up first, or was approved.
  */
-import type Database from 'better-sqlite3';
+import type { Sql } from './db';
 import crypto from 'crypto';
 import { legacyMembershipRole, type PlatformRole, type TenantRole } from './rbac';
 import { normalizeDepartmentName } from './recordScope';
 import { defaultSettingsPayload, writeIntegrationRow, writeSettingsRow } from './organizationSettingsStore';
 
-type DB = Database.Database;
+type DB = Sql;
 
-export function uniqueSlug(db: DB, name: string, preferred?: string): string {
+export async function uniqueSlug(db: DB, name: string, preferred?: string): Promise<string> {
   const base = (preferred || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'organization';
   let slug = base;
-  for (let i = 2; db.prepare(`SELECT 1 FROM organization WHERE slug = ?`).get(slug); i++) slug = `${base}-${i}`;
+  for (let i = 2; await db.get(`SELECT 1 FROM organization WHERE slug = ?`, slug); i++) slug = `${base}-${i}`;
   return slug;
 }
 
@@ -35,7 +35,7 @@ export interface OrganizationSeed {
   createdAt?: string;
 }
 
-export function createOrganizationRecord(db: DB, seed: OrganizationSeed, actorId: string | null = null): string {
+export async function createOrganizationRecord(db: DB, seed: OrganizationSeed, actorId: string | null = null): Promise<string> {
   const id = seed.id || `org_${crypto.randomUUID()}`;
   const name = String(seed.name || '').trim().slice(0, 200);
   if (!name) throw new Error('Organization name is required.');
@@ -43,39 +43,35 @@ export function createOrganizationRecord(db: DB, seed: OrganizationSeed, actorId
     legalEntity: seed.legalEntity, brandName: seed.brandName, tagline: seed.tagline,
     logoUrl: seed.logoUrl && seed.logoUrl !== '/favicon.png' ? seed.logoUrl : '', primaryColor: seed.primaryColor, policy: seed.settings,
   });
-  db.prepare(`INSERT INTO organization (id, name, slug, logo, createdAt, metadata) VALUES (?, ?, ?, ?, ?, NULL)`)
-    .run(id, name, uniqueSlug(db, name, seed.slug), payload.profile.logoUrl || null, seed.createdAt || new Date().toISOString());
-  writeSettingsRow(db, id, payload, 1, actorId);
-  writeIntegrationRow(db, { organizationId: id, driveFolderId: null, spreadsheetId: null, legacyAutoSync: 0, version: 1 }, actorId);
+  await db.run(`INSERT INTO organization (id, name, slug, logo, createdAt, metadata) VALUES (?, ?, ?, ?, ?, NULL)`, id, name, await uniqueSlug(db, name, seed.slug), payload.profile.logoUrl || null, seed.createdAt || new Date().toISOString());
+  await writeSettingsRow(db, id, payload, 1, actorId);
+  await writeIntegrationRow(db, { organizationId: id, driveFolderId: null, spreadsheetId: null, legacyAutoSync: 0, version: 1 }, actorId);
   return id;
 }
 
-export function createTeamRecord(db: DB, organizationId: string, name: string, id?: string, createdAt?: string): string {
+export async function createTeamRecord(db: DB, organizationId: string, name: string, id?: string, createdAt?: string): Promise<string> {
   const teamId = id || `team_${crypto.randomUUID()}`;
   const at = createdAt || new Date().toISOString();
-  db.prepare(`INSERT INTO team (id, name, memberCount, organizationId, createdAt, updatedAt) VALUES (?, ?, 0, ?, ?, ?)`)
-    .run(teamId, name.trim(), organizationId, at, at);
+  await db.run(`INSERT INTO team (id, name, memberCount, organizationId, createdAt, updatedAt) VALUES (?, ?, 0, ?, ?, ?)`, teamId, name.trim(), organizationId, at, at);
   return teamId;
 }
 
-export function createIdentityRecord(db: DB, input: { id?: string; name: string; email: string; platformRole: PlatformRole; emailVerified?: boolean }): string {
+export async function createIdentityRecord(db: DB, input: { id?: string; name: string; email: string; platformRole: PlatformRole; emailVerified?: boolean }): Promise<string> {
   const id = input.id || `usr_${crypto.randomUUID()}`;
   const now = new Date().toISOString();
-  db.prepare(`
+  await db.run(`
     INSERT INTO "user" (id, name, email, emailVerified, role, banned, createdAt, updatedAt)
     VALUES (?, ?, ?, ?, ?, 0, ?, ?)
-  `).run(id, input.name || input.email.split('@')[0], input.email.trim().toLowerCase(), input.emailVerified === false ? 0 : 1, input.platformRole, now, now);
+  `, id, input.name || input.email.split('@')[0], input.email.trim().toLowerCase(), input.emailVerified === false ? 0 : 1, input.platformRole, now, now);
   return id;
 }
 
-export function addMembershipRecord(db: DB, input: { userId: string; organizationId: string; tenantRole: TenantRole; departmentIds?: string[] }): string {
+export async function addMembershipRecord(db: DB, input: { userId: string; organizationId: string; tenantRole: TenantRole; departmentIds?: string[] }): Promise<string> {
   const id = `mem_${crypto.randomUUID()}`;
   const now = new Date().toISOString();
-  db.prepare(`INSERT INTO member (id, organizationId, userId, role, createdAt, status) VALUES (?, ?, ?, ?, ?, 'active')`)
-    .run(id, input.organizationId, input.userId, input.tenantRole, now);
+  await db.run(`INSERT INTO member (id, organizationId, userId, role, createdAt, status) VALUES (?, ?, ?, ?, ?, 'active')`, id, input.organizationId, input.userId, input.tenantRole, now);
   if (input.tenantRole !== 'admin') {
-    const insert = db.prepare(`INSERT INTO teamMember (id, teamId, userId, createdAt) VALUES (?, ?, ?, ?)`);
-    for (const teamId of input.departmentIds || []) insert.run(`tm_${crypto.randomUUID()}`, teamId, input.userId, now);
+    for (const teamId of input.departmentIds || []) await db.run(`INSERT INTO teamMember (id, teamId, userId, createdAt) VALUES (?, ?, ?, ?)`, `tm_${crypto.randomUUID()}`, teamId, input.userId, now);
   }
   return id;
 }
@@ -92,10 +88,10 @@ export interface DatasetSeed {
  * becomes a platform superuser without membership; every other dataset
  * login is a platform user with a membership role in its own organization.
  */
-export function seedOrganizationsFromDataset(db: DB, dataset: DatasetSeed, options: { bootstrapSuperuser?: { id: string; email: string; name: string } } = {}) {
-  db.transaction(() => {
+export async function seedOrganizationsFromDataset(db: DB, dataset: DatasetSeed, options: { bootstrapSuperuser?: { id: string; email: string; name: string } } = {}) {
+  await db.tx(async () => {
     for (const tenant of dataset.tenants) {
-      createOrganizationRecord(db, {
+      await createOrganizationRecord(db, {
         id: tenant.id, name: tenant.name, slug: tenant.domainSlug, legalEntity: tenant.legalEntity,
         brandName: tenant.brandName, tagline: tenant.tagline, logoUrl: tenant.logoUrl,
         primaryColor: tenant.primaryColor, settings: tenant.settings, createdAt: tenant.created_at,
@@ -103,22 +99,22 @@ export function seedOrganizationsFromDataset(db: DB, dataset: DatasetSeed, optio
     }
     for (const dept of dataset.departments) {
       if (!dataset.tenants.some((t) => t.id === dept.organizationId)) continue;
-      createTeamRecord(db, dept.organizationId, dept.name, dept.id, dept.created_at);
+      await createTeamRecord(db, dept.organizationId, dept.name, dept.id, dept.created_at);
     }
     for (const u of dataset.allowedUsers) {
       const email = String(u.email || '').trim().toLowerCase();
-      if (!email || db.prepare(`SELECT 1 FROM "user" WHERE LOWER(email) = ?`).get(email)) continue;
+      if (!email || await db.get(`SELECT 1 FROM "user" WHERE LOWER(email) = ?`, email)) continue;
       const isSuper = String(u.role || '').toLowerCase() === 'superuser';
-      const userId = createIdentityRecord(db, { id: u.id, name: u.name, email, platformRole: isSuper ? 'superuser' : 'user' });
+      const userId = await createIdentityRecord(db, { id: u.id, name: u.name, email, platformRole: isSuper ? 'superuser' : 'user' });
       const tenantRole = legacyMembershipRole(u.role);
       if (isSuper || !tenantRole || !dataset.tenants.some((t) => t.id === u.organizationId)) continue;
-      const teamId = (db.prepare(`SELECT id, name FROM team WHERE organizationId = ?`).all(u.organizationId) as any[])
+      const teamId = (await db.all(`SELECT id, name FROM team WHERE organizationId = ?`, u.organizationId) as any[])
         .find((t) => normalizeDepartmentName(t.name) === normalizeDepartmentName(u.department))?.id;
-      addMembershipRecord(db, { userId, organizationId: u.organizationId, tenantRole, departmentIds: teamId ? [teamId] : [] });
+      await addMembershipRecord(db, { userId, organizationId: u.organizationId, tenantRole, departmentIds: teamId ? [teamId] : [] });
     }
     const boot = options.bootstrapSuperuser;
-    if (boot && !db.prepare(`SELECT 1 FROM "user" WHERE id = ? OR LOWER(email) = ?`).get(boot.id, boot.email.toLowerCase())) {
-      createIdentityRecord(db, { id: boot.id, name: boot.name, email: boot.email, platformRole: 'superuser' });
+    if (boot && !await db.get(`SELECT 1 FROM "user" WHERE id = ? OR LOWER(email) = ?`, boot.id, boot.email.toLowerCase())) {
+      await createIdentityRecord(db, { id: boot.id, name: boot.name, email: boot.email, platformRole: 'superuser' });
     }
-  })();
+  });
 }

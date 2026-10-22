@@ -1,21 +1,12 @@
 import { createHash } from 'node:crypto';
-import type Database from 'better-sqlite3';
+import type { Sql } from './db';
 import { ENTITIES, entityFor, NORMALIZED_MIGRATION, type EntitySchema, type Field } from './normalizedSchema';
 import { migratePartnerContact } from './partnerContact';
 
-type DB = Database.Database;
+type DB = Sql;
 type Row = Record<string, any>;
 const q = (name: string) => `"${name.replaceAll('"', '""')}"`;
-// Compiling SQL dominates per-row cost; statements are reusable, so compile each text once per connection.
-const statements = new WeakMap<DB, Map<string, Database.Statement>>();
-function prep(db: DB, sql: string) {
-  let cache = statements.get(db);
-  if (!cache) statements.set(db, cache = new Map());
-  let statement = cache.get(sql);
-  if (!statement) cache.set(sql, statement = db.prepare(sql));
-  return statement;
-}
-export const normalizedCoreReady = (db: DB) => Boolean(prep(db, "SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").get()) && Boolean(prep(db, 'SELECT 1 FROM schema_migrations WHERE id = ?').get(NORMALIZED_MIGRATION));
+export const normalizedCoreReady = async (db: DB) => Boolean(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'")) && Boolean(await db.get('SELECT 1 FROM schema_migrations WHERE id = ?', NORMALIZED_MIGRATION));
 
 // Integer coefficient + decimal scale preserves existing decimal amounts without rounding.
 export function decimalParts(value: unknown): { minor: bigint; scale: number } {
@@ -35,7 +26,7 @@ function fieldDDL(field: Field): string {
   const check = field.kind === 'boolean' ? ` CHECK (${q(field.sql)} IN (0,1))` : field.kind === 'json' ? ` CHECK (${q(field.sql)} IS NULL OR json_valid(${q(field.sql)}))` : '';
   return `${q(field.sql)} ${type}${check}`;
 }
-export function createNormalizedCoreSchema(db: DB) {
+export async function createNormalizedCoreSchema(db: DB) {
   for (const entity of ENTITIES) {
     const relations = entity.table === 'contracts' ? [
       'FOREIGN KEY (organization_id, partner_id) REFERENCES partners(organization_id, partner_id) DEFERRABLE INITIALLY DEFERRED',
@@ -47,7 +38,7 @@ export function createNormalizedCoreSchema(db: DB) {
       : entity.table === 'evaluations' ? ['FOREIGN KEY (organization_id, partner_id) REFERENCES partners(organization_id, partner_id) DEFERRABLE INITIALLY DEFERRED'] : [];
     // Global operational activity may have no organization; business ownership never gets guessed.
     const optionalOrg = entity.table === 'activity_logs';
-    db.exec(`CREATE TABLE IF NOT EXISTS ${q(entity.table)} (
+    await db.exec(`CREATE TABLE IF NOT EXISTS ${q(entity.table)} (
       ${q(entity.key)} TEXT PRIMARY KEY NOT NULL CHECK(length(trim(${q(entity.key)})) > 0),
       organization_id TEXT ${optionalOrg ? '' : 'NOT NULL'} REFERENCES organization(id) DEFERRABLE INITIALLY DEFERRED,
       record_position INTEGER NOT NULL,
@@ -56,9 +47,9 @@ export function createNormalizedCoreSchema(db: DB) {
       ${entity.table === 'contracts' ? "risk_score REAL GENERATED ALWAYS AS (json_extract(redline_analysis,'$.overallRiskScore')) VIRTUAL, risk_level TEXT GENERATED ALWAYS AS (json_extract(redline_analysis,'$.riskLevel')) VIRTUAL," : ''}
       UNIQUE(organization_id, ${q(entity.key)})${relations.length ? ',\n' + relations.join(',\n') : ''}
     )`);
-    db.exec(`CREATE INDEX IF NOT EXISTS ${q('idx_v3_' + entity.table + '_org_order')} ON ${q(entity.table)}(organization_id, record_position, ${q(entity.key)})`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS ${q('idx_v3_' + entity.table + '_org_order')} ON ${q(entity.table)}(organization_id, record_position, ${q(entity.key)})`);
   }
-  db.exec(`
+  await db.exec(`
     CREATE INDEX IF NOT EXISTS idx_v3_partners_name ON partners(organization_id, partner_name COLLATE NOCASE, partner_id);
     CREATE INDEX IF NOT EXISTS idx_v3_partners_owner ON partners(organization_id, internal_pic, partner_id);
     CREATE INDEX IF NOT EXISTS idx_v3_contracts_partner ON contracts(organization_id, partner_id);
@@ -176,60 +167,61 @@ function decodeFields(record: Row, fields: Field[]) {
 function upsert(db: DB, table: string, key: string[], values: Row) {
   const columns = Object.keys(values);
   const changed = columns.filter(column => !key.includes(column));
-  return prep(db, `INSERT INTO ${q(table)} (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})
+  return db.run(`INSERT INTO ${q(table)} (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})
     ON CONFLICT(${key.map(q).join(',')}) DO UPDATE SET ${changed.map(column => `${q(column)}=excluded.${q(column)}`).join(',')}
-    WHERE ${changed.map(column => `${q(table)}.${q(column)} IS NOT excluded.${q(column)}`).join(' OR ')}`).run(values);
+    WHERE ${changed.map(column => `${q(table)}.${q(column)} IS NOT excluded.${q(column)}`).join(' OR ')}`, values);
 }
 function arrayMarkers(row: Row, keys: string[]) {
   const copy = { ...row };
   for (const key of keys) if (Array.isArray(copy[key])) copy[key] = [];
   return copy;
 }
-function writeChildren(db: DB, entity: EntitySchema, row: Row) {
+async function writeChildren(db: DB, entity: EntitySchema, row: Row) {
   const id = String(row[entity.key]);
-  const replaceList = (table: string, parentKey: string, list: any[], make: (value: any, index: number) => Row) => {
-    prep(db, `DELETE FROM ${q(table)} WHERE ${q(parentKey)} = ?`).run(id);
-    list.forEach((value, position) => { const record = { [parentKey]: id, position, ...make(value, position) }; const columns = Object.keys(record); prep(db, `INSERT INTO ${q(table)} (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})`).run(record); });
+  const insert = (table: string, record: Row) => { const columns = Object.keys(record); return db.run(`INSERT INTO ${q(table)} (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})`, record); };
+  const replaceList = async (table: string, parentKey: string, list: any[], make: (value: any, index: number) => Row) => {
+    await db.run(`DELETE FROM ${q(table)} WHERE ${q(parentKey)} = ?`, id);
+    for (const [position, value] of list.entries()) await insert(table, { [parentKey]: id, position, ...make(value, position) });
   };
   if (entity.table === 'partners') {
-    replaceList('partner_categories','partner_id',row.tags || [], value => ({ category: value }));
-    replaceList('partner_identifiers','partner_id',row.identifiers || [], value => encodeFields(value,identifierFields));
-    replaceList('partner_dd_requirements','partner_id',row.dd_documents || [], value => encodeFields(arrayMarkers(value,['files']),ddFields));
-    (row.dd_documents || []).forEach((requirement: Row, index: number) => {
-      (requirement.files || []).forEach((file: Row, position: number) => {
-        const values = { partner_id: id, requirement_position: index, position, ...encodeFields(file,fileFields) };
-        const columns = Object.keys(values);
-        prep(db, `INSERT INTO partner_dd_files (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})`).run(values);
-      });
-    });
+    await replaceList('partner_categories','partner_id',row.tags || [], value => ({ category: value }));
+    await replaceList('partner_identifiers','partner_id',row.identifiers || [], value => encodeFields(value,identifierFields));
+    await replaceList('partner_dd_requirements','partner_id',row.dd_documents || [], value => encodeFields(arrayMarkers(value,['files']),ddFields));
+    for (const [index, requirement] of (row.dd_documents || []).entries()) {
+      for (const [position, file] of (requirement.files || []).entries()) {
+        await insert('partner_dd_files', { partner_id: id, requirement_position: index, position, ...encodeFields(file,fileFields) });
+      }
+    }
   }
-  if (entity.table === 'contracts') replaceList('contract_categories','contract_id',row.cooperation_categories || [], value => ({ category: value }));
+  if (entity.table === 'contracts') await replaceList('contract_categories','contract_id',row.cooperation_categories || [], value => ({ category: value }));
   if (entity.table === 'spendings') {
-    replaceList('spending_allocations','spending_id',row.month_allocations || [], value => ({ month: value.month, amount_minor: decimalParts(value.amount).minor, amount_scale: decimalParts(value.amount).scale, extra_json: JSON.stringify(Object.fromEntries(Object.entries(value).filter(([key]) => !['month','amount'].includes(key)))) }));
-    replaceList('spending_reporting_months','spending_id',row.invoice_month || [], value => ({ month: value }));
+    await replaceList('spending_allocations','spending_id',row.month_allocations || [], value => ({ month: value.month, amount_minor: decimalParts(value.amount).minor, amount_scale: decimalParts(value.amount).scale, extra_json: JSON.stringify(Object.fromEntries(Object.entries(value).filter(([key]) => !['month','amount'].includes(key)))) }));
+    await replaceList('spending_reporting_months','spending_id',row.invoice_month || [], value => ({ month: value }));
   }
 }
-function childArrays(db: DB, entity: EntitySchema, row: Row) {
-  const list = (table: string, parentKey: string) => prep(db, `SELECT * FROM ${q(table)} WHERE ${q(parentKey)} = ? ORDER BY position`).safeIntegers().all(row[entity.key]) as Row[];
+async function childArrays(db: DB, entity: EntitySchema, row: Row) {
+  const list = (table: string, parentKey: string) => db.all<Row>(`SELECT * FROM ${q(table)} WHERE ${q(parentKey)} = ? ORDER BY position`, row[entity.key]);
   const assign = (key: string, value: any[]) => { if (value.length || key in row) row[key] = value; };
   if (entity.table === 'partners') {
-    assign('tags',list('partner_categories','partner_id').map(record => record.category));
-    assign('identifiers',list('partner_identifiers','partner_id').map(record => decodeFields(record,identifierFields)));
-    assign('dd_documents',list('partner_dd_requirements','partner_id').map(record => {
+    assign('tags',(await list('partner_categories','partner_id')).map(record => record.category));
+    assign('identifiers',(await list('partner_identifiers','partner_id')).map(record => decodeFields(record,identifierFields)));
+    const requirements = [];
+    for (const record of await list('partner_dd_requirements','partner_id')) {
       const requirement = decodeFields(record,ddFields);
-      const files = prep(db, 'SELECT * FROM partner_dd_files WHERE partner_id = ? AND requirement_position = ? ORDER BY position').safeIntegers().all(row.partner_id, record.position) as Row[];
+      const files = await db.all<Row>('SELECT * FROM partner_dd_files WHERE partner_id = ? AND requirement_position = ? ORDER BY position', row.partner_id, record.position);
       if (files.length || 'files' in requirement) requirement.files = files.map(file => decodeFields(file,fileFields));
-      return requirement;
-    }));
+      requirements.push(requirement);
+    }
+    assign('dd_documents',requirements);
     if (!('pic_contact' in row) && (row.pic_email || row.pic_phone)) row.pic_contact = [row.pic_email,row.pic_phone].filter(Boolean).join(' / ');
   }
-  if (entity.table === 'contracts') assign('cooperation_categories',list('contract_categories','contract_id').map(record => record.category));
+  if (entity.table === 'contracts') assign('cooperation_categories',(await list('contract_categories','contract_id')).map(record => record.category));
   if (entity.table === 'spendings') {
-    assign('month_allocations',list('spending_allocations','spending_id').map(record => ({ ...JSON.parse(record.extra_json), month: record.month, amount: Number(`${record.amount_minor}e-${record.amount_scale}`) })));
-    assign('invoice_month',list('spending_reporting_months','spending_id').map(record => record.month));
+    assign('month_allocations',(await list('spending_allocations','spending_id')).map(record => ({ ...JSON.parse(record.extra_json), month: record.month, amount: Number(`${record.amount_minor}e-${record.amount_scale}`) })));
+    assign('invoice_month',(await list('spending_reporting_months','spending_id')).map(record => record.month));
   }
 }
-export function readBusinessRows(db: DB, table: string, organizationId?: string, searchIds?: string[]): Row[] {
+export async function readBusinessRows(db: DB, table: string, organizationId?: string, searchIds?: string[]): Promise<Row[]> {
   const entity = entityFor(table);
   const clauses: string[] = []; const params: any[] = [];
   if (organizationId !== undefined) { clauses.push('organization_id = ?'); params.push(organizationId); }
@@ -237,28 +229,24 @@ export function readBusinessRows(db: DB, table: string, organizationId?: string,
     if (!searchIds.length) return [];
     clauses.push(`${q(entity.key)} IN (${searchIds.map(() => '?').join(',')})`); params.push(...searchIds);
   }
-  const records = prep(db, `SELECT * FROM ${q(table)}${clauses.length ? ' WHERE ' + clauses.join(' AND ') : ''} ORDER BY record_position, ${q(entity.key)}`).safeIntegers().all(...params) as Row[];
-  return records.map(record => { const row = decodeFields(record,entity.fields); row[entity.key] = record[entity.key]; row.organizationId = record.organization_id; childArrays(db,entity,row); return row; });
+  const records = await db.all<Row>(`SELECT * FROM ${q(table)}${clauses.length ? ' WHERE ' + clauses.join(' AND ') : ''} ORDER BY record_position, ${q(entity.key)}`, ...params);
+  const rows: Row[] = [];
+  for (const record of records) { const row = decodeFields(record,entity.fields); row[entity.key] = record[entity.key]; row.organizationId = record.organization_id; await childArrays(db,entity,row); rows.push(row); }
+  return rows;
 }
 // Fingerprints of rows as last written, so an unchanged row costs one hash instead of several SQL round trips.
-// Trusted only while this connection made every change since: any other write (sessions, SQL editor, restore) drops it.
-// shortcut: any write by another module on this connection empties the cache, costing one full-speed-less save; upgrade to per-table counters if that is frequent.
-const syncedRows = new WeakMap<DB, { changes: number; fingerprints: Map<string, string> }>();
-const changesOf = (db: DB) => (prep(db, 'SELECT total_changes() AS n').get() as { n: number }).n;
+// Business tables are written only through this function, so the cache stays valid until a rollback or a direct
+// delete (application reset) calls resetSyncCache. Callers whose outer transaction fails must reset it too.
+const syncedRows = new WeakMap<DB, Map<string, string>>();
 const fingerprintOf = (table: string, position: number, input: Row) =>
   table + '\u0000' + createHash('sha1').update(position + ':' + JSON.stringify(input)).digest('base64');
-/** The caller's own writes after synchronizeBusinessRows (same save) must not count as foreign changes. */
-export function acknowledgeOwnWrites(db: DB) {
-  const state = syncedRows.get(db);
-  if (state) state.changes = changesOf(db);
-}
-export function synchronizeBusinessRows(db: DB, data: Row) {
-  const previous = syncedRows.get(db);
-  const known = previous && previous.changes === changesOf(db) ? previous.fingerprints : new Map<string, string>();
+export const resetSyncCache = (db: DB) => { syncedRows.delete(db); };
+export async function synchronizeBusinessRows(db: DB, data: Row) {
+  const known = syncedRows.get(db) ?? new Map<string, string>();
   const written = new Map<string, string>();
   // All tables commit together. Deferred constraints support reparenting and full replacement.
   try {
-  db.transaction(() => {
+  await db.tx(async () => {
     for (const entity of ENTITIES) {
       const rows = Array.isArray(data[entity.collection]) ? data[entity.collection] : [];
       const seen = new Set<string>();
@@ -277,37 +265,35 @@ export function synchronizeBusinessRows(db: DB, data: Row) {
         if (seen.has(id)) throw new Error(`Duplicate ${entity.key} in ${entity.table}: ${id}`);
         seen.add(id);
         written.set(fingerprint,id);
-        const old = readBusinessRows(db,entity.table,undefined,[id])[0];
         const markerKeys = entity.table === 'partners' ? ['tags','identifiers','dd_documents'] : entity.table === 'contracts' ? ['cooperation_categories'] : entity.table === 'spendings' ? ['month_allocations','invoice_month'] : [];
         const values = { [entity.key]: id, organization_id: row.organizationId ?? null, record_position: position, ...encodeFields(arrayMarkers(row,markerKeys), entity.fields, [entity.key,'organizationId']) };
-        upsert(db,entity.table,[entity.key],values);
-        // Only replace child rows when their values actually change.
-        if (!old || markerKeys.some(key => JSON.stringify(old[key]) !== JSON.stringify(row[key]))) writeChildren(db,entity,row);
+        await upsert(db,entity.table,[entity.key],values);
+        await writeChildren(db,entity,row);
         if (entity.search.length) {
           const texts = entity.search.map(key => String(row[key] || ''));
-          upsert(db,'search_records',['entity_type','entity_id'],{ organization_id: row.organizationId, entity_type: entity.table, entity_id: id, title: texts[0], body: texts.slice(1).join('\n') });
+          await upsert(db,'search_records',['entity_type','entity_id'],{ organization_id: row.organizationId, entity_type: entity.table, entity_id: id, title: texts[0], body: texts.slice(1).join('\n') });
         }
       }
-      const stored = prep(db, `SELECT ${q(entity.key)} AS id FROM ${q(entity.table)}`).all() as {id:string}[];
+      const stored = await db.all<{id:string}>(`SELECT ${q(entity.key)} AS id FROM ${q(entity.table)}`);
       for (const {id} of stored) if (!seen.has(id)) {
-        prep(db, `DELETE FROM ${q(entity.table)} WHERE ${q(entity.key)} = ?`).run(id);
-        prep(db, 'DELETE FROM search_records WHERE entity_type = ? AND entity_id = ?').run(entity.table,id);
+        await db.run(`DELETE FROM ${q(entity.table)} WHERE ${q(entity.key)} = ?`, id);
+        await db.run('DELETE FROM search_records WHERE entity_type = ? AND entity_id = ?', entity.table,id);
       }
     }
-  })();
+  });
   } catch (error) {
     syncedRows.delete(db); // rolled back: nothing about the cache can be trusted
     throw error;
   }
-  syncedRows.set(db,{ changes: changesOf(db), fingerprints: written });
+  syncedRows.set(db,written);
 }
 export interface SearchHit { entity_type: string; entity_id: string; title: string; score: number }
-export function searchBusinessRows(db: DB, organizationId: string, query: string): SearchHit[] {
+export async function searchBusinessRows(db: DB, organizationId: string, query: string): Promise<SearchHit[]> {
   const tokens = query.match(/[\p{L}\p{N}_]+/gu)?.slice(0,16) || [];
   if (!tokens.length) return [];
   const match = tokens.map(token => '"' + token.replaceAll('"','""') + '"*').join(' AND ');
   // Authorization by department is applied by the caller before returning any text/counts.
-  return prep(db, `SELECT s.entity_type,s.entity_id,s.title,bm25(business_search) AS score
+  return db.all<SearchHit>(`SELECT s.entity_type,s.entity_id,s.title,bm25(business_search) AS score
     FROM business_search JOIN search_records s ON s.rowid=business_search.rowid
-    WHERE business_search MATCH ? AND s.organization_id = ? ORDER BY score,s.entity_type,s.entity_id`).all(match,organizationId) as SearchHit[];
+    WHERE business_search MATCH ? AND s.organization_id = ? ORDER BY score,s.entity_type,s.entity_id`, match,organizationId);
 }

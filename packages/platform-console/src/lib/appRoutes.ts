@@ -81,12 +81,13 @@ export function resolveRoute(tab: string, ctx: RouteContext): RouteDecision {
     }
     case 'settings-ai':
       return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-ai' } : { kind: 'denied' };
-    case 'settings-security':
-      return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-database' } : { kind: 'denied' };
     case 'settings-language':
       return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-ui-texts' } : { kind: 'denied' };
-    // The Design System catalog page was removed; old links land on the System Console dashboard.
+    // Removed pages (Design System catalog, SQLite database and backups); old links land on the System Console dashboard.
     case 'admin-system-design-system':
+    case 'admin-system-database':
+    case 'admin-system-backups':
+    case 'settings-security':
       return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-dashboard' } : { kind: 'denied' };
     case 'admin-system-settings':
       return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-google' } : { kind: 'denied' };

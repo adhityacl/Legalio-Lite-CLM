@@ -1,6 +1,7 @@
 import express from "express";
 import crypto from "crypto";
-import type { Database } from "better-sqlite3";
+import type { Sql } from "./db";
+import { forwardAsyncRouteErrors } from "./asyncRoutes";
 import {
   DOCUMENT_SORT_KEYS,
   DOCUMENT_STATUSES,
@@ -11,7 +12,7 @@ import {
   type CommentAction,
   type DocumentSortKey,
 } from "@legalio/types/documents";
-import { approvalStatusLock, ensureApprovalSchema } from "./approvalRoutes";
+import { approvalStatusLock } from "./approvalRoutes";
 import { sanitizePageLayout } from "@legalio/shared/pageLayout";
 
 // ponytail: unnamed, unlabeled versions beyond this are pruned; named/labeled ones are kept forever.
@@ -29,8 +30,8 @@ const MAX_TEXT = 5000;
 /** Stored page setup: validated, null when the request carries none. */
 const pageLayoutJson = (value: unknown) => (value === undefined || value === null ? null : JSON.stringify(sanitizePageLayout(value)));
 
-export function ensureDocumentSchema(db: Database) {
-  db.exec(`
+export async function ensureDocumentSchema(db: Sql) {
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS contract_documents (
       id TEXT PRIMARY KEY,
       organization_id TEXT NOT NULL,
@@ -103,8 +104,8 @@ export function ensureDocumentSchema(db: Database) {
     CREATE INDEX IF NOT EXISTS idx_contract_comments_contract ON contract_comments (contract_id, status);
   `);
   // Page setup (paper, margins, header, footer) as JSON; null means the defaults.
-  if (!(db.prepare('PRAGMA table_info(contract_documents)').all() as { name: string }[]).some((column) => column.name === 'page_layout')) {
-    db.exec('ALTER TABLE contract_documents ADD COLUMN page_layout TEXT');
+  if (!(await db.all('PRAGMA table_info(contract_documents)') as { name: string }[]).some((column) => column.name === 'page_layout')) {
+    await db.exec('ALTER TABLE contract_documents ADD COLUMN page_layout TEXT');
   }
 }
 
@@ -141,7 +142,7 @@ interface CommentRow {
 }
 
 export interface DocumentRouterOptions {
-  db: Database;
+  db: Sql;
   /** Organization of the verified request context; never widened by client input. */
   tenantOf: (req: express.Request) => string;
 }
@@ -164,9 +165,8 @@ const newId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
 const cleanName = (value: unknown) => str(value).slice(0, 200);
 
 export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
-  ensureDocumentSchema(db);
-  ensureApprovalSchema(db);
   const router = express.Router();
+  forwardAsyncRouteErrors(router);
   const actorOf = (req: express.Request) => (req as unknown as { actor?: Actor | null }).actor ?? null;
 
   router.use(["/documents", "/metadata-fields"], (req, res, next) => {
@@ -174,30 +174,28 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
     next();
   });
 
-  const documentDetail = (id: string) =>
-    db.prepare(`
+  const documentDetail = async (id: string) =>
+    await db.get(`
       SELECT d.*, ${nameOf("d.created_by")} AS created_by_name, ${nameOf("d.modified_by")} AS modified_by_name,
         (SELECT COUNT(*) FROM contract_drafts v WHERE v.contract_id = d.id) AS draft_count
       FROM contract_documents d WHERE d.id = ?
-    `).get(id);
+    `, id);
 
   /** Looks the document up inside the caller's tenant; other tenants' documents answer 404. */
   const withDocument =
     (handler: (req: express.Request, res: express.Response, doc: DocumentRow, actor: Actor) => unknown) =>
-    (req: express.Request, res: express.Response) => {
-      const doc = db
-        .prepare(`SELECT id, organization_id, name, status FROM contract_documents WHERE id = ? AND organization_id = ?`)
-        .get(req.params.id, tenantOf(req)) as DocumentRow | undefined;
+    async (req: express.Request, res: express.Response) => {
+      const doc = await db.get(`SELECT id, organization_id, name, status FROM contract_documents WHERE id = ? AND organization_id = ?`, req.params.id, tenantOf(req)) as DocumentRow | undefined;
       if (!doc) return res.status(404).json({ error: "Document not found." });
       return handler(req, res, doc, actorOf(req)!);
     };
 
-  const latestDraft = (contractId: string) =>
-    db.prepare(`SELECT * FROM contract_drafts WHERE contract_id = ? ORDER BY version_number DESC LIMIT 1`).get(contractId) as
+  const latestDraft = async (contractId: string) =>
+    await db.get(`SELECT * FROM contract_drafts WHERE contract_id = ? ORDER BY version_number DESC LIMIT 1`, contractId) as
       | DraftRow
       | undefined;
 
-  const insertDraft = (
+  const insertDraft = async (
     contractId: string,
     version: number,
     content: string,
@@ -206,20 +204,20 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
     at: string,
     restoredFrom: number | null = null,
   ) => {
-    db.prepare(`
+    await db.run(`
       INSERT INTO contract_drafts (id, contract_id, version_number, content, content_hash, file_size, save_kind, restored_from, saved_by, created_at, saved_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(newId("ver"), contractId, version, content, sha256(content), byteSize(content), kind, restoredFrom, actorId, at, at);
+    `, newId("ver"), contractId, version, content, sha256(content), byteSize(content), kind, restoredFrom, actorId, at, at);
   };
 
-  const setCurrentContent = (contractId: string, content: string, version: number, actorId: string, at: string) => {
-    db.prepare(`
+  const setCurrentContent = async (contractId: string, content: string, version: number, actorId: string, at: string) => {
+    await db.run(`
       UPDATE contract_documents SET content = ?, file_size = ?, current_version = ?, modified_by = ?, modified_at = ? WHERE id = ?
-    `).run(content, byteSize(content), version, actorId, at, contractId);
+    `, content, byteSize(content), version, actorId, at, contractId);
   };
 
-  const pruneDrafts = (contractId: string) => {
-    db.prepare(`
+  const pruneDrafts = async (contractId: string) => {
+    await db.run(`
       DELETE FROM contract_drafts
       WHERE contract_id = @id AND draft_name IS NULL AND labels = '[]'
         AND version_number NOT IN (
@@ -227,12 +225,12 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
           WHERE contract_id = @id AND draft_name IS NULL AND labels = '[]'
           ORDER BY version_number DESC LIMIT @keep
         )
-    `).run({ id: contractId, keep: MAX_UNNAMED_VERSIONS });
+    `, { id: contractId, keep: MAX_UNNAMED_VERSIONS });
   };
 
   /* ----------------------------- documents ----------------------------- */
 
-  router.get("/documents", (req, res) => {
+  router.get("/documents", async (req, res) => {
     const org = tenantOf(req);
     const where = ["d.organization_id = @org"];
     const params: Record<string, string | number> = { org };
@@ -284,24 +282,22 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
     const page = Math.max(1, Math.floor(Number(req.query.page)) || 1);
     const whereSql = where.join(" AND ");
 
-    const { total } = db.prepare(`SELECT COUNT(*) AS total FROM contract_documents d WHERE ${whereSql}`).get(params) as {
+    const { total } = await db.get(`SELECT COUNT(*) AS total FROM contract_documents d WHERE ${whereSql}`, params) as {
       total: number;
     };
-    const documents = db.prepare(`
+    const documents = await db.all(`
       SELECT d.id, d.name, d.type, d.status, d.file_size, d.current_version, d.created_by, d.created_at,
         d.modified_by, d.modified_at, ${nameOf("d.created_by")} AS created_by_name, ${nameOf("d.modified_by")} AS modified_by_name
       FROM contract_documents d WHERE ${whereSql}
       ORDER BY ${SORT_SQL[sortKey]} ${direction}, d.id
       LIMIT @limit OFFSET @offset
-    `).all({ ...params, limit, offset: (page - 1) * limit });
-    const creators = db
-      .prepare(`SELECT DISTINCT d.created_by AS id, ${nameOf("d.created_by")} AS name FROM contract_documents d WHERE d.organization_id = ?`)
-      .all(org);
+    `, { ...params, limit, offset: (page - 1) * limit });
+    const creators = await db.all(`SELECT DISTINCT d.created_by AS id, ${nameOf("d.created_by")} AS name FROM contract_documents d WHERE d.organization_id = ?`, org);
 
     res.json({ total, page, limit, documents, creators });
   });
 
-  router.post("/documents", (req, res) => {
+  router.post("/documents", async (req, res) => {
     const actor = actorOf(req)!;
     const name = cleanName(req.body?.name);
     if (!name) return res.status(400).json({ error: "Document name is required." });
@@ -309,47 +305,47 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
     const type = isOneOf(DOCUMENT_TYPES, req.body?.type) ? req.body.type : "contract";
     const id = newId("doc");
     const at = new Date().toISOString();
-    db.transaction(() => {
-      db.prepare(`
+    await db.tx(async () => {
+      await db.run(`
         INSERT INTO contract_documents (id, organization_id, name, type, status, content, current_version, file_size, created_by, created_at, modified_by, modified_at, page_layout)
         VALUES (?, ?, ?, ?, 'draft', ?, 1, ?, ?, ?, ?, ?, ?)
-      `).run(id, tenantOf(req), name, type, content, byteSize(content), actor.id, at, actor.id, at, pageLayoutJson(req.body?.page_layout));
-      insertDraft(id, 1, content, actor.id, "manual", at);
-    })();
-    res.status(201).json(documentDetail(id));
+      `, id, tenantOf(req), name, type, content, byteSize(content), actor.id, at, actor.id, at, pageLayoutJson(req.body?.page_layout));
+      await insertDraft(id, 1, content, actor.id, "manual", at);
+    });
+    res.status(201).json(await documentDetail(id));
   });
 
-  router.get("/documents/:id", withDocument((_req, res, doc) => res.json(documentDetail(doc.id))));
+  router.get("/documents/:id", withDocument(async (_req, res, doc) => res.json(await documentDetail(doc.id))));
 
   router.patch(
     "/documents/:id",
-    withDocument((req, res, doc, actor) => {
+    withDocument(async (req, res, doc, actor) => {
       const name = req.body?.name === undefined ? doc.name : cleanName(req.body.name);
       if (!name) return res.status(400).json({ error: "Document name is required." });
       const { status, type } = req.body ?? {};
       if (status !== undefined && !isOneOf(DOCUMENT_STATUSES, status)) return res.status(400).json({ error: "Invalid status." });
       if (type !== undefined && !isOneOf(DOCUMENT_TYPES, type)) return res.status(400).json({ error: "Invalid type." });
-      const locked = status === undefined ? null : approvalStatusLock(db, doc.id, doc.status, status);
+      const locked = status === undefined ? null : await approvalStatusLock(db, doc.id, doc.status, status);
       if (locked) return res.status(409).json({ error: "APPROVAL_OWNS_STATUS", message: locked });
-      db.prepare(`
+      await db.run(`
         UPDATE contract_documents SET name = ?, status = COALESCE(?, status), type = COALESCE(?, type), page_layout = COALESCE(?, page_layout), modified_by = ?, modified_at = ?
         WHERE id = ?
-      `).run(name, status ?? null, type ?? null, pageLayoutJson(req.body?.page_layout), actor.id, new Date().toISOString(), doc.id);
-      res.json(documentDetail(doc.id));
+      `, name, status ?? null, type ?? null, pageLayoutJson(req.body?.page_layout), actor.id, new Date().toISOString(), doc.id);
+      res.json(await documentDetail(doc.id));
     }),
   );
 
   router.delete(
     "/documents/:id",
-    withDocument((_req, res, doc) => {
-      const locked = approvalStatusLock(db, doc.id, doc.status, null);
+    withDocument(async (_req, res, doc) => {
+      const locked = await approvalStatusLock(db, doc.id, doc.status, null);
       if (locked) return res.status(409).json({ error: "APPROVAL_OWNS_STATUS", message: locked });
-      db.transaction(() => {
+      await db.tx(async () => {
         for (const table of ["contract_comments", "document_metadata", "contract_drafts"]) {
-          db.prepare(`DELETE FROM ${table} WHERE contract_id = ?`).run(doc.id);
+          await db.run(`DELETE FROM ${table} WHERE contract_id = ?`, doc.id);
         }
-        db.prepare(`DELETE FROM contract_documents WHERE id = ?`).run(doc.id);
-      })();
+        await db.run(`DELETE FROM contract_documents WHERE id = ?`, doc.id);
+      });
       res.json({ success: true });
     }),
   );
@@ -358,23 +354,23 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
 
   router.get(
     "/documents/:id/drafts",
-    withDocument((_req, res, doc) => {
-      const rows = db.prepare(`
+    withDocument(async (_req, res, doc) => {
+      const rows = await db.all(`
         SELECT version_number, draft_name, labels, file_size, save_kind, restored_from, saved_by, saved_at,
           ${nameOf("saved_by")} AS saved_by_name
         FROM contract_drafts WHERE contract_id = ? ORDER BY version_number DESC
-      `).all(doc.id) as Array<{ labels: string }>;
+      `, doc.id) as Array<{ labels: string }>;
       res.json(rows.map((row) => ({ ...row, labels: JSON.parse(row.labels) })));
     }),
   );
 
   router.get(
     "/documents/:id/drafts/:version",
-    withDocument((req, res, doc) => {
-      const row = db.prepare(`
+    withDocument(async (req, res, doc) => {
+      const row = await db.get(`
         SELECT version_number, content, draft_name, labels, saved_by, saved_at, ${nameOf("saved_by")} AS saved_by_name
         FROM contract_drafts WHERE contract_id = ? AND version_number = ?
-      `).get(doc.id, Number(req.params.version)) as { labels: string } | undefined;
+      `, doc.id, Number(req.params.version)) as { labels: string } | undefined;
       if (!row) return res.status(404).json({ error: "Version not found." });
       res.json({ ...row, labels: JSON.parse(row.labels) });
     }),
@@ -382,20 +378,20 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
 
   router.post(
     "/documents/:id/drafts",
-    withDocument((req, res, doc, actor) => {
+    withDocument(async (req, res, doc, actor) => {
       const content = req.body?.content;
       if (typeof content !== "string") return res.status(400).json({ error: "Content is required." });
       const kind = req.body?.kind === "auto" ? "auto" : "manual";
       const name = cleanName(req.body?.name) || doc.name;
       const at = new Date().toISOString();
-      const latest = latestDraft(doc.id);
+      const latest = await latestDraft(doc.id);
       const version = latest?.version_number ?? 0;
 
       if (latest && latest.content_hash === sha256(content)) {
         if (name !== doc.name) {
-          db.prepare(`UPDATE contract_documents SET name = ?, modified_by = ?, modified_at = ? WHERE id = ?`).run(name, actor.id, at, doc.id);
+          await db.run(`UPDATE contract_documents SET name = ?, modified_by = ?, modified_at = ? WHERE id = ?`, name, actor.id, at, doc.id);
         }
-        return res.json({ document: documentDetail(doc.id), version, created: false });
+        return res.json({ document: await documentDetail(doc.id), version, created: false });
       }
 
       const coalesce =
@@ -408,68 +404,61 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
         Date.now() - Date.parse(latest.created_at) < AUTOSAVE_COALESCE_MS;
       const nextVersion = coalesce ? version : version + 1;
 
-      db.transaction(() => {
+      await db.tx(async () => {
         if (coalesce) {
-          db.prepare(`
+          await db.run(`
             UPDATE contract_drafts SET content = ?, content_hash = ?, file_size = ?, saved_at = ?
             WHERE contract_id = ? AND version_number = ?
-          `).run(content, sha256(content), byteSize(content), at, doc.id, version);
+          `, content, sha256(content), byteSize(content), at, doc.id, version);
         } else {
-          insertDraft(doc.id, nextVersion, content, actor.id, kind, at);
+          await insertDraft(doc.id, nextVersion, content, actor.id, kind, at);
         }
-        setCurrentContent(doc.id, content, nextVersion, actor.id, at);
-        db.prepare(`UPDATE contract_documents SET name = ? WHERE id = ?`).run(name, doc.id);
-        pruneDrafts(doc.id);
-      })();
-      res.json({ document: documentDetail(doc.id), version: nextVersion, created: !coalesce });
+        await setCurrentContent(doc.id, content, nextVersion, actor.id, at);
+        await db.run(`UPDATE contract_documents SET name = ? WHERE id = ?`, name, doc.id);
+        await pruneDrafts(doc.id);
+      });
+      res.json({ document: await documentDetail(doc.id), version: nextVersion, created: !coalesce });
     }),
   );
 
   router.patch(
     "/documents/:id/drafts/:version",
-    withDocument((req, res, doc) => {
+    withDocument(async (req, res, doc) => {
       const version = Number(req.params.version);
-      const exists = db.prepare(`SELECT 1 FROM contract_drafts WHERE contract_id = ? AND version_number = ?`).get(doc.id, version);
+      const exists = await db.get(`SELECT 1 FROM contract_drafts WHERE contract_id = ? AND version_number = ?`, doc.id, version);
       if (!exists) return res.status(404).json({ error: "Version not found." });
       const draftName = str(req.body?.draft_name).slice(0, 100) || null;
       const rawLabels: unknown[] = Array.isArray(req.body?.labels) ? req.body.labels : [];
       const labels = Array.from(new Set(rawLabels.map((l) => str(l).slice(0, 40)).filter(Boolean))).slice(0, 10);
-      db.prepare(`UPDATE contract_drafts SET draft_name = ?, labels = ? WHERE contract_id = ? AND version_number = ?`).run(
-        draftName,
-        JSON.stringify(labels),
-        doc.id,
-        version,
-      );
+      await db.run(`UPDATE contract_drafts SET draft_name = ?, labels = ? WHERE contract_id = ? AND version_number = ?`, draftName, JSON.stringify(labels), doc.id, version);
       res.json({ success: true });
     }),
   );
 
   router.post(
     "/documents/:id/drafts/:version/restore",
-    withDocument((req, res, doc, actor) => {
-      const source = db
-        .prepare(`SELECT version_number, content, content_hash FROM contract_drafts WHERE contract_id = ? AND version_number = ?`)
-        .get(doc.id, Number(req.params.version)) as Pick<DraftRow, "version_number" | "content" | "content_hash"> | undefined;
+    withDocument(async (req, res, doc, actor) => {
+      const source = await db.get(`SELECT version_number, content, content_hash FROM contract_drafts WHERE contract_id = ? AND version_number = ?`, doc.id, Number(req.params.version)) as Pick<DraftRow, "version_number" | "content" | "content_hash"> | undefined;
       if (!source) return res.status(404).json({ error: "Version not found." });
-      const latest = latestDraft(doc.id)!;
+      const latest = (await latestDraft(doc.id))!;
       if (latest.content_hash === source.content_hash) {
-        return res.json({ document: documentDetail(doc.id), version: latest.version_number, created: false });
+        return res.json({ document: await documentDetail(doc.id), version: latest.version_number, created: false });
       }
       const at = new Date().toISOString();
       const nextVersion = latest.version_number + 1;
-      db.transaction(() => {
-        insertDraft(doc.id, nextVersion, source.content, actor.id, "restore", at, source.version_number);
-        setCurrentContent(doc.id, source.content, nextVersion, actor.id, at);
-        pruneDrafts(doc.id);
-      })();
-      res.json({ document: documentDetail(doc.id), version: nextVersion, created: true });
+      await db.tx(async () => {
+        await insertDraft(doc.id, nextVersion, source.content, actor.id, "restore", at, source.version_number);
+        await setCurrentContent(doc.id, source.content, nextVersion, actor.id, at);
+        await pruneDrafts(doc.id);
+      });
+      res.json({ document: await documentDetail(doc.id), version: nextVersion, created: true });
     }),
   );
 
   /* ------------------------------ metadata ----------------------------- */
 
-  const listFields = (org: string) =>
-    (db.prepare(`SELECT id, name, field_type, options FROM metadata_fields WHERE organization_id = ? ORDER BY created_at, id`).all(org) as Array<{
+  const listFields = async (org: string) =>
+    (await db.all(`SELECT id, name, field_type, options FROM metadata_fields WHERE organization_id = ? ORDER BY created_at, id`, org) as Array<{
       id: string;
       name: string;
       field_type: string;
@@ -481,9 +470,9 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
     res.status(403).json({ error: "INSUFFICIENT_PERMISSION", message: "Only administrators can manage metadata fields." });
   };
 
-  router.get("/metadata-fields", (req, res) => res.json(listFields(tenantOf(req))));
+  router.get("/metadata-fields", async (req, res) => res.json(await listFields(tenantOf(req))));
 
-  router.post("/metadata-fields", requireFieldAdmin, (req, res) => {
+  router.post("/metadata-fields", requireFieldAdmin, async (req, res) => {
     const name = str(req.body?.name).slice(0, 80);
     const fieldType = req.body?.field_type;
     if (!name) return res.status(400).json({ error: "Field name is required." });
@@ -493,35 +482,28 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
     const needsOptions = fieldType === "select" || fieldType === "multi_select";
     if (needsOptions && options.length === 0) return res.status(400).json({ error: "Select fields need at least one option." });
     const id = newId("fld");
-    db.prepare(`INSERT INTO metadata_fields (id, organization_id, name, field_type, options, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
-      id,
-      tenantOf(req),
-      name,
-      fieldType,
-      JSON.stringify(needsOptions ? options : []),
-      new Date().toISOString(),
-    );
-    res.status(201).json(listFields(tenantOf(req)).find((f) => f.id === id));
+    await db.run(`INSERT INTO metadata_fields (id, organization_id, name, field_type, options, created_at) VALUES (?, ?, ?, ?, ?, ?)`, id, tenantOf(req), name, fieldType, JSON.stringify(needsOptions ? options : []), new Date().toISOString());
+    res.status(201).json((await listFields(tenantOf(req))).find((f) => f.id === id));
   });
 
-  router.delete("/metadata-fields/:fieldId", requireFieldAdmin, (req, res) => {
-    const found = db.prepare(`SELECT 1 FROM metadata_fields WHERE id = ? AND organization_id = ?`).get(req.params.fieldId, tenantOf(req));
+  router.delete("/metadata-fields/:fieldId", requireFieldAdmin, async (req, res) => {
+    const found = await db.get(`SELECT 1 FROM metadata_fields WHERE id = ? AND organization_id = ?`, req.params.fieldId, tenantOf(req));
     if (!found) return res.status(404).json({ error: "Field not found." });
-    db.transaction(() => {
-      db.prepare(`DELETE FROM document_metadata WHERE field_id = ?`).run(req.params.fieldId);
-      db.prepare(`DELETE FROM metadata_fields WHERE id = ?`).run(req.params.fieldId);
-    })();
+    await db.tx(async () => {
+      await db.run(`DELETE FROM document_metadata WHERE field_id = ?`, req.params.fieldId);
+      await db.run(`DELETE FROM metadata_fields WHERE id = ?`, req.params.fieldId);
+    });
     res.json({ success: true });
   });
 
   router.get(
     "/documents/:id/metadata",
-    withDocument((_req, res, doc) => {
-      const rows = db.prepare(`SELECT field_id, field_value FROM document_metadata WHERE contract_id = ?`).all(doc.id) as Array<{
+    withDocument(async (_req, res, doc) => {
+      const rows = await db.all(`SELECT field_id, field_value FROM document_metadata WHERE contract_id = ?`, doc.id) as Array<{
         field_id: string;
         field_value: string;
       }>;
-      const fields = new Map(listFields(doc.organization_id).map((f) => [f.id, f]));
+      const fields = new Map((await listFields(doc.organization_id)).map((f) => [f.id, f]));
       const values: Record<string, string | string[]> = {};
       for (const row of rows) {
         values[row.field_id] = fields.get(row.field_id)?.field_type === "multi_select" ? JSON.parse(row.field_value) : row.field_value;
@@ -532,10 +514,10 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
 
   router.put(
     "/documents/:id/metadata",
-    withDocument((req, res, doc, actor) => {
+    withDocument(async (req, res, doc, actor) => {
       const input = req.body?.values;
       if (!input || typeof input !== "object" || Array.isArray(input)) return res.status(400).json({ error: "Values are required." });
-      const fields = new Map(listFields(doc.organization_id).map((f) => [f.id, f]));
+      const fields = new Map((await listFields(doc.organization_id)).map((f) => [f.id, f]));
       const rows: Array<[string, string | null]> = [];
       for (const [fieldId, raw] of Object.entries(input as Record<string, unknown>)) {
         const field = fields.get(fieldId);
@@ -555,19 +537,19 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
         rows.push([fieldId, value || null]);
       }
       const at = new Date().toISOString();
-      db.transaction(() => {
+      await db.tx(async () => {
         for (const [fieldId, value] of rows) {
           if (value === null) {
-            db.prepare(`DELETE FROM document_metadata WHERE contract_id = ? AND field_id = ?`).run(doc.id, fieldId);
+            await db.run(`DELETE FROM document_metadata WHERE contract_id = ? AND field_id = ?`, doc.id, fieldId);
           } else {
-            db.prepare(`
+            await db.run(`
               INSERT INTO document_metadata (contract_id, field_id, field_value, updated_at) VALUES (?, ?, ?, ?)
               ON CONFLICT (contract_id, field_id) DO UPDATE SET field_value = excluded.field_value, updated_at = excluded.updated_at
-            `).run(doc.id, fieldId, value, at);
+            `, doc.id, fieldId, value, at);
           }
         }
-        db.prepare(`UPDATE contract_documents SET modified_by = ?, modified_at = ? WHERE id = ?`).run(actor.id, at, doc.id);
-      })();
+        await db.run(`UPDATE contract_documents SET modified_by = ?, modified_at = ? WHERE id = ?`, actor.id, at, doc.id);
+      });
       res.json({ success: true });
     }),
   );
@@ -580,14 +562,14 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
 
   router.get(
     "/documents/:id/comments",
-    withDocument((_req, res, doc) => {
-      res.json(db.prepare(`${commentSelect} WHERE c.contract_id = ? ORDER BY c.created_at, c.id`).all(doc.id));
+    withDocument(async (_req, res, doc) => {
+      res.json(await db.all(`${commentSelect} WHERE c.contract_id = ? ORDER BY c.created_at, c.id`, doc.id));
     }),
   );
 
   router.post(
     "/documents/:id/comments",
-    withDocument((req, res, doc, actor) => {
+    withDocument(async (req, res, doc, actor) => {
       const body = str(req.body?.body).slice(0, MAX_TEXT);
       const parentId = str(req.body?.parent_id) || null;
       const type = req.body?.comment_type === "suggestion" && !parentId ? "suggestion" : "comment";
@@ -595,7 +577,7 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
       const newText = type === "suggestion" ? String(req.body?.new_text ?? "").slice(0, MAX_TEXT) : null;
 
       if (parentId) {
-        const parent = db.prepare(`SELECT parent_id FROM contract_comments WHERE id = ? AND contract_id = ?`).get(parentId, doc.id) as
+        const parent = await db.get(`SELECT parent_id FROM contract_comments WHERE id = ? AND contract_id = ?`, parentId, doc.id) as
           | Pick<CommentRow, "parent_id">
           | undefined;
         if (!parent || parent.parent_id) return res.status(400).json({ error: "Replies must target a top-level comment." });
@@ -604,11 +586,11 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
       if (type === "suggestion" && !quote) return res.status(400).json({ error: "A suggestion needs selected text." });
 
       const id = newId("cmt");
-      db.prepare(`
+      await db.run(`
         INSERT INTO contract_comments (id, contract_id, parent_id, comment_type, body, quote, new_text, status, author_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)
-      `).run(id, doc.id, parentId, type, body, quote, newText, actor.id, new Date().toISOString());
-      res.status(201).json(db.prepare(`${commentSelect} WHERE c.id = ?`).get(id));
+      `, id, doc.id, parentId, type, body, quote, newText, actor.id, new Date().toISOString());
+      res.status(201).json(await db.get(`${commentSelect} WHERE c.id = ?`, id));
     }),
   );
 
@@ -621,24 +603,17 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
 
   router.post(
     "/documents/:id/comments/:commentId/:action",
-    withDocument((req, res, doc, actor) => {
+    withDocument(async (req, res, doc, actor) => {
       const transition = TRANSITIONS[req.params.action as CommentAction];
       if (!transition) return res.status(404).json({ error: "Unknown action." });
-      const comment = db
-        .prepare(`SELECT id, parent_id, comment_type, status FROM contract_comments WHERE id = ? AND contract_id = ?`)
-        .get(req.params.commentId, doc.id) as CommentRow | undefined;
+      const comment = await db.get(`SELECT id, parent_id, comment_type, status FROM contract_comments WHERE id = ? AND contract_id = ?`, req.params.commentId, doc.id) as CommentRow | undefined;
       if (!comment || comment.parent_id) return res.status(404).json({ error: "Comment not found." });
       if (comment.comment_type !== transition.type || comment.status !== transition.from) {
         return res.status(409).json({ error: `Cannot ${req.params.action} a ${comment.status} ${comment.comment_type}.` });
       }
       const reopening = transition.to === "open";
-      db.prepare(`UPDATE contract_comments SET status = ?, resolved_by = ?, resolved_at = ? WHERE id = ?`).run(
-        transition.to,
-        reopening ? null : actor.id,
-        reopening ? null : new Date().toISOString(),
-        comment.id,
-      );
-      res.json(db.prepare(`${commentSelect} WHERE c.id = ?`).get(comment.id));
+      await db.run(`UPDATE contract_comments SET status = ?, resolved_by = ?, resolved_at = ? WHERE id = ?`, transition.to, reopening ? null : actor.id, reopening ? null : new Date().toISOString(), comment.id);
+      res.json(await db.get(`${commentSelect} WHERE c.id = ?`, comment.id));
     }),
   );
 

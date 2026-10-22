@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { normalizedCoreReady } from '../normalizedCoreStore';
+import { normalizedCoreApplied as normalizedCoreReady } from './003_normalized_core';
 
 const MIGRATION = '005_status_indexes';
 

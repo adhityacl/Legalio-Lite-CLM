@@ -18,10 +18,12 @@ const freePort=()=>new Promise<number>((resolve,reject)=>{const s=net.createServ
 const backendPort=await freePort();const frontendPort=await freePort();
 const backendURL=`http://127.0.0.1:${backendPort}`;const frontendURL=`http://127.0.0.1:${frontendPort}`;
 Object.assign(process.env,{APP_TEST_MODE:'1',AUTH_DB_PATH:path.join(directory,'kaelyn.db'),APP_DATA_DIR:directory,BETTER_AUTH_URL:frontendURL,TRUSTED_ORIGINS:`${backendURL},${frontendURL}`,BETTER_AUTH_ENABLE_INFRA:'false',API_ONLY:'true',SEED_DEMO_ADMIN:'false',PORT:String(backendPort),DISABLE_HMR:'true',BETTER_AUTH_SECRET:'test-only-secret-for-isolated-sqlite-e2e-123456789',GEMINI_API_KEY:'',GOOGLE_CLIENT_ID:'',GOOGLE_CLIENT_SECRET:'',GOOGLE_APPLICATION_CREDENTIALS:''});
-const {sqliteDb:fixtureDb,hydrateCoreDataFromJson}=await import('./lib/auth');
+const {sqliteDb:fixtureDb,hydrateCoreDataFromJson,initAuthDatabase}=await import('./lib/auth');
+const {sql:fixtureSql}=await import('./db');
 const {seedOrganizationsFromDataset,createOrganizationRecord}=await import('./organizationProvisioning');
 const {markMigrationApplied}=await import('./organizationSettingsStore');
-const dataset=buildDemoDataset();seedOrganizationsFromDataset(fixtureDb,dataset);markMigrationApplied(fixtureDb,{fixture:true});hydrateCoreDataFromJson(dataset);
+await initAuthDatabase();
+const dataset=buildDemoDataset();await seedOrganizationsFromDataset(fixtureSql,dataset);await markMigrationApplied(fixtureSql,{fixture:true});await hydrateCoreDataFromJson(dataset);
 fixtureDb.exec("UPDATE insertion_orders SET id=json_extract(payload,'$.contract_id')");
 const now=new Date().toISOString();const password='E2e-local-password-1234';const hash=await hashPassword(password);
 for(const [id,email,role] of [['e2e-root','root@example.com','superuser'],['e2e-admin','admin@example.com','user'],['e2e-editor','editor@example.com','user']]){
@@ -30,7 +32,7 @@ for(const [id,email,role] of [['e2e-root','root@example.com','superuser'],['e2e-
 }
 const org=dataset.tenants[0].id;
 const otherOrg='e2e-other-org';
-createOrganizationRecord(fixtureDb,{id:otherOrg,name:'Other Organization'});
+await createOrganizationRecord(fixtureSql,{id:otherOrg,name:'Other Organization'});
 for(const [id,role] of [['e2e-admin','admin'],['e2e-editor','editor']])fixtureDb.prepare("INSERT INTO member(id,organizationId,userId,role,status) VALUES(?,?,?,?,'active')").run(`${id}-member`,org,id,role);
 const teams=fixtureDb.prepare('SELECT id,name FROM team WHERE organizationId=? ORDER BY name').all(org) as any[];
 const owner=teams[0];const otherOwner=teams[1];
@@ -38,7 +40,7 @@ fixtureDb.prepare("INSERT INTO teamMember(id,teamId,userId) VALUES('e2e-editor-t
 let server:ChildProcess|undefined;let frontend:ChildProcess|undefined;let browser:Awaited<ReturnType<typeof chromium.launch>>|undefined;
 const logs:string[]=[];const checks:string[]=[];
 const appTabs=['dashboard','hierarchy','partners','contracts','create-contract','ios','partner-spending','partner-evaluation','notifikasi','settings-organization','settings-access'];
-const systemTabs=['dashboard','users','accounts','sessions','organizations','apikeys','google','google-drive','google-credentials','ai','smtp','mailer','ui-texts','database','backups','reset'];
+const systemTabs=['dashboard','users','accounts','sessions','organizations','apikeys','google','google-drive','google-credentials','ai','smtp','mailer','ui-texts','reset'];
 const run=(args:string[],cwd=repository,env=process.env)=>{const child=spawn('node',args,{cwd,env,stdio:['ignore','pipe','pipe']});child.stdout?.on('data',c=>logs.push(String(c)));child.stderr?.on('data',c=>logs.push(String(c)));return child;};
 const waitFor=async(url:string,child:ChildProcess)=>{const deadline=Date.now()+60000;while(Date.now()<deadline){if(child.exitCode!==null)throw new Error(`Server exited ${child.exitCode}`);try{if((await fetch(url)).ok)return;}catch{}await new Promise(r=>setTimeout(r,200));}throw new Error(`Timed out ${url}`);};
 const stop=async(child?:ChildProcess)=>{if(!child||child.exitCode!==null)return;child.kill('SIGTERM');await Promise.race([once(child,'exit'),new Promise(r=>setTimeout(r,5000))]);if(child.exitCode===null)child.kill('SIGKILL');};

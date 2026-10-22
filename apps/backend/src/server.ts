@@ -7,8 +7,6 @@ import { renameFieldsToEnglish } from './migrations/006_english_field_names';
 import { renameLegacyKeys, renameLegacyKeyTokens } from '@legalio/shared/fieldNames';
 import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
 import { readBusinessRows, searchBusinessRows } from './normalizedCoreStore';
-import { SQLiteBackups } from './sqliteBackups';
-import { createSQLiteBackupRouter } from './sqliteBackupRoutes';
 import { mountSystemConsole } from './systemConsoleHosting';
 import "dotenv/config";
 import { getPublicBaseUrl, normalizePublicUrl, saveInstallationPublicUrl } from './installationSettings';
@@ -23,10 +21,11 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { buildMatrix as buildRbacMatrix, can, hasOrganizationScope, type OrgContext } from "./rbac";
 import {
-  RequestDenied, accessibleOrganizations, isIdentityBanned, resolveIdentity, resolveLegacyContext, resolveOrganizationContext, sendError,
+  RequestDenied, accessibleOrganizations, identityOf, isIdentityBanned, resolveIdentity, resolveLegacyContext, resolveOrganizationContext, sendError,
 } from "./identity";
+import { sql } from "./db";
 import { BETTER_AUTH_ALLOWED, createAuthorizationMiddleware, isBetterAuthPathAllowed } from "./routePolicies";
-import { createOrganizationScope, filterRecords, recordVisible, normalizeDepartmentName, type RecordKind } from "./recordScope";
+import { createOrganizationScope, filterRecords, recordVisible, normalizeDepartmentName, teamsOf, type RecordKind } from "./recordScope";
 import { IS_TEST_MODE, LEGACY_DATA_FILE, UPLOADS_DIR, REPOSITORY_DIR, APP_DATA_DIR } from "./runtimePaths";
 import {
   ApiError, appendAudit, buildTenantProjection, ensureTenantBoundarySchema, isEmptyInstall, markMigrationApplied,
@@ -40,6 +39,7 @@ import { toNodeHandler } from "better-auth/node";
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import {
   auth as betterAuthInstance,
+  initAuthDatabase,
   sqliteDb,
   hydrateCoreDataFromJson,
   syncDbToSqlite,
@@ -52,10 +52,11 @@ import {
   setConsoleDbReference,
   ensureUserAccountsExist,
 } from "./authConsoleRoutes";
-import { createDocumentRouter } from "./documentRoutes";
-import { createApprovalRouter } from "./approvalRoutes";
+import { createDocumentRouter, ensureDocumentSchema } from "./documentRoutes";
+import { createApprovalRouter, ensureApprovalSchema } from "./approvalRoutes";
+import { createCoreSaver } from "./coreDataStore";
+import { resetSyncCache } from "./normalizedCoreStore";
 import { isDemoAccountEmail, removeDemoAccounts } from "./demoAccounts";
-import Database from "better-sqlite3";
 import {
   formatContractFileName,
   formatIOFileName,
@@ -137,15 +138,13 @@ import {
 
 const app = express();
 forwardAsyncRouteErrors(app);
-const sqliteBackups = new SQLiteBackups(sqliteDb, APP_DATA_DIR);
-app.use(sqliteBackups.middleware);
 // This app is only ever meant to run behind a reverse proxy (nginx, Cloud
 // Run, Codespaces' tunnel — see README: "keep port 3000 closed to the
 // internet"), so trust its X-Forwarded-* headers for req.ip/req.protocol.
 app.set("trust proxy", true);
 const PORT = Number(process.env.PORT) || 3000;
 // Google JSON credentials uploaded in the app win over the GOOGLE_* env vars.
-const googleCredentials = createGoogleCredentialStore(sqliteDb);
+const googleCredentials = createGoogleCredentialStore(sql);
 setStoredServiceAccountProvider(googleCredentials.getServiceAccount);
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -169,14 +168,14 @@ app.use("/api", localizeApiMessages);
  * operation passes the declared route policy (server/routePolicies.ts).
  */
 let migrationBlock: string | null = null;
-app.all(["/api/auth", "/api/auth/*"], (req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.all(["/api/auth", "/api/auth/*"], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (req.path.startsWith("/api/auth/google/")) return next();
   if (migrationBlock) return sendError(req, res, 503, migrationBlock, "The database must be migrated before this version can serve requests.");
   const path = req.path.replace(/\/$/, "");
   if (!isBetterAuthPathAllowed(path)) return sendError(req, res, 404, "RESOURCE_NOT_FOUND");
   if (BETTER_AUTH_ALLOWED[path] === "self") {
     try {
-      resolveIdentity(sqliteDb, req);
+      await resolveIdentity(sql, req);
     } catch (err: any) {
       if (err instanceof RequestDenied) return sendError(req, res, err.status, err.error);
       throw err;
@@ -184,7 +183,7 @@ app.all(["/api/auth", "/api/auth/*"], (req: express.Request, res: express.Respon
   }
   return toNodeHandler(betterAuthInstance)(req, res);
 });
-app.use(createAuthorizationMiddleware(sqliteDb, { blocked: () => migrationBlock }));
+app.use(createAuthorizationMiddleware(sql, { blocked: () => migrationBlock }));
 
 /** Verified organization context attached by the route policy (tenant/orgParam routes only). */
 function orgContextOf(req: express.Request): OrgContext {
@@ -194,10 +193,10 @@ function orgContextOf(req: express.Request): OrgContext {
 }
 
 /* Legacy RBAC adapters (PRD §10.1): server-resolved actor, explicit catalogs, no wildcard. */
-app.get("/api/rbac/me", (req: express.Request, res: express.Response) => {
-  const identity = resolveIdentity(sqliteDb, req);
+app.get("/api/rbac/me", async (req: express.Request, res: express.Response) => {
+  const identity = identityOf(req);
   let ctx: OrgContext | null = null;
-  try { ctx = resolveLegacyContext(sqliteDb, identity, req, { includeBody: false }); } catch { ctx = null; }
+  try { ctx = await resolveLegacyContext(sql, identity, req, { includeBody: false }); } catch { ctx = null; }
   res.json({
     ok: true,
     identity: { id: identity.userId, platformRole: identity.platformRole },
@@ -211,11 +210,11 @@ app.get("/api/rbac/roles", (_req: express.Request, res: express.Response) => {
   const matrix = buildRbacMatrix();
   res.json({ ok: true, platformRoles: matrix.platformRoles.map((r) => r.role), tenantRoles: matrix.tenantRoles.map((r) => r.role) });
 });
-app.post("/api/rbac/check", (req: express.Request, res: express.Response) => {
+app.post("/api/rbac/check", async (req: express.Request, res: express.Response) => {
   const permission = req.body?.permission;
   if (typeof permission !== "string") return sendError(req, res, 400, "INVALID_INPUT", "permission is required.");
   try {
-    const ctx = resolveLegacyContext(sqliteDb, resolveIdentity(sqliteDb, req), req, { includeBody: false });
+    const ctx = await resolveLegacyContext(sql, identityOf(req), req, { includeBody: false });
     return res.json({ ok: true, allow: can(ctx, permission) });
   } catch (err: any) {
     if (err instanceof RequestDenied) return sendError(req, res, err.status, err.error);
@@ -224,13 +223,13 @@ app.post("/api/rbac/check", (req: express.Request, res: express.Response) => {
 });
 
 /** Persists a platform-provisioned folder mapping through the canonical integration store. */
-function persistTenantFolder(tenantId: string, folderId: string) {
+async function persistTenantFolder(tenantId: string, folderId: string) {
   try {
-    const current = readIntegration(sqliteDb, tenantId);
-    const claimed = sqliteDb.prepare("SELECT 1 FROM organization_integrations WHERE driveFolderId = ? AND organizationId <> ?").get(folderId, tenantId);
+    const current = await readIntegration(sql, tenantId);
+    const claimed = await sql.get("SELECT 1 FROM organization_integrations WHERE driveFolderId = ? AND organizationId <> ?", folderId, tenantId);
     if (claimed) return;
-    writeIntegrationRow(sqliteDb, { ...current, driveFolderId: folderId, version: current.version + 1 }, null);
-    refreshTenantProjection();
+    await writeIntegrationRow(sql, { ...current, driveFolderId: folderId, version: current.version + 1 }, null);
+    await refreshTenantProjection();
   } catch (err: any) {
     console.warn(`[Drive] Could not record folder mapping for ${tenantId}:`, err?.message);
   }
@@ -256,7 +255,7 @@ async function getOrgFolderId(tenantInput, token) {
       activeToken,
     );
     if (orgFolder.id) {
-      persistTenantFolder(tenant.id, orgFolder.id);
+      await persistTenantFolder(tenant.id, orgFolder.id);
       return orgFolder;
     }
   } catch (err) {
@@ -296,7 +295,7 @@ async function autoEnsureTenantGoogleResources(token, forceNew = false) {
         orgFolder = await getOrCreateDriveFolder(orgFolderName, masterRootId, activeToken);
       }
       if (orgFolder && orgFolder.id && orgFolder.id !== masterRootId) {
-        persistTenantFolder(tenant.id, orgFolder.id);
+        await persistTenantFolder(tenant.id, orgFolder.id);
         updatedCount++;
       }
     } catch (err) {
@@ -326,7 +325,7 @@ async function getPartnerFolderId(partner, token, orgId) {
         activeToken,
       );
       partner.dd_folder_link = folderRes.webViewLink;
-      saveDb();
+      await saveDb();
       return folderRes.id;
     } catch (err) {
       console.warn(
@@ -402,11 +401,11 @@ function uploadOwners(urlPath: string) {
   }
   return uploadIndex.get(urlPath) || [];
 }
-app.use("/uploads", (req: express.Request, res: express.Response, next: express.NextFunction) => {
+async function authorizeUpload(req: express.Request, res: express.Response, next: express.NextFunction) {
   if (migrationBlock) return res.status(503).end();
   let identity;
   try {
-    identity = resolveIdentity(sqliteDb, req);
+    identity = await resolveIdentity(sql, req);
   } catch (err: any) {
     if (err instanceof RequestDenied) return sendError(req, res, err.status, err.error);
     throw err;
@@ -417,21 +416,22 @@ app.use("/uploads", (req: express.Request, res: express.Response, next: express.
   const key = normalizeUploadPath(`/uploads${req.path}`);
   if (!key) return res.status(400).end();
   const scopes = new Map<string, any>();
-  const allowed = uploadOwners(key).some(({ kind, record }) => {
-    if (!record?.organizationId) return false;
+  for (const { kind, record } of uploadOwners(key)) {
+    if (!record?.organizationId) continue;
     let ctx: OrgContext;
     try {
-      ctx = resolveOrganizationContext(sqliteDb, identity, record.organizationId);
+      ctx = await resolveOrganizationContext(sql, identity, record.organizationId);
     } catch {
-      return false;
+      continue;
     }
-    if (!can(ctx, "document.view")) return false;
-    if (!scopes.has(ctx.organizationId)) scopes.set(ctx.organizationId, createOrganizationScope(sqliteDb, ctx.organizationId, db));
-    return recordVisible(ctx, scopes.get(ctx.organizationId), kind, record);
-  });
-  if (allowed) return next();
+    if (!can(ctx, "document.view")) continue;
+    if (!scopes.has(ctx.organizationId)) scopes.set(ctx.organizationId, createOrganizationScope(await teamsOf(sql, ctx.organizationId), ctx.organizationId, db));
+    if (recordVisible(ctx, scopes.get(ctx.organizationId), kind, record)) return next();
+  }
   return res.status(404).end();
-}, express.static(uploadsDir, { dotfiles: "deny", index: false }));
+}
+app.use("/uploads", (req: express.Request, res: express.Response, next: express.NextFunction) => { authorizeUpload(req, res, next).catch(next); },
+  express.static(uploadsDir, { dotfiles: "deny", index: false }));
 function saveLocalFile(
   partnerName: any,
   category: string,
@@ -594,13 +594,13 @@ function isMatchingOrg(entityOrgId, targetTenantId) {
 /** Request-local department resolver for the verified organization. */
 function scopeOf(req: express.Request) {
   const r = req as any;
-  if (!r.recordScope) r.recordScope = createOrganizationScope(sqliteDb, orgContextOf(req).organizationId, db);
+  if (!r.recordScope) r.recordScope = createOrganizationScope(r.teams || [], orgContextOf(req).organizationId, db);
   return r.recordScope as ReturnType<typeof createOrganizationScope>;
 }
 /** Records of `kind` the caller may see: own organization, department scope, before any aggregation. */
-function scopedRecords<T = any>(req: express.Request, kind: RecordKind, rows: T[] | undefined): T[] {
+async function scopedRecords<T = any>(req: express.Request, kind: RecordKind, rows: T[] | undefined): Promise<T[]> {
   const tables: Record<RecordKind, string> = { partner: 'partners', contract: 'contracts', io: 'insertion_orders', spending: 'spendings', evaluation: 'evaluations', notification: 'notifications' };
-  const records = readBusinessRows(sqliteDb, tables[kind], orgContextOf(req).organizationId) as T[];
+  const records = await readBusinessRows(sql, tables[kind], orgContextOf(req).organizationId) as T[];
   return filterRecords(orgContextOf(req), scopeOf(req), kind, records);
 }
 /**
@@ -622,7 +622,7 @@ function assertRecordWritable(req: express.Request, kind: RecordKind, record: an
   const ctx = orgContextOf(req);
   if (hasOrganizationScope(ctx)) return null;
   // Rebuild so a just-edited partner/contract name or PIC is resolved fresh.
-  const fresh = createOrganizationScope(sqliteDb, ctx.organizationId, db);
+  const fresh = createOrganizationScope((req as any).teams || [], ctx.organizationId, db);
   if (recordVisible(ctx, fresh, kind, { ...record, organizationId: ctx.organizationId })) return null;
   return { status: 403, body: { error: "INSUFFICIENT_PERMISSION", message: "The record must belong to one of your departments." } };
 }
@@ -767,9 +767,9 @@ let db: any = {
 bindTenantStore(() => db);
 
 /** Rebuilds the read-only `db.tenants` projection from canonical organization rows (PRD §7.3). */
-function refreshTenantProjection() {
+async function refreshTenantProjection() {
   if (migrationBlock) return;
-  db.tenants = buildTenantProjection(sqliteDb);
+  db.tenants = await buildTenantProjection(sql);
 }
 setInvalidTokenCallback((badToken) => {
   if (db.googleConfig && db.googleConfig.accessToken === badToken) {
@@ -777,7 +777,7 @@ setInvalidTokenCallback((badToken) => {
       "[Server] Membersihkan Google accessToken yang kedaluwarsa dari database.",
     );
     db.googleConfig.accessToken = "";
-    saveDb();
+    saveDb().catch((err) => console.error("[Server] Could not save the cleared Google token:", err));
   }
 });
 async function getFreshGoogleAccessToken() {
@@ -804,7 +804,7 @@ async function getFreshGoogleAccessToken() {
     if (freshToken && freshToken !== currentToken) {
       db.googleConfig.accessToken = freshToken;
       db.googleConfig.lastSyncTime = new Date().toISOString();
-      saveDb();
+      await saveDb();
       console.log(
         "[Google Auth] Access Token berhasil di-refresh otomatis menggunakan Refresh Token.",
       );
@@ -821,7 +821,7 @@ async function getFreshGoogleAccessToken() {
       );
       db.googleConfig.refreshToken = "";
       db.googleConfig.accessToken = "";
-      saveDb();
+      await saveDb();
       return null;
     }
     return currentToken || null;
@@ -1180,77 +1180,129 @@ __name(
  * directly; an existing database must have run 002_tenant_boundaries,
  * otherwise the API stays in a controlled MIGRATION_REQUIRED state and no
  * legacy administrative projection is hydrated or saved.
+ * Everything that reads or writes the database runs here; startServer() awaits it before listening.
  */
-ensureTenantBoundarySchema(sqliteDb);
-const freshInstall = isEmptyInstall(sqliteDb);
-if (freshInstall) {
-  if (!IS_TEST_MODE) {
-    seedOrganizationsFromDataset(sqliteDb, demoData, {
-      bootstrapSuperuser: shouldSeedDemoAdmin && demoAdminEmail && demoAdminPassword
-        ? { id: "demo-admin", email: demoAdminEmail, name: "Legalio Admin" }
-        : undefined,
+export async function init() {
+  await initAuthDatabase();
+  await googleCredentials.init();
+  await mailTemplates.init();
+  await ensureDocumentSchema(sql);
+  await ensureApprovalSchema(sql);
+  await ensureTenantBoundarySchema(sql);
+  const freshInstall = await isEmptyInstall(sql);
+  if (freshInstall) {
+    if (!IS_TEST_MODE) {
+      await seedOrganizationsFromDataset(sql, demoData, {
+        bootstrapSuperuser: shouldSeedDemoAdmin && demoAdminEmail && demoAdminPassword
+          ? { id: "demo-admin", email: demoAdminEmail, name: "Legalio Admin" }
+          : undefined,
+      });
+    }
+    await markMigrationApplied(sql, { freshInstall: true });
+  } else if (!await migrationApplied(sql)) {
+    migrationBlock = "MIGRATION_REQUIRED";
+    console.error("[startup] Legacy data found without migration 002_tenant_boundaries. Run `npm run tenant-boundaries:migrate` (dry-run, then --apply) before starting this version.");
+  }
+  if (!migrationBlock && !IS_TEST_MODE && shouldSeedDemoAdmin && demoAdminEmail && demoAdminPassword
+    && !await sql.get(`SELECT 1 FROM "user" WHERE id = 'demo-admin' OR LOWER(email) = ?`, demoAdminEmail)) {
+    await seedOrganizationsFromDataset(sql, { tenants: [], departments: [], allowedUsers: [] }, {
+      bootstrapSuperuser: { id: "demo-admin", email: demoAdminEmail, name: "Legalio Admin" },
     });
+    console.log(`Seeded bootstrap superuser: ${demoAdminEmail}`);
   }
-  markMigrationApplied(sqliteDb, { freshInstall: true });
-} else if (!migrationApplied(sqliteDb)) {
-  migrationBlock = "MIGRATION_REQUIRED";
-  console.error("[startup] Legacy data found without migration 002_tenant_boundaries. Run `npm run tenant-boundaries:migrate` (dry-run, then --apply) before starting this version.");
-}
-if (!migrationBlock && !IS_TEST_MODE && shouldSeedDemoAdmin && demoAdminEmail && demoAdminPassword
-  && !sqliteDb.prepare(`SELECT 1 FROM "user" WHERE id = 'demo-admin' OR LOWER(email) = ?`).get(demoAdminEmail)) {
-  seedOrganizationsFromDataset(sqliteDb, { tenants: [], departments: [], allowedUsers: [] }, {
-    bootstrapSuperuser: { id: "demo-admin", email: demoAdminEmail, name: "Legalio Admin" },
-  });
-  console.log(`Seeded bootstrap superuser: ${demoAdminEmail}`);
-}
-if (!migrationBlock) {
-  const result = migrateNormalizedCore(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-normalized-core-${Date.now()}.db`));
-  if (result.applied) console.log('Normalized SQLite business schema:', result.counts);
-  const cleanup = removeLegacyCoreTables(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-remove-legacy-core-${Date.now()}.db`));
-  if (cleanup.applied) console.log('Removed legacy SQLite snapshots:', cleanup.tables);
-  // Before the status indexes: those are declared with the English column names.
-  const english = renameFieldsToEnglish(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-english-field-names-${Date.now()}.db`));
-  if (english.applied) console.log('Renamed Indonesian data columns to English:', english.renamed);
-  if (addStatusIndexes(sqliteDb).applied) console.log('Added status indexes for dashboard and list queries.');
-}
-const sqliteInitialData = loadCoreDataFromSqlite();
-const sqliteHasCoreData = ["partners", "contracts", "ios", "spendings", "evaluations", "notifications", "templates", "activityLogs"]
-  .some((key) => Array.isArray((sqliteInitialData as any)[key]) && (sqliteInitialData as any)[key].length > 0);
+  if (!migrationBlock) {
+    const result = await migrateNormalizedCore(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-normalized-core-${Date.now()}.db`));
+    if (result.applied) console.log('Normalized SQLite business schema:', result.counts);
+    const cleanup = removeLegacyCoreTables(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-remove-legacy-core-${Date.now()}.db`));
+    if (cleanup.applied) console.log('Removed legacy SQLite snapshots:', cleanup.tables);
+    // Before the status indexes: those are declared with the English column names.
+    const english = renameFieldsToEnglish(sqliteDb, path.join(APP_DATA_DIR, 'backups', `before-english-field-names-${Date.now()}.db`));
+    if (english.applied) console.log('Renamed Indonesian data columns to English:', english.renamed);
+    if (addStatusIndexes(sqliteDb).applied) console.log('Added status indexes for dashboard and list queries.');
+  }
+  const sqliteInitialData = await loadCoreDataFromSqlite();
+  const sqliteHasCoreData = ["partners", "contracts", "ios", "spendings", "evaluations", "notifications", "templates", "activityLogs"]
+    .some((key) => Array.isArray((sqliteInitialData as any)[key]) && (sqliteInitialData as any)[key].length > 0);
 
-// An initialized workspace may intentionally contain no business records after a reset.
-if (sqliteHasCoreData || !freshInstall) {
-  db = { ...db, ...sqliteInitialData,
-    branding: sqliteInitialData.branding ?? db.branding,
-    googleConfig: sqliteInitialData.googleConfig ?? db.googleConfig,
-    newsTicker: sqliteInitialData.newsTicker ?? db.newsTicker,
-  };
-  console.log("Database loaded from SQLite as the source of truth.");
-} else if (!IS_TEST_MODE && fs.existsSync(dataFilePath)) {
-  try {
-    const raw = fs.readFileSync(dataFilePath, "utf-8");
-    const parsed = renameLegacyKeys(JSON.parse(raw));
-    db = { ...db, ...parsed };
-    if (!migrationBlock) hydrateCoreDataFromJson(db);
-    console.log("Imported legacy data_store.json into SQLite.");
-  } catch (err) {
-    console.error("Error importing data_store.json, using seed defaults", err);
+  // An initialized workspace may intentionally contain no business records after a reset.
+  if (sqliteHasCoreData || !freshInstall) {
+    db = { ...db, ...sqliteInitialData,
+      branding: sqliteInitialData.branding ?? db.branding,
+      googleConfig: sqliteInitialData.googleConfig ?? db.googleConfig,
+      newsTicker: sqliteInitialData.newsTicker ?? db.newsTicker,
+    };
+    console.log("Database loaded from SQLite as the source of truth.");
+  } else if (!IS_TEST_MODE && fs.existsSync(dataFilePath)) {
+    try {
+      const raw = fs.readFileSync(dataFilePath, "utf-8");
+      const parsed = renameLegacyKeys(JSON.parse(raw));
+      db = { ...db, ...parsed };
+      if (!migrationBlock) await hydrateCoreDataFromJson(db);
+      console.log("Imported legacy data_store.json into SQLite.");
+    } catch (err) {
+      console.error("Error importing data_store.json, using seed defaults", err);
+    }
+  } else {
+    db = {
+      ...db,
+      allowedUsers: sqliteInitialData.allowedUsers || [],
+      branding: sqliteInitialData.branding || db.branding,
+      googleConfig: sqliteInitialData.googleConfig || db.googleConfig,
+      newsTicker: sqliteInitialData.newsTicker || db.newsTicker,
+    };
+    console.log("SQLite is empty; using seed defaults for the first initialization.");
   }
-} else {
-  db = {
-    ...db,
-    allowedUsers: sqliteInitialData.allowedUsers || [],
-    branding: sqliteInitialData.branding || db.branding,
-    googleConfig: sqliteInitialData.googleConfig || db.googleConfig,
-    newsTicker: sqliteInitialData.newsTicker || db.newsTicker,
-  };
-  console.log("SQLite is empty; using seed defaults for the first initialization.");
+  // Only the canonical tables define organizations; legacy snapshot rows are migration input.
+  db.tenants = [];
+  delete db.departments;
+  delete db.activeTenantId;
+  await refreshTenantProjection();
+  migrateLegacyRecords();
+  // Demo-dataset logins share DEMO_ADMIN_PASSWORD, so a production server never keeps them —
+  // including servers that created them before this rule existed.
+  if (process.env.NODE_ENV === "production") {
+    const { allowedUsers, removed } = await removeDemoAccounts(sql, db.allowedUsers || []);
+    db.allowedUsers = allowedUsers;
+    if (removed) console.log(`Production: removed ${removed} demo login account(s).`);
+  }
+  await saveDb();
+  // The auth console reads platform configuration (SMTP) from `db`; it no longer
+  // hydrates identities, memberships or organizations from this projection.
+  setConsoleDbReference(db, saveDb, async (organizationId?: string) => {
+    if (organizationId) await onOrganizationChanged(organizationId);
+    else await refreshTenantProjection();
+  });
+  if (!IS_TEST_MODE && !migrationBlock) {
+    await ensureUserAccountsExist();
+    ensureAllPartnersFolders().catch((err) =>
+      console.error("Startup category folder provisioning error:", err),
+    );
+  }
+  if (db.spendings && db.spendings.length > 0) {
+    let legacyCounter = 1;
+    let changed = false;
+    for (const sp of db.spendings) {
+      if (!sp.id || sp.id.startsWith("spd-")) {
+        sp.id = `SP${String(legacyCounter).padStart(4, "0")}`;
+        legacyCounter++;
+        changed = true;
+      }
+    }
+    if (changed) {
+      await saveDb();
+    }
+  }
+  if (db.partners && Array.isArray(db.partners)) {
+    db.partners = db.partners.map((p) => ({
+      ...p,
+      tags: sanitizePartnerTags(p.tags),
+    }));
+    await saveDb();
+  }
+  syncAdderNames();
+  await saveDb();
+  await recalculateStatuses();
 }
-// Only the canonical tables define organizations; legacy snapshot rows are migration input.
-db.tenants = [];
-delete db.departments;
-delete db.activeTenantId;
-refreshTenantProjection();
-migrateLegacyRecords();
 /**
  * Bring records written by earlier releases in line with the current model:
  * - Indonesian status labels become stable codes (see src/lib/domainStatus);
@@ -1282,37 +1334,6 @@ function migrateLegacyRecords() {
   (db.spendings || []).forEach((sp: any) => {
     sp.currency = normalizeCurrencyCode(sp.currency, tenantDefaultCurrency(sp.organizationId));
   });
-}
-// Demo-dataset logins share DEMO_ADMIN_PASSWORD, so a production server never keeps them —
-// including servers that created them before this rule existed.
-if (process.env.NODE_ENV === "production") {
-  const { allowedUsers, removed } = removeDemoAccounts(sqliteDb, db.allowedUsers || []);
-  db.allowedUsers = allowedUsers;
-  if (removed) console.log(`Production: removed ${removed} demo login account(s).`);
-}
-saveDb();
-// The auth console reads platform configuration (SMTP) from `db`; it no longer
-// hydrates identities, memberships or organizations from this projection.
-setConsoleDbReference(db, saveDb, (organizationId?: string) => (organizationId ? onOrganizationChanged(organizationId) : refreshTenantProjection()));
-if (!IS_TEST_MODE && !migrationBlock) {
-  ensureUserAccountsExist();
-  ensureAllPartnersFolders().catch((err) =>
-    console.error("Startup category folder provisioning error:", err),
-  );
-}
-if (db.spendings && db.spendings.length > 0) {
-  let legacyCounter = 1;
-  let changed = false;
-  for (const sp of db.spendings) {
-    if (!sp.id || sp.id.startsWith("spd-")) {
-      sp.id = `SP${String(legacyCounter).padStart(4, "0")}`;
-      legacyCounter++;
-      changed = true;
-    }
-  }
-  if (changed) {
-    saveDb();
-  }
 }
 function generateNextPartnerId() {
   let maxNum = 0;
@@ -1435,22 +1456,17 @@ function sanitizeIdentifiers(value: unknown): Array<{ scheme: string; value: str
       country: sanitizeCountryCode(item.country),
     }));
 }
-if (db.partners && Array.isArray(db.partners)) {
-  db.partners = db.partners.map((p) => ({
-    ...p,
-    tags: sanitizePartnerTags(p.tags),
-  }));
-  saveDb();
-}
-function saveDb() {
+const coreSaver = createCoreSaver(sql, () => db);
+/** Persists the in-memory projection: one writer at a time, never inside sql.tx. */
+async function saveDb() {
   uploadIndex = null;
   lifecyclesFreshUntil = 0;
   if (migrationBlock) return; // never persist legacy projections before migration
   try {
-    syncDbToSqlite(db);
+    await coreSaver.save();
   } catch (err) {
     console.error("Failed to save core data to SQLite", err);
-    Object.assign(db, loadCoreDataFromSqlite());
+    Object.assign(db, await loadCoreDataFromSqlite());
     if (String((err as any)?.code || '').startsWith('SQLITE_CONSTRAINT')) (err as any).status = 409;
     throw err;
   }
@@ -1501,9 +1517,7 @@ function syncAdderNames() {
     }
   });
 }
-syncAdderNames();
-saveDb();
-const mailTemplates = createMailTemplateStore(sqliteDb);
+const mailTemplates = createMailTemplateStore(sql);
 async function sendSmtpEmail({
   to,
   subject,
@@ -1558,7 +1572,7 @@ async function sendPlatformMail(input: { to: string; subject: string; html: stri
   return Boolean(result?.success);
 }
 setVerificationMailer(async ({ email, name, url }) => {
-  const sent = await sendPlatformMail({ to: email, ...mailTemplates.render('verification', { email, name, url }) });
+  const sent = await sendPlatformMail({ to: email, ...await mailTemplates.render('verification', { email, name, url }) });
   if (!sent) throw new Error("Verification email delivery is unavailable.");
 });
 function daysUntilForTenant(tenantId: string | null | undefined, date: string): number | null {
@@ -1588,7 +1602,7 @@ function formatAmountForTenant(amount: unknown, currency: string, tenantId?: str
   }
 }
 /** Reminder e-mail in the tenant's language, with its own name and colour. */
-function buildReminderEmail(params: {
+async function buildReminderEmail(params: {
   tenantId: string;
   kind: "contract" | "commercial";
   reference: string;
@@ -1596,7 +1610,7 @@ function buildReminderEmail(params: {
   endDate: string;
   daysRemaining: number;
   rows: Array<[string, string]>;
-}): { subject: string; html: string } {
+}): Promise<{ subject: string; html: string }> {
   const settings = getTenantSettings(params.tenantId);
   const tenant = findTenant(params.tenantId);
   const brandColor = /^#[0-9a-f]{6}$/i.test(tenant?.primaryColor || "") ? tenant.primaryColor : DEFAULT_BRANDING.primaryColor;
@@ -1630,7 +1644,7 @@ function buildReminderEmail(params: {
     `E-mail otomatis dari Legalio untuk ${orgName}.`,
     `此邮件由 Legalio 为 ${orgName} 自动发送。`,
   );
-  return mailTemplates.render(params.kind === 'contract' ? 'contract-reminder' : 'commercial-reminder', {
+  return await mailTemplates.render(params.kind === 'contract' ? 'contract-reminder' : 'commercial-reminder', {
     subject, heading, intro, brandColor, details: tableRows, footer, organizationName: orgName,
     reference: params.reference, title: params.title, endDate: params.endDate, daysRemaining: String(params.daysRemaining),
   }, ['details']);
@@ -1652,22 +1666,24 @@ function rollForwardAutoRenewal(contract: any): void {
   contract.end_date = end;
 }
 /** Recipients from the record's OWNING organization (PRD §11.5), never global config. */
-function reminderRecipients(tenantId: string, kind: "contract" | "commercial", owner?: string): string {
+function reminderRecipients(tenantId: string, kind: "contract" | "commercial", owner: string | undefined, admins: string[]): string {
   const notifications = findTenant(tenantId)?.notifications || { notificationEmails: [], legalNotificationEmail: null, financeNotificationEmail: null };
   const dedicated = kind === "contract" ? notifications.legalNotificationEmail : notifications.financeNotificationEmail;
   const configured = dedicated ? [dedicated] : notifications.notificationEmails || [];
-  const admins = (sqliteDb.prepare(`
-    SELECT u.email FROM member m JOIN "user" u ON u.id = m.userId
-    WHERE m.organizationId = ? AND m.status = 'active' AND m.role IN ('admin', 'manager') AND COALESCE(u.banned, 0) = 0
-  `).all(tenantId) as any[]).map((r) => r.email);
   return Array.from(new Set([owner, ...configured, ...admins].filter(Boolean))).join(", ");
 }
 /**
  * Recompute lifecycle status for contracts and commercial documents and emit
  * reminders at the tenant's configured offsets (default 90/60/30/14 days).
  */
-function recalculateStatuses() {
+async function recalculateStatuses() {
   let newNotifsCount = 0;
+  // Active admin/manager emails per organization, read once so the reminder pass below stays synchronous.
+  const adminEmails = new Map<string, string[]>();
+  for (const row of await sql.all(`
+    SELECT m.organizationId, u.email FROM member m JOIN "user" u ON u.id = m.userId
+    WHERE m.status = 'active' AND m.role IN ('admin', 'manager') AND COALESCE(u.banned, 0) = 0
+  `)) adminEmails.set(row.organizationId, [...(adminEmails.get(row.organizationId) || []), row.email]);
   const emitReminder = (kind: "contract" | "commercial", record: any, daysRemaining: number) => {
     const tenantId = record.organizationId;
     if (!findTenant(tenantId)) return; // unowned records get no reminders
@@ -1683,7 +1699,7 @@ function recalculateStatuses() {
     const reference = kind === "contract" ? record.contract_number : record.io_number;
     const title = kind === "contract" ? record.contract_title : record.io_title;
     const amount = kind === "contract" ? record.contract_value : record.io_value;
-    const recipients = reminderRecipients(tenantId, kind, record.internal_pic && String(record.internal_pic).includes("@") ? record.internal_pic : "");
+    const recipients = reminderRecipients(tenantId, kind, record.internal_pic && String(record.internal_pic).includes("@") ? record.internal_pic : "", adminEmails.get(tenantId) || []);
     // en/id/zh in that order, matching settings.language.
     const pick = <T,>(en: T, id: T, zh: T): T => (settings.language === "ID" ? id : settings.language === "ZH" ? zh : en);
     const noticeType = record.notice_type_required || "Termination";
@@ -1721,12 +1737,11 @@ function recalculateStatuses() {
       } else {
         rows.push([pick("Pricing model", "Model harga", "定价模式"), record.pricing_model || "-"]);
       }
-      const { subject, html } = buildReminderEmail({
-        tenantId, kind, reference, title, endDate: record.end_date, daysRemaining, rows,
-      });
       const validRecipients = recipients.split(",").map((s: string) => s.trim()).filter((s: string) => s.includes("@"));
       if (validRecipients.length > 0) {
-        sendSmtpEmail({ to: validRecipients, subject, html });
+        buildReminderEmail({ tenantId, kind, reference, title, endDate: record.end_date, daysRemaining, rows })
+          .then(({ subject, html }) => sendSmtpEmail({ to: validRecipients, subject, html }))
+          .catch((err) => console.error("[Reminder email]", err));
       }
     }
   };
@@ -1753,12 +1768,11 @@ function recalculateStatuses() {
       updated_at: io.updated_at || new Date().toISOString(),
     };
   });
-  saveDb();
+  await saveDb();
   return newNotifsCount;
 }
-recalculateStatuses();
 /** Reads refresh date-driven status without sending reminders or requiring a cron run. */
-function refreshContractLifecycles() {
+async function refreshContractLifecycles() {
   if (Date.now() < lifecyclesFreshUntil) return;
   lifecyclesFreshUntil = Date.now() + 60_000;
   let changed = false;
@@ -1776,14 +1790,14 @@ function refreshContractLifecycles() {
       changed = true;
     }
   }
-  if (changed) saveDb();
+  if (changed) await saveDb();
 }
 /**
  * Operational activity entry (the History drawer's "activity" dataset). The
  * actor comes from the verified identity and the organization from the
  * verified context; caller-supplied names/roles are ignored when either exists.
  */
-function addActivityLog(
+async function addActivityLog(
   userEmail,
   userName,
   role,
@@ -1819,12 +1833,12 @@ function addActivityLog(
   if (db.activityLogs.length > 500) {
     db.activityLogs = db.activityLogs.slice(0, 500);
   }
-  saveDb();
+  await saveDb();
   return log;
 }
 async function getBetterAuthSession(req) {
   try {
-    const identity = resolveIdentity(sqliteDb, req);
+    const identity = identityOf(req);
     return { user: { id: identity.userId, email: identity.email, name: identity.name, platformRole: identity.platformRole } };
   } catch {
     return null;
@@ -1837,16 +1851,16 @@ async function getClerkUserEmail(req) {
  * Identity adapter (PRD §10.1): explicit platformRole and own memberships.
  * GET never creates allowlist rows, memberships or selections.
  */
-app.get("/api/user/my-role", (req: express.Request, res: express.Response) => {
+app.get("/api/user/my-role", async (req: express.Request, res: express.Response) => {
   let identity;
   try {
-    identity = resolveIdentity(sqliteDb, req);
+    identity = identityOf(req);
   } catch (err: any) {
     // The start-up probe treats "signed out" as an expected answer.
     if (req.query.probe === "1") return res.status(204).end();
     return sendError(req, res, err?.status || 401, err?.error || "UNAUTHENTICATED");
   }
-  const me = identityResponse(sqliteDb, identity);
+  const me = await identityResponse(sql, identity);
   res.json({ ...me, email: identity.email, name: identity.name, platformRole: identity.platformRole, loginTime: new Date().toISOString() });
 });
 // Dashboard news ticker (optional module, off by default): 5 short
@@ -1930,7 +1944,7 @@ app.get("/api/dashboard/news-ticker", async (req: express.Request, res: express.
 
     const entry = { items, lastGeneratedAt: new Date().toISOString(), language: settings.language, industry: settings.industry };
     db.newsTicker.byTenant[tenantId] = entry;
-    saveDb();
+    await saveDb();
     res.json({ items: entry.items, lastGeneratedAt: entry.lastGeneratedAt, cached: false });
   } catch (err: any) {
     console.error("Error generating news ticker:", err);
@@ -1944,20 +1958,20 @@ app.get("/api/dashboard/news-ticker", async (req: express.Request, res: express.
 });
 
 /** Department names for operational forms: the verified organization, scoped to the caller (no fallback). */
-app.get("/api/departments", (req: express.Request, res: express.Response) => {
+app.get("/api/departments", async (req: express.Request, res: express.Response) => {
   const ctx = orgContextOf(req);
-  const rows = sqliteDb.prepare("SELECT id, name FROM team WHERE organizationId = ? ORDER BY name COLLATE NOCASE, id").all(ctx.organizationId) as any[];
+  const rows = await sql.all("SELECT id, name FROM team WHERE organizationId = ? ORDER BY name COLLATE NOCASE, id", ctx.organizationId) as any[];
   const visible = hasOrganizationScope(ctx) ? rows : rows.filter((r) => ctx.departmentIds.includes(r.id));
   res.json({ success: true, departments: visible.map((r) => r.name), items: visible });
 });
 /** Records the caller's own sign-in/sign-out in their session's organization (if any). */
-app.post("/api/user/log-activity", (req: express.Request, res: express.Response) => {
-  const identity = resolveIdentity(sqliteDb, req);
+app.post("/api/user/log-activity", async (req: express.Request, res: express.Response) => {
+  const identity = identityOf(req);
   const actionType = req.body?.actionType === "LOGOUT" ? "LOGOUT" : "LOGIN";
   const orgId = identity.sessionDefaultOrganizationId;
   let ctx: OrgContext | null = null;
-  try { ctx = orgId ? resolveOrganizationContext(sqliteDb, identity, orgId) : null; } catch { ctx = null; }
-  addActivityLog("", "", "", actionType, "AUTH", actionType === "LOGOUT" ? "Signed out" : "Signed in", req, ctx?.organizationId ?? null);
+  try { ctx = orgId ? await resolveOrganizationContext(sql, identity, orgId) : null; } catch { ctx = null; }
+  await addActivityLog("", "", "", actionType, "AUTH", actionType === "LOGOUT" ? "Signed out" : "Signed in", req, ctx?.organizationId ?? null);
   res.json({ success: true });
 });
 /**
@@ -2016,7 +2030,7 @@ function redactProviderConfig(config: any) {
  */
 async function checkIsAdmin(req: express.Request, _fallbackEmail?: string, _fallbackName?: string) {
   try {
-    const identity = resolveIdentity(sqliteDb, req);
+    const identity = identityOf(req);
     return { isAdmin: identity.platformRole === "superuser", adminEmail: identity.email, adminName: identity.name || "Admin" };
   } catch {
     return { isAdmin: false, adminEmail: "", adminName: "" };
@@ -2060,8 +2074,8 @@ app.post("/api/user/allowed-users", async (req: express.Request, res: express.Re
   };
   db.allowedUsers.unshift(newUser);
   syncAdderNames();
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     adminCheck.adminEmail || "admin@app",
     adminCheck.adminName || "Admin",
     "Admin",
@@ -2102,8 +2116,8 @@ app.put("/api/user/allowed-users/:id", async (req: express.Request, res: express
   if (status) user.status = status;
   if (name) user.name = name;
   syncAdderNames();
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     adminCheck.adminEmail || "admin@app",
     adminCheck.adminName || "Admin",
     "Admin",
@@ -2151,8 +2165,8 @@ app.delete("/api/user/allowed-users/:id", async (req: express.Request, res: expr
     }
   }
   db.allowedUsers = db.allowedUsers.filter((u) => u.id !== id);
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     adminCheck.adminEmail || "admin@app",
     adminCheck.adminName || "Admin",
     "Admin",
@@ -2183,11 +2197,9 @@ app.post("/api/user/reset-password", async (req: express.Request, res: express.R
     return res.status(400).json({ error: "Password minimal 6 karakter." });
   }
   try {
-    const authDb = sqliteDb;
+    const authDb = sql;
     const trimmedEmail = email.trim().toLowerCase();
-    let targetUser: any = authDb
-      .prepare("SELECT id, name, email FROM user WHERE LOWER(email) = ?")
-      .get(trimmedEmail);
+    let targetUser: any = await authDb.get("SELECT id, name, email FROM user WHERE LOWER(email) = ?", trimmedEmail);
     const hashedPassword = await hashPassword(newPassword.trim());
     const nowIso = new Date().toISOString();
     if (!targetUser) {
@@ -2197,61 +2209,30 @@ app.post("/api/user/reset-password", async (req: express.Request, res: express.R
       const userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       const userName = allowedUser?.name || email.split("@")[0];
       const userRole = "user"; // platform role only; organization access comes from memberships
-      authDb
-        .prepare(
-          `
+      await authDb.run(`
         INSERT INTO user (id, name, email, emailVerified, role, banned, createdAt, updatedAt)
         VALUES (?, ?, ?, 1, ?, 0, ?, ?)
-      `,
-        )
-        .run(userId, userName, trimmedEmail, userRole, nowIso, nowIso);
+      `, userId, userName, trimmedEmail, userRole, nowIso, nowIso);
       const accountId = `acc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      authDb
-        .prepare(
-          `
+      await authDb.run(`
         INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer)
         VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')
-      `,
-        )
-        .run(accountId, userId, userId, hashedPassword, nowIso, nowIso);
+      `, accountId, userId, userId, hashedPassword, nowIso, nowIso);
       targetUser = { id: userId, name: userName, email: trimmedEmail };
     } else {
-      const existingAccount: any = authDb
-        .prepare(
-          "SELECT id FROM account WHERE userId = ? AND providerId = 'credential'",
-        )
-        .get(targetUser.id);
+      const existingAccount: any = await authDb.get("SELECT id FROM account WHERE userId = ? AND providerId = 'credential'", targetUser.id);
       if (existingAccount) {
-        authDb
-          .prepare(
-            "UPDATE account SET password = ?, updatedAt = ? WHERE id = ?",
-          )
-          .run(hashedPassword, nowIso, existingAccount.id);
+        await authDb.run("UPDATE account SET password = ?, updatedAt = ? WHERE id = ?", hashedPassword, nowIso, existingAccount.id);
       } else {
         const accountId = `acc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        authDb
-          .prepare(
-            `
+        await authDb.run(`
           INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer)
           VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')
-        `,
-          )
-          .run(
-            accountId,
-            targetUser.id,
-            targetUser.id,
-            hashedPassword,
-            nowIso,
-            nowIso,
-          );
+        `, accountId, targetUser.id, targetUser.id, hashedPassword, nowIso, nowIso);
       }
-      authDb
-        .prepare(
-          "UPDATE user SET banned = 0, banReason = NULL, updatedAt = ? WHERE id = ?",
-        )
-        .run(nowIso, targetUser.id);
+      await authDb.run("UPDATE user SET banned = 0, banReason = NULL, updatedAt = ? WHERE id = ?", nowIso, targetUser.id);
     }
-    addActivityLog(
+    await addActivityLog(
       adminCheck.adminEmail || "admin@app",
       adminCheck.adminName || "Admin",
       "Admin",
@@ -2278,20 +2259,21 @@ app.get("/api/activity-logs", (req: express.Request, res: express.Response) => {
   const orgId = getRequestTenantId(req);
   res.json((db.activityLogs || []).filter((log: any) => log?.organizationId === orgId));
 });
-app.get("/api/search", (req: express.Request, res: express.Response) => {
+app.get("/api/search", async (req: express.Request, res: express.Response) => {
   const organizationId = getRequestTenantId(req);
   const kinds: Record<string, RecordKind> = { partners: 'partner', contracts: 'contract', insertion_orders: 'io', spendings: 'spending', evaluations: 'evaluation' };
-  const hits = searchBusinessRows(sqliteDb, organizationId, String(req.query.q || '').slice(0, 1000));
-  const permitted = hits.filter(hit => {
+  const hits = await searchBusinessRows(sql, organizationId, String(req.query.q || '').slice(0, 1000));
+  const permitted = [];
+  for (const hit of hits) {
     const kind = kinds[hit.entity_type];
-    if (!kind) return false;
-    const record = readBusinessRows(sqliteDb, hit.entity_type, organizationId, [hit.entity_id])[0];
-    return record && recordVisible(orgContextOf(req), scopeOf(req), kind, record);
-  });
+    if (!kind) continue;
+    const record = (await readBusinessRows(sql, hit.entity_type, organizationId, [hit.entity_id]))[0];
+    if (record && recordVisible(orgContextOf(req), scopeOf(req), kind, record)) permitted.push(hit);
+  }
   res.json({ results: permitted.slice(0, 50), total: permitted.length });
 });
-app.get("/api/partners", (req: express.Request, res: express.Response) => {
-  const partnerList = scopedRecords(req, "partner", db.partners);
+app.get("/api/partners", async (req: express.Request, res: express.Response) => {
+  const partnerList = await scopedRecords(req, "partner", db.partners);
   const normalizedPartners = partnerList.map((p) => ({
     ...p,
     tags: sanitizePartnerTags(p.tags),
@@ -2343,10 +2325,10 @@ function withDocumentTranscriptField(schema: any, ocrMode: "text" | "vision"): a
 /** Pulls `document_text` out of a parsed AI response, caches it by file hash, and
  * strips it from the object so it never leaks into the API response or the
  * per-task result cache (which would otherwise duplicate the whole transcript). */
-function extractAndCacheDocumentTranscript(parsedData: any, fileHash: string): void {
+async function extractAndCacheDocumentTranscript(parsedData: any, fileHash: string): Promise<void> {
   const text = parsedData?.document_text;
   if (typeof text === "string" && text.trim()) {
-    setCachedTranscript(fileHash, text);
+    await setCachedTranscript(fileHash, text);
   }
   delete parsedData?.document_text;
 }
@@ -2362,7 +2344,7 @@ app.post("/api/partners/parse", upload.single("file") as any, async (req: expres
     const tenantId = getRequestTenantId(req);
     const inputHash = computeInputSha256(inputData);
     const cacheScope = `partners:${tenantId}`;
-    const cached = globalOcrCache.get(inputHash, cacheScope);
+    const cached = await globalOcrCache.get(inputHash, cacheScope);
     if (cached) {
       return res.json({
         ...cached,
@@ -2415,10 +2397,10 @@ Return strictly one valid JSON object matching the schema.`;
       },
     });
     const parsedData = JSON.parse((response as any).text);
-    extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
+    await extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
     const responsePayload = { success: true, data: parsedData, ocrStats };
     if (ocrStats.fileHash) {
-      globalOcrCache.set(ocrStats.fileHash, cacheScope, responsePayload);
+      await globalOcrCache.set(ocrStats.fileHash, cacheScope, responsePayload);
     }
     res.json(responsePayload);
   } catch (error) {
@@ -2532,7 +2514,7 @@ Return JSON with exactly:
       saved.redline_analysis = analysis;
       saved.redline_analyzed_at = analysis.analyzed_at;
       saved.updated_at = analysis.analyzed_at;
-      saveDb();
+      await saveDb();
     }
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
@@ -2633,8 +2615,8 @@ app.post("/api/partners", async (req: express.Request, res: express.Response) =>
   const writeDenial = assertRecordWritable(req, "partner", newPartner);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.partners.unshift(newPartner);
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Business Owner",
@@ -2714,8 +2696,8 @@ app.put("/api/partners/:id", async (req: express.Request, res: express.Response)
   const writeDenial = assertRecordWritable(req, "partner", updatedPartner);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.partners[partnerIndex] = updatedPartner;
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Legal",
@@ -2752,8 +2734,8 @@ app.delete("/api/partners/:id", async (req: express.Request, res: express.Respon
   for (const spending of db.spendings) if (sameOrg(spending) && spending.vendor_id === id) spending.vendor_id = null;
   for (const evaluation of db.evaluations) if (sameOrg(evaluation) && evaluation.partner_id === id) evaluation.partner_id = null;
   db.partners.splice(partnerIndex, 1);
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Legal",
@@ -2791,8 +2773,8 @@ function computeEvaluationScore(obligationTarget, incidentFreq, comm, pricing) {
   else if (pricing === "Expensive") pricingScore = 10;
   return targetScore + incidentScore + commScore + pricingScore;
 }
-app.get("/api/partner-evaluations", (req: express.Request, res: express.Response) => {
-  const list = scopedRecords(req, "evaluation", db.evaluations);
+app.get("/api/partner-evaluations", async (req: express.Request, res: express.Response) => {
+  const list = await scopedRecords(req, "evaluation", db.evaluations);
   res.json(list);
 });
 /** AI annual review for the partner evaluation form: summarises the year's snapshot and suggests ratings; an existing evaluation stores the result right away. */
@@ -2857,7 +2839,7 @@ Return JSON with exactly:
       saved.redline_analysis = analysis;
       saved.redline_analyzed_at = analysis.analyzed_at;
       saved.updated_at = analysis.analyzed_at;
-      saveDb();
+      await saveDb();
     }
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
@@ -2933,8 +2915,8 @@ app.post("/api/partner-evaluations", async (req: express.Request, res: express.R
   const writeDenial = assertRecordWritable(req, "evaluation", newEval);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.evaluations.unshift(newEval);
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Legal",
@@ -2997,8 +2979,8 @@ app.put("/api/partner-evaluations/:id", async (req: express.Request, res: expres
   const writeDenial = assertRecordWritable(req, "evaluation", updatedEval);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.evaluations[evalIndex] = updatedEval;
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Legal",
@@ -3020,8 +3002,8 @@ app.delete("/api/partner-evaluations/:id", async (req: express.Request, res: exp
   const accessDenial = assertRecordAccess(req, "evaluation", removed);
   if (accessDenial) return res.status(accessDenial.status).json(accessDenial.body);
   db.evaluations.splice(evalIndex, 1);
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Legal",
@@ -3057,8 +3039,8 @@ app.get("/api/exchange-rate-historical", async (req: express.Request, res: expre
     res.status(500).json({ error: err.message });
   }
 });
-app.get("/api/partner-spendings", (req: express.Request, res: express.Response) => {
-  const spendingsList = scopedRecords(req, "spending", db.spendings);
+app.get("/api/partner-spendings", async (req: express.Request, res: express.Response) => {
+  const spendingsList = await scopedRecords(req, "spending", db.spendings);
   const list = spendingsList.map((s) => {
     if (s.total_amount_usd === void 0 || s.total_amount_usd === null) {
       const amt = Number(s.total_amount) || 0;
@@ -3085,7 +3067,7 @@ app.post("/api/spendings/parse", upload.single("file") as any, async (req: expre
     const tenantId = getRequestTenantId(req);
     const inputHash = computeInputSha256(inputData);
     const cacheScope = `spendings:v2-explicit-period:${tenantId}`;
-    const cached = globalOcrCache.get(inputHash, cacheScope);
+    const cached = await globalOcrCache.get(inputHash, cacheScope);
     if (cached) {
       return res.json({
         ...cached,
@@ -3148,13 +3130,13 @@ Return strictly one valid JSON object matching the schema. Use an empty string "
       },
     });
     const parsedData = JSON.parse((response as any).text);
-    extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
+    await extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
     if (parsedData.invoice_date) {
       parsedData.invoice_date = normalizeParsedDate(parsedData.invoice_date);
     }
     const responsePayload = { success: true, data: parsedData, ocrStats };
     if (ocrStats.fileHash) {
-      globalOcrCache.set(ocrStats.fileHash, cacheScope, responsePayload);
+      await globalOcrCache.set(ocrStats.fileHash, cacheScope, responsePayload);
     }
     res.json(responsePayload);
   } catch (error) {
@@ -3277,7 +3259,7 @@ Return JSON with exactly:
       saved.redline_analysis = analysis;
       saved.redline_analyzed_at = analysis.analyzed_at;
       saved.updated_at = analysis.analyzed_at;
-      saveDb();
+      await saveDb();
     }
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
@@ -3382,7 +3364,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
         invoice_file.fileData,
         targetTenant?.name,
       );
-      addActivityLog(
+      await addActivityLog(
         userEmail || "user@app",
         userName || "User",
         userRole || "Finance",
@@ -3410,7 +3392,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
         billing_file.fileData,
         targetTenant?.name,
       );
-      addActivityLog(
+      await addActivityLog(
         userEmail || "user@app",
         userName || "User",
         userRole || "Finance",
@@ -3455,8 +3437,8 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
   const writeDenial = assertRecordWritable(req, "spending", newSpending);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.spendings.unshift(newSpending);
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Finance",
@@ -3560,7 +3542,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
         targetInvoiceName,
         invoice_file.fileData,
       );
-      addActivityLog(
+      await addActivityLog(
         userEmail || "user@app",
         userName || "User",
         userRole || "Finance",
@@ -3590,7 +3572,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
         targetBillingName,
         billing_file.fileData,
       );
-      addActivityLog(
+      await addActivityLog(
         userEmail || "user@app",
         userName || "User",
         userRole || "Finance",
@@ -3606,8 +3588,8 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
   const writeDenial = assertRecordWritable(req, "spending", updated);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.spendings[idx] = updated;
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Finance",
@@ -3630,8 +3612,8 @@ app.delete("/api/partner-spendings/:id", async (req: express.Request, res: expre
   const accessDenial = assertRecordAccess(req, "spending", removed);
   if (accessDenial) return res.status(accessDenial.status).json(accessDenial.body);
   db.spendings.splice(idx, 1);
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Finance",
@@ -3688,7 +3670,7 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
       fileData,
       findTenant(partner.organizationId)?.name,
     );
-    addActivityLog(
+    await addActivityLog(
       userEmail || "user@app",
       userName || "User",
       userRole || "Legal",
@@ -3758,8 +3740,8 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
     partner.dd_verified_date = new Date().toISOString().split("T")[0];
   }
   partner.updated_at = new Date().toISOString();
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Legal",
@@ -3800,8 +3782,8 @@ app.delete("/api/partners/:id/dd-file", async (req: express.Request, res: expres
     partner.dd_verified_date = new Date().toISOString().split("T")[0];
   }
   partner.updated_at = new Date().toISOString();
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Legal",
@@ -3833,7 +3815,7 @@ app.post("/api/contracts/export-google-docs", async (req: express.Request, res: 
     let targetFolderId = (await getOrgFolderId(targetOrgId, token)).id;
     if (partnerName) {
       try {
-        const partner = scopedRecords(req, "partner", db.partners).find(
+        const partner = (await scopedRecords(req, "partner", db.partners)).find(
           (p: any) => p.partner_name?.toLowerCase() === String(partnerName).toLowerCase() || p.partner_id === partnerName
         );
         if (partner) {
@@ -3893,19 +3875,19 @@ function withCurrentUiTextKeys(overrides: Record<string, Record<string, string>>
       .map(([key, text]) => [renameLegacyKeyTokens(key), text])),
   ]));
 }
-app.get("/api/init-data", (req: express.Request, res: express.Response) => {
-  refreshContractLifecycles();
+app.get("/api/init-data", async (req: express.Request, res: express.Response) => {
+  await refreshContractLifecycles();
   const organizationId = getRequestTenantId(req);
   const settings = getTenantSettings(organizationId);
   res.setHeader("Cache-Control", "no-store");
   res.json({
     organizationId,
-    contracts: scopedRecords(req, "contract", db.contracts),
-    ios: scopedRecords(req, "io", db.ios),
-    partners: scopedRecords(req, "partner", db.partners),
-    notifications: scopedRecords(req, "notification", db.notifications),
-    evaluations: scopedRecords(req, "evaluation", db.evaluations),
-    spendings: scopedRecords(req, "spending", db.spendings),
+    contracts: await scopedRecords(req, "contract", db.contracts),
+    ios: await scopedRecords(req, "io", db.ios),
+    partners: await scopedRecords(req, "partner", db.partners),
+    notifications: await scopedRecords(req, "notification", db.notifications),
+    evaluations: await scopedRecords(req, "evaluation", db.evaluations),
+    spendings: await scopedRecords(req, "spending", db.spendings),
     services: {
       aiAvailable: Boolean(getEffectiveGeminiApiKey()) && settings.modules.aiAssistant,
       googleUploadsAvailable: Boolean(sanitizeParentFolderId(db.googleConfig?.driveFolderId)) &&
@@ -3915,9 +3897,9 @@ app.get("/api/init-data", (req: express.Request, res: express.Response) => {
   });
 });
 
-app.get("/api/contracts", (req: express.Request, res: express.Response) => {
-  refreshContractLifecycles();
-  const contractsList = scopedRecords(req, "contract", db.contracts);
+app.get("/api/contracts", async (req: express.Request, res: express.Response) => {
+  await refreshContractLifecycles();
+  const contractsList = await scopedRecords(req, "contract", db.contracts);
   const result = contractsList.map((c) => {
     const cur = normalizeCurrencyCode(c.currency, tenantDefaultCurrency(c.organizationId));
     const amt = Number(c.contract_value) || 0;
@@ -3947,7 +3929,7 @@ app.post("/api/contracts/parse", upload.single("file") as any, async (req: expre
     const tenantId = getRequestTenantId(req);
     const inputHash = computeInputSha256(inputData);
     const cacheScope = `contracts:${tenantId}`;
-    const cached = globalOcrCache.get(inputHash, cacheScope);
+    const cached = await globalOcrCache.get(inputHash, cacheScope);
     if (cached) {
       return res.json({
         ...cached,
@@ -4036,7 +4018,7 @@ Return strictly one valid JSON object matching the schema. Use "" for any text f
       },
     });
     const parsedData = JSON.parse((response as any).text);
-    extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
+    await extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
     if (parsedData.start_date) {
       parsedData.start_date = normalizeParsedDate(parsedData.start_date);
     }
@@ -4091,7 +4073,7 @@ Return strictly one valid JSON object matching the schema. Use "" for any text f
       performance: { durationMs, ...ocrStats },
     };
     if (ocrStats.fileHash) {
-      globalOcrCache.set(ocrStats.fileHash, cacheScope, responsePayload);
+      await globalOcrCache.set(ocrStats.fileHash, cacheScope, responsePayload);
     }
     res.json(responsePayload);
   } catch (error) {
@@ -4269,7 +4251,7 @@ app.post("/api/contracts/redline-analysis", async (req: express.Request, res: ex
       saved.redline_analysis = analysis;
       saved.redline_analyzed_at = analysis.analyzed_at;
       saved.updated_at = analysis.analyzed_at;
-      saveDb();
+      await saveDb();
     }
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
@@ -4304,7 +4286,7 @@ app.post("/api/contracts/:id/redline-analysis", async (req: express.Request, res
     contract.redline_analysis = parsed;
     contract.redline_analyzed_at = nowIso;
     contract.updated_at = nowIso;
-    saveDb();
+    await saveDb();
     res.json({
       success: true,
       cached: false,
@@ -4336,9 +4318,7 @@ app.post("/api/contracts/:id/redline-analysis", async (req: express.Request, res
  * within to anchor each suggestion back into the live document.
  */
 app.post("/api/documents/:id/ai-redline", async (req: express.Request, res: express.Response) => {
-  const document = sqliteDb
-    .prepare(`SELECT id, organization_id, name FROM contract_documents WHERE id = ?`)
-    .get(req.params.id) as { id: string; organization_id: string; name: string } | undefined;
+  const document = await sql.get(`SELECT id, organization_id, name FROM contract_documents WHERE id = ?`, req.params.id) as { id: string; organization_id: string; name: string } | undefined;
   if (!document || !isMatchingOrg(document.organization_id, getRequestTenantId(req))) {
     return res.status(404).json({ error: "Document not found." });
   }
@@ -4410,10 +4390,10 @@ ${plainText}
         continue;
       }
       const id = `cmt-${crypto.randomUUID()}`;
-      sqliteDb.prepare(`
+      await sql.run(`
         INSERT INTO contract_comments (id, contract_id, parent_id, comment_type, body, quote, new_text, status, author_id, created_at)
         VALUES (?, ?, NULL, 'suggestion', ?, ?, ?, 'open', ?, ?)
-      `).run(id, document.id, rationale ? `AI Redlining: ${rationale}` : "AI Redlining suggestion.", quote, newText, actor.id, nowIso);
+      `, id, document.id, rationale ? `AI Redlining: ${rationale}` : "AI Redlining suggestion.", quote, newText, actor.id, nowIso);
       created.push({ id, quote, new_text: newText });
     }
     res.status(201).json({ success: true, created, skipped });
@@ -4430,7 +4410,7 @@ app.get("/api/templates", (req, res) => {
   res.json((db.templates || []).filter((t: any) => isMatchingOrg(t.organizationId, tenantId)));
 });
 
-app.post("/api/templates", (req, res) => {
+app.post("/api/templates", async (req, res) => {
   try {
     const { id, name, contentId, customFields } = req.body;
     if (!name || !contentId) {
@@ -4466,14 +4446,14 @@ app.post("/api/templates", (req, res) => {
       db.templates.push(templateData);
     }
 
-    saveDb();
+    await saveDb();
     res.json({ success: true, template: templateData });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.delete("/api/templates/:id", (req, res) => {
+app.delete("/api/templates/:id", async (req, res) => {
   const tenantId = getRequestTenantId(req);
   const index = (db.templates || []).findIndex(
     (t: any) => t.id === req.params.id && isMatchingOrg(t.organizationId, tenantId),
@@ -4482,7 +4462,7 @@ app.delete("/api/templates/:id", (req, res) => {
     return res.status(404).json({ error: "Template not found." });
   }
   db.templates.splice(index, 1);
-  saveDb();
+  await saveDb();
   res.json({ success: true });
 });
 
@@ -4592,9 +4572,9 @@ Rules:
 app.use("/api", createGoogleCredentialsRouter(googleCredentials));
 
 // Create Contract documents: explorer, draft versions, metadata, comments/redlines.
-app.use("/api", createDocumentRouter({ db: sqliteDb, tenantOf: getRequestTenantId }));
+app.use("/api", createDocumentRouter({ db: sql, tenantOf: getRequestTenantId }));
 // Document Approval: sequential sign-off on a My Documents item or an uploaded file.
-app.use("/api", createApprovalRouter({ db: sqliteDb, tenantOf: getRequestTenantId }));
+app.use("/api", createApprovalRouter({ db: sql, tenantOf: getRequestTenantId }));
 
 async function persistContractTerminationFile(req: express.Request, record: { organizationId?: string; partner_id?: string }, file: TerminationFile) {
   const partner = db.partners.find(p => p.partner_id === record.partner_id);
@@ -4727,7 +4707,7 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
         fileData,
         targetTenant?.name,
       );
-      addActivityLog(
+      await addActivityLog(
         userEmail || "user@app",
         userName || "User",
         userRole || "Legal",
@@ -4796,8 +4776,8 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
   const writeDenial = assertRecordWritable(req, "contract", newContract);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.contracts.unshift(newContract);
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Legal",
@@ -4920,7 +4900,7 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
         targetFileName,
         fileData,
       );
-      addActivityLog(
+      await addActivityLog(
         userEmail || "user@app",
         userName || "User",
         userRole || "Legal",
@@ -4944,8 +4924,8 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
   const writeDenial = assertRecordWritable(req, "contract", updated);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.contracts[idx] = updated;
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Legal",
@@ -4968,8 +4948,8 @@ app.delete("/api/contracts/:id", async (req: express.Request, res: express.Respo
   for (const child of db.contracts) if (child.organizationId === ctr.organizationId && child.parent_contract_id === id) child.parent_contract_id = null;
   db.notifications = db.notifications.filter((n) => !(n.organizationId === ctr.organizationId && n.parent_type === 'Contract' && n.parent_id === id));
   db.contracts = db.contracts.filter((c) => c !== ctr);
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Admin",
@@ -4981,8 +4961,8 @@ app.delete("/api/contracts/:id", async (req: express.Request, res: express.Respo
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });
 });
-app.get("/api/ios", (req: express.Request, res: express.Response) => {
-  const iosList = scopedRecords(req, "io", db.ios);
+app.get("/api/ios", async (req: express.Request, res: express.Response) => {
+  const iosList = await scopedRecords(req, "io", db.ios);
   const result = iosList.map((io) => {
     const c = db.contracts.find((ctr) => ctr.contract_id === io.contract_id && ctr.organizationId === io.organizationId);
     const cur = normalizeCurrencyCode(io.currency, tenantDefaultCurrency(io.organizationId));
@@ -5014,7 +4994,7 @@ app.post("/api/ios/parse", upload.single("file") as any, async (req: express.Req
     const tenantId = getRequestTenantId(req);
     const inputHash = computeInputSha256(inputData);
     const cacheScope = `ios:${tenantId}`;
-    const cached = globalOcrCache.get(inputHash, cacheScope);
+    const cached = await globalOcrCache.get(inputHash, cacheScope);
     if (cached) {
       return res.json({
         ...cached,
@@ -5083,7 +5063,7 @@ Return strictly one valid JSON object matching the schema.`;
       },
     });
     const parsedData = JSON.parse((response as any).text);
-    extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
+    await extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
     if (parsedData.start_date) {
       parsedData.start_date = normalizeParsedDate(parsedData.start_date);
     }
@@ -5126,7 +5106,7 @@ Return strictly one valid JSON object matching the schema.`;
       performance: { durationMs, ...ocrStats },
     };
     if (ocrStats.fileHash) {
-      globalOcrCache.set(ocrStats.fileHash, cacheScope, responsePayload);
+      await globalOcrCache.set(ocrStats.fileHash, cacheScope, responsePayload);
     }
     res.json(responsePayload);
   } catch (error) {
@@ -5197,7 +5177,7 @@ Return JSON with exactly:
       saved.redline_analysis = analysis;
       saved.redline_analyzed_at = analysis.analyzed_at;
       saved.updated_at = analysis.analyzed_at;
-      saveDb();
+      await saveDb();
     }
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
@@ -5311,7 +5291,7 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
         fileData,
         targetTenant?.name,
       );
-      addActivityLog(
+      await addActivityLog(
         userEmail || "user@app",
         userName || "User",
         userRole || "Business Owner",
@@ -5359,8 +5339,8 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
   const writeDenial = assertRecordWritable(req, "io", newIO);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.ios.unshift(newIO);
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Business Owner",
@@ -5445,7 +5425,7 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
         targetFileName,
         fileData,
       );
-      addActivityLog(
+      await addActivityLog(
         userEmail || "user@app",
         userName || "User",
         userRole || "Business Owner",
@@ -5489,8 +5469,8 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
   const writeDenial = assertRecordWritable(req, "io", updated);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.ios[idx] = updated;
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Business Owner",
@@ -5510,8 +5490,8 @@ app.delete("/api/ios/:id", async (req: express.Request, res: express.Response) =
   const tenantDenial = assertRecordAccess(req, "io", item);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
   db.ios = db.ios.filter((i) => i !== item);
-  saveDb();
-  addActivityLog(
+  await saveDb();
+  await addActivityLog(
     userEmail || "user@app",
     userName || "User",
     userRole || "Admin",
@@ -5523,38 +5503,38 @@ app.delete("/api/ios/:id", async (req: express.Request, res: express.Response) =
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });
 });
-app.get("/api/notification-logs", (req: express.Request, res: express.Response) => {
-  res.json(scopedRecords(req, "notification", db.notifications));
+app.get("/api/notification-logs", async (req: express.Request, res: express.Response) => {
+  res.json(await scopedRecords(req, "notification", db.notifications));
 });
 /**
  * Matches in-memory notifications the caller may touch. scopedRecords re-reads rows from SQLite,
  * so this matches by organization + notif_id; object identity never matches db.notifications.
  */
-function visibleNotificationFilter(req: express.Request) {
+async function visibleNotificationFilter(req: express.Request) {
   const org = orgContextOf(req).organizationId;
-  const ids = new Set(scopedRecords(req, "notification", db.notifications).map((n: any) => n.notif_id));
+  const ids = new Set((await scopedRecords(req, "notification", db.notifications)).map((n: any) => n.notif_id));
   return { has: (n: any) => n.organizationId === org && ids.has(n.notif_id) };
 }
 /** Only notifications attached to records the caller can see are touched (PRD §4.5.2). */
-app.post("/api/notification-logs/mark-read", (req: express.Request, res: express.Response) => {
+app.post("/api/notification-logs/mark-read", async (req: express.Request, res: express.Response) => {
   const { notif_id, markAll } = req.body || {};
-  const visible = visibleNotificationFilter(req);
+  const visible = await visibleNotificationFilter(req);
   db.notifications = (db.notifications || []).map((n) =>
     visible.has(n) && (markAll || (notif_id && n.notif_id === notif_id)) ? { ...n, is_read: true } : n,
   );
-  saveDb();
-  res.json({ success: true, notifications: scopedRecords(req, "notification", db.notifications) });
+  await saveDb();
+  res.json({ success: true, notifications: await scopedRecords(req, "notification", db.notifications) });
 });
-app.post("/api/notification-logs/delete", (req: express.Request, res: express.Response) => {
+app.post("/api/notification-logs/delete", async (req: express.Request, res: express.Response) => {
   const { notif_id, notif_ids, deleteAll } = req.body || {};
-  const visible = visibleNotificationFilter(req);
+  const visible = await visibleNotificationFilter(req);
   const chosen = new Set<string>(Array.isArray(notif_ids) ? notif_ids : notif_id ? [notif_id] : []);
   db.notifications = (db.notifications || []).filter((n) => !(visible.has(n) && (deleteAll || chosen.has(n.notif_id))));
-  saveDb();
-  res.json({ success: true, notifications: scopedRecords(req, "notification", db.notifications) });
+  await saveDb();
+  res.json({ success: true, notifications: await scopedRecords(req, "notification", db.notifications) });
 });
-app.post("/api/cron/trigger-check", (req: express.Request, res: express.Response) => {
-  const count = recalculateStatuses();
+app.post("/api/cron/trigger-check", async (req: express.Request, res: express.Response) => {
+  const count = await recalculateStatuses();
   res.json({ success: true, newNotificationsGenerated: count });
 });
 app.get(
@@ -5702,18 +5682,18 @@ app.post(
 
       // Google proved the email above; invitations satisfy account approval,
       // while membership is still granted only by explicit invitation acceptance.
-      const invited = hasApprovalInvitation(sqliteDb, cleanEmail, req.get('x-invitation-token'));
-      let existingUser: any = sqliteDb.prepare(`SELECT id, name, role, banned, banReason, banExpires FROM "user" WHERE LOWER(email) = ?`).get(cleanEmail);
+      const invited = await hasApprovalInvitation(sql, cleanEmail, req.get('x-invitation-token'));
+      let existingUser: any = await sql.get(`SELECT id, name, role, banned, banReason, banExpires FROM "user" WHERE LOWER(email) = ?`, cleanEmail);
       if (!existingUser) {
         const newId = `usr_${crypto.randomUUID()}`;
-        sqliteDb.prepare(`
+        await sql.run(`
           INSERT INTO "user" (id, name, email, emailVerified, image, role, banned, banReason, createdAt, updatedAt)
           VALUES (?, ?, ?, 1, ?, 'user', ?, ?, ?, ?)
-        `).run(newId, userName, cleanEmail, photoURL || null, invited ? 0 : 1, invited ? null : 'PENDING_APPROVAL', now, now);
-        existingUser = sqliteDb.prepare('SELECT id, name, role, banned, banReason, banExpires FROM "user" WHERE id = ?').get(newId);
+        `, newId, userName, cleanEmail, photoURL || null, invited ? 0 : 1, invited ? null : 'PENDING_APPROVAL', now, now);
+        existingUser = await sql.get('SELECT id, name, role, banned, banReason, banExpires FROM "user" WHERE id = ?', newId);
       }
       if (existingUser.banReason === 'PENDING_APPROVAL' && invited) {
-        sqliteDb.prepare('UPDATE "user" SET banned = 0, banReason = NULL, banExpires = NULL, updatedAt = ? WHERE id = ?').run(now, existingUser.id);
+        await sql.run('UPDATE "user" SET banned = 0, banReason = NULL, banExpires = NULL, updatedAt = ? WHERE id = ?', now, existingUser.id);
         existingUser.banned = 0;
         existingUser.banReason = null;
         existingUser.banExpires = null;
@@ -5724,21 +5704,21 @@ app.post(
           message: pending ? "Your account is waiting for manual superuser approval." : "This account is disabled." });
       }
       // Google verified this address, so the identity's email is verified.
-      sqliteDb.prepare(`UPDATE "user" SET image = COALESCE(?, image), emailVerified = 1, updatedAt = ? WHERE id = ?`).run(photoURL || null, now, existingUser.id);
+      await sql.run(`UPDATE "user" SET image = COALESCE(?, image), emailVerified = 1, updatedAt = ? WHERE id = ?`, photoURL || null, now, existingUser.id);
       const userId = existingUser.id;
-      const existingAcc: any = sqliteDb.prepare("SELECT id FROM account WHERE userId = ? AND providerId = 'google'").get(userId);
+      const existingAcc: any = await sql.get("SELECT id FROM account WHERE userId = ? AND providerId = 'google'", userId);
       if (!existingAcc) {
-        sqliteDb.prepare(`
+        await sql.run(`
           INSERT INTO account (id, accountId, providerId, userId, idToken, createdAt, updatedAt, issuer)
           VALUES (?, ?, 'google', ?, ?, ?, ?, 'google')
-        `).run(`acc_${crypto.randomUUID()}`, cleanEmail, userId, idToken || null, now, now);
+        `, `acc_${crypto.randomUUID()}`, cleanEmail, userId, idToken || null, now, now);
       }
       const sessionToken = crypto.randomBytes(32).toString("hex");
       const sessionExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      sqliteDb.prepare(`
+      await sql.run(`
         INSERT INTO session (id, expiresAt, token, createdAt, updatedAt, ipAddress, userAgent, userId, activeOrganizationId)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
-      `).run(`sess_${crypto.randomUUID()}`, sessionExpiry, sessionToken, now, now, req.ip || "", String(req.headers["user-agent"] || ""), userId);
+      `, `sess_${crypto.randomUUID()}`, sessionExpiry, sessionToken, now, now, req.ip || "", String(req.headers["user-agent"] || ""), userId);
 
       // 5. Set session cookie
       res.cookie("better-auth.session_token", sessionToken, {
@@ -5783,7 +5763,7 @@ app.post(
       if (refreshToken) db.googleConfig.refreshToken = refreshToken;
       db.googleConfig.isConnected = true;
       db.googleConfig.lastSyncTime = new Date().toISOString();
-      saveDb();
+      await saveDb();
       if (token) {
         backupLocalFilesToGoogleDrive(token).catch((e) => {
           console.warn(
@@ -5825,7 +5805,7 @@ app.post(
       db.googleConfig.refreshToken = "";
       db.googleConfig.isConnected = false;
       db.googleConfig.lastSyncTime = new Date().toISOString();
-      saveDb();
+      await saveDb();
       res.json({
         success: true,
         isConnected: false,
@@ -5943,7 +5923,7 @@ function validatePlatformValue(section: string, key: string, value: unknown): un
   }
   platformConfigError(`Unknown field: ${section}.${key}`);
 }
-function applyPlatformConfiguration(section: unknown, values: unknown, actor: ReturnType<typeof auditActorFor>) {
+async function applyPlatformConfiguration(section: unknown, values: unknown, actor: ReturnType<typeof auditActorFor>) {
   if (typeof section !== "string" || !Object.hasOwn(PLATFORM_SECTIONS, section)) platformConfigError("section must be branding, google, ai, smtp or uiTexts.");
   if (!values || typeof values !== "object" || Array.isArray(values)) platformConfigError("values must be an object.");
   const allowed = PLATFORM_SECTIONS[section as string];
@@ -5978,13 +5958,10 @@ function applyPlatformConfiguration(section: unknown, values: unknown, actor: Re
   else db.googleConfig = { ...(db.googleConfig || {}), ...next, ...(section === "google" && next.masterSpreadsheetId !== undefined ? { masterSpreadsheetUrl: "" } : {}) };
   if (section === "ai" && next.geminiApiKey !== undefined) process.env.GEMINI_API_KEY = String(next.geminiApiKey);
   try {
-    sqliteDb.transaction(() => {
-      syncDbToSqlite(db);
-      appendAudit(sqliteDb, actor, {
-        organizationId: null, action: "platform.configuration.update", targetType: "installation", targetId: "installation",
-        outcome: "success", changedFields: Object.keys(next).map((k) => `${section}.${k}`),
-      });
-    })();
+    await coreSaver.save(() => appendAudit(sql, actor, {
+      organizationId: null, action: "platform.configuration.update", targetType: "installation", targetId: "installation",
+      outcome: "success", changedFields: Object.keys(next).map((k) => `${section}.${k}`),
+    }));
   } catch (err) {
     const restored = JSON.parse(before);
     db.branding = restored.branding;
@@ -5994,15 +5971,15 @@ function applyPlatformConfiguration(section: unknown, values: unknown, actor: Re
   return (readPlatformConfiguration() as any)[section as string];
 }
 /** Committed organization change: rebuild projections and re-derive policy-dependent state. */
-function onOrganizationChanged(organizationId: string) {
-  refreshTenantProjection();
+async function onOrganizationChanged(organizationId: string) {
+  await refreshTenantProjection();
   (db.partners || []).forEach((p: any) => {
     if (p.organizationId !== organizationId) return;
     p.dd_documents = normalizePartnerDocuments(p);
     p.status_dd = computeDueDiligenceStatus(p.dd_documents);
   });
-  recalculateStatuses();
-  saveDb();
+  await recalculateStatuses();
+  await saveDb();
 }
 app.get("/api/google-integration", (_req: express.Request, res: express.Response) => {
   const config = readPlatformConfiguration();
@@ -6010,7 +5987,7 @@ app.get("/api/google-integration", (_req: express.Request, res: express.Response
 });
 /** Legacy platform write adapter: splits a flat body into strict sections. Tenant fields are rejected. */
 app.post("/api/google-integration", async (req: express.Request, res: express.Response) => {
-  const identity = resolveIdentity(sqliteDb, req);
+  const identity = identityOf(req);
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const sections: Record<string, Record<string, unknown>> = {};
   for (const [key, value] of Object.entries(body)) {
@@ -6021,7 +5998,7 @@ app.post("/api/google-integration", async (req: express.Request, res: express.Re
   }
   const previousFolder = db.googleConfig?.driveFolderId;
   try {
-    for (const [section, values] of Object.entries(sections)) applyPlatformConfiguration(section, values, auditActorFor(req, identity));
+    for (const [section, values] of Object.entries(sections)) await applyPlatformConfiguration(section, values, auditActorFor(req, identity));
   } catch (err: any) {
     if (err instanceof ApiError) return sendError(req, res, err.status, err.error, err.message);
     throw err;
@@ -6032,17 +6009,17 @@ app.post("/api/google-integration", async (req: express.Request, res: express.Re
   const config = readPlatformConfiguration();
   res.json({ success: true, config: { ...config.google, ...config.ai, ...config.smtp } });
 });
-app.get('/api/mailer/templates', (_req, res) => res.json({ templates: mailTemplates.list() }));
-app.put('/api/mailer/templates/:id', (req, res) => {
+app.get('/api/mailer/templates', async (_req, res) => res.json({ templates: await mailTemplates.list() }));
+app.put('/api/mailer/templates/:id', async (req, res) => {
   const { subject, html, expectedVersion } = req.body || {};
-  const template = sqliteDb.transaction(() => {
-    const saved = mailTemplates.save(String(req.params.id), { subject, html }, expectedVersion);
-    appendAudit(sqliteDb, auditActorFor(req, resolveIdentity(sqliteDb, req)), {
+  const template = await sql.tx(async () => {
+    const saved = await mailTemplates.save(String(req.params.id), { subject, html }, expectedVersion);
+    await appendAudit(sql, auditActorFor(req, identityOf(req)), {
       organizationId: null, action: 'platform.configuration.update', targetType: 'mail_template', targetId: String(req.params.id),
       outcome: 'success', changedFields: ['subject', 'html'],
     });
     return saved;
-  })();
+  });
   res.json({ template });
 });
 app.post("/api/smtp/test", async (req: express.Request, res: express.Response) => {
@@ -6097,7 +6074,7 @@ app.post("/api/smtp/test", async (req: express.Request, res: express.Response) =
     const info = await transporter.sendMail({
       from: `"${fromName}" <${fromAddress}>`,
       to: recipient,
-      ...mailTemplates.render('smtp-test', { host, port: String(port), fromAddress, testedAt: new Date().toISOString() }),
+      ...await mailTemplates.render('smtp-test', { host, port: String(port), fromAddress, testedAt: new Date().toISOString() }),
     });
     res.json({
       success: true,
@@ -6222,7 +6199,7 @@ app.post("/api/google-integration/auto-provision-master", async (req: express.Re
         orgErr?.message,
       );
     }
-    saveDb();
+    await saveDb();
     return res.json({
       success: true,
       message:
@@ -6292,7 +6269,7 @@ const provisionFoldersHandler = __name(async (req: express.Request, res: express
   );
   try {
     const stats = await ensureAllPartnersFolders(token);
-    saveDb();
+    await saveDb();
     return res.json({
       success: true,
       message: `4 Subfolder Kategori (Folder Contract, Folder Invoice & Billing, Folder IO, Folder DD) berhasil dibuat/diperbarui untuk ${db.partners.length} partner.`,
@@ -6368,7 +6345,7 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
     };
   }
   const primaryTenantId = dataset.tenants[0].id;
-  const identity = resolveIdentity(sqliteDb, req);
+  const identity = identityOf(req);
 
   /*
    * Application-wide reset (PRD §2.3, §14.5). Non-demo identities, their
@@ -6378,23 +6355,23 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
    */
   const previousState = { ...db };
   try {
-    sqliteDb.transaction(() => {
+    await coreSaver.withSaveLock(() => sql.tx(async () => {
       // Clear editor data and extraction caches with the same reset.
       for (const table of ["contract_comments", "document_metadata", "contract_drafts", "contract_documents", "metadata_fields", "ai_ocr_cache", "tenants", "departments", "search_records"]) {
-        if (sqliteDb.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)) {
-          sqliteDb.prepare(`DELETE FROM "${table}"`).run();
+        if (await sql.get("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", table)) {
+          await sql.run(`DELETE FROM "${table}"`);
         }
       }
-      removeDemoAccounts(sqliteDb, [], identity.userId);
+      await removeDemoAccounts(sql, [], identity.userId);
       for (const table of ["invitation", "apikey", "teamMember", "team", "member", "organization_settings", "organization_integrations", "organization"]) {
-        sqliteDb.prepare(`DELETE FROM ${table}`).run();
+        await sql.run(`DELETE FROM ${table}`);
       }
-      seedOrganizationsFromDataset(sqliteDb, {
+      await seedOrganizationsFromDataset(sql, {
         tenants: dataset.tenants,
         departments: dataset.departments,
         allowedUsers: mode === "demo" && process.env.NODE_ENV !== "production" ? dataset.allowedUsers : [],
       });
-      sqliteDb.prepare("UPDATE session SET activeOrganizationId = NULL, activeTeamId = NULL").run();
+      await sql.run("UPDATE session SET activeOrganizationId = NULL, activeTeamId = NULL");
 
       // Mutate `db` in place: the auth console holds a reference to this object.
       const provider = db.googleConfig || {};
@@ -6433,16 +6410,18 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
           accessToken: "",
         },
       });
-      refreshTenantProjection();
+      await refreshTenantProjection();
       migrateLegacyRecords();
-      // Organization replacement and its referencing business records must commit together.
-      syncDbToSqlite(db);
-      appendAudit(sqliteDb, auditActorFor(req, identity), {
+      // search_records was emptied above, so no fingerprint may skip a row; the replacement and its business records commit together.
+      resetSyncCache(sql);
+      await syncDbToSqlite(coreSaver.snapshot());
+      await appendAudit(sql, auditActorFor(req, identity), {
         organizationId: null, action: "platform.application.reset", targetType: "installation", targetId: "installation",
         outcome: "success", changedFields: [`mode:${mode}`],
       });
-    })();
+    }));
   } catch (err) {
+    resetSyncCache(sql);
     Object.assign(db, previousState);
     console.error("Error resetting auth organization tables:", err);
     return res.status(500).json({ error: "Failed to reset organization tables." });
@@ -6458,8 +6437,8 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
     }
   }
 
-  recalculateStatuses();
-  saveDb();
+  await recalculateStatuses();
+  await saveDb();
   // Demo accounts get a password only when DEMO_ADMIN_PASSWORD is set.
   if (!IS_TEST_MODE) await ensureUserAccountsExist();
   res.json({
@@ -7006,10 +6985,10 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
       .status(400)
       .json({ error: `Tipe import tidak dikenal: ${type}` });
   }
-  recalculateStatuses(); // once per import: it saves the whole database
+  await recalculateStatuses(); // once per import: it saves the whole database
   const totalSucceeded = succeeded.length;
   if (totalSucceeded > 0) {
-    addActivityLog(
+    await addActivityLog(
       "system", "System", "User", "BULK_IMPORT", type.toUpperCase(),
       `Bulk import ${type}: ${totalSucceeded} berhasil, ${skipped.length} dilewati, ${failed.length} gagal.`,
       req,
@@ -7022,9 +7001,9 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
  * active tenant, no provisioning); switching only updates this session's
  * default; lifecycle writes are platform-only canonical services.
  */
-app.get("/api/tenants", (req: express.Request, res: express.Response) => {
-  const identity = resolveIdentity(sqliteDb, req);
-  const accessible = accessibleOrganizations(sqliteDb, identity);
+app.get("/api/tenants", async (req: express.Request, res: express.Response) => {
+  const identity = identityOf(req);
+  const accessible = await accessibleOrganizations(sql, identity);
   const ids = new Set(accessible.map((o) => o.organizationId));
   const tenants = (db.tenants || []).filter((t: any) => ids.has(t.id)).map((t: any) => ({
     id: t.id, name: t.name, brandName: t.brandName, legalEntity: t.legalEntity, tagline: t.tagline,
@@ -7036,25 +7015,25 @@ app.get("/api/tenants", (req: express.Request, res: express.Response) => {
   res.setHeader("Cache-Control", "no-store");
   return res.json({ success: true, tenants, organizations: accessible, activeTenantId: defaultId });
 });
-app.post("/api/tenants/switch", (req: express.Request, res: express.Response) => {
-  const identity = resolveIdentity(sqliteDb, req);
+app.post("/api/tenants/switch", async (req: express.Request, res: express.Response) => {
+  const identity = identityOf(req);
   const tenantId = typeof req.body?.tenantId === "string" ? req.body.tenantId : req.body?.organizationId;
   try {
-    const result = selectActiveOrganization(sqliteDb, identity, Object.assign(Object.create(req), { body: { organizationId: tenantId } }));
+    const result = await selectActiveOrganization(sql, identity, Object.assign(Object.create(req), { body: { organizationId: tenantId } }));
     return res.json({ success: true, activeTenantId: result.organizationId });
   } catch (err: any) {
     if (err instanceof RequestDenied || err instanceof ApiError) return sendError(req, res, err.status, err.error, err.message);
     throw err;
   }
 });
-app.post("/api/tenants", (req: express.Request, res: express.Response) => {
-  const identity = resolveIdentity(sqliteDb, req);
+app.post("/api/tenants", async (req: express.Request, res: express.Response) => {
+  const identity = identityOf(req);
   const body = req.body || {};
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name || name.length > 200) return sendError(req, res, 400, "INVALID_INPUT", "Organization name is required (1–200 characters).");
   try {
-    const id = sqliteDb.transaction(() => {
-      const orgId = createOrganizationRecord(sqliteDb, {
+    const id = await sql.tx(async () => {
+      const orgId = await createOrganizationRecord(sql, {
         name,
         slug: typeof body.domainSlug === "string" ? body.domainSlug : undefined,
         legalEntity: typeof body.legalEntity === "string" ? body.legalEntity.slice(0, 200) : "",
@@ -7063,21 +7042,21 @@ app.post("/api/tenants", (req: express.Request, res: express.Response) => {
         primaryColor: typeof body.primaryColor === "string" ? body.primaryColor : undefined,
         settings: { countryCode: body.countryCode || body.settings?.countryCode, industry: body.industry || body.settings?.industry, defaultCurrency: body.currency },
       }, identity.userId);
-      appendAudit(sqliteDb, auditActorFor(req, identity), {
+      await appendAudit(sql, auditActorFor(req, identity), {
         organizationId: orgId, action: "organization.create", targetType: "organization", targetId: orgId, outcome: "success", changedFields: ["name"],
       });
       return orgId;
-    })();
-    refreshTenantProjection();
+    });
+    await refreshTenantProjection();
     return res.status(201).json({ success: true, newTenant: findTenant(id), tenants: db.tenants });
   } catch (err: any) {
     return sendError(req, res, 400, "INVALID_INPUT", err?.message);
   }
 });
-app.put("/api/tenants/:id", (req: express.Request, res: express.Response) => {
-  const identity = resolveIdentity(sqliteDb, req);
+app.put("/api/tenants/:id", async (req: express.Request, res: express.Response) => {
+  const identity = identityOf(req);
   try {
-    const current = readOrganizationSettings(sqliteDb, req.params.id);
+    const current = await readOrganizationSettings(sql, req.params.id);
     const body = req.body || {};
     const patch: any = { expectedVersion: typeof body.expectedVersion === "number" ? body.expectedVersion : current.version };
     if (typeof body.name === "string") patch.name = body.name;
@@ -7088,52 +7067,52 @@ app.put("/api/tenants/:id", (req: express.Request, res: express.Response) => {
     if (typeof body.domainSlug === "string" && body.domainSlug.trim() && body.domainSlug !== current.slug) {
       const slug = body.domainSlug.trim().toLowerCase();
       if (!/^[a-z0-9-]{1,48}$/.test(slug)) return sendError(req, res, 400, "INVALID_INPUT", "Slug may contain lowercase letters, digits and dashes.");
-      if (sqliteDb.prepare("SELECT 1 FROM organization WHERE slug = ? AND id <> ?").get(slug, req.params.id)) return sendError(req, res, 409, "SLUG_EXISTS");
-      sqliteDb.prepare("UPDATE organization SET slug = ? WHERE id = ?").run(slug, req.params.id);
+      if (await sql.get("SELECT 1 FROM organization WHERE slug = ? AND id <> ?", slug, req.params.id)) return sendError(req, res, 409, "SLUG_EXISTS");
+      await sql.run("UPDATE organization SET slug = ? WHERE id = ?", slug, req.params.id);
     }
     if (patch.name !== undefined || patch.profile || patch.policy) {
-      patchOrganizationSettings(sqliteDb, req.params.id, patch, auditActorFor(req, identity));
+      await patchOrganizationSettings(sql, req.params.id, patch, auditActorFor(req, identity));
     }
-    onOrganizationChanged(req.params.id);
+    await onOrganizationChanged(req.params.id);
     return res.json({ success: true, tenants: db.tenants });
   } catch (err: any) {
     if (err instanceof ApiError) return sendError(req, res, err.status, err.error, err.message);
     throw err;
   }
 });
-app.delete("/api/tenants/:id", (req: express.Request, res: express.Response) => {
-  const identity = resolveIdentity(sqliteDb, req);
+app.delete("/api/tenants/:id", async (req: express.Request, res: express.Response) => {
+  const identity = identityOf(req);
   const id = req.params.id;
   if (!findTenant(id)) return sendError(req, res, 404, "RESOURCE_NOT_FOUND");
   // Deleting an organization never cascades into business data (PRD §9.4).
   const owned = ["partners", "contracts", "ios", "spendings", "evaluations", "notifications", "templates"]
     .some((key) => (db[key] || []).some((row: any) => row?.organizationId === id));
   if (owned) return sendError(req, res, 409, "ORGANIZATION_IN_USE", "Move or remove this organization's records first.");
-  sqliteDb.transaction(() => {
-    sqliteDb.prepare("DELETE FROM teamMember WHERE teamId IN (SELECT id FROM team WHERE organizationId = ?)").run(id);
+  await sql.tx(async () => {
+    await sql.run("DELETE FROM teamMember WHERE teamId IN (SELECT id FROM team WHERE organizationId = ?)", id);
     for (const table of ["member", "team", "invitation", "organization_settings", "organization_integrations"]) {
-      sqliteDb.prepare(`DELETE FROM ${table} WHERE organizationId = ?`).run(id);
+      await sql.run(`DELETE FROM ${table} WHERE organizationId = ?`, id);
     }
-    sqliteDb.prepare("UPDATE session SET activeOrganizationId = NULL WHERE activeOrganizationId = ?").run(id);
-    sqliteDb.prepare("DELETE FROM organization WHERE id = ?").run(id);
-    appendAudit(sqliteDb, auditActorFor(req, identity), {
+    await sql.run("UPDATE session SET activeOrganizationId = NULL WHERE activeOrganizationId = ?", id);
+    await sql.run("DELETE FROM organization WHERE id = ?", id);
+    await appendAudit(sql, auditActorFor(req, identity), {
       organizationId: id, action: "organization.delete", targetType: "organization", targetId: id, outcome: "success", changedFields: [],
     });
-  })();
-  refreshTenantProjection();
+  });
+  await refreshTenantProjection();
   return res.json({ success: true, tenants: db.tenants });
 });
 /** Legacy Integrations write: validated folder AND sheet mapping through the canonical store. */
-app.post("/api/tenants/:id/setup-google", (req: express.Request, res: express.Response) => {
+app.post("/api/tenants/:id/setup-google", async (req: express.Request, res: express.Response) => {
   const ctx = orgContextOf(req);
-  const identity = resolveIdentity(sqliteDb, req);
-  const current = readIntegration(sqliteDb, ctx.organizationId);
+  const identity = identityOf(req);
+  const current = await readIntegration(sql, ctx.organizationId);
   const body: any = { expectedVersion: typeof req.body?.expectedVersion === "number" ? req.body.expectedVersion : current.version };
   if (req.body?.driveFolderId !== undefined) body.driveFolderId = req.body.driveFolderId || null;
   if (req.body?.spreadsheetId !== undefined) body.spreadsheetId = req.body.spreadsheetId || null;
   try {
-    patchIntegration(sqliteDb, ctx.organizationId, body, auditActorFor(req, identity, ctx));
-    onOrganizationChanged(ctx.organizationId);
+    await patchIntegration(sql, ctx.organizationId, body, auditActorFor(req, identity, ctx));
+    await onOrganizationChanged(ctx.organizationId);
     return res.json({ success: true, tenant: findTenant(ctx.organizationId) });
   } catch (err: any) {
     if (err instanceof ApiError) return sendError(req, res, err.status, err.error, err.message);
@@ -7150,9 +7129,9 @@ app.get("/api/branding", (req: express.Request, res: express.Response) => {
     branding: { appName: b.appName, logoUrl: b.logoUrl, primaryColor: b.primaryColor, footerText: b.footerText, loginHeadline: b.loginHeadline },
   });
 });
-app.post("/api/branding", (req: express.Request, res: express.Response) => {
+app.post("/api/branding", async (req: express.Request, res: express.Response) => {
   try {
-    const branding = applyPlatformConfiguration("branding", req.body, auditActorFor(req, resolveIdentity(sqliteDb, req)));
+    const branding = await applyPlatformConfiguration("branding", req.body, auditActorFor(req, identityOf(req)));
     return res.json({ success: true, branding });
   } catch (err: any) {
     if (err instanceof ApiError) return sendError(req, res, err.status, err.error, err.message);
@@ -7187,7 +7166,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
      */
     const dbContext = {
       organization: { name: ctx.organizationName, country: ctx.countryName, industry: ctx.industryName },
-      partners: readBusinessRows(sqliteDb, 'partners', tenantId).filter(visibleTo("partner")).map((p: any) => ({
+      partners: (await readBusinessRows(sql, 'partners', tenantId)).filter(visibleTo("partner")).map((p: any) => ({
         partner_id: p.partner_id || p.id,
         name: p.partner_name,
         codename: p.codename || p.partner_channel || "",
@@ -7209,7 +7188,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
             }))
           : [],
       })),
-      contracts: readBusinessRows(sqliteDb, 'contracts', tenantId).filter(visibleTo("contract")).map((c: any) => ({
+      contracts: (await readBusinessRows(sql, 'contracts', tenantId)).filter(visibleTo("contract")).map((c: any) => ({
         contract_id: c.contract_id || c.id,
         reference: c.contract_number,
         title: c.contract_title,
@@ -7234,7 +7213,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
         changed_fields: c.changed_fields || [],
         days_remaining: c.days_remaining,
       })),
-      commercial_documents: readBusinessRows(sqliteDb, 'insertion_orders', tenantId).filter(visibleTo("io")).map((i: any) => {
+      commercial_documents: (await readBusinessRows(sql, 'insertion_orders', tenantId)).filter(visibleTo("io")).map((i: any) => {
         const endDateStr = i.end_date || i.completion_date || i.period_end || "";
         const lifecycle = computeLifecycle(i.organizationId, endDateStr, i.status);
         return {
@@ -7260,7 +7239,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
           days_remaining: lifecycle.daysRemaining,
         };
       }),
-      spendings_and_invoices: readBusinessRows(sqliteDb, 'spendings', tenantId).filter(visibleTo("spending")).map((s: any) => ({
+      spendings_and_invoices: (await readBusinessRows(sql, 'spendings', tenantId)).filter(visibleTo("spending")).map((s: any) => ({
         spending_id: s.id,
         vendor_name: s.vendor_name || s.partner_name || "",
         vendor_id: s.vendor_id || s.partner_id || "",
@@ -7274,7 +7253,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
         payment_status: s.payment_status || "",
         bank: [s.bank_name, maskTail(s.bank_account_number)].filter(Boolean).join(" "),
       })),
-      evaluations: readBusinessRows(sqliteDb, 'evaluations', tenantId).filter(visibleTo("evaluation")).map((e: any) => ({
+      evaluations: (await readBusinessRows(sql, 'evaluations', tenantId)).filter(visibleTo("evaluation")).map((e: any) => ({
         evaluation_id: e.id,
         supplier_name: e.supplier_name,
         review_date: e.review_date,
@@ -7349,9 +7328,9 @@ app.get("/api/health", (_req: express.Request, res: express.Response) => {
 /** True while an install upgraded from an older release still uses the old shipped admin password. */
 async function isBootstrapPasswordActive(): Promise<boolean> {
   try {
-    const row: any = sqliteDb.prepare(`
+    const row: any = await sql.get(`
       SELECT password FROM account WHERE userId = 'demo-admin' AND providerId = 'credential' LIMIT 1
-    `).get();
+    `);
     if (!row?.password) return false;
     return await verifyPassword({ hash: row.password, password: LEGACY_DEFAULT_ADMIN_PASSWORD });
   } catch {
@@ -7360,13 +7339,13 @@ async function isBootstrapPasswordActive(): Promise<boolean> {
 }
 
 /** A fresh install has no Superuser until someone completes the first-run setup page. */
-const needsFirstRunSetup = () => !sqliteDb.prepare(`SELECT 1 FROM "user" WHERE role = 'superuser' LIMIT 1`).get();
+const needsFirstRunSetup = async () => !await sql.get(`SELECT 1 FROM "user" WHERE role = 'superuser' LIMIT 1`);
 
 // Unauthenticated: tells the sign-in page whether to show the first-run setup form instead.
-app.get("/api/system/public-status", (_req: express.Request, res: express.Response) => {
+app.get("/api/system/public-status", async (_req: express.Request, res: express.Response) => {
   res.set('Cache-Control', 'no-store').json({
     appName: db.branding?.appName || DEFAULT_BRANDING.appName,
-    needsSetup: !migrationBlock && needsFirstRunSetup(),
+    needsSetup: !migrationBlock && await needsFirstRunSetup(),
     publicUrl: getPublicBaseUrl(),
     migrationRequired: Boolean(migrationBlock),
   });
@@ -7374,7 +7353,7 @@ app.get("/api/system/public-status", (_req: express.Request, res: express.Respon
 
 // Unauthenticated, and only usable while no Superuser exists: creates the first admin.
 app.post("/api/system/setup", async (req: express.Request, res: express.Response) => {
-  if (!needsFirstRunSetup()) {
+  if (!await needsFirstRunSetup()) {
     return res.status(409).json({ error: "ALREADY_SET_UP", message: "An administrator already exists. Please sign in." });
   }
   let publicUrl: string;
@@ -7397,30 +7376,30 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
   const now = new Date().toISOString();
   try {
     // Re-checked inside the transaction: hashing above yields, so a second request could have won.
-    const created = sqliteDb.transaction(() => {
-      if (!needsFirstRunSetup()) return false;
-      if (sqliteDb.prepare(`SELECT 1 FROM user WHERE LOWER(email) = ?`).get(email)) {
+    const created = await sql.tx(async () => {
+      if (!await needsFirstRunSetup()) return false;
+      if (await sql.get(`SELECT 1 FROM user WHERE LOWER(email) = ?`, email)) {
         throw Object.assign(new Error("That email is already used by another account."), { status: 409 });
       }
-      sqliteDb.prepare(`
+      await sql.run(`
         INSERT INTO user (id, name, email, emailVerified, role, banned, createdAt, updatedAt)
         VALUES (?, ?, ?, 1, 'superuser', 0, ?, ?)
-      `).run(id, name, email, now, now);
-      sqliteDb.prepare(`
+      `, id, name, email, now, now);
+      await sql.run(`
         INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer)
         VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')
-      `).run(`acc_${id}`, id, id, hashed, now, now);
-      saveInstallationPublicUrl(sqliteDb, publicUrl);
+      `, `acc_${id}`, id, id, hashed, now, now);
+      await saveInstallationPublicUrl(sql, publicUrl);
       return true;
-    }).immediate(); // write lock before the check: concurrent setups cannot both pass
+    }); // the facade serializes transactions, so concurrent setups cannot both pass the check
     if (!created) {
       return res.status(409).json({ error: "ALREADY_SET_UP", message: "An administrator already exists. Please sign in." });
     }
   } catch (err: any) {
     return res.status(err?.status || 500).json({ error: "SETUP_FAILED", message: err?.message || "Setup failed." });
   }
-  reloadAuthConfiguration();
-  appendAudit(sqliteDb, { actorId: id, actorPlatformRole: "superuser", accessMode: "platform", requestId: String((req as any).requestId || crypto.randomUUID()) }, {
+  await reloadAuthConfiguration();
+  await appendAudit(sql, { actorId: id, actorPlatformRole: "superuser", accessMode: "platform", requestId: String((req as any).requestId || crypto.randomUUID()) }, {
     organizationId: null, action: "platform.setup", targetType: "installation", targetId: "installation", outcome: "success", changedFields: ["superuser", "publicUrl"],
   });
   // Outside production the demo-workspace logins stay usable with the same password.
@@ -7430,7 +7409,7 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
 });
 
 app.get("/api/system/status", async (req: express.Request, res: express.Response) => {
-  const identity = resolveIdentity(sqliteDb, req);
+  const identity = identityOf(req);
   const isSuperuser = identity.platformRole === "superuser";
   const google = isSuperuser ? googleCredentials.status() : null;
   res.json({
@@ -7507,7 +7486,7 @@ app.get("/api/tenant-settings", (req: express.Request, res: express.Response) =>
   res.json(tenantSettingsPayload(getRequestTenantId(req)));
 });
 /** Legacy write adapter (PRD §10.1): strict policy/legalEntity fields through the settings service. */
-app.put("/api/tenant-settings", (req: express.Request, res: express.Response) => {
+app.put("/api/tenant-settings", async (req: express.Request, res: express.Response) => {
   const ctx = orgContextOf(req);
   const body = req.body && typeof req.body === "object" ? req.body : {};
   for (const key of Object.keys(body)) {
@@ -7516,12 +7495,12 @@ app.put("/api/tenant-settings", (req: express.Request, res: express.Response) =>
     }
   }
   try {
-    const current = readOrganizationSettings(sqliteDb, ctx.organizationId);
+    const current = await readOrganizationSettings(sql, ctx.organizationId);
     const patch: any = { expectedVersion: typeof body.expectedVersion === "number" ? body.expectedVersion : current.version };
     if (body.settings !== undefined) patch.policy = body.settings;
     if (typeof body.legalEntity === "string") patch.profile = { legalEntity: body.legalEntity };
-    patchOrganizationSettings(sqliteDb, ctx.organizationId, patch, auditActorFor(req, resolveIdentity(sqliteDb, req), ctx));
-    onOrganizationChanged(ctx.organizationId);
+    await patchOrganizationSettings(sql, ctx.organizationId, patch, auditActorFor(req, identityOf(req), ctx));
+    await onOrganizationChanged(ctx.organizationId);
     res.json({ success: true, ...tenantSettingsPayload(ctx.organizationId) });
   } catch (err: any) {
     if (err instanceof ApiError) return sendError(req, res, err.status, err.error, err.message);
@@ -7531,7 +7510,7 @@ app.put("/api/tenant-settings", (req: express.Request, res: express.Response) =>
 
 /* Canonical tenant administration API (PRD §9). */
 app.use("/api", createOrganizationAdminRouter({
-  db: sqliteDb,
+  db: sql,
   policyView: (organizationId: string) => tenantSettingsPayload(organizationId),
   providerConfigured: () => hasServiceAccountCredentials() || Boolean(db.googleConfig?.accessToken || db.googleConfig?.refreshToken),
   onOrganizationChanged,
@@ -7548,16 +7527,15 @@ app.use("/api", createOrganizationAdminRouter({
     if (IS_TEST_MODE) return false;
     return sendPlatformMail({
       to: email,
-      ...mailTemplates.render('invitation', { organizationName, tenantRole, inviteUrl, expiresAt: String(expiresAt).slice(0, 10), inviterName: inviterName || 'An administrator' }),
+      ...await mailTemplates.render('invitation', { organizationName, tenantRole, inviteUrl, expiresAt: String(expiresAt).slice(0, 10), inviterName: inviterName || 'An administrator' }),
     });
   },
   platformConfiguration: {
     read: readPlatformConfiguration,
-    patch: (section: string, values: unknown, actor) => applyPlatformConfiguration(section, values, actor),
+    patch: async (section: string, values: unknown, actor) => await applyPlatformConfiguration(section, values, actor),
   },
 }));
 
-app.use("/api/auth-console/backups", createSQLiteBackupRouter(sqliteDb, sqliteBackups));
 app.use("/api/auth-console", authConsoleRouter);
 app.all("/api/*", (req: express.Request, res: express.Response) => {
   res
@@ -7580,6 +7558,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   next(err);
 });
 async function startServer() {
+  await init();
   mountSystemConsole(app, process.env.SYSTEM_CONSOLE_DIR || path.join(REPOSITORY_DIR, "apps/backend/dist/console"));
   let viteServer;
   // API_ONLY=true (set by `npm run dev:backend`) skips Vite entirely, for

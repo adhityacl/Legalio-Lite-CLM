@@ -14,7 +14,8 @@
  *   orgParam  — legacy route whose `:id` path segment is the organization
  */
 import type express from 'express';
-import type Database from 'better-sqlite3';
+import type { Sql } from './db';
+import { teamsOf } from './recordScope';
 import {
   RequestDenied, isSameOriginRequest, legacyActorOf, resolveIdentity, resolveLegacyContext,
   resolveOrganizationContext, sendError,
@@ -144,16 +145,6 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['POST', '/api/auth-console/api-keys/:id/revoke', platform('platform.apikey.revoke')],
   ['DELETE', '/api/auth-console/api-keys/:id', platform('platform.apikey.delete')],
   ['GET', '/api/auth-console/rbac-matrix', platform('platform.policy.read')],
-  ['GET', '/api/auth-console/backups', platform('platform.database.read')],
-  ['POST', '/api/auth-console/backups', platform('platform.database.optimize')],
-  ['GET', '/api/auth-console/backups/:id/download', platform('platform.database.read')],
-  ['POST', '/api/auth-console/backups/restore-file', platform('platform.application.reset')],
-  ['POST', '/api/auth-console/backups/:id/restore', platform('platform.application.reset')],
-  ['GET', '/api/auth-console/sqlite/status', platform('platform.database.read')],
-  ['GET', '/api/auth-console/sqlite/tables', platform('platform.database.read')],
-  ['GET', '/api/auth-console/sqlite/table-data', platform('platform.database.read')],
-  ['PATCH', '/api/auth-console/sqlite/table-data', platform('platform.database.update')],
-  ['POST', '/api/auth-console/sqlite/optimize', platform('platform.database.optimize')],
 
   /* ---------------- legacy tenant operations ---------------- */
   ['GET', '/api/init-data', tenant('document.view')],
@@ -277,9 +268,10 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  * identity, same-origin check for cookie mutations, then platform or
  * organization context with explicit permissions. Better Auth's own
  * /api/auth/* endpoints are filtered separately (betterAuthBoundary).
+ * It also loads the organization's departments once (`req.teams`) so record scoping stays synchronous.
  */
-export function createAuthorizationMiddleware(db: Database.Database, options: { blocked?: () => string | null } = {}) {
-  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+export function createAuthorizationMiddleware(db: Sql, options: { blocked?: () => string | null } = {}) {
+  const run = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (!req.path.startsWith('/api/')) return next();
     if (req.method === 'OPTIONS') return res.status(204).end();
     const found = findPolicy(req.method, req.path);
@@ -291,7 +283,7 @@ export function createAuthorizationMiddleware(db: Database.Database, options: { 
     }
     if (policy.kind === 'public') return next();
     try {
-      const identity = resolveIdentity(db, req);
+      const identity = await resolveIdentity(db, req);
       if (identity.viaCookie && !SAFE_METHODS.has(req.method) && !isSameOriginRequest(req)) {
         return sendError(req, res, 403, 'CSRF_REJECTED');
       }
@@ -304,11 +296,12 @@ export function createAuthorizationMiddleware(db: Database.Database, options: { 
       if (policy.kind === 'orgParam') {
         const headers = [req.headers['x-organization-id'], req.headers['x-tenant-id']].map((v) => (typeof v === 'string' ? v.trim() : '')).filter(Boolean);
         if (headers.some((v) => v !== params.id)) throw new RequestDenied(400, 'ORGANIZATION_SELECTOR_CONFLICT');
-        ctx = resolveOrganizationContext(db, identity, params.id);
+        ctx = await resolveOrganizationContext(db, identity, params.id);
       } else {
-        ctx = resolveLegacyContext(db, identity, req, { includeBody: policy.includeBody });
+        ctx = await resolveLegacyContext(db, identity, req, { includeBody: policy.includeBody });
       }
       if (!policy.permissions.every((p) => can(ctx, p))) return sendError(req, res, 403, 'INSUFFICIENT_PERMISSION');
+      (req as any).teams = await teamsOf(db, ctx.organizationId);
       (req as any).orgContext = ctx;
       (req as any).actor = legacyActorOf(ctx);
       return next();
@@ -317,6 +310,7 @@ export function createAuthorizationMiddleware(db: Database.Database, options: { 
       return next(err);
     }
   };
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => { run(req, res, next).catch(next); };
 }
 
 /* ------------------------------------------------------------------ */

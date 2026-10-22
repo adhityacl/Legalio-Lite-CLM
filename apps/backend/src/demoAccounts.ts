@@ -1,4 +1,4 @@
-import type { Database } from "better-sqlite3";
+import type { Sql } from "./db";
 import { buildDemoDataset } from "@legalio/shared/data/demoDataset";
 
 /** Login accounts shipped with the demo dataset — all on the reserved example.com domain. */
@@ -26,18 +26,18 @@ export const isDemoAccountEmail = (email: unknown) => {
  * the app user list without them. Both must go: every boot recreates a login, with the
  * DEMO_ADMIN_PASSWORD, for each entry left in the app user list.
  */
-export function removeDemoAccounts<T extends { id?: unknown; email?: unknown }>(auth: Database, allowedUsers: T[], keepUserId?: string) {
-  const doomed = (auth.prepare(`SELECT id, email FROM "user"`).all() as Array<{ id: string; email: string }>).filter(
+export async function removeDemoAccounts<T extends { id?: unknown; email?: unknown }>(auth: Sql, allowedUsers: T[], keepUserId?: string) {
+  const doomed = (await auth.all(`SELECT id, email FROM "user"`) as Array<{ id: string; email: string }>).filter(
     (u) => isDemoAccountEmail(u.email) && u.id !== keepUserId,
   );
-  auth.transaction(() => {
+  await auth.tx(async () => {
     for (const { id } of doomed) {
       for (const table of ["session", "account", "member", "teamMember"]) {
-        auth.prepare(`DELETE FROM "${table}" WHERE userId = ?`).run(id);
+        await auth.run(`DELETE FROM "${table}" WHERE userId = ?`, id);
       }
-      auth.prepare(`DELETE FROM "user" WHERE id = ?`).run(id);
+      await auth.run(`DELETE FROM "user" WHERE id = ?`, id);
     }
-  })();
+  });
   return {
     allowedUsers: allowedUsers.filter((u) => !isDemoAccountEmail(u.email) || u.id === keepUserId),
     removed: doomed.length,

@@ -7,7 +7,7 @@
  * x-user-email / x-role style headers or request bodies.
  */
 import type express from 'express';
-import type Database from 'better-sqlite3';
+import type { Sql } from './db';
 import crypto from 'crypto';
 import { getPublicBaseUrl } from './installationSettings';
 import {
@@ -15,7 +15,7 @@ import {
   type OrgContext, type PlatformRole,
 } from './rbac';
 
-type DB = Database.Database;
+type DB = Sql;
 
 export interface Identity {
   userId: string;
@@ -97,17 +97,24 @@ export function isIdentityBanned(user: { banned?: unknown; banExpires?: unknown 
   return until === null || until > now;
 }
 
+/** The identity the authorization middleware verified for this request, or 401. */
+export function identityOf(req: express.Request): Identity {
+  const identity = (req as any).identity as Identity | undefined;
+  if (!identity) throw new RequestDenied(401, 'UNAUTHENTICATED');
+  return identity;
+}
+
 /** Resolves the caller's identity, or throws RequestDenied (401/403). */
-export function resolveIdentity(db: DB, req: express.Request): Identity {
+export async function resolveIdentity(db: DB, req: express.Request): Promise<Identity> {
   const cached = (req as any).identity as Identity | undefined;
   if (cached) return cached;
   const { token, viaCookie } = readSessionToken(req);
   if (!token || token.length > 512) throw new RequestDenied(401, 'UNAUTHENTICATED');
-  const session = db.prepare(`SELECT id, userId, expiresAt, activeOrganizationId FROM session WHERE token = ?`).get(token) as any;
+  const session = await db.get(`SELECT id, userId, expiresAt, activeOrganizationId FROM session WHERE token = ?`, token) as any;
   if (!session) throw new RequestDenied(401, 'UNAUTHENTICATED');
   const expires = parseTimestamp(session.expiresAt);
   if (expires === null || expires <= Date.now()) throw new RequestDenied(401, 'UNAUTHENTICATED');
-  const user = db.prepare(`SELECT id, email, name, image, emailVerified, role, banned, banReason, banExpires FROM "user" WHERE id = ?`).get(session.userId) as any;
+  const user = await db.get(`SELECT id, email, name, image, emailVerified, role, banned, banReason, banExpires FROM "user" WHERE id = ?`, session.userId) as any;
   if (!user) throw new RequestDenied(401, 'UNAUTHENTICATED');
   if (isIdentityBanned(user)) throw new RequestDenied(403, user.banReason === 'PENDING_APPROVAL' ? 'ACCOUNT_PENDING_APPROVAL' : 'ACCOUNT_DISABLED');
   const platformRole = platformRoleOf(user.role);
@@ -173,11 +180,11 @@ export function collectSelectors(req: express.Request, options: { includeBody?: 
   return Array.from(new Set(values.filter(Boolean)));
 }
 
-export function departmentIdsOf(db: DB, userId: string, organizationId: string): string[] {
-  return (db.prepare(`
+export async function departmentIdsOf(db: DB, userId: string, organizationId: string): Promise<string[]> {
+  return (await db.all(`
     SELECT t.id FROM teamMember tm JOIN team t ON t.id = tm.teamId
     WHERE tm.userId = ? AND t.organizationId = ? ORDER BY t.createdAt ASC, t.id ASC
-  `).all(userId, organizationId) as Array<{ id: string }>).map((r) => r.id);
+  `, userId, organizationId) as Array<{ id: string }>).map((r) => r.id);
 }
 
 export interface MembershipRow {
@@ -188,9 +195,8 @@ export interface MembershipRow {
   status: string;
 }
 
-export function membershipOf(db: DB, userId: string, organizationId: string): MembershipRow | null {
-  return (db.prepare(`SELECT id, organizationId, userId, role, status FROM member WHERE userId = ? AND organizationId = ?`)
-    .get(userId, organizationId) as MembershipRow | undefined) || null;
+export async function membershipOf(db: DB, userId: string, organizationId: string): Promise<MembershipRow | null> {
+  return (await db.get(`SELECT id, organizationId, userId, role, status FROM member WHERE userId = ? AND organizationId = ?`, userId, organizationId) as MembershipRow | undefined) || null;
 }
 
 /**
@@ -199,14 +205,14 @@ export function membershipOf(db: DB, userId: string, organizationId: string): Me
  * request); a superuser gets explicit platform-management context. Anything
  * else is indistinguishable from a missing organization (404).
  */
-export function resolveOrganizationContext(db: DB, identity: Identity, organizationId: string): OrgContext {
-  if (!organizationId || organizationId.length > 200 || !db.prepare(`SELECT 1 FROM organization WHERE id = ?`).get(organizationId)) {
+export async function resolveOrganizationContext(db: DB, identity: Identity, organizationId: string): Promise<OrgContext> {
+  if (!organizationId || organizationId.length > 200 || !await db.get(`SELECT 1 FROM organization WHERE id = ?`, organizationId)) {
     throw new RequestDenied(404, 'RESOURCE_NOT_FOUND');
   }
   if (identity.platformRole === 'superuser') {
     return platformContext({ organizationId, userId: identity.userId });
   }
-  const membership = membershipOf(db, identity.userId, organizationId);
+  const membership = await membershipOf(db, identity.userId, organizationId);
   if (!membership || membership.status !== 'active' || !isTenantRole(membership.role)) {
     throw new RequestDenied(404, 'RESOURCE_NOT_FOUND');
   }
@@ -216,14 +222,14 @@ export function resolveOrganizationContext(db: DB, identity: Identity, organizat
     platformRole: identity.platformRole,
     membershipId: membership.id,
     tenantRole: membership.role,
-    departmentIds: departmentIdsOf(db, identity.userId, organizationId),
+    departmentIds: await departmentIdsOf(db, identity.userId, organizationId),
   });
 }
 
 /** Whether the identity may select the organization (same rule, no context built). */
-export function canAccessOrganization(db: DB, identity: Identity, organizationId: string): boolean {
+export async function canAccessOrganization(db: DB, identity: Identity, organizationId: string): Promise<boolean> {
   try {
-    resolveOrganizationContext(db, identity, organizationId);
+    await resolveOrganizationContext(db, identity, organizationId);
     return true;
   } catch {
     return false;
@@ -235,11 +241,11 @@ export function canAccessOrganization(db: DB, identity: Identity, organizationId
  * otherwise the session default is used only if still accessible; otherwise
  * ORGANIZATION_REQUIRED. Never the first/default organization.
  */
-export function resolveLegacyContext(db: DB, identity: Identity, req: express.Request, options: { includeBody?: boolean } = {}): OrgContext {
+export async function resolveLegacyContext(db: DB, identity: Identity, req: express.Request, options: { includeBody?: boolean } = {}): Promise<OrgContext> {
   const selectors = collectSelectors(req, options);
   if (selectors.length > 1) throw new RequestDenied(400, 'ORGANIZATION_SELECTOR_CONFLICT');
   if (selectors.length === 1) return resolveOrganizationContext(db, identity, selectors[0]);
-  if (identity.sessionDefaultOrganizationId && canAccessOrganization(db, identity, identity.sessionDefaultOrganizationId)) {
+  if (identity.sessionDefaultOrganizationId && await canAccessOrganization(db, identity, identity.sessionDefaultOrganizationId)) {
     return resolveOrganizationContext(db, identity, identity.sessionDefaultOrganizationId);
   }
   throw new RequestDenied(409, 'ORGANIZATION_REQUIRED');
@@ -276,19 +282,19 @@ export function legacyActorOf(ctx: OrgContext): LegacyActor {
 }
 
 /** Accessible organizations for the switcher: own active memberships, plus the directory for a superuser. */
-export function accessibleOrganizations(db: DB, identity: Identity) {
+export async function accessibleOrganizations(db: DB, identity: Identity) {
   // A superuser always works in platform-management context (§5.3), so its
   // switcher is the deduplicated directory rather than membership rows.
   if (identity.platformRole === 'superuser') {
-    return (db.prepare(`SELECT id, name, slug, logo FROM organization ORDER BY name COLLATE NOCASE, id`).all() as any[])
+    return (await db.all(`SELECT id, name, slug, logo FROM organization ORDER BY name COLLATE NOCASE, id`) as any[])
       .map((o) => ({ organizationId: o.id as string, organizationName: o.name as string, slug: (o.slug || '') as string, logoUrl: (o.logo || null) as string | null, tenantRole: null, accessMode: 'platform' as const }));
   }
-  const own = db.prepare(`
+  const own = await db.all(`
     SELECT o.id, o.name, o.slug, o.logo, m.role AS tenantRole
     FROM member m JOIN organization o ON o.id = m.organizationId
     WHERE m.userId = ? AND m.status = 'active'
     ORDER BY o.name COLLATE NOCASE, o.id
-  `).all(identity.userId) as any[];
+  `, identity.userId) as any[];
   return own.filter((r) => isTenantRole(r.tenantRole)).map((r) => ({
     organizationId: r.id as string, organizationName: r.name as string, slug: (r.slug || '') as string, logoUrl: (r.logo || null) as string | null,
     tenantRole: r.tenantRole, accessMode: 'membership' as const,

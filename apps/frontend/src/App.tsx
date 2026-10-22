@@ -663,7 +663,6 @@ const MainApp: React.FC = () => {
                 'admin-system-ai',
                 'admin-system-smtp',
                 'admin-system-ui-texts',
-                'admin-system-database',
               ].includes(activeTab)}
             />
           )}

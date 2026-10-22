@@ -1,6 +1,7 @@
 import express from "express";
 import crypto from "crypto";
-import type { Database } from "better-sqlite3";
+import type { Sql } from "./db";
+import { forwardAsyncRouteErrors } from "./asyncRoutes";
 import type { Identity } from "./identity";
 import { loadServiceAccountCredentials, type ServiceAccountCredentials } from "./lib/googleServiceAccountAuth";
 import {
@@ -27,22 +28,24 @@ interface StoredRow<T> {
  * ponytail: stored unencrypted, same exposure as the .env file they replace; encrypt the payload
  * (e.g. KMS or a BETTER_AUTH_SECRET-derived key) if copies of kaelyn.db ever leave the server.
  */
-export function createGoogleCredentialStore(db: Database) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS integration_credentials (
-      id TEXT PRIMARY KEY,
-      payload TEXT NOT NULL,
-      updated_by TEXT,
-      updated_at TEXT NOT NULL
-    );
-  `);
-
-  const read = <T>(kind: GoogleCredentialKind): StoredRow<T> | null => {
-    const row = db.prepare(`SELECT payload, updated_at FROM integration_credentials WHERE id = ?`).get(ROW_ID[kind]) as
-      | { payload: string; updated_at: string }
-      | undefined;
-    return row ? { value: JSON.parse(row.payload) as T, updated_at: row.updated_at } : null;
+export function createGoogleCredentialStore(db: Sql) {
+  // Rows mirrored in memory so token callbacks and status reads stay synchronous; only save/remove write them.
+  const rows = new Map<string, StoredRow<unknown>>();
+  const init = async () => {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS integration_credentials (
+        id TEXT PRIMARY KEY,
+        payload TEXT NOT NULL,
+        updated_by TEXT,
+        updated_at TEXT NOT NULL
+      );
+    `);
+    const stored = await db.all<{ id: string; payload: string; updated_at: string }>(`SELECT id, payload, updated_at FROM integration_credentials`);
+    rows.clear();
+    for (const row of stored) rows.set(row.id, { value: JSON.parse(row.payload), updated_at: row.updated_at });
   };
+
+  const read = <T>(kind: GoogleCredentialKind): StoredRow<T> | null => (rows.get(ROW_ID[kind]) as StoredRow<T> | undefined) ?? null;
 
   const getServiceAccount = (): ServiceAccountCredentials | null => read<ServiceAccountFile>("service-account")?.value ?? null;
 
@@ -56,15 +59,18 @@ export function createGoogleCredentialStore(db: Database) {
     };
   };
 
-  const save = (kind: GoogleCredentialKind, value: ServiceAccountFile | OAuthClientFile, actorId: string) => {
-    db.prepare(`
+  const save = async (kind: GoogleCredentialKind, value: ServiceAccountFile | OAuthClientFile, actorId: string) => {
+    const updated_at = new Date().toISOString();
+    await db.run(`
       INSERT INTO integration_credentials (id, payload, updated_by, updated_at) VALUES (?, ?, ?, ?)
       ON CONFLICT (id) DO UPDATE SET payload = excluded.payload, updated_by = excluded.updated_by, updated_at = excluded.updated_at
-    `).run(ROW_ID[kind], JSON.stringify(value), actorId, new Date().toISOString());
+    `, ROW_ID[kind], JSON.stringify(value), actorId, updated_at);
+    rows.set(ROW_ID[kind], { value, updated_at });
   };
 
-  const remove = (kind: GoogleCredentialKind) => {
-    db.prepare(`DELETE FROM integration_credentials WHERE id = ?`).run(ROW_ID[kind]);
+  const remove = async (kind: GoogleCredentialKind) => {
+    await db.run(`DELETE FROM integration_credentials WHERE id = ?`, ROW_ID[kind]);
+    rows.delete(ROW_ID[kind]);
   };
 
   const status = (): GoogleCredentialStatus => {
@@ -91,7 +97,7 @@ export function createGoogleCredentialStore(db: Database) {
     };
   };
 
-  return { getServiceAccount, getOAuthClient, save, remove, status };
+  return { init, getServiceAccount, getOAuthClient, save, remove, status };
 }
 
 export type GoogleCredentialStore = ReturnType<typeof createGoogleCredentialStore>;
@@ -111,6 +117,7 @@ const MESSAGES: Record<string, string> = {
 
 export function createGoogleCredentialsRouter(store: GoogleCredentialStore) {
   const router = express.Router();
+  forwardAsyncRouteErrors(router);
   const base = "/integrations/google/credentials";
 
   router.use(base, (req, res, next) => {
@@ -121,7 +128,7 @@ export function createGoogleCredentialsRouter(store: GoogleCredentialStore) {
 
   router.get(base, (_req, res) => res.json(store.status()));
 
-  router.put(`${base}/:kind`, (req, res) => {
+  router.put(`${base}/:kind`, async (req, res) => {
     const kind = req.params.kind as GoogleCredentialKind;
     if (!KINDS.includes(kind)) return res.status(404).json({ error: "Unknown credential kind." });
     const parsed = kind === "service-account" ? parseServiceAccountFile(req.body?.file) : parseOAuthClientFile(req.body?.file);
@@ -134,14 +141,14 @@ export function createGoogleCredentialsRouter(store: GoogleCredentialStore) {
       }
     }
     const identity = (req as unknown as { identity: Identity }).identity;
-    store.save(kind, parsed.value, identity.userId);
+    await store.save(kind, parsed.value, identity.userId);
     res.json(store.status());
   });
 
-  router.delete(`${base}/:kind`, (req, res) => {
+  router.delete(`${base}/:kind`, async (req, res) => {
     const kind = req.params.kind as GoogleCredentialKind;
     if (!KINDS.includes(kind)) return res.status(404).json({ error: "Unknown credential kind." });
-    store.remove(kind);
+    await store.remove(kind);
     res.json(store.status());
   });
 

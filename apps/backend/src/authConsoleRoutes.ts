@@ -7,15 +7,13 @@
  * nothing here creates or changes a membership implicitly.
  */
 import { Router, Request, Response } from 'express';
-import { editableColumns, editBusinessRow } from './sqliteEditing';
-import { ENTITIES } from './normalizedSchema';
-import { sqliteDb } from './lib/auth';
+import { sql } from './db';
+import { forwardAsyncRouteErrors } from './asyncRoutes';
 import { hashPassword } from 'better-auth/crypto';
 import crypto from 'crypto';
-import fs from 'fs';
 import { buildMatrix, isPlatformRole } from './rbac';
-import { RequestDenied, accessibleOrganizations, resolveIdentity, sendError, type Identity } from './identity';
-import { APP_DATA_DIR, AUTH_DB_PATH, UPLOADS_DIR } from './runtimePaths';
+import { RequestDenied, accessibleOrganizations, identityOf, sendError, type Identity } from './identity';
+import { APP_DATA_DIR, UPLOADS_DIR } from './runtimePaths';
 import path from 'node:path';
 import { resetOrganizationData } from './organizationReset';
 import { isDemoAccountEmail } from './demoAccounts';
@@ -24,13 +22,14 @@ import { assertAdminsRemainWithout, assertSuperusersRemainWithout, auditActorFor
 import { addMembershipRecord, createIdentityRecord, createOrganizationRecord } from './organizationProvisioning';
 
 export const authConsoleRouter = Router();
+forwardAsyncRouteErrors(authConsoleRouter);
 
 let globalDbRef: any = null;
-let saveDbFnRef: (() => void) | null = null;
-let organizationChangedRef: ((organizationId?: string) => void) | null = null;
+let saveDbFnRef: (() => Promise<void>) | null = null;
+let organizationChangedRef: ((organizationId?: string) => Promise<void>) | null = null;
 
 /** server.ts shares its projection (for SMTP/branding reads) and a refresh hook. No hydration happens here. */
-export function setConsoleDbReference(dbStore: any, saveFn: () => void, onOrganizationsChanged?: (organizationId?: string) => void) {
+export function setConsoleDbReference(dbStore: any, saveFn: () => Promise<void>, onOrganizationsChanged?: (organizationId?: string) => Promise<void>) {
   globalDbRef = dbStore;
   saveDbFnRef = saveFn;
   organizationChangedRef = onOrganizationsChanged || null;
@@ -40,7 +39,7 @@ type Handler = (req: Request, res: Response, identity: Identity) => unknown;
 /** Wraps a platform handler: verified identity, uniform errors with requestId. */
 const platformHandler = (fn: Handler) => async (req: Request, res: Response) => {
   try {
-    await fn(req, res, resolveIdentity(sqliteDb, req));
+    await fn(req, res, identityOf(req));
   } catch (err: any) {
     if (err instanceof ApiError || err instanceof RequestDenied) return sendError(req, res, err.status, err.error, err.message);
     console.error('[auth-console]', err);
@@ -50,7 +49,7 @@ const platformHandler = (fn: Handler) => async (req: Request, res: Response) => 
 const bad = (message: string) => new ApiError(400, 'INVALID_INPUT', message);
 const EMAIL = /^[^\s@,;<>"']+@[^\s@,;<>"']+\.[^\s@,;<>"']+$/;
 const platformAudit = (req: Request, identity: Identity, action: string, targetType: string, targetId: string, changedFields: string[] = []) =>
-  appendAudit(sqliteDb, auditActorFor(req, identity), { organizationId: null, action, targetType, targetId, outcome: 'success', changedFields });
+  appendAudit(sql, auditActorFor(req, identity), { organizationId: null, action, targetType, targetId, outcome: 'success', changedFields });
 
 /**
  * Gives the env-configured bootstrap admin (`demo-admin`) and the demo-workspace
@@ -61,7 +60,7 @@ const platformAudit = (req: Request, identity: Identity, action: string, targetT
 export async function ensureUserAccountsExist(defaultPassword = process.env.DEMO_ADMIN_PASSWORD || '') {
   if (!defaultPassword) return;
   try {
-    const users = (sqliteDb.prepare('SELECT id, email FROM user').all() as any[]).filter(
+    const users = (await sql.all('SELECT id, email FROM user') as any[]).filter(
       (u) => u.id === 'demo-admin' || isDemoAccountEmail(u.email),
     );
     if (users.length === 0) return;
@@ -74,19 +73,19 @@ export async function ensureUserAccountsExist(defaultPassword = process.env.DEMO
     const reseedBootstrapAdmin = process.env.SEED_DEMO_ADMIN !== 'false' && defaultPassword === process.env.DEMO_ADMIN_PASSWORD;
 
     for (const u of users) {
-      const existing = sqliteDb.prepare("SELECT id FROM account WHERE userId = ? AND providerId = 'credential'").get(u.id) as any;
+      const existing = await sql.get("SELECT id FROM account WHERE userId = ? AND providerId = 'credential'", u.id) as any;
       if (existing && !(reseedBootstrapAdmin && u.id === 'demo-admin')) continue;
       if (!hashedDef) {
         hashedDef = await hashPassword(defaultPassword);
       }
       if (existing) {
-        sqliteDb.prepare('UPDATE account SET password = ?, updatedAt = ? WHERE id = ?').run(hashedDef, now, existing.id);
+        await sql.run('UPDATE account SET password = ?, updatedAt = ? WHERE id = ?', hashedDef, now, existing.id);
       } else {
         const accountId = 'acc_' + u.id;
-        sqliteDb.prepare(`
+        await sql.run(`
           INSERT OR IGNORE INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer)
           VALUES (?, ?, 'credential', ?, ?, ?, ?, ?)
-        `).run(accountId, u.id, u.id, hashedDef, now, now, 'local:credential');
+        `, accountId, u.id, u.id, hashedDef, now, now, 'local:credential');
       }
     }
   } catch (err) {
@@ -94,43 +93,43 @@ export async function ensureUserAccountsExist(defaultPassword = process.env.DEMO
   }
 }
 // 1. GET /overview - High-level metrics for Console Dashboard
-authConsoleRouter.get('/overview', (req: Request, res: Response) => {
+authConsoleRouter.get('/overview', async (req: Request, res: Response) => {
   try {
-    const totalUsers = (sqliteDb.prepare('SELECT COUNT(*) as count FROM user').get() as any)?.count || 0;
-    const activeUsers = (sqliteDb.prepare("SELECT COUNT(*) as count FROM user WHERE banned = 0 OR banned IS NULL").get() as any)?.count || 0;
-    const bannedUsers = (sqliteDb.prepare('SELECT COUNT(*) as count FROM user WHERE banned = 1').get() as any)?.count || 0;
-    const verifiedUsers = (sqliteDb.prepare('SELECT COUNT(*) as count FROM user WHERE emailVerified = 1').get() as any)?.count || 0;
+    const totalUsers = (await sql.get('SELECT COUNT(*) as count FROM user') as any)?.count || 0;
+    const activeUsers = (await sql.get("SELECT COUNT(*) as count FROM user WHERE banned = 0 OR banned IS NULL") as any)?.count || 0;
+    const bannedUsers = (await sql.get('SELECT COUNT(*) as count FROM user WHERE banned = 1') as any)?.count || 0;
+    const verifiedUsers = (await sql.get('SELECT COUNT(*) as count FROM user WHERE emailVerified = 1') as any)?.count || 0;
     
     // Active sessions (not expired)
     const now = new Date().toISOString();
-    const activeSessions = (sqliteDb.prepare('SELECT COUNT(*) as count FROM session WHERE expiresAt > ?').get(now) as any)?.count || 0;
+    const activeSessions = (await sql.get('SELECT COUNT(*) as count FROM session WHERE expiresAt > ?', now) as any)?.count || 0;
     
     // Total accounts & providers
-    const totalAccounts = (sqliteDb.prepare('SELECT COUNT(*) as count FROM account').get() as any)?.count || 0;
-    const credentialAccounts = (sqliteDb.prepare("SELECT COUNT(*) as count FROM account WHERE providerId = 'credential'").get() as any)?.count || 0;
-    const googleAccounts = (sqliteDb.prepare("SELECT COUNT(*) as count FROM account WHERE providerId = 'google'").get() as any)?.count || 0;
+    const totalAccounts = (await sql.get('SELECT COUNT(*) as count FROM account') as any)?.count || 0;
+    const credentialAccounts = (await sql.get("SELECT COUNT(*) as count FROM account WHERE providerId = 'credential'") as any)?.count || 0;
+    const googleAccounts = (await sql.get("SELECT COUNT(*) as count FROM account WHERE providerId = 'google'") as any)?.count || 0;
 
     // Organizations & Teams
-    const totalOrgs = (sqliteDb.prepare('SELECT COUNT(*) as count FROM organization').get() as any)?.count || 0;
-    const totalTeams = (sqliteDb.prepare('SELECT COUNT(*) as count FROM team').get() as any)?.count || 0;
-    const pendingInvitations = (sqliteDb.prepare("SELECT COUNT(*) as count FROM invitation WHERE status = 'pending'").get() as any)?.count || 0;
-    const totalApiKeys = (sqliteDb.prepare("SELECT COUNT(*) as count FROM apikey WHERE status = 'active'").get() as any)?.count || 0;
+    const totalOrgs = (await sql.get('SELECT COUNT(*) as count FROM organization') as any)?.count || 0;
+    const totalTeams = (await sql.get('SELECT COUNT(*) as count FROM team') as any)?.count || 0;
+    const pendingInvitations = (await sql.get("SELECT COUNT(*) as count FROM invitation WHERE status = 'pending'") as any)?.count || 0;
+    const totalApiKeys = (await sql.get("SELECT COUNT(*) as count FROM apikey WHERE status = 'active'") as any)?.count || 0;
 
     // Platform roles only; tenant roles are per-organization membership data.
-    const superusers = (sqliteDb.prepare("SELECT COUNT(*) as count FROM user WHERE role = 'superuser'").get() as any)?.count || 0;
+    const superusers = (await sql.get("SELECT COUNT(*) as count FROM user WHERE role = 'superuser'") as any)?.count || 0;
     const roleDistribution: Record<string, number> = { superuser: superusers, user: totalUsers - superusers };
 
     // Recent users
-    const recentUsers = (sqliteDb.prepare('SELECT id, name, email, role, banned, createdAt FROM user ORDER BY createdAt DESC LIMIT 5').all() as any[])
+    const recentUsers = (await sql.all('SELECT id, name, email, role, banned, createdAt FROM user ORDER BY createdAt DESC LIMIT 5') as any[])
       .map((u) => ({ id: u.id, name: u.name, email: u.email, platformRole: u.role === 'superuser' ? 'superuser' : 'user', banned: Boolean(u.banned), createdAt: u.createdAt }));
 
     // Recent sessions
-    const recentSessions = sqliteDb.prepare(`
+    const recentSessions = await sql.all(`
       SELECT s.id, s.ipAddress, s.userAgent, s.createdAt, s.expiresAt, u.name as userName, u.email as userEmail
       FROM session s
       LEFT JOIN user u ON s.userId = u.id
       ORDER BY s.createdAt DESC LIMIT 5
-    `).all();
+    `);
 
     return res.json({
       success: true,
@@ -192,8 +191,8 @@ function platformUserDto(u: any) {
   };
 }
 
-function loadUser(id: string) {
-  const row = sqliteDb.prepare(`${userSelect} WHERE u.id = ?`).get(id) as any;
+async function loadUser(id: string) {
+  const row = await sql.get(`${userSelect} WHERE u.id = ?`, id) as any;
   if (!row) throw new ApiError(404, 'RESOURCE_NOT_FOUND');
   return row;
 }
@@ -202,37 +201,36 @@ async function setCredentialPassword(userId: string, password: unknown) {
   if (typeof password !== 'string' || password.length < 8 || password.length > 256) throw bad('Password must be 8–256 characters.');
   const hashed = await hashPassword(password);
   const now = new Date().toISOString();
-  const existing = sqliteDb.prepare("SELECT id FROM account WHERE userId = ? AND providerId = 'credential'").get(userId) as any;
-  if (existing) sqliteDb.prepare('UPDATE account SET password = ?, updatedAt = ? WHERE id = ?').run(hashed, now, existing.id);
-  else sqliteDb.prepare(`INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer) VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')`)
-    .run(`acc_${crypto.randomUUID()}`, userId, userId, hashed, now, now);
+  const existing = await sql.get("SELECT id FROM account WHERE userId = ? AND providerId = 'credential'", userId) as any;
+  if (existing) await sql.run('UPDATE account SET password = ?, updatedAt = ? WHERE id = ?', hashed, now, existing.id);
+  else await sql.run(`INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer) VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')`, `acc_${crypto.randomUUID()}`, userId, userId, hashed, now, now);
 }
 
 /** Ban/delete invariants (§4.3 rules 3–4): never strand an organization or the platform. */
-function assertAccountRemovable(userId: string) {
-  assertSuperusersRemainWithout(sqliteDb, userId);
-  assertAdminsRemainWithout(sqliteDb, userId);
+async function assertAccountRemovable(userId: string) {
+  await assertSuperusersRemainWithout(sql, userId);
+  await assertAdminsRemainWithout(sql, userId);
 }
 
-function setBanned(userId: string, banned: boolean, reason: string | null) {
+async function setBanned(userId: string, banned: boolean, reason: string | null) {
   if (banned) {
-    assertAccountRemovable(userId);
-    sqliteDb.prepare('UPDATE "user" SET banned = 1, banReason = ?, banExpires = NULL, updatedAt = ? WHERE id = ?').run(reason, new Date().toISOString(), userId);
-    sqliteDb.prepare('DELETE FROM session WHERE userId = ?').run(userId);
+    await assertAccountRemovable(userId);
+    await sql.run('UPDATE "user" SET banned = 1, banReason = ?, banExpires = NULL, updatedAt = ? WHERE id = ?', reason, new Date().toISOString(), userId);
+    await sql.run('DELETE FROM session WHERE userId = ?', userId);
   } else {
-    sqliteDb.prepare('UPDATE "user" SET banned = 0, banReason = NULL, banExpires = NULL, updatedAt = ? WHERE id = ?').run(new Date().toISOString(), userId);
+    await sql.run('UPDATE "user" SET banned = 0, banReason = NULL, banExpires = NULL, updatedAt = ? WHERE id = ?', new Date().toISOString(), userId);
   }
 }
 
-function deleteAccount(userId: string) {
-  assertAccountRemovable(userId);
-  for (const table of ['session', 'account', 'teamMember', 'member']) sqliteDb.prepare(`DELETE FROM "${table}" WHERE userId = ?`).run(userId);
-  sqliteDb.prepare('DELETE FROM "user" WHERE id = ?').run(userId); // audit_log keeps the actor id (no cascade)
+async function deleteAccount(userId: string) {
+  await assertAccountRemovable(userId);
+  for (const table of ['session', 'account', 'teamMember', 'member']) await sql.run(`DELETE FROM "${table}" WHERE userId = ?`, userId);
+  await sql.run('DELETE FROM "user" WHERE id = ?', userId); // audit_log keeps the actor id (no cascade)
 }
 
-authConsoleRouter.get('/users', platformHandler((req, res) => {
+authConsoleRouter.get('/users', platformHandler(async (req, res) => {
   const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase().slice(0, 200) : '';
-  const rows = sqliteDb.prepare(`${userSelect} ORDER BY u.createdAt DESC, u.id`).all() as any[];
+  const rows = await sql.all(`${userSelect} ORDER BY u.createdAt DESC, u.id`) as any[];
   const users = rows.filter((u) => !search || String(u.name).toLowerCase().includes(search) || String(u.email).toLowerCase().includes(search));
   res.json({ success: true, users: users.map(platformUserDto) });
 }));
@@ -245,115 +243,114 @@ authConsoleRouter.post('/users', platformHandler(async (req, res, identity) => {
   if (!cleanName || !EMAIL.test(cleanEmail)) throw bad('Name and a valid email are required.');
   if (!isPlatformRole(platformRole)) throw bad('platformRole must be user or superuser.');
   if (platformRole === 'superuser' && !identity.platformPermissions.includes('platform.user.role.update')) throw new ApiError(403, 'INSUFFICIENT_PERMISSION');
-  if (sqliteDb.prepare('SELECT 1 FROM "user" WHERE LOWER(email) = ?').get(cleanEmail)) throw new ApiError(409, 'ACCOUNT_EXISTS', 'An account with this email already exists.');
+  if (await sql.get('SELECT 1 FROM "user" WHERE LOWER(email) = ?', cleanEmail)) throw new ApiError(409, 'ACCOUNT_EXISTS', 'An account with this email already exists.');
   if (password !== undefined && (typeof password !== 'string' || password.length < 8)) throw bad('Password must be at least 8 characters.');
   const hashed = typeof password === 'string' ? await hashPassword(password) : null;
-  const id = sqliteDb.transaction(() => {
-    const userId = createIdentityRecord(sqliteDb, { name: cleanName, email: cleanEmail, platformRole });
+  const id = await sql.tx(async () => {
+    const userId = await createIdentityRecord(sql, { name: cleanName, email: cleanEmail, platformRole });
     if (hashed) {
       const now = new Date().toISOString();
-      sqliteDb.prepare(`INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer) VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')`)
-        .run(`acc_${crypto.randomUUID()}`, userId, userId, hashed, now, now);
+      await sql.run(`INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt, issuer) VALUES (?, ?, 'credential', ?, ?, ?, ?, 'local:credential')`, `acc_${crypto.randomUUID()}`, userId, userId, hashed, now, now);
     }
-    platformAudit(req, identity, 'platform.user.create', 'user', userId, ['name', 'email', 'platformRole']);
+    await platformAudit(req, identity, 'platform.user.create', 'user', userId, ['name', 'email', 'platformRole']);
     return userId;
-  })();
-  res.status(201).json({ success: true, user: platformUserDto(loadUser(id)) });
+  });
+  res.status(201).json({ success: true, user: platformUserDto(await loadUser(id)) });
 }));
 
-authConsoleRouter.put('/users/:id', platformHandler((req, res, identity) => {
+authConsoleRouter.put('/users/:id', platformHandler(async (req, res, identity) => {
   const body = req.body || {};
   for (const key of Object.keys(body)) if (!['name', 'email'].includes(key)) throw bad(`Unknown field: ${key}`);
-  const user = loadUser(req.params.id);
+  const user = await loadUser(req.params.id);
   const changed: string[] = [];
-  sqliteDb.transaction(() => {
+  await sql.tx(async () => {
     if (body.name !== undefined) {
       const name = String(body.name).trim().slice(0, 200);
       if (!name) throw bad('Name is required.');
-      sqliteDb.prepare('UPDATE "user" SET name = ?, updatedAt = ? WHERE id = ?').run(name, new Date().toISOString(), user.id);
+      await sql.run('UPDATE "user" SET name = ?, updatedAt = ? WHERE id = ?', name, new Date().toISOString(), user.id);
       changed.push('name');
     }
     if (body.email !== undefined) {
       const email = String(body.email).trim().toLowerCase();
       if (!EMAIL.test(email)) throw bad('Email is not valid.');
-      if (sqliteDb.prepare('SELECT 1 FROM "user" WHERE LOWER(email) = ? AND id <> ?').get(email, user.id)) throw new ApiError(409, 'ACCOUNT_EXISTS', 'Another account uses this email.');
-      sqliteDb.prepare('UPDATE "user" SET email = ?, emailVerified = 0, updatedAt = ? WHERE id = ?').run(email, new Date().toISOString(), user.id);
+      if (await sql.get('SELECT 1 FROM "user" WHERE LOWER(email) = ? AND id <> ?', email, user.id)) throw new ApiError(409, 'ACCOUNT_EXISTS', 'Another account uses this email.');
+      await sql.run('UPDATE "user" SET email = ?, emailVerified = 0, updatedAt = ? WHERE id = ?', email, new Date().toISOString(), user.id);
       changed.push('email');
     }
-    platformAudit(req, identity, 'platform.user.update', 'user', user.id, changed);
-  })();
-  res.json({ success: true, user: platformUserDto(loadUser(user.id)) });
+    await platformAudit(req, identity, 'platform.user.update', 'user', user.id, changed);
+  });
+  res.json({ success: true, user: platformUserDto(await loadUser(user.id)) });
 }));
 
 const passwordHandler = platformHandler(async (req, res, identity) => {
-  const user = loadUser(req.params.id);
+  const user = await loadUser(req.params.id);
   await setCredentialPassword(user.id, req.body?.password ?? req.body?.newPassword);
-  platformAudit(req, identity, 'platform.user.password.reset', 'user', user.id, ['password']);
+  await platformAudit(req, identity, 'platform.user.password.reset', 'user', user.id, ['password']);
   res.json({ success: true });
 });
 authConsoleRouter.post('/users/:id/reset-password', passwordHandler);
 authConsoleRouter.put('/users/:id/password', passwordHandler);
 
-authConsoleRouter.put('/users/:id/role', platformHandler((req, res, identity) => {
+authConsoleRouter.put('/users/:id/role', platformHandler(async (req, res, identity) => {
   const platformRole = req.body?.platformRole;
   if (!isPlatformRole(platformRole)) throw bad('platformRole must be user or superuser.');
-  const user = loadUser(req.params.id);
+  const user = await loadUser(req.params.id);
   if (user.id === identity.userId) throw new ApiError(403, 'INSUFFICIENT_PERMISSION', 'You cannot change your own platform role.');
-  sqliteDb.transaction(() => {
-    if (user.role === 'superuser' && platformRole !== 'superuser') assertSuperusersRemainWithout(sqliteDb, user.id);
-    sqliteDb.prepare('UPDATE "user" SET role = ?, updatedAt = ? WHERE id = ?').run(platformRole, new Date().toISOString(), user.id);
+  await sql.tx(async () => {
+    if (user.role === 'superuser' && platformRole !== 'superuser') await assertSuperusersRemainWithout(sql, user.id);
+    await sql.run('UPDATE "user" SET role = ?, updatedAt = ? WHERE id = ?', platformRole, new Date().toISOString(), user.id);
     // Cached privileges end with the role change.
-    sqliteDb.prepare('DELETE FROM session WHERE userId = ?').run(user.id);
-    platformAudit(req, identity, 'platform.user.role.update', 'user', user.id, ['platformRole']);
-  })();
-  res.json({ success: true, user: platformUserDto(loadUser(user.id)) });
+    await sql.run('DELETE FROM session WHERE userId = ?', user.id);
+    await platformAudit(req, identity, 'platform.user.role.update', 'user', user.id, ['platformRole']);
+  });
+  res.json({ success: true, user: platformUserDto(await loadUser(user.id)) });
 }));
 
-authConsoleRouter.post('/users/:id/ban', platformHandler((req, res, identity) => {
+authConsoleRouter.post('/users/:id/ban', platformHandler(async (req, res, identity) => {
   const banned = req.body?.banned !== false;
-  const user = loadUser(req.params.id);
+  const user = await loadUser(req.params.id);
   if (user.id === identity.userId) throw new ApiError(403, 'INSUFFICIENT_PERMISSION', 'You cannot disable your own account.');
   const reason = typeof req.body?.banReason === 'string' ? req.body.banReason.slice(0, 500) : null;
-  sqliteDb.transaction(() => {
-    setBanned(user.id, banned, reason);
-    platformAudit(req, identity, banned ? 'platform.user.ban' : 'platform.user.unban', 'user', user.id, ['banned']);
-  })();
-  res.json({ success: true, user: platformUserDto(loadUser(user.id)) });
+  await sql.tx(async () => {
+    await setBanned(user.id, banned, reason);
+    await platformAudit(req, identity, banned ? 'platform.user.ban' : 'platform.user.unban', 'user', user.id, ['banned']);
+  });
+  res.json({ success: true, user: platformUserDto(await loadUser(user.id)) });
 }));
 
-authConsoleRouter.delete('/users/:id', platformHandler((req, res, identity) => {
-  const user = loadUser(req.params.id);
+authConsoleRouter.delete('/users/:id', platformHandler(async (req, res, identity) => {
+  const user = await loadUser(req.params.id);
   if (user.id === identity.userId) throw new ApiError(403, 'INSUFFICIENT_PERMISSION', 'You cannot delete your own account.');
-  sqliteDb.transaction(() => {
-    deleteAccount(user.id);
-    platformAudit(req, identity, 'platform.user.delete', 'user', user.id);
-  })();
+  await sql.tx(async () => {
+    await deleteAccount(user.id);
+    await platformAudit(req, identity, 'platform.user.delete', 'user', user.id);
+  });
   res.json({ success: true });
 }));
 
 /** All targets validated first; the whole batch commits or nothing does. */
-authConsoleRouter.post('/users/bulk-action', platformHandler((req, res, identity) => {
+authConsoleRouter.post('/users/bulk-action', platformHandler(async (req, res, identity) => {
   const { action, userIds } = req.body || {};
   const needs: Record<string, string> = { ban: 'platform.user.ban', unban: 'platform.user.ban', delete: 'platform.user.delete' };
   if (!needs[action]) throw bad('action must be ban, unban or delete.');
   if (!identity.platformPermissions.includes(needs[action])) throw new ApiError(403, 'INSUFFICIENT_PERMISSION');
   if (!Array.isArray(userIds) || userIds.length === 0 || userIds.length > 500 || userIds.some((id) => typeof id !== 'string')) throw bad('userIds must be a non-empty list.');
   if (userIds.includes(identity.userId)) throw new ApiError(403, 'INSUFFICIENT_PERMISSION', 'You cannot include your own account.');
-  for (const id of userIds) loadUser(id);
-  sqliteDb.transaction(() => {
+  for (const id of userIds) await loadUser(id);
+  await sql.tx(async () => {
     for (const id of userIds) {
-      if (action === 'delete') deleteAccount(id);
-      else setBanned(id, action === 'ban', action === 'ban' ? 'Bulk action' : null);
-      platformAudit(req, identity, `platform.user.${action}`, 'user', id, action === 'delete' ? [] : ['banned']);
+      if (action === 'delete') await deleteAccount(id);
+      else await setBanned(id, action === 'ban', action === 'ban' ? 'Bulk action' : null);
+      await platformAudit(req, identity, `platform.user.${action}`, 'user', id, action === 'delete' ? [] : ['banned']);
     }
-  })();
+  });
   res.json({ success: true, count: userIds.length });
 }));
 
 // 3. GET /accounts - List all linked auth provider accounts
-authConsoleRouter.get('/accounts', (req: Request, res: Response) => {
+authConsoleRouter.get('/accounts', async (req: Request, res: Response) => {
   try {
-    const accounts = sqliteDb.prepare(`
+    const accounts = await sql.all(`
       SELECT 
         a.id, 
         a.accountId, 
@@ -368,7 +365,7 @@ authConsoleRouter.get('/accounts', (req: Request, res: Response) => {
       FROM account a
       LEFT JOIN user u ON a.userId = u.id
       ORDER BY a.createdAt DESC
-    `).all();
+    `);
 
     return res.json({
       success: true,
@@ -384,9 +381,9 @@ authConsoleRouter.get('/accounts', (req: Request, res: Response) => {
 });
 
 // 4. GET /sessions - List active sessions
-authConsoleRouter.get('/sessions', (req: Request, res: Response) => {
+authConsoleRouter.get('/sessions', async (req: Request, res: Response) => {
   try {
-    const sessions = sqliteDb.prepare(`
+    const sessions = await sql.all(`
       SELECT 
         s.id, 
         s.createdAt, 
@@ -403,7 +400,7 @@ authConsoleRouter.get('/sessions', (req: Request, res: Response) => {
       FROM session s
       LEFT JOIN user u ON s.userId = u.id
       ORDER BY s.createdAt DESC
-    `).all();
+    `);
 
     const now = new Date();
     return res.json({
@@ -420,10 +417,10 @@ authConsoleRouter.get('/sessions', (req: Request, res: Response) => {
 });
 
 // DELETE /sessions/:id - Revoke single session
-authConsoleRouter.delete('/sessions/:id', (req: Request, res: Response) => {
+authConsoleRouter.delete('/sessions/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    sqliteDb.prepare('DELETE FROM session WHERE id = ?').run(id);
+    await sql.run('DELETE FROM session WHERE id = ?', id);
     return res.json({ success: true, message: 'Session revoked successfully' });
   } catch (err: any) {
     console.error('Error revoking session:', err);
@@ -432,13 +429,13 @@ authConsoleRouter.delete('/sessions/:id', (req: Request, res: Response) => {
 });
 
 // POST /sessions/revoke-user - Revoke all sessions for a user
-authConsoleRouter.post('/sessions/revoke-user', (req: Request, res: Response) => {
+authConsoleRouter.post('/sessions/revoke-user', async (req: Request, res: Response) => {
   try {
     const { userId } = req.body;
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
     }
-    sqliteDb.prepare('DELETE FROM session WHERE userId = ?').run(userId);
+    await sql.run('DELETE FROM session WHERE userId = ?', userId);
     return res.json({ success: true, message: `All sessions revoked for user ${userId}` });
   } catch (err: any) {
     console.error('Error revoking user sessions:', err);
@@ -447,10 +444,10 @@ authConsoleRouter.post('/sessions/revoke-user', (req: Request, res: Response) =>
 });
 
 // POST /sessions/revoke-all/:userId - Param-based alias for revoking all sessions of a user
-authConsoleRouter.post('/sessions/revoke-all/:userId', (req: Request, res: Response) => {
+authConsoleRouter.post('/sessions/revoke-all/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    sqliteDb.prepare('DELETE FROM session WHERE userId = ?').run(userId);
+    await sql.run('DELETE FROM session WHERE userId = ?', userId);
     return res.json({ success: true, message: `All sessions revoked for user ${userId}` });
   } catch (err: any) {
     console.error('Error revoking user sessions:', err);
@@ -463,132 +460,133 @@ authConsoleRouter.post('/sessions/revoke-all/:userId', (req: Request, res: Respo
 /* Organization directory (platform) / accessible summaries (others)    */
 /* ------------------------------------------------------------------ */
 
-authConsoleRouter.get('/organizations', platformHandler((req, res, identity) => {
-  const accessible = new Set(accessibleOrganizations(sqliteDb, identity).map((o) => o.organizationId));
-  const rows = sqliteDb.prepare(`
+authConsoleRouter.get('/organizations', platformHandler(async (req, res, identity) => {
+  const accessible = new Set((await accessibleOrganizations(sql, identity)).map((o) => o.organizationId));
+  const rows = await sql.all(`
     SELECT o.id, o.name, o.slug, o.logo, o.createdAt,
       (SELECT COUNT(*) FROM member WHERE organizationId = o.id AND status = 'active') AS memberCount,
       (SELECT COUNT(*) FROM team WHERE organizationId = o.id) AS teamCount
     FROM organization o ORDER BY o.name COLLATE NOCASE, o.id
-  `).all() as any[];
+  `) as any[];
   const isPlatform = identity.platformPermissions.includes('platform.organization.read');
-  const organizations = rows.filter((o) => accessible.has(o.id)).map((o) => {
-    if (!isPlatform) return { id: o.id, name: o.name, slug: o.slug, logo: o.logo };
-    const settings = readOrganizationSettings(sqliteDb, o.id);
-    return { id: o.id, name: o.name, slug: o.slug, logo: o.logo, createdAt: o.createdAt, memberCount: o.memberCount, teamCount: o.teamCount, version: settings.version, metadata: { ...settings.profile, currency: settings.policy.defaultCurrency } };
-  });
+  const organizations = [];
+  for (const o of rows.filter((row) => accessible.has(row.id))) {
+    if (!isPlatform) { organizations.push({ id: o.id, name: o.name, slug: o.slug, logo: o.logo }); continue; }
+    const settings = await readOrganizationSettings(sql, o.id);
+    organizations.push({ id: o.id, name: o.name, slug: o.slug, logo: o.logo, createdAt: o.createdAt, memberCount: o.memberCount, teamCount: o.teamCount, version: settings.version, metadata: { ...settings.profile, currency: settings.policy.defaultCurrency } });
+  }
   res.json({ success: true, organizations });
 }));
 
 /** Platform creation with an explicitly selected first tenant admin (PRD §10.2). */
-authConsoleRouter.post('/organizations', platformHandler((req, res, identity) => {
+authConsoleRouter.post('/organizations', platformHandler(async (req, res, identity) => {
   const body = req.body || {};
   for (const key of Object.keys(body)) if (!['name', 'slug', 'countryCode', 'industry', 'defaultCurrency', 'legalEntity', 'adminUserId'].includes(key)) throw bad(`Unknown field: ${key}`);
   const name = String(body.name || '').trim();
   if (!name || name.length > 200) throw bad('Organization name is required (1–200 characters).');
   if (body.adminUserId !== undefined) {
-    const admin = sqliteDb.prepare('SELECT id, role, banned FROM "user" WHERE id = ?').get(body.adminUserId) as any;
+    const admin = await sql.get('SELECT id, role, banned FROM "user" WHERE id = ?', body.adminUserId) as any;
     if (!admin || Number(admin.banned) === 1) throw bad('The selected administrator does not exist or is disabled.');
   }
-  const id = sqliteDb.transaction(() => {
-    const orgId = createOrganizationRecord(sqliteDb, {
+  const id = await sql.tx(async () => {
+    const orgId = await createOrganizationRecord(sql, {
       name, slug: typeof body.slug === 'string' ? body.slug : undefined,
       legalEntity: typeof body.legalEntity === 'string' ? body.legalEntity.slice(0, 200) : '',
       settings: { countryCode: body.countryCode, industry: body.industry, defaultCurrency: body.defaultCurrency },
     }, identity.userId);
-    if (body.adminUserId) addMembershipRecord(sqliteDb, { userId: body.adminUserId, organizationId: orgId, tenantRole: 'admin' });
-    appendAudit(sqliteDb, auditActorFor(req, identity), { organizationId: orgId, action: 'organization.create', targetType: 'organization', targetId: orgId, outcome: 'success', changedFields: ['name', ...(body.adminUserId ? ['admin'] : [])] });
+    if (body.adminUserId) await addMembershipRecord(sql, { userId: body.adminUserId, organizationId: orgId, tenantRole: 'admin' });
+    await appendAudit(sql, auditActorFor(req, identity), { organizationId: orgId, action: 'organization.create', targetType: 'organization', targetId: orgId, outcome: 'success', changedFields: ['name', ...(body.adminUserId ? ['admin'] : [])] });
     return orgId;
-  })();
-  organizationChangedRef?.(id);
-  res.status(201).json({ success: true, organization: { id, ...readOrganizationSettings(sqliteDb, id) } });
+  });
+  await organizationChangedRef?.(id);
+  res.status(201).json({ success: true, organization: { id, ...await readOrganizationSettings(sql, id) } });
 }));
 
-authConsoleRouter.put('/organizations/:id', platformHandler((req, res, identity) => {
-  const current = readOrganizationSettings(sqliteDb, req.params.id);
+authConsoleRouter.put('/organizations/:id', platformHandler(async (req, res, identity) => {
+  const current = await readOrganizationSettings(sql, req.params.id);
   const body = req.body || {};
   for (const key of Object.keys(body)) if (!['name', 'slug', 'expectedVersion', 'profile'].includes(key)) throw bad(`Unknown field: ${key}`);
-  sqliteDb.transaction(() => {
+  await sql.tx(async () => {
     if (typeof body.slug === 'string' && body.slug !== current.slug) {
       const slug = body.slug.trim().toLowerCase();
       if (!/^[a-z0-9-]{1,48}$/.test(slug)) throw bad('Slug may contain lowercase letters, digits and dashes.');
-      if (sqliteDb.prepare('SELECT 1 FROM organization WHERE slug = ? AND id <> ?').get(slug, current.organizationId)) throw new ApiError(409, 'SLUG_EXISTS');
-      sqliteDb.prepare('UPDATE organization SET slug = ? WHERE id = ?').run(slug, current.organizationId);
+      if (await sql.get('SELECT 1 FROM organization WHERE slug = ? AND id <> ?', slug, current.organizationId)) throw new ApiError(409, 'SLUG_EXISTS');
+      await sql.run('UPDATE organization SET slug = ? WHERE id = ?', slug, current.organizationId);
     }
     if (body.name !== undefined || body.profile !== undefined) {
-      patchOrganizationSettings(sqliteDb, current.organizationId,
+      await patchOrganizationSettings(sql, current.organizationId,
         { expectedVersion: typeof body.expectedVersion === 'number' ? body.expectedVersion : current.version, ...(body.name !== undefined ? { name: body.name } : {}), ...(body.profile !== undefined ? { profile: body.profile } : {}) },
         auditActorFor(req, identity));
     }
-  })();
-  organizationChangedRef?.(current.organizationId);
-  res.json({ success: true, organization: readOrganizationSettings(sqliteDb, current.organizationId) });
+  });
+  await organizationChangedRef?.(current.organizationId);
+  res.json({ success: true, organization: await readOrganizationSettings(sql, current.organizationId) });
 }));
 
 /** Empties the organization's business data (a superuser tool); the organization itself, members and settings stay. */
-authConsoleRouter.post('/organizations/:id/reset', platformHandler((req, res, identity) => {
+authConsoleRouter.post('/organizations/:id/reset', platformHandler(async (req, res, identity) => {
   const id = req.params.id;
-  readOrganizationSettings(sqliteDb, id); // 404 for unknown IDs
+  await readOrganizationSettings(sql, id); // 404 for unknown IDs
   if (!globalDbRef || !saveDbFnRef) throw new ApiError(503, 'NOT_READY', 'Business data is not ready.');
-  const organization = sqliteDb.prepare('SELECT slug FROM organization WHERE id = ?').get(id) as { slug?: string } | undefined;
+  const organization = await sql.get('SELECT slug FROM organization WHERE id = ?', id) as { slug?: string } | undefined;
   const confirmation = String(req.body?.confirm ?? '').trim().toLowerCase();
   if (!organization?.slug || confirmation !== organization.slug.toLowerCase()) throw bad('Type the organization slug to confirm the reset.');
-  const result = resetOrganizationData({
-    db: sqliteDb,
+  const result = await resetOrganizationData({
+    db: sql,
     memory: globalDbRef,
     organizationId: id,
     uploadsDir: UPLOADS_DIR,
     save: saveDbFnRef,
     backupPath: path.join(APP_DATA_DIR, 'backups', `before-organization-reset-${id}-${Date.now()}.db`),
   });
-  appendAudit(sqliteDb, auditActorFor(req, identity), {
+  await appendAudit(sql, auditActorFor(req, identity), {
     organizationId: id, action: 'organization.reset', targetType: 'organization', targetId: id, outcome: 'success',
     changedFields: Object.keys(result.removed).filter(key => result.removed[key] > 0),
   });
-  organizationChangedRef?.(id);
+  await organizationChangedRef?.(id);
   res.json({ success: true, ...result });
 }));
 
-authConsoleRouter.delete('/organizations/:id', platformHandler((req, res, identity) => {
+authConsoleRouter.delete('/organizations/:id', platformHandler(async (req, res, identity) => {
   const id = req.params.id;
-  readOrganizationSettings(sqliteDb, id); // 404 for unknown IDs
+  await readOrganizationSettings(sql, id); // 404 for unknown IDs
   const owned = ['partners', 'contracts', 'ios', 'spendings', 'evaluations', 'notifications', 'templates']
     .some((key) => (globalDbRef?.[key] || []).some((row: any) => row?.organizationId === id));
   if (owned) throw new ApiError(409, 'ORGANIZATION_IN_USE', "Move or remove this organization's records first.");
-  sqliteDb.transaction(() => {
-    sqliteDb.prepare('DELETE FROM teamMember WHERE teamId IN (SELECT id FROM team WHERE organizationId = ?)').run(id);
-    for (const table of ['member', 'team', 'invitation', 'organization_settings', 'organization_integrations']) sqliteDb.prepare(`DELETE FROM ${table} WHERE organizationId = ?`).run(id);
-    sqliteDb.prepare('UPDATE session SET activeOrganizationId = NULL WHERE activeOrganizationId = ?').run(id);
-    sqliteDb.prepare('DELETE FROM organization WHERE id = ?').run(id);
-    appendAudit(sqliteDb, auditActorFor(req, identity), { organizationId: id, action: 'organization.delete', targetType: 'organization', targetId: id, outcome: 'success', changedFields: [] });
-  })();
-  organizationChangedRef?.(id);
+  await sql.tx(async () => {
+    await sql.run('DELETE FROM teamMember WHERE teamId IN (SELECT id FROM team WHERE organizationId = ?)', id);
+    for (const table of ['member', 'team', 'invitation', 'organization_settings', 'organization_integrations']) await sql.run(`DELETE FROM ${table} WHERE organizationId = ?`, id);
+    await sql.run('UPDATE session SET activeOrganizationId = NULL WHERE activeOrganizationId = ?', id);
+    await sql.run('DELETE FROM organization WHERE id = ?', id);
+    await appendAudit(sql, auditActorFor(req, identity), { organizationId: id, action: 'organization.delete', targetType: 'organization', targetId: id, outcome: 'success', changedFields: [] });
+  });
+  await organizationChangedRef?.(id);
   res.json({ success: true });
 }));
 
 /* Legacy invitation adapters → canonical preview/acceptance (PRD §10.1). */
-authConsoleRouter.get('/invitations/verify', (req: Request, res: Response) => {
+authConsoleRouter.get('/invitations/verify', async (req: Request, res: Response) => {
   try {
     const code = String(req.query.code || req.query.accept_invite || '');
-    return res.json({ success: true, invitation: previewInvitation(sqliteDb, code) });
+    return res.json({ success: true, invitation: await previewInvitation(sql, code) });
   } catch (err: any) {
     if (err instanceof ApiError) return sendError(req, res, err.status, err.error, err.message);
     throw err;
   }
 });
-authConsoleRouter.post('/invitations/accept', platformHandler((req, res, identity) => {
-  const membership = acceptInvitation(sqliteDb, identity, String(req.body?.code || ''), req);
+authConsoleRouter.post('/invitations/accept', platformHandler(async (req, res, identity) => {
+  const membership = await acceptInvitation(sql, identity, String(req.body?.code || ''), req);
   res.status(201).json({ success: true, membership });
 }));
 
 // 8. GET /api-keys - List API Keys
-authConsoleRouter.get('/api-keys', (req: Request, res: Response) => {
+authConsoleRouter.get('/api-keys', async (req: Request, res: Response) => {
   try {
-    const keys = sqliteDb.prepare(`
+    const keys = await sql.all(`
       SELECT id, name, keyPreview, scopes, createdAt, expiresAt, status
       FROM apikey
       ORDER BY createdAt DESC
-    `).all();
+    `);
 
     return res.json({
       success: true,
@@ -604,7 +602,7 @@ authConsoleRouter.get('/api-keys', (req: Request, res: Response) => {
 });
 
 // POST /api-keys - Generate new enterprise API key
-authConsoleRouter.post('/api-keys', (req: Request, res: Response) => {
+authConsoleRouter.post('/api-keys', async (req: Request, res: Response) => {
   try {
     const { name, scopes = ['contract:read'], expiresInDays = 90 } = req.body;
     if (!name) {
@@ -620,10 +618,10 @@ authConsoleRouter.post('/api-keys', (req: Request, res: Response) => {
     const expires = expiresInDays ? new Date(now.getTime() + expiresInDays * 24 * 60 * 60 * 1000) : null;
     const scopeString = Array.isArray(scopes) ? scopes.join(',') : String(scopes);
 
-    sqliteDb.prepare(`
+    await sql.run(`
       INSERT INTO apikey (id, name, keyPreview, keyHash, scopes, createdAt, expiresAt, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
-    `).run(keyId, name, keyPreview, keyHash, scopeString, now.toISOString(), expires ? expires.toISOString() : null);
+    `, keyId, name, keyPreview, keyHash, scopeString, now.toISOString(), expires ? expires.toISOString() : null);
 
     // Return the rawSecret ONCE so user can copy it
     return res.json({
@@ -646,10 +644,10 @@ authConsoleRouter.post('/api-keys', (req: Request, res: Response) => {
 });
 
 // POST /api-keys/:id/revoke - Revoke API key (set status = 'revoked')
-authConsoleRouter.post('/api-keys/:id/revoke', (req: Request, res: Response) => {
+authConsoleRouter.post('/api-keys/:id/revoke', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    sqliteDb.prepare('UPDATE apikey SET status = ? WHERE id = ?').run('revoked', id);
+    await sql.run('UPDATE apikey SET status = ? WHERE id = ?', 'revoked', id);
     return res.json({ success: true, message: 'API key revoked successfully' });
   } catch (err: any) {
     console.error('Error revoking API key:', err);
@@ -658,10 +656,10 @@ authConsoleRouter.post('/api-keys/:id/revoke', (req: Request, res: Response) => 
 });
 
 // DELETE /api-keys/:id - Delete API key permanently or revoke if active
-authConsoleRouter.delete('/api-keys/:id', (req: Request, res: Response) => {
+authConsoleRouter.delete('/api-keys/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    sqliteDb.prepare('DELETE FROM apikey WHERE id = ?').run(id);
+    await sql.run('DELETE FROM apikey WHERE id = ?', id);
     return res.json({ success: true, message: 'API key deleted successfully' });
   } catch (err: any) {
     console.error('Error deleting API key:', err);
@@ -670,202 +668,6 @@ authConsoleRouter.delete('/api-keys/:id', (req: Request, res: Response) => {
 });
 
 
-authConsoleRouter.get('/rbac-matrix', platformHandler((_req, res) => {
+authConsoleRouter.get('/rbac-matrix', platformHandler(async (_req, res) => {
   res.json({ success: true, matrix: buildMatrix() });
 }));
-
-// 10. SQLite Database Status & Metrics
-authConsoleRouter.get('/sqlite/status', (req: Request, res: Response) => {
-  try {
-    const dbPath = AUTH_DB_PATH;
-    let fileSizeBytes = 0;
-    let modifiedAt: string | null = null;
-    if (fs.existsSync(dbPath)) {
-      const stat = fs.statSync(dbPath);
-      fileSizeBytes = stat.size;
-      modifiedAt = stat.mtime.toISOString();
-    }
-
-    const journalModeRow = sqliteDb.prepare('PRAGMA journal_mode').get() as any;
-    const versionRow = sqliteDb.prepare('SELECT sqlite_version() as version').get() as any;
-    const pageCountRow = sqliteDb.prepare('PRAGMA page_count').get() as any;
-    const pageSizeRow = sqliteDb.prepare('PRAGMA page_size').get() as any;
-
-    const tables = sqliteDb
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
-      .all() as { name: string }[];
-
-    const tableSummaries: Record<string, number> = {};
-    let totalRecords = 0;
-    for (const t of tables) {
-      try {
-        const countRow = sqliteDb.prepare(`SELECT COUNT(*) as count FROM "${t.name}"`).get() as any;
-        const count = countRow?.count || 0;
-        tableSummaries[t.name] = count;
-        totalRecords += count;
-      } catch (e) {
-        tableSummaries[t.name] = 0;
-      }
-    }
-
-    return res.json({
-      success: true,
-      status: 'active',
-      journalMode: journalModeRow?.journal_mode || 'wal',
-      version: versionRow?.version || '3.x',
-      fileSizeBytes,
-      pageCount: pageCountRow?.page_count || 0,
-      pageSize: pageSizeRow?.page_size || 4096,
-      modifiedAt,
-      tablesCount: tables.length,
-      totalRecords,
-      tableSummaries,
-    });
-  } catch (err: any) {
-    console.error('Error fetching SQLite status:', err);
-    return res.status(500).json({ error: err.message || 'Failed to fetch SQLite status' });
-  }
-});
-
-// 11. SQLite Database Tables List
-authConsoleRouter.get('/sqlite/tables', (req: Request, res: Response) => {
-  try {
-    const tables = sqliteDb
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
-      .all() as { name: string }[];
-
-    const result = tables.map((t) => {
-      let count = 0;
-      let columnsCount = 0;
-      try {
-        const countRow = sqliteDb.prepare(`SELECT COUNT(*) as count FROM "${t.name}"`).get() as any;
-        count = countRow?.count || 0;
-        const cols = sqliteDb.prepare(`PRAGMA table_xinfo("${t.name}")`).all() as any[];
-        columnsCount = cols.length;
-      } catch (e) {}
-      return {
-        name: t.name,
-        count,
-        columnsCount,
-      };
-    });
-
-    return res.json({ success: true, tables: result });
-  } catch (err: any) {
-    console.error('Error fetching SQLite tables:', err);
-    return res.status(500).json({ error: err.message || 'Failed to fetch SQLite tables' });
-  }
-});
-
-// Columns that hold live credentials rather than ordinary application data —
-// masked in the raw-row browser below even for Superuser, so this debugging
-// tool can't be used to lift a working session token or a password hash out
-// of the database (QA/QC audit finding L1).
-const SQLITE_BROWSER_REDACTED_COLUMNS: Record<string, string[]> = {
-  session: ['token'],
-  account: ['password', 'accessToken', 'refreshToken', 'idToken'],
-  verification: ['value'],
-  apikey: ['keyHash'],
-  integration_credentials: ['payload'],
-  app_settings: ['payload'],
-};
-function redactSensitiveColumns(tableName: string, rows: any[]): any[] {
-  const columnsToRedact = SQLITE_BROWSER_REDACTED_COLUMNS[tableName];
-  if (!columnsToRedact || columnsToRedact.length === 0) return rows;
-  return rows.map((row) => {
-    const redacted = { ...row };
-    for (const col of columnsToRedact) {
-      if (redacted[col] != null && redacted[col] !== '') redacted[col] = '[redacted]';
-    }
-    return redacted;
-  });
-}
-
-// 12. SQLite Database Table Data & Records Browser
-authConsoleRouter.get('/sqlite/table-data', (req: Request, res: Response) => {
-  try {
-    const tableName = String(req.query.table || '').trim();
-    if (!tableName || !/^[a-zA-Z0-9_]+$/.test(tableName)) {
-      return res.status(400).json({ error: 'Invalid table name' });
-    }
-
-    const tableExists = sqliteDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(tableName);
-    if (!tableExists) {
-      return res.status(404).json({ error: 'Table not found' });
-    }
-
-    const limit = Math.min(Math.max(parseInt(String(req.query.limit || '20'), 10) || 20, 1), 100);
-    const offset = Math.max(parseInt(String(req.query.offset || '0'), 10) || 0, 0);
-    const search = String(req.query.search || '').trim();
-
-    const columns = sqliteDb.prepare(`PRAGMA table_xinfo("${tableName}")`).all() as {
-      cid: number;
-      name: string;
-      type: string;
-      notnull: number;
-      dflt_value: any;
-      pk: number;
-    }[];
-
-    // Sort only validated, visible columns; credentials must not leak through ordering.
-    const redacted = new Set(SQLITE_BROWSER_REDACTED_COLUMNS[tableName] ?? []);
-    const sort = String(req.query.sort || '');
-    const direction = String(req.query.direction || 'asc').toLowerCase();
-    if ((sort && !columns.some(c => c.name === sort && !redacted.has(c.name))) || !['asc', 'desc'].includes(direction)) {
-      return res.status(400).json({ error: 'Invalid sort column or direction' });
-    }
-    const quote = (name: string) => '"' + name.replace(/"/g, '""') + '"';
-    const searchable = columns.filter(c => !redacted.has(c.name));
-    const where = search && searchable.length ? ` WHERE ${searchable.map(c => `CAST(${quote(c.name)} AS TEXT) LIKE ?`).join(' OR ')}` : '';
-    const params = where ? searchable.map(() => `%${search}%`) : [];
-    // Primary keys stabilize pagination when multiple rows have the same sort value.
-    const order = [...(sort ? [`${quote(sort)} ${direction}`] : []), ...columns.filter(c => c.pk && c.name !== sort).sort((a, b) => a.pk - b.pk).map(c => quote(c.name))];
-    const orderBy = order.length ? ` ORDER BY ${order.join(', ')}` : '';
-    const total = (sqliteDb.prepare(`SELECT COUNT(*) as count FROM "${tableName}"${where}`).get(...params) as any).count;
-    const rows = sqliteDb.prepare(`SELECT * FROM "${tableName}"${where}${orderBy} LIMIT ? OFFSET ?`).all(...params, limit, offset);
-
-    return res.json({
-      success: true,
-      table: tableName,
-      columns: columns.map(column => ({ ...column, sortable: !redacted.has(column.name), editable: editableColumns(tableName).some(field => field.sql === column.name), editKind: editableColumns(tableName).find(field => field.sql === column.name)?.kind })),
-      primaryKey: ENTITIES.find(entity => entity.table === tableName)?.key ?? null,
-      rows: redactSensitiveColumns(tableName, rows),
-      total,
-      limit,
-      offset,
-    });
-  } catch (err: any) {
-    console.error('Error fetching SQLite table data:', err);
-    return res.status(500).json({ error: err.message || 'Failed to fetch SQLite table data' });
-  }
-});
-
-// Explicit platform write permission; raw credentials and internal tables never enter this path.
-authConsoleRouter.patch('/sqlite/table-data', platformHandler((req, res, identity) => {
-  if (!identity.platformPermissions.includes('platform.database.update')) throw new RequestDenied(403, 'INSUFFICIENT_PERMISSION');
-  if (!globalDbRef) throw new ApiError(503, 'NOT_READY', 'Business data is not ready.');
-  let result;
-  try {
-    result = sqliteDb.transaction(() => {
-      const updated = editBusinessRow(sqliteDb, req.body);
-      platformAudit(req, identity, 'platform.database.row.update', updated.entity.table, req.body.key, updated.changedFields);
-      return updated;
-    }).immediate();
-  } catch (err: any) {
-    if (String(err.code || '').startsWith('SQLITE_CONSTRAINT')) throw new ApiError(409, 'INVALID_ROW', 'The change violates a database constraint. No changes were saved.');
-    throw err;
-  }
-  globalDbRef[result.entity.collection] = result.rows;
-  return res.json({ success: true });
-}));
-
-// 13. SQLite DB Maintenance (Optimize / PRAGMA optimize)
-authConsoleRouter.post('/sqlite/optimize', (req: Request, res: Response) => {
-  try {
-    sqliteDb.prepare('PRAGMA optimize').run();
-    return res.json({ success: true, message: 'Database optimized successfully' });
-  } catch (err: any) {
-    console.error('Error optimizing SQLite:', err);
-    return res.status(500).json({ error: err.message || 'Failed to optimize SQLite database' });
-  }
-});

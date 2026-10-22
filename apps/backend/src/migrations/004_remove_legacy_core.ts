@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type Database from 'better-sqlite3';
 import { ENTITIES } from '../normalizedSchema';
-import { normalizedCoreReady } from '../normalizedCoreStore';
+import { normalizedCoreApplied as normalizedCoreReady } from './003_normalized_core';
 
 const MIGRATION = '004_remove_legacy_core';
 
