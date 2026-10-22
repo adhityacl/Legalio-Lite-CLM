@@ -2,7 +2,7 @@
 
 Status per 22 Oktober 2026. Branch: `PostgreSQL`.
 
-Pekerjaan dibagi menjadi 7 fase (A–G). Fase D dipecah menjadi D1 (backend pg dan skema, sifatnya hanya menambah) dan D2 (pindah engine). **Fase A, B, C, D1 dan D2 selesai: aplikasi sekarang hanya berjalan di PostgreSQL.** Review keamanan fase B sudah dilakukan dan 10 temuannya sudah diperbaiki; semua tes hijau. **Fase E, F dan G belum dikerjakan.**
+Pekerjaan dibagi menjadi 7 fase (A–G). Fase D dipecah menjadi D1 (backend pg dan skema, sifatnya hanya menambah) dan D2 (pindah engine). **Fase A, B, C, D1, D2 dan E selesai: aplikasi sekarang hanya berjalan di PostgreSQL.** Review keamanan fase B sudah dilakukan dan 10 temuannya sudah diperbaiki; semua tes hijau. **Fase F dan G belum dikerjakan.**
 
 > Sampai fase F selesai, backend butuh env `DATABASE_URL` (atau `APP_DATA_DIR/database.json`) untuk start. Contoh untuk dev: `DATABASE_URL=postgres://legalio:legalio@127.0.0.1:5432/legalio`. File ini di-update dan di-push setiap kali satu fase selesai. Dokumen ini berisi semua yang perlu diketahui untuk melanjutkan. Catatan kerja sebelumnya (rencana arsitek dan review) hanya disimpan di `/tmp` dan sudah hilang, jadi isinya dirangkum ulang di sini.
 
@@ -196,6 +196,17 @@ Gate: lint ✅, build ✅, unit 66/66 ✅, e2e sqlite 32 ✅, data-entry 41 ✅,
   - Script menjadi `test:e2e:postgres` dan `test:e2e:data-entry`.
 - **Gate:** lint ✅, build ✅, unit 73/73 ✅, e2e postgres 32 ✅, data-entry 41 ✅, cek promise tanpa temuan baru ✅, grep `better-sqlite3|sqliteDb|.prepare(|sqlite_master|PRAGMA` kosong ✅.
 
+### Fase E: batching baca ✅
+- `childArrays(db, entity, rows)` di `normalizedCoreStore.ts` sekarang menjalankan satu query per tabel anak untuk semua parent sekaligus (`WHERE <fk> = ANY(?) ORDER BY position`), lalu hasilnya dikelompokkan di JS. `partner_dd_files` dikelompokkan dengan key `(partner_id, requirement_position)`. Jika tidak ada parent, tidak ada query anak sama sekali.
+- Query anak dijalankan berurutan, bukan `Promise.all`. Alasannya: di dalam `sql.tx` semua query memakai satu client, dan query paralel pada satu client sudah deprecated di pg 8.23.
+- Jumlah query per list:
+  - partners: 1 + K·(3 + jumlah requirement DD) menjadi **5**
+  - contracts: 1 + K menjadi **2**
+  - spendings: 1 + 2K menjadi **3**
+- Tes baru "a list read costs one query per table, not per parent row" (sebelum perbaikan: 11 vs 51 query).
+- **Belum dioptimalkan:** jalur tulis `writeChildren` masih menjalankan satu DELETE plus satu INSERT per item anak, tetapi hanya untuk baris yang berubah. Penghapusan baris basi juga masih 2 query per id; ini bisa diganti satu `= ANY(?)` nanti.
+- **Gate:** lint ✅, build ✅, unit 74/74 ✅, e2e postgres ✅, data-entry 41 ✅, cek promise ✅.
+
 > **Perilaku baru di dev:** di luar `APP_TEST_MODE`, upload mengembalikan 503 sampai superuser menyimpan COS di /sys (tab Google credentials) atau, setelah fase F, di onboarding. File lama di `uploads/` tidak lagi dilayani; ini sesuai keputusan "tanpa impor".
 
 ---
@@ -338,7 +349,7 @@ Hasilnya ada di §3. Spesifikasi asli disimpan di bawah sebagai referensi. Penyi
 
 > **Risiko utama fase D:** case folding identifier (kolom camelCase tanpa kutip) gagal tanpa pesan error. Andalkan assert di `db.ts` dan e2e penuh.
 
-### Fase E: batching baca (performa)
+### Fase E: batching baca (performa) ✅ SELESAI (lihat §3)
 `readBusinessRows` dan `childArrays` (`normalizedCoreStore.ts`) menjalankan 1 + 3 + (jumlah requirement DD) query **per partner**. Lewat jaringan, ini berarti ratusan sampai ribuan round trip per `GET /api/partners`. Ganti dengan satu query per tabel anak, `WHERE parent = ANY($1) ORDER BY parent, position`, lalu kelompokkan di JS. `partner_dd_files` memakai key `(partner_id, requirement_position)`. Gate sama dengan fase D.
 
 ### Fase F: onboarding (rencana setting di halaman onboard)

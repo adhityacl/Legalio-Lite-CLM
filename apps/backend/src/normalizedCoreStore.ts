@@ -178,26 +178,45 @@ async function writeChildren(db: DB, entity: EntitySchema, row: Row) {
     await replaceList('spending_reporting_months','spending_id',row.invoice_month || [], value => ({ month: value }));
   }
 }
-async function childArrays(db: DB, entity: EntitySchema, row: Row) {
-  const list = (table: string, parentKey: string) => db.all<Row>(`SELECT * FROM ${q(table)} WHERE ${q(parentKey)} = ? ORDER BY position`, row[entity.key]);
-  const assign = (key: string, value: any[]) => { if (value.length || key in row) row[key] = value; };
-  if (entity.table === 'partners') {
-    assign('tags',(await list('partner_categories','partner_id')).map(record => record.category));
-    assign('identifiers',(await list('partner_identifiers','partner_id')).map(record => decodeFields(record,identifierFields)));
-    const requirements = [];
-    for (const record of await list('partner_dd_requirements','partner_id')) {
-      const requirement = decodeFields(record,ddFields);
-      const files = await db.all<Row>('SELECT * FROM partner_dd_files WHERE partner_id = ? AND requirement_position = ? ORDER BY position', row.partner_id, record.position);
-      if (files.length || 'files' in requirement) requirement.files = files.map(file => decodeFields(file,fileFields));
-      requirements.push(requirement);
+// One query per child table for the whole parent set (not per parent row), grouped here by parent key.
+// Sequential on purpose: inside sql.tx all queries share one client, where concurrent queries are deprecated in pg.
+async function childArrays(db: DB, entity: EntitySchema, rows: Row[]) {
+  const ids = rows.map(row => row[entity.key]);
+  const grouped = async (table: string, keys: string[]) => {
+    const groups = new Map<string, Row[]>();
+    for (const record of await db.all<Row>(`SELECT * FROM ${q(table)} WHERE ${q(keys[0])} = ANY(?) ORDER BY position`, ids)) {
+      const key = keys.map(column => record[column]).join('\u0000');
+      if (groups.has(key)) groups.get(key).push(record); else groups.set(key, [record]);
     }
-    assign('dd_documents',requirements);
-    if (!('pic_contact' in row) && (row.pic_email || row.pic_phone)) row.pic_contact = [row.pic_email,row.pic_phone].filter(Boolean).join(' / ');
+    return (...parts: unknown[]) => groups.get(parts.join('\u0000')) ?? [];
+  };
+  const assign = (row: Row, key: string, value: any[]) => { if (value.length || key in row) row[key] = value; };
+  if (entity.table === 'partners') {
+    const categories = await grouped('partner_categories',['partner_id']), identifiers = await grouped('partner_identifiers',['partner_id']);
+    const requirements = await grouped('partner_dd_requirements',['partner_id']), files = await grouped('partner_dd_files',['partner_id','requirement_position']);
+    for (const row of rows) {
+      const id = row[entity.key];
+      assign(row,'tags',categories(id).map(record => record.category));
+      assign(row,'identifiers',identifiers(id).map(record => decodeFields(record,identifierFields)));
+      assign(row,'dd_documents',requirements(id).map(record => {
+        const requirement = decodeFields(record,ddFields);
+        const list = files(id,record.position);
+        if (list.length || 'files' in requirement) requirement.files = list.map(file => decodeFields(file,fileFields));
+        return requirement;
+      }));
+      if (!('pic_contact' in row) && (row.pic_email || row.pic_phone)) row.pic_contact = [row.pic_email,row.pic_phone].filter(Boolean).join(' / ');
+    }
   }
-  if (entity.table === 'contracts') assign('cooperation_categories',(await list('contract_categories','contract_id')).map(record => record.category));
+  if (entity.table === 'contracts') {
+    const categories = await grouped('contract_categories',['contract_id']);
+    for (const row of rows) assign(row,'cooperation_categories',categories(row[entity.key]).map(record => record.category));
+  }
   if (entity.table === 'spendings') {
-    assign('month_allocations',(await list('spending_allocations','spending_id')).map(record => ({ ...JSON.parse(record.extra_json), month: record.month, amount: Number(`${record.amount_minor}e-${record.amount_scale}`) })));
-    assign('invoice_month',(await list('spending_reporting_months','spending_id')).map(record => record.month));
+    const allocations = await grouped('spending_allocations',['spending_id']), months = await grouped('spending_reporting_months',['spending_id']);
+    for (const row of rows) {
+      assign(row,'month_allocations',allocations(row[entity.key]).map(record => ({ ...JSON.parse(record.extra_json), month: record.month, amount: Number(`${record.amount_minor}e-${record.amount_scale}`) })));
+      assign(row,'invoice_month',months(row[entity.key]).map(record => record.month));
+    }
   }
 }
 export async function readBusinessRows(db: DB, table: string, organizationId?: string, searchIds?: string[]): Promise<Row[]> {
@@ -209,8 +228,8 @@ export async function readBusinessRows(db: DB, table: string, organizationId?: s
     clauses.push(`${q(entity.key)} IN (${searchIds.map(() => '?').join(',')})`); params.push(...searchIds);
   }
   const records = await db.all<Row>(`SELECT * FROM ${q(table)}${clauses.length ? ' WHERE ' + clauses.join(' AND ') : ''} ORDER BY record_position, ${q(entity.key)}`, ...params);
-  const rows: Row[] = [];
-  for (const record of records) { const row = decodeFields(record,entity.fields); row[entity.key] = record[entity.key]; row.organizationId = record.organization_id; await childArrays(db,entity,row); rows.push(row); }
+  const rows = records.map(record => { const row = decodeFields(record,entity.fields); row[entity.key] = record[entity.key]; row.organizationId = record.organization_id; return row; });
+  if (rows.length) await childArrays(db,entity,rows);
   return rows;
 }
 // Fingerprints of rows as last written, so an unchanged row costs one hash instead of several SQL round trips.

@@ -192,6 +192,23 @@ test('organization reset empties one organization\'s business data, editor docum
   }
 });
 
+test('a list read costs one query per table, not per parent row', async () => {
+  await fixture();
+  const partner = (id: string) => ({ partner_id:id, organizationId:'org-a', partner_name:id, tags:[id,'x'], identifiers:[{scheme:'tax',value:id}], dd_documents:[0,1].map(r => ({ key:`k${r}`, files:[{id:`${id}-${r}-a`},{id:`${id}-${r}-b`}] })) });
+  const spending = (id: string) => ({ id, organizationId:'org-a', invoice_month:[id], month_allocations:[{month:id,amount:1.5}] });
+  let queries = 0;
+  const counted = { ...s, all: (text: string, ...params: unknown[]) => { queries++; return s.all(text, ...params); } };
+  const readCount = async (k: number) => {
+    const ids = Array.from({ length: k }, (_, i) => `p${i}`);
+    const rows = { partners: ids.map(partner), contracts: ids.map(id => ({ contract_id:`c-${id}`, organizationId:'org-a', cooperation_categories:[id,'y'] })), spendings: ids.map(id => spending(`s-${id}`)) };
+    await synchronizeBusinessRows(s, rows);
+    queries = 0;
+    for (const [table, collection] of [['partners','partners'],['contracts','contracts'],['spendings','spendings']]) assert.deepEqual(await readBusinessRows(counted, table), rows[collection as keyof typeof rows]);
+    return queries;
+  };
+  assert.equal(await readCount(1), await readCount(6));
+});
+
 test('decimal precision is explicit', () => {
   assert.deepEqual(decimalParts(0.29),{minor:29n,scale:2});
   assert.deepEqual(decimalParts('1e-7'),{minor:1n,scale:7});
