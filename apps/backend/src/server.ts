@@ -1,183 +1,68 @@
-import { verifyGoogleAccessTokenEmail } from './googleTokenVerifier';
-import { createUsersRouter } from "./routes/users";
-import { createAdminRouter } from "./routes/admin";
-import { createAiRouter } from "./routes/ai";
-import { createBulkImportRouter } from "./routes/bulkImport";
-import { createTenantsRouter } from "./routes/tenants";
-import { createGoogleAuthRouter } from "./routes/googleAuth";
-import { createGoogleIntegrationRouter } from "./routes/googleIntegration";
-import { checkIsAdmin } from './adminCheck';
-import { tenantSettingsPayload } from './tenantSettingsView';
-import { createSystemSettingsRouter } from "./routes/systemSettings";
-import { onOrganizationChanged, redactProviderConfig, readPlatformConfiguration, PLATFORM_SECTIONS, isMaskedSecret, applyPlatformConfiguration } from './platformSettings';
-import { withCurrentUiTextKeys } from './uiTextKeys';
-import { createInitDataRouter } from "./routes/initData";
-import { normalizeSpendingMonths } from './spendingMonths';
-import { createActivityLogsRouter } from "./routes/activityLogs";
-import { createSearchRouter } from "./routes/search";
-import { createNotificationsRouter } from "./routes/notifications";
-import { createTemplatesRouter } from "./routes/templates";
-import { createUploadsRouter } from "./routes/uploads";
-import { createIoRouter } from "./routes/io";
-import { createContractsRouter } from "./routes/contracts";
-import { computeEvaluationScore } from './evaluationScoring';
-import { createSpendingsRouter } from "./routes/spendings";
-import { generateRedlineAnalysis, runContractRedlineAnalysis } from './redlineAnalysis';
-import { createEvaluationsRouter } from "./routes/evaluations";
-import { createPartnersRouter } from "./routes/partners";
-import { upload } from './uploadMiddleware';
-import { recalculateStatuses, seedReminderLedger, reminderScheduler, refreshContractLifecycles, rollForwardAutoRenewal, runReminderPass, stopReminderScheduler } from './reminderJobs';
-import { generateContentWithRetryAndFallback, getEffectiveGeminiApiKey, ensureAiAvailable, getValidAiModel, withDocumentTranscriptField, extractAndCacheDocumentTranscript, formatGeminiError, aiLimits } from './aiClient';
-import { normalizeParsedDate, computeContractEndDateFromDuration } from './documentParsing';
-import { formatAmountForTenant, buildReminderEmail, sendSmtpEmail, daysUntilForTenant, mailTemplates, sendPlatformMail } from './mailHelpers';
-import { ensureAllPartnersFolders, resolveActiveGoogleToken, getOrgFolderId, getPartnerCategoryFolderId, getFreshGoogleAccessToken, autoEnsureTenantGoogleResources } from './googleDrive';
-import { backupLocalFilesToGoogleDrive } from './driveBackup';
-import { authorizeUpload, serveUpload, getStore, getMimeType, UPLOAD_KINDS, saveUpload } from './uploadStorage';
-import { googleCredentials } from './googleCredentialStore';
-import { addActivityLog, isMatchingOrg, getRequestTenantId, orgContextOf, scopeOf, scopedRecords, assertRecordAccess, assertRecordWritable, logActivity } from './recordAccess';
-import { refreshTenantProjection, db, saveDb, onDbSaved, demoData, migrateLegacyRecords, sanitizePartnerTags, syncAdderNames, DEFAULT_BRANDING, triggerAutoPushToGoogleSheet, sanitizeCountryCode, countryNameForPrompt, sanitizeIdentifiers, generateNextPartnerId, generateNextSpendingId, generateNextContractId, generateNextIOId, coreSaver } from './memoryDb';
-import { createMailTemplateStore } from "./mailTemplateStore";
-import { aiContext, AiLimitError, AiRateLimiter, aiLimitsFromEnv, boundChatHistory, boundWorkspaceContext, currentAiOrganization, recordAiTokens, reserveAiCall, runModelChain } from "./aiLimits";
-import { verifyGoogleAccessToken } from "./googleAudience";
-import { smtpTlsOptions } from "./smtpTls";
-import { appendActivity, listActivity } from "./activityLog";
-import { seedLedgerFromLegacy, createReminderScheduler, deliverDue as deliverDueReminders, enqueue as enqueueReminder, existingKeys as existingReminderKeys, planReminders, REMINDER_LOCK_KEY, schedulerOptionsFromEnv, type ReminderSender } from "./reminders";
-import { backfillUploadOwners, eligibleOwners, newUploadKey, recordUploadOwner } from "./uploadOwnership";
-import { componentLog, errorResponder, requestLogging } from "./logger";
-import { sendApiError, sendRouteError, PublicError } from "./apiErrors";
-import { validateBody } from "./validation";
-import * as bodySchemas from "./schemas";
-const log = componentLog("server");
-import { forwardAsyncRouteErrors } from './asyncRoutes';
-import { renameLegacyKeys, renameLegacyKeyTokens } from '@legalio/shared/fieldNames';
-import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
-import { readBusinessRows, searchBusinessRows } from './normalizedCoreStore';
+/**
+ * Composition root: builds the Express app (edge middleware, Better Auth boundary, route policies) and mounts the route
+ * modules in ./routes. Everything else lives in the modules it imports; `init()` prepares the database-backed state.
+ */
 import "dotenv/config";
-import { getPublicBaseUrl, normalizePublicUrl, saveInstallationPublicUrl } from './installationSettings';
-import type { UITextOverrides } from '@legalio/types/uiTexts';
-var __defProp = Object.defineProperty;
-var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 import express from "express";
-import { createSensitiveRateLimiter, trustProxySetting } from "./edgeConfig";
-import { allocationInvoiceMonths, validateSpendingAllocations } from "@legalio/shared/spendingAllocations";
-import path from "path";
-import fs from "fs";
-import crypto from "crypto";
-import nodemailer from "nodemailer";
-import { buildMatrix as buildRbacMatrix, can, hasOrganizationScope, type OrgContext } from "./rbac";
-import {
-  RequestDenied, accessibleOrganizations, identityOf, isIdentityBanned, resolveIdentity, resolveLegacyContext, resolveOrganizationContext, sendError,
-} from "./identity";
-import { isConstraintViolation, isUniqueViolation, sql, withAdvisoryLock } from "./db";
-import { ensureSchema } from "./schema";
-import { BETTER_AUTH_ALLOWED, createAuthorizationMiddleware, isBetterAuthPathAllowed } from "./routePolicies";
-import { createOrganizationScope, filterRecords, recordVisible, normalizeDepartmentName, teamsOf, type RecordKind } from "./recordScope";
-import { IS_TEST_MODE, APP_DATA_DIR } from "./runtimePaths";
-import { cosStore, keyFromLink, memoryStore, type CosConfig, type ObjectStore } from "./objectStore";
-import {
-  ApiError, appendAudit, buildTenantProjection, isEmptyInstall, readIntegration, writeIntegrationRow, patchOrganizationSettings, readOrganizationSettings, patchIntegration,
-} from "./organizationSettingsStore";
-import { auditActorFor, capabilitiesOf, createOrganizationAdminRouter, hasApprovalInvitation, identityResponse, selectActiveOrganization } from "./organizationAdminRoutes";
-import { createOrganizationRecord, seedOrganizationsFromDataset } from "./organizationProvisioning";
-import { GoogleGenAI, Type } from "@google/genai";
-import { OAuth2Client } from "google-auth-library";
 import { toNodeHandler } from "better-auth/node";
-import { hashPassword, verifyPassword } from "better-auth/crypto";
-import {
-  auth as betterAuthInstance,
-  saveCoreData,
-  loadCoreData,
-  setVerificationMailer,
-  reloadAuthConfiguration,
-} from "./lib/auth";
-import {
-  authConsoleRouter,
-  setConsoleDbReference,
-  ensureUserAccountsExist,
-} from "./authConsoleRoutes";
+import { renameLegacyKeys } from "@legalio/shared/fieldNames";
+import { aiContext } from "./aiLimits";
+import { sendApiError } from "./apiErrors";
+import { forwardAsyncRouteErrors } from "./asyncRoutes";
+import { setConsoleDbReference, authConsoleRouter, ensureUserAccountsExist } from "./authConsoleRoutes";
+import { sql } from "./db";
+import { removeDemoAccounts } from "./demoAccounts";
+import { demoAdminEmail, demoAdminPassword, shouldSeedDemoAdmin } from "./demoAdmin";
+import { createSensitiveRateLimiter, trustProxySetting } from "./edgeConfig";
 import { createDocumentRouter } from "./documentRoutes";
 import { createApprovalRouter } from "./approvalRoutes";
-import { createCoreSaver } from "./coreDataStore";
+import { createGoogleCredentialsRouter } from "./googleCredentials";
+import { googleCredentials } from "./googleCredentialStore";
+import { ensureAllPartnersFolders, getFreshGoogleAccessToken, resolveActiveGoogleToken } from "./googleDrive";
+import { RequestDenied, resolveIdentity, sendError } from "./identity";
+import { getPublicBaseUrl } from "./installationSettings";
+import { auth as betterAuthInstance, loadCoreData, reloadAuthConfiguration } from "./lib/auth";
+import { hasServiceAccountCredentials } from "./lib/googleServiceAccountAuth";
+import { componentLog, errorResponder, requestLogging } from "./logger";
+import { mailTemplates, sendPlatformMail } from "./mailHelpers";
+import { coreSaver, db, demoData, migrateLegacyRecords, refreshTenantProjection, saveDb, sanitizePartnerTags, syncAdderNames } from "./memoryDb";
 import { resetSyncCache } from "./normalizedCoreStore";
-import { isDemoAccountEmail, removeDemoAccounts } from "./demoAccounts";
-import {
-  formatContractFileName,
-  formatIOFileName,
-  formatInvoiceFileName,
-  formatBillingFileName,
-  formatDueDiligenceFileName,
-} from "@legalio/shared/fileNaming";
-import {
-  getExchangeRates,
-  getHistoricalExchangeRate,
-  getUsdRate,
-} from "@legalio/shared/currencyRates";
-import {
-  createDriveFolder,
-  createNewDriveFolderInParent,
-  getOrCreateDriveFolder,
-  uploadFileToDrive,
-  extractFolderIdFromLink,
-  sanitizeParentFolderId,
-  setInvalidTokenCallback,
-  setRefreshTokenGetter,
-  createSpreadsheetInFolder,
-  createGoogleDocInFolder,
-} from "./lib/googleDriveSync";
-import {
-  loadServiceAccountCredentials,
-  hasServiceAccountCredentials,
-  getGoogleSheetsClient,
-  setStoredServiceAccountProvider,
-} from "./lib/googleServiceAccountAuth";
-import { checkCosInput, createGoogleCredentialStore, createGoogleCredentialsRouter } from "./googleCredentials";
-import multer from "multer";
-import { randomUUID } from "node:crypto";
-import { contractLifecycle, contractLifecycleMode, validateContractTermination } from "@legalio/shared/contractLifecycle";
-import { parseTerminationFile, type TerminationFile } from "./contractTermination";
-import { CONTRACT_TERMINATION_TRANSLATIONS } from "@legalio/shared/i18n/contractTermination";
-import {
-  bindTenantStore,
-  getDefaultTenantId,
-  getTenantSettings,
-  tenantDefaultCurrency,
-  tenantDisplayName,
-  computeLifecycle,
-  normalizePartnerDocuments,
-  computeDueDiligenceStatus,
-  aiPolicyContext,
-  findTenant,
-  isLegacyDefaultAlias,
-} from "./tenantPolicy";
-import {
-  resolveTenantSettings,
-  todayInTimezone,
-  listCountryPacks,
-  listIndustryPacks,
-  buildDueDiligenceChecklist,
-  getCountryPack,
-  getIndustryPack,
-  localize,
-} from "@legalio/shared/policy";
-import {
-  normalizeContractStatus,
-  normalizeApprovalStatus,
-  normalizeDueDiligenceStatus,
-  normalizeDocumentStatus,
-} from "@legalio/types/domainStatus";
-import {
-  convertToUsdWithFallback,
-  getDefaultUsdRate,
-  normalizeCurrencyCode,
-} from "@legalio/shared/currencyUtils";
-import { buildDemoDataset, DEMO_TENANTS } from "@legalio/shared/data/demoDataset";
+import { createOrganizationAdminRouter } from "./organizationAdminRoutes";
+import { seedOrganizationsFromDataset } from "./organizationProvisioning";
+import { isEmptyInstall } from "./organizationSettingsStore";
+import { applyPlatformConfiguration, onOrganizationChanged, readPlatformConfiguration } from "./platformSettings";
+import { addActivityLog, getRequestTenantId, isMatchingOrg } from "./recordAccess";
+import { normalizeDepartmentName } from "./recordScope";
+import { recalculateStatuses, reminderScheduler, seedReminderLedger, stopReminderScheduler } from "./reminderJobs";
+import { createAdminRouter } from "./routes/admin";
+import { createActivityLogsRouter } from "./routes/activityLogs";
+import { createAiRouter } from "./routes/ai";
+import { createBulkImportRouter } from "./routes/bulkImport";
+import { createContractsRouter } from "./routes/contracts";
+import { createEvaluationsRouter } from "./routes/evaluations";
+import { createGoogleAuthRouter } from "./routes/googleAuth";
+import { createGoogleIntegrationRouter } from "./routes/googleIntegration";
+import { createInitDataRouter } from "./routes/initData";
+import { createIoRouter } from "./routes/io";
+import { createNotificationsRouter } from "./routes/notifications";
+import { createPartnersRouter } from "./routes/partners";
+import { createSearchRouter } from "./routes/search";
+import { createSpendingsRouter } from "./routes/spendings";
+import { createSystemRouter } from "./routes/system";
+import { createSystemSettingsRouter } from "./routes/systemSettings";
+import { createTemplatesRouter } from "./routes/templates";
+import { createTenantsRouter } from "./routes/tenants";
+import { createUploadsRouter } from "./routes/uploads";
+import { createUsersRouter } from "./routes/users";
+import { BETTER_AUTH_ALLOWED, createAuthorizationMiddleware, isBetterAuthPathAllowed } from "./routePolicies";
+import { IS_TEST_MODE } from "./runtimePaths";
 import { localizeApiMessages } from "./serverMessages";
-import {
-  buildCheapOcrContents,
-  globalOcrCache,
-  computeInputSha256,
-  setCachedTranscript,
-} from "./lib/cheapOcrPipeline";
+import { tenantSettingsPayload } from "./tenantSettingsView";
+import { getStore, UPLOAD_KINDS } from "./uploadStorage";
+import { backfillUploadOwners } from "./uploadOwnership";
+import { ensureSchema } from "./schema";
+
+const log = componentLog("server");
 
 const app = express();
 forwardAsyncRouteErrors(app);
@@ -225,17 +110,6 @@ app.use(createAuthorizationMiddleware(sql));
 app.use((req: express.Request, _res: express.Response, next: express.NextFunction) => {
   aiContext.run({ organizationId: (req as any).orgContext?.organizationId ?? null }, next);
 });
-/*
- * There are no default credentials. The first admin is created on the
- * first-run setup page (POST /api/system/setup). For automated deploys,
- * setting both DEMO_ADMIN_EMAIL and DEMO_ADMIN_PASSWORD pre-creates it
- * instead; SEED_DEMO_ADMIN=false stops that once your own admin exists.
- */
-const demoAdminEmail = (process.env.DEMO_ADMIN_EMAIL || "").trim().toLowerCase();
-const demoAdminPassword = process.env.DEMO_ADMIN_PASSWORD || "";
-const shouldSeedDemoAdmin = process.env.SEED_DEMO_ADMIN !== "false";
-// The password older releases seeded the admin with; only kept to warn installs still using it.
-const LEGACY_DEFAULT_ADMIN_PASSWORD = "123456789";
 /*
  * Startup (PRD §14.1): creates or completes the schema on the connected pool, and on a fresh install seeds the demo workspace.
  * Everything that reads or writes the database runs here; main.ts connects first and awaits it before serving this app.
@@ -336,31 +210,6 @@ export async function init() {
   await seedReminderLedger();
   reminderScheduler.start();
 }
-app.get("/api/exchange-rates", async (req: express.Request, res: express.Response) => {
-  try {
-    const currencies = Array.from(
-      new Set([
-        ...(db.spendings || []).map((s) => s.currency),
-        ...(db.contracts || []).map((c) => c.currency),
-        ...(db.ios || []).map((i) => i.currency),
-      ].filter(Boolean).map((c) => normalizeCurrencyCode(c))),
-    );
-    const rates = await getExchangeRates("", "", currencies);
-    res.json({ USD: 1, ...rates });
-  } catch (err) {
-    sendRouteError(req, res, err, "request failed", "Could not load exchange rates.", { status: 500 });
-  }
-});
-app.get("/api/exchange-rate-historical", async (req: express.Request, res: express.Response) => {
-  try {
-    const currency = normalizeCurrencyCode(req.query.currency, "USD");
-    const date = String(req.query.date || "");
-    const { rate, isFallback } = await getUsdRate(currency);
-    res.json({ currency, date, rate, isFallback });
-  } catch (err) {
-    sendRouteError(req, res, err, "request failed", "Could not load the exchange rate.", { status: 500 });
-  }
-});
 
 app.use("/api", createGoogleCredentialsRouter(googleCredentials));
 
@@ -372,158 +221,6 @@ app.use("/api", createDocumentRouter({
 }));
 // Document Approval: sequential sign-off on a My Documents item or an uploaded file.
 app.use("/api", createApprovalRouter({ db: sql, tenantOf: getRequestTenantId }));
-/* ------------------------------------------------------------------ */
-/* Health, first-run status, policy packs and tenant settings          */
-/* ------------------------------------------------------------------ */
-app.get("/api/health", (_req: express.Request, res: express.Response) => {
-  res.json({ status: "ok", time: new Date().toISOString() });
-});
-// Readiness: the process is up AND PostgreSQL answers. Used by the Docker/compose healthchecks. A fresh install that still
-// needs its first-run setup is ready (the setup page must be reachable), so that is reported but is not an error.
-app.get("/api/health/ready", async (_req: express.Request, res: express.Response) => {
-  res.set("Cache-Control", "no-store");
-  try {
-    await Promise.race([
-      sql.get("SELECT 1 AS ok"),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000).unref()),
-    ]);
-  } catch {
-    return res.status(503).json({ status: "unavailable", database: "down", time: new Date().toISOString() });
-  }
-  res.json({ status: "ok", database: "up", time: new Date().toISOString() });
-});
-
-/** True while an install upgraded from an older release still uses the old shipped admin password. */
-async function isBootstrapPasswordActive(): Promise<boolean> {
-  try {
-    const row: any = await sql.get(`
-      SELECT password FROM account WHERE "userId" = 'demo-admin' AND "providerId" = 'credential' LIMIT 1
-    `);
-    if (!row?.password) return false;
-    return await verifyPassword({ hash: row.password, password: LEGACY_DEFAULT_ADMIN_PASSWORD });
-  } catch {
-    return false;
-  }
-}
-
-/** A fresh install has no Superuser until someone completes the first-run setup page. */
-const needsFirstRunSetup = async () => !await sql.get(`SELECT 1 FROM "user" WHERE role = 'superuser' LIMIT 1`);
-
-// Unauthenticated: tells the sign-in page whether to show the first-run setup form instead.
-app.get("/api/system/public-status", async (_req: express.Request, res: express.Response) => {
-  res.set('Cache-Control', 'no-store').json({
-    appName: db.branding?.appName || DEFAULT_BRANDING.appName,
-    needsDatabase: false,
-    needsSetup: await needsFirstRunSetup(),
-    publicUrl: getPublicBaseUrl(),
-  });
-});
-
-// Unauthenticated, and only usable while no Superuser exists: creates the first admin.
-app.post("/api/system/setup", async (req: express.Request, res: express.Response) => {
-  if (!await needsFirstRunSetup()) {
-    return res.status(409).json({ error: "ALREADY_SET_UP", message: "An administrator already exists. Please sign in." });
-  }
-  let publicUrl: string;
-  try {
-    publicUrl = normalizePublicUrl(req.body?.publicUrl);
-    if (process.env.BETTER_AUTH_URL?.trim() && publicUrl !== getPublicBaseUrl()) {
-      throw new Error(`The deployment already specifies the website URL ${getPublicBaseUrl()}. Use that URL for setup.`);
-    }
-  } catch (err: any) {
-    return res.status(400).json({ error: "INVALID_PUBLIC_URL", message: err.message });
-  }
-  const name = String(req.body?.name || "").trim().slice(0, 200);
-  const email = String(req.body?.email || "").trim().toLowerCase();
-  const password = String(req.body?.password || "");
-  if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8) {
-    return res.status(400).json({ error: "INVALID_SETUP", message: "Enter your name, a valid email, and a password of at least 8 characters." });
-  }
-  // Uploads have no local fallback, so outside test mode the first admin also connects Tencent COS; tested before the transaction.
-  const checked = req.body?.storage || !IS_TEST_MODE ? await checkCosInput(req.body?.storage) : null;
-  if (checked && "error" in checked) return res.status(400).json(checked);
-  const storage = checked as CosConfig | null; // the tsconfig is not strict, so `checked &&` above does not narrow
-  const hashed = await hashPassword(password);
-  const id = `usr_${crypto.randomUUID()}`;
-  const now = new Date().toISOString();
-  try {
-    // Re-checked inside the transaction: hashing above yields, so a second request could have won.
-    const created = await sql.tx(async () => {
-      // Serializes concurrent setups: the loser sees the winner's superuser below.
-      await sql.get(`SELECT pg_advisory_xact_lock(hashtext('legalio:setup'))`);
-      if (!await needsFirstRunSetup()) return false;
-      if (await sql.get(`SELECT 1 FROM "user" WHERE LOWER(email) = ?`, email)) {
-        throw Object.assign(new Error("That email is already used by another account."), { status: 409 });
-      }
-      await sql.run(`
-        INSERT INTO "user" (id, name, email, "emailVerified", role, banned, "createdAt", "updatedAt")
-        VALUES (?, ?, ?, true, 'superuser', false, ?, ?)
-      `, id, name, email, now, now);
-      await sql.run(`
-        INSERT INTO account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt")
-        VALUES (?, ?, 'credential', ?, ?, ?, ?)
-      `, `acc_${id}`, id, id, hashed, now, now);
-      await saveInstallationPublicUrl(sql, publicUrl);
-      if (storage) await googleCredentials.saveCos(storage, id);
-      return true;
-    });
-    if (!created) {
-      return res.status(409).json({ error: "ALREADY_SET_UP", message: "An administrator already exists. Please sign in." });
-    }
-  } catch (err: any) {
-    // saveCos already updated the in-memory credentials; after a rollback the table is the truth again.
-    if (storage) await googleCredentials.init().catch((reloadErr) => log.error("[setup] credential reload failed:", reloadErr));
-    const known = err instanceof ApiError || err instanceof RequestDenied;
-    if (!known) log.error("[setup] failed:", err);
-    return sendApiError(req, res, known ? err.status : 500, "SETUP_FAILED", known ? err.message : "Setup failed.", { error: "SETUP_FAILED" });
-  }
-  await reloadAuthConfiguration();
-  await appendAudit(sql, { actorId: id, actorPlatformRole: "superuser", accessMode: "platform", requestId: String((req as any).requestId || crypto.randomUUID()) }, {
-    organizationId: null, action: "platform.setup", targetType: "installation", targetId: "installation", outcome: "success", changedFields: storage ? ["superuser", "publicUrl", "storage"] : ["superuser", "publicUrl"],
-  });
-  // Outside production the demo-workspace logins stay usable with the same password.
-  if (!IS_TEST_MODE) await ensureUserAccountsExist(password);
-  log.info(`First-run setup: created superuser ${email}`);
-  res.status(201).json({ success: true, publicUrl });
-});
-
-app.get("/api/system/status", async (req: express.Request, res: express.Response) => {
-  const identity = identityOf(req);
-  const isSuperuser = identity.platformRole === "superuser";
-  const google = isSuperuser ? googleCredentials.status() : null;
-  res.json({
-    isSuperuser,
-    defaultAdminPasswordActive: isSuperuser ? await isBootstrapPasswordActive() : false,
-    // Drives the "finish setup: connect Google" banner for a fresh install's admin.
-    googleSetupIncomplete: Boolean(google && (!google.serviceAccount.source || !google.oauthClient.source)),
-    tenantCount: isSuperuser ? (db.tenants || []).length : undefined,
-  });
-});
-
-app.get("/api/policy-packs", (_req: express.Request, res: express.Response) => {
-  res.json({
-    countries: listCountryPacks().map((c) => ({
-      code: c.code,
-      name: c.name,
-      region: c.region,
-      defaultCurrency: c.defaultCurrency,
-      timezone: c.timezone,
-      legalForms: c.legalForms,
-      identifierSchemes: c.identifierSchemes,
-      dataProtectionLaw: c.dataProtectionLaw,
-      governingLaw: c.governingLaw,
-      disputeVenue: c.disputeVenue,
-    })),
-    industries: listIndustryPacks().map((i) => ({
-      key: i.key,
-      name: i.name,
-      partnerCategories: i.partnerCategories,
-      commercialDocument: i.commercialDocument,
-      counterpartyTypes: i.counterpartyTypes,
-      contractCurrency: i.contractCurrency || null,
-    })),
-  });
-});
 
 /* Canonical tenant administration API (PRD §9). */
 app.use("/api", createOrganizationAdminRouter({
@@ -572,6 +269,7 @@ app.use(createBulkImportRouter());
 app.use(createAiRouter());
 app.use(createAdminRouter());
 app.use(createUsersRouter());
+app.use(createSystemRouter());
 app.use("/api/auth-console", authConsoleRouter);
 app.all("/api/*", (req: express.Request, res: express.Response) => {
   sendApiError(req, res, 404, "ROUTE_NOT_FOUND", `API route not found: ${req.method} ${req.path}`);
