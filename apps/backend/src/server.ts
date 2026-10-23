@@ -7307,9 +7307,7 @@ app.use("/api", createOrganizationAdminRouter({
 
 app.use("/api/auth-console", authConsoleRouter);
 app.all("/api/*", (req: express.Request, res: express.Response) => {
-  res
-    .status(404)
-    .json({ error: `API route not found: ${req.method} ${req.path}` });
+  sendApiError(req, res, 404, "ROUTE_NOT_FOUND", `API route not found: ${req.method} ${req.path}`);
 });
 app.use(errorResponder());
 /** Graceful shutdown: stop background work, then wait for queued database saves. The caller closes the pool afterwards. */
