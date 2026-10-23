@@ -1,3 +1,6 @@
+import { verifyGoogleAccessTokenEmail } from './googleTokenVerifier';
+import { createGoogleAuthRouter } from "./routes/googleAuth";
+import { createGoogleIntegrationRouter } from "./routes/googleIntegration";
 import { checkIsAdmin } from './adminCheck';
 import { tenantSettingsPayload } from './tenantSettingsView';
 import { createSystemSettingsRouter } from "./routes/systemSettings";
@@ -496,15 +499,6 @@ app.post("/api/user/log-activity", async (req: express.Request, res: express.Res
   await addActivityLog("", "", "", actionType, "AUTH", actionType === "LOGOUT" ? "Signed out" : "Signed in", req, ctx?.organizationId ?? null);
   res.json({ success: true });
 });
-/**
- * Resolve the verified e-mail behind a Google OAuth access token: the token must have been issued to this
- * installation's OAuth client (tokeninfo audience) and Google must report the e-mail as verified.
- * `verifyGoogleToken` is swappable so tests can run without contacting Google.
- */
-let verifyGoogleToken: (accessToken: unknown, clientId: string | null | undefined) => Promise<string | null> = verifyGoogleAccessToken;
-function verifyGoogleAccessTokenEmail(accessToken: unknown): Promise<string | null> {
-  return verifyGoogleToken(accessToken, googleCredentials.getOAuthClient().clientId);
-}
 app.get("/api/user/allowed-users", (req: express.Request, res: express.Response) => {
   syncAdderNames();
   res.json(db.allowedUsers);
@@ -755,266 +749,6 @@ app.use("/api", createDocumentRouter({
 }));
 // Document Approval: sequential sign-off on a My Documents item or an uploaded file.
 app.use("/api", createApprovalRouter({ db: sql, tenantOf: getRequestTenantId }));
-app.get(
-  ["/api/auth/google/client-id", "/api/google-auth/client-id"],
-  (req: express.Request, res: express.Response) => {
-    res.json({ clientId: googleCredentials.getOAuthClient().clientId });
-  },
-);
-app.post(
-  ["/api/auth/google/exchange-code", "/api/google-auth/exchange-code"],
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { code, redirect_uri } = req.body;
-      if (!code) {
-        return res
-          .status(400)
-          .json({ error: "Authorization code is required" });
-      }
-      const { clientId, clientSecret } = googleCredentials.getOAuthClient();
-      if (!clientId) {
-        return res
-          .status(500)
-          .json({
-            error:
-              "OAuth client Google belum dikonfigurasi. Unggah file JSON OAuth client di Settings → Google, atau isi GOOGLE_CLIENT_ID.",
-          });
-      }
-      const oauth2Client = new OAuth2Client(
-        clientId,
-        clientSecret,
-        redirect_uri || "postmessage",
-      );
-      const { tokens } = await oauth2Client.getToken(code);
-      if (!tokens || !tokens.access_token) {
-        return res
-          .status(400)
-          .json({
-            error: "Gagal mendapatkan Access Token dari Google OAuth server.",
-          });
-      }
-      // The caller's own tokens are returned to the caller only. Connecting the
-      // platform Google account is a separate, platform-only action (/connect).
-      let profile: any = { email: "Google User", name: "Pengguna Google" };
-      try {
-        const userInfoRes = await fetch(
-          "https://www.googleapis.com/oauth2/v3/userinfo",
-          { headers: { Authorization: `Bearer ${tokens.access_token}` } },
-        );
-        if (userInfoRes.ok) {
-          const userInfo = await userInfoRes.json() as { email?: string; name?: string; picture?: string };
-          profile = {
-            email: userInfo.email || "Google User",
-            name: userInfo.name || userInfo.email || "Pengguna Google",
-            photoURL: userInfo.picture || void 0,
-          };
-        }
-      } catch (profileErr) {
-        log.warn(
-          "Gagal memuat profil pengguna di exchange-code:",
-          profileErr,
-        );
-      }
-      res.json({
-        success: true,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token || undefined,
-        expiresAt: tokens.expiry_date,
-        profile,
-      });
-    } catch (err) {
-      log.error("Error exchanging Google OAuth code:", err);
-      sendRouteError(req, res, err, "request failed", "Gagal menukarkan Google Authorization Code.", { status: 500 });
-    }
-  },
-);
-app.get(
-  ["/api/auth/google/token", "/api/google-auth/token"],
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const freshToken = await getFreshGoogleAccessToken();
-      const activeToken = freshToken || db.googleConfig?.accessToken || null;
-      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      res.json({
-        success: true,
-        accessToken: activeToken,
-        isConnected: Boolean(
-          db.googleConfig?.isConnected &&
-          (activeToken || db.googleConfig?.refreshToken),
-        ),
-        lastSyncTime: db.googleConfig?.lastSyncTime || null,
-      });
-    } catch (err) {
-      sendRouteError(req, res, err, "request failed", "Gagal memeriksa token Google.", { status: 500, extra: { success: false } });
-    }
-  },
-);
-app.post(
-  ["/api/auth/google/refresh-token", "/api/google-auth/refresh-token"],
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const freshToken = await getFreshGoogleAccessToken();
-      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      res.json({ success: true, accessToken: freshToken });
-    } catch (err) {
-      sendRouteError(req, res, err, "request failed", "Gagal me-refresh token Google.", { status: 500, extra: { success: false } });
-    }
-  },
-);
-app.post(
-  ["/api/auth/google/sync-session", "/api/google-auth/sync-session"],
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { email, name, photoURL, idToken, accessToken, refreshToken } = req.body || {};
-      if (!email || typeof email !== 'string') {
-        return res.status(400).json({ success: false, error: "Email diperlukan untuk sinkronisasi akun." });
-      }
-
-      const cleanEmail = email.toLowerCase().trim();
-      const userName = name || cleanEmail.split("@")[0];
-      const now = new Date().toISOString();
-
-      // The e-mail in the request body is untrusted: prove it with Google.
-      const verifiedEmail = await verifyGoogleAccessTokenEmail(accessToken);
-      if (!verifiedEmail || verifiedEmail !== cleanEmail) {
-        return res.status(401).json({
-          success: false,
-          error: "GOOGLE_IDENTITY_NOT_VERIFIED",
-          message: "The Google sign-in could not be verified. Please sign in again.",
-        });
-      }
-
-      // Google proved the email above; invitations satisfy account approval,
-      // while membership is still granted only by explicit invitation acceptance.
-      const invited = await hasApprovalInvitation(sql, cleanEmail, req.get('x-invitation-token'));
-      let existingUser: any = await sql.get(`SELECT id, name, role, banned, "banReason", "banExpires" FROM "user" WHERE LOWER(email) = ?`, cleanEmail);
-      if (!existingUser) {
-        try {
-          await sql.run(`
-            INSERT INTO "user" (id, name, email, "emailVerified", image, role, banned, "banReason", "createdAt", "updatedAt")
-            VALUES (?, ?, ?, true, ?, 'user', ?, ?, ?, ?)
-          `, `usr_${crypto.randomUUID()}`, userName, cleanEmail, photoURL || null, !invited, invited ? null : 'PENDING_APPROVAL', now, now);
-        } catch (err) {
-          if (!isUniqueViolation(err)) throw err; // a concurrent sign-in of the same address created it first
-        }
-        existingUser = await sql.get(`SELECT id, name, role, banned, "banReason", "banExpires" FROM "user" WHERE LOWER(email) = ?`, cleanEmail);
-      }
-      if (existingUser.banReason === 'PENDING_APPROVAL' && invited) {
-        await sql.run('UPDATE "user" SET banned = false, "banReason" = NULL, "banExpires" = NULL, "updatedAt" = ? WHERE id = ?', now, existingUser.id);
-        existingUser.banned = false;
-        existingUser.banReason = null;
-        existingUser.banExpires = null;
-      }
-      if (isIdentityBanned(existingUser)) {
-        const pending = existingUser.banReason === 'PENDING_APPROVAL';
-        return res.status(403).json({ success: false, error: pending ? "ACCOUNT_PENDING_APPROVAL" : "ACCOUNT_DISABLED",
-          message: pending ? "Your account is waiting for manual superuser approval." : "This account is disabled." });
-      }
-      // Google verified this address, so the identity's email is verified.
-      await sql.run(`UPDATE "user" SET image = COALESCE(?, image), "emailVerified" = true, "updatedAt" = ? WHERE id = ?`, photoURL || null, now, existingUser.id);
-      const userId = existingUser.id;
-      const existingAcc: any = await sql.get(`SELECT id FROM account WHERE "userId" = ? AND "providerId" = 'google'`, userId);
-      if (!existingAcc) {
-        await sql.run(`
-          INSERT INTO account (id, "accountId", "providerId", "userId", "idToken", "createdAt", "updatedAt")
-          VALUES (?, ?, 'google', ?, ?, ?, ?)
-        `, `acc_${crypto.randomUUID()}`, cleanEmail, userId, idToken || null, now, now);
-      }
-      const sessionToken = crypto.randomBytes(32).toString("hex");
-      const sessionExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      await sql.run(`
-        INSERT INTO session (id, "expiresAt", token, "createdAt", "updatedAt", "ipAddress", "userAgent", "userId", "activeOrganizationId")
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
-      `, `sess_${crypto.randomUUID()}`, sessionExpiry, sessionToken, now, now, req.ip || "", String(req.headers["user-agent"] || ""), userId);
-
-      // 5. Set session cookie
-      res.cookie("better-auth.session_token", sessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
-
-      return res.json({
-        success: true,
-        sessionToken,
-        user: { id: userId, email: cleanEmail, name: existingUser.name || userName, photoURL: photoURL || null },
-      });
-    } catch (err: any) {
-      log.error("Error in /api/auth/google/sync-session:", err);
-      sendRouteError(req, res, err, "request failed", "Gagal menyinkronkan sesi Google ke Better Auth.", { status: 500, extra: { success: false } });
-    }
-  }
-);
-app.post(
-  ["/api/google-integration/connect", "/api/auth/google/connect"],
-  async (req: express.Request, res: express.Response) => {
-    if (!(await checkIsAdmin(req)).isAdmin) {
-      return res.status(403).json({ error: "Forbidden: only administrators can change the Google integration." });
-    }
-    try {
-      const { accessToken, refreshToken } = req.body || {};
-      const token = accessToken || req.headers["x-google-access-token"];
-      if (!token && !refreshToken) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            error: "Access token atau Refresh token Google diperlukan.",
-          });
-      }
-      if (token) db.googleConfig.accessToken = token;
-      if (refreshToken) db.googleConfig.refreshToken = refreshToken;
-      db.googleConfig.isConnected = true;
-      db.googleConfig.lastSyncTime = new Date().toISOString();
-      await saveDb();
-      if (token) {
-        backupLocalFilesToGoogleDrive(token).catch((e) => {
-          log.warn(
-            "[Google Auth] Background backup error on connect:",
-            e?.message,
-          );
-        });
-      }
-      res.json({
-        success: true,
-        isConnected: true,
-        lastSyncTime: db.googleConfig.lastSyncTime,
-        config: redactProviderConfig(db.googleConfig),
-      });
-    } catch (err) {
-      sendRouteError(req, res, err, "request failed", "Gagal menyinkronkan status koneksi Google.", { status: 500, extra: { success: false } });
-    }
-  },
-);
-app.post("/api/google-integration/backup", async (req: express.Request, res: express.Response) => {
-  if (!(await checkIsAdmin(req)).isAdmin) {
-    return res.status(403).json({ error: "Forbidden: only administrators can run the Google Drive backup." });
-  }
-  res.json({ success: true, ...(await backupLocalFilesToGoogleDrive(req.headers["x-google-access-token"] as string | undefined)) });
-});
-app.post(
-  ["/api/google-integration/disconnect", "/api/auth/google/disconnect"],
-  async (req: express.Request, res: express.Response) => {
-    if (!(await checkIsAdmin(req)).isAdmin) {
-      return res.status(403).json({ error: "Forbidden: only administrators can change the Google integration." });
-    }
-    try {
-      db.googleConfig.accessToken = "";
-      db.googleConfig.refreshToken = "";
-      db.googleConfig.isConnected = false;
-      db.googleConfig.lastSyncTime = new Date().toISOString();
-      await saveDb();
-      res.json({
-        success: true,
-        isConnected: false,
-        message: "Akun Google berhasil diputuskan dari konfigurasi server.",
-      });
-    } catch (err) {
-      sendRouteError(req, res, err, "request failed", "Gagal memutuskan akun Google di server.", { status: 500, extra: { success: false } });
-    }
-  },
-);
 app.post("/api/ai/test-key", async (req: express.Request, res: express.Response) => {
   const { apiKey, model } = req.body;
   const keyToTest = (apiKey && !isMaskedSecret(apiKey) ? String(apiKey) : getEffectiveGeminiApiKey()).trim();
@@ -1064,139 +798,6 @@ app.post("/api/ai/test-key", async (req: express.Request, res: express.Response)
     return res.status(400).json({ error: formatGeminiError(err) });
   }
 });
-/* Google synchronization is a placeholder in this release (PRD §6.5): honest, scoped, no fake success. */
-app.post(["/api/google-integration/sync", "/api/google-integration/sync-flush"], (req: express.Request, res: express.Response) =>
-  sendError(req, res, 409, "SYNC_UNAVAILABLE", "Google synchronization is not available in this release."));
-app.get("/api/google-integration/sync-status", (req: express.Request, res: express.Response) => {
-  res.setHeader("Cache-Control", "no-store");
-  res.json({ organizationId: getRequestTenantId(req), active: false, queueLength: 0, status: "unavailable", syncSupported: false });
-});
-app.post("/api/google-integration/auto-provision-master", async (req: express.Request, res: express.Response) => {
-  const adminCheck = await checkIsAdmin(req);
-  if (!adminCheck.isAdmin) {
-    return res
-      .status(403)
-      .json({
-        error:
-          "Forbidden: Hanya Admin/Superuser yang berhak membuat Master Root.",
-      });
-  }
-  const token = await resolveActiveGoogleToken(
-    req.headers["x-google-access-token"] || req.body?.accessToken,
-  );
-  if (!token && !hasServiceAccountCredentials()) {
-    return res
-      .status(400)
-      .json({
-        error:
-          "Koneksi Google belum aktif. Hubungkan akun Google terlebih dahulu.",
-      });
-  }
-  try {
-    const rootFolderLink = await createDriveFolder(
-      "Master Google Drive Storage (LMS)",
-      void 0,
-      token,
-    );
-    const rootFolderId =
-      extractFolderIdFromLink(rootFolderLink) || rootFolderLink;
-    let spreadsheetId = "";
-    const sheet = await createSpreadsheetInFolder(
-      "Master Spreadsheet Database (LMS)",
-      rootFolderId,
-      token,
-    );
-    if (sheet && sheet.id) {
-      spreadsheetId = sheet.id;
-    }
-    if (!spreadsheetId) {
-      throw new Error("Gagal membuat Spreadsheet Database di dalam folder.");
-    }
-    db.googleConfig.driveFolderId = rootFolderId;
-    db.googleConfig.spreadsheetId = spreadsheetId;
-    if (token) {
-      db.googleConfig.accessToken = token;
-    }
-    try {
-      await autoEnsureTenantGoogleResources(token, true);
-    } catch (orgErr) {
-      log.warn(
-        "[AutoProvision] Warning auto-ensuring org folders:",
-        orgErr?.message,
-      );
-    }
-    await saveDb();
-    return res.json({
-      success: true,
-      message:
-        "Master Root Folder, Spreadsheet Database, serta Folder Organisasi dan Sheet Database Organisasi berhasil dibuat otomatis di Google Drive.",
-      driveFolderId: rootFolderId,
-      masterSpreadsheetId: spreadsheetId,
-      spreadsheetId,
-      tenants: db.tenants,
-    });
-  } catch (err) {
-    log.error("Auto provision master root error:", err);
-    return sendRouteError(req, res, err, "request failed", "Gagal membuat Master Root secara otomatis.", { status: 500 });
-  }
-});
-app.post("/api/tenants/auto-provision-folders", async (req: express.Request, res: express.Response) => {
-  const adminCheck = await checkIsAdmin(req);
-  if (!adminCheck.isAdmin) {
-    return res
-      .status(403)
-      .json({
-        error:
-          "Forbidden: Hanya Admin/Superuser yang berhak menyinkronkan folder organisasi.",
-      });
-  }
-  const token = await resolveActiveGoogleToken(
-    req.headers["x-google-access-token"] || req.body?.accessToken,
-  );
-  if (!token && !hasServiceAccountCredentials()) {
-    return res
-      .status(400)
-      .json({
-        error:
-          "Koneksi Google belum aktif. Hubungkan akun Google terlebih dahulu.",
-      });
-  }
-  try {
-    const result = await autoEnsureTenantGoogleResources(token);
-    return res.json({
-      success: true,
-      message: `Berhasil menyinkronkan folder organisasi ke Master Root (${result.updatedCount} organisasi disinkronkan).`,
-      tenants: db.tenants,
-    });
-  } catch (err) {
-    log.error("Auto provision tenant folders error:", err);
-    return sendRouteError(req, res, err, "request failed", "Gagal menyinkronkan folder organisasi ke Master Root.", { status: 500 });
-  }
-});
-const provisionFoldersHandler = __name(async (req: express.Request, res: express.Response) => {
-  const adminCheck = await checkIsAdmin(req);
-  if (!adminCheck.isAdmin) {
-    return res
-      .status(403)
-      .json({ error: "Forbidden: Only Admins can provision folders." });
-  }
-  const token = await resolveActiveGoogleToken(
-    req.headers["x-google-access-token"] || req.body?.accessToken,
-  );
-  try {
-    const stats = await ensureAllPartnersFolders(token);
-    await saveDb();
-    return res.json({
-      success: true,
-      message: `4 Subfolder Kategori (Folder Contract, Folder Invoice & Billing, Folder IO, Folder DD) berhasil dibuat/diperbarui untuk ${db.partners.length} partner.`,
-      stats,
-    });
-  } catch (err) {
-    return sendRouteError(req, res, err, "request failed", "Gagal membuat folder kategori.", { status: 500 });
-  }
-}, "provisionFoldersHandler");
-app.post("/api/google-integration/provision-folders", provisionFoldersHandler);
-app.post("/api/partners/provision-folders", provisionFoldersHandler);
 /**
  * Reset & organization setup (superuser only).
  *
@@ -1372,24 +973,6 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       : `The application was reset. Organization "${dataset.tenants[0].name}" is ready to use.`,
     defaultOrgId: primaryTenantId,
   });
-});
-app.get("/api/google-service-account/status", async (req: express.Request, res: express.Response) => {
-  try {
-    const creds = loadServiceAccountCredentials();
-    const sheets = getGoogleSheetsClient(creds);
-    res.json({
-      success: true,
-      serviceAccount: {
-        client_email: creds.client_email,
-        project_id: creds.project_id,
-        type: creds.type || "service_account",
-      },
-      message:
-        "Otentikasi Google Service Account untuk Google Sheets API berhasil dikonfigurasi.",
-    });
-  } catch (err: any) {
-    sendRouteError(req, res, err, "service account setup failed", "Gagal mengonfigurasi Google Service Account.", { extra: { success: false } });
-  }
 });
 /** Bulk-import row failure text: the cause is logged, the response carries only the row's generic message. */
 function bulkRowFailure(err: unknown, fallback: string) {
@@ -2034,25 +1617,6 @@ app.delete("/api/tenants/:id", async (req: express.Request, res: express.Respons
   await refreshTenantProjection();
   return res.json({ success: true, tenants: db.tenants });
 });
-/** Legacy Integrations write: validated folder AND sheet mapping through the canonical store. */
-app.post("/api/tenants/:id/setup-google", async (req: express.Request, res: express.Response) => {
-  const ctx = orgContextOf(req);
-  const identity = identityOf(req);
-  const current = await readIntegration(sql, ctx.organizationId);
-  const body: any = { expectedVersion: typeof req.body?.expectedVersion === "number" ? req.body.expectedVersion : current.version };
-  if (req.body?.driveFolderId !== undefined) body.driveFolderId = req.body.driveFolderId || null;
-  if (req.body?.spreadsheetId !== undefined) body.spreadsheetId = req.body.spreadsheetId || null;
-  try {
-    await patchIntegration(sql, ctx.organizationId, body, auditActorFor(req, identity, ctx));
-    await onOrganizationChanged(ctx.organizationId);
-    return res.json({ success: true, tenant: findTenant(ctx.organizationId) });
-  } catch (err: any) {
-    if (err instanceof ApiError) return sendError(req, res, err.status, err.error, err.message);
-    throw err;
-  }
-});
-app.post("/api/tenants/:id/sync-google", (req: express.Request, res: express.Response) =>
-  sendError(req, res, 409, "SYNC_UNAVAILABLE", "Google synchronization is not available in this release."));
 /** Mask all but the last `keep` characters, e.g. bank account numbers. */
 function maskTail(value: unknown, keep = 4): string {
   const text = String(value ?? "").trim();
@@ -2420,6 +1984,8 @@ app.use(createSearchRouter());
 app.use(createActivityLogsRouter());
 app.use(createInitDataRouter());
 app.use(createSystemSettingsRouter());
+app.use(createGoogleIntegrationRouter());
+app.use(createGoogleAuthRouter());
 app.use("/api/auth-console", authConsoleRouter);
 app.all("/api/*", (req: express.Request, res: express.Response) => {
   sendApiError(req, res, 404, "ROUTE_NOT_FOUND", `API route not found: ${req.method} ${req.path}`);
@@ -2430,6 +1996,5 @@ export async function drain() {
   await stopReminderScheduler();
   await coreSaver.idle();
 }
-/** Tests only: replaces the Google token verifier. */
-export function setGoogleTokenVerifier(verifier: typeof verifyGoogleToken) { verifyGoogleToken = verifier; }
 export { app, getFreshGoogleAccessToken, isMatchingOrg, resolveActiveGoogleToken };
+export { setGoogleTokenVerifier } from "./googleTokenVerifier";
