@@ -1,4 +1,5 @@
 import { normalizeSpendingMonths } from './spendingMonths';
+import { createActivityLogsRouter } from "./routes/activityLogs";
 import { createSearchRouter } from "./routes/search";
 import { createNotificationsRouter } from "./routes/notifications";
 import { createTemplatesRouter } from "./routes/templates";
@@ -754,13 +755,6 @@ app.post("/api/user/reset-password", async (req: express.Request, res: express.R
     log.error("Server error resetting password:", err);
     sendRouteError(req, res, err, "request failed", "Terjadi kesalahan saat mereset password.", { status: 500 });
   }
-});
-/** Operational activity for the selected organization only (History drawer, tenant.audit.read). */
-app.get("/api/activity-logs", async (req: express.Request, res: express.Response) => {
-  const page = await listActivity(sql, getRequestTenantId(req), { limit: req.query.limit, offset: req.query.offset });
-  // Body stays the array older clients expect (newest first); paging metadata travels in headers.
-  res.set({ "X-Total-Count": String(page.total), "X-Limit": String(page.limit), "X-Offset": String(page.offset) });
-  res.json(page.rows);
 });
 app.get("/api/exchange-rates", async (req: express.Request, res: express.Response) => {
   try {
@@ -2842,6 +2836,7 @@ app.use(createUploadsRouter());
 app.use(createTemplatesRouter());
 app.use(createNotificationsRouter());
 app.use(createSearchRouter());
+app.use(createActivityLogsRouter());
 app.use("/api/auth-console", authConsoleRouter);
 app.all("/api/*", (req: express.Request, res: express.Response) => {
   sendApiError(req, res, 404, "ROUTE_NOT_FOUND", `API route not found: ${req.method} ${req.path}`);
