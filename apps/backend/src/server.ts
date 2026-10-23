@@ -1,4 +1,5 @@
 import { normalizeSpendingMonths } from './spendingMonths';
+import { createSearchRouter } from "./routes/search";
 import { createNotificationsRouter } from "./routes/notifications";
 import { createTemplatesRouter } from "./routes/templates";
 import { createUploadsRouter } from "./routes/uploads";
@@ -760,19 +761,6 @@ app.get("/api/activity-logs", async (req: express.Request, res: express.Response
   // Body stays the array older clients expect (newest first); paging metadata travels in headers.
   res.set({ "X-Total-Count": String(page.total), "X-Limit": String(page.limit), "X-Offset": String(page.offset) });
   res.json(page.rows);
-});
-app.get("/api/search", async (req: express.Request, res: express.Response) => {
-  const organizationId = getRequestTenantId(req);
-  const kinds: Record<string, RecordKind> = { partners: 'partner', contracts: 'contract', insertion_orders: 'io', spendings: 'spending', evaluations: 'evaluation' };
-  const hits = await searchBusinessRows(sql, organizationId, String(req.query.q || '').slice(0, 1000));
-  const permitted = [];
-  for (const hit of hits) {
-    const kind = kinds[hit.entity_type];
-    if (!kind) continue;
-    const record = (await readBusinessRows(sql, hit.entity_type, organizationId, [hit.entity_id]))[0];
-    if (record && recordVisible(orgContextOf(req), scopeOf(req), kind, record)) permitted.push(hit);
-  }
-  res.json({ results: permitted.slice(0, 50), total: permitted.length });
 });
 app.get("/api/exchange-rates", async (req: express.Request, res: express.Response) => {
   try {
@@ -2853,6 +2841,7 @@ app.use(createIoRouter());
 app.use(createUploadsRouter());
 app.use(createTemplatesRouter());
 app.use(createNotificationsRouter());
+app.use(createSearchRouter());
 app.use("/api/auth-console", authConsoleRouter);
 app.all("/api/*", (req: express.Request, res: express.Response) => {
   sendApiError(req, res, 404, "ROUTE_NOT_FOUND", `API route not found: ${req.method} ${req.path}`);
