@@ -1,3 +1,5 @@
+import { withCurrentUiTextKeys } from './uiTextKeys';
+import { createInitDataRouter } from "./routes/initData";
 import { normalizeSpendingMonths } from './spendingMonths';
 import { createActivityLogsRouter } from "./routes/activityLogs";
 import { createSearchRouter } from "./routes/search";
@@ -780,43 +782,6 @@ app.get("/api/exchange-rate-historical", async (req: express.Request, res: expre
   } catch (err) {
     sendRouteError(req, res, err, "request failed", "Could not load the exchange rate.", { status: 500 });
   }
-});
-
-// Aggregation Endpoint for Fast Initial Data Load (replaces multi-endpoint polling)
-/**
- * Operational workspace payload (PRD §11.4): one verified organization,
- * department-scoped before any client aggregation, no tenant directory and
- * no provider configuration — only non-sensitive service availability.
- */
-/** Admin UI-text overrides saved before the field rename carry old keys; they follow their texts to the new keys. */
-function withCurrentUiTextKeys(overrides: Record<string, Record<string, string>>) {
-  return Object.fromEntries(Object.entries(overrides).map(([language, texts]) => [
-    language,
-    Object.fromEntries(Object.entries(texts || {})
-      .filter(([key]) => renameLegacyKeyTokens(key) === key || !(renameLegacyKeyTokens(key) in texts))
-      .map(([key, text]) => [renameLegacyKeyTokens(key), text])),
-  ]));
-}
-app.get("/api/init-data", async (req: express.Request, res: express.Response) => {
-  await refreshContractLifecycles();
-  const organizationId = getRequestTenantId(req);
-  const settings = getTenantSettings(organizationId);
-  res.setHeader("Cache-Control", "no-store");
-  res.json({
-    organizationId,
-    contracts: await scopedRecords(req, "contract", db.contracts),
-    ios: await scopedRecords(req, "io", db.ios),
-    partners: await scopedRecords(req, "partner", db.partners),
-    notifications: await scopedRecords(req, "notification", db.notifications),
-    evaluations: await scopedRecords(req, "evaluation", db.evaluations),
-    spendings: await scopedRecords(req, "spending", db.spendings),
-    services: {
-      aiAvailable: Boolean(getEffectiveGeminiApiKey()) && settings.modules.aiAssistant,
-      googleUploadsAvailable: Boolean(sanitizeParentFolderId(db.googleConfig?.driveFolderId)) &&
-        Boolean(db.googleConfig?.accessToken || db.googleConfig?.refreshToken || hasServiceAccountCredentials()),
-    },
-    timestamp: Date.now(),
-  });
 });
 
 app.use("/api", createGoogleCredentialsRouter(googleCredentials));
@@ -2837,6 +2802,7 @@ app.use(createTemplatesRouter());
 app.use(createNotificationsRouter());
 app.use(createSearchRouter());
 app.use(createActivityLogsRouter());
+app.use(createInitDataRouter());
 app.use("/api/auth-console", authConsoleRouter);
 app.all("/api/*", (req: express.Request, res: express.Response) => {
   sendApiError(req, res, 404, "ROUTE_NOT_FOUND", `API route not found: ${req.method} ${req.path}`);
