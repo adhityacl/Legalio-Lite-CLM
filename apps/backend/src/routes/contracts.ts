@@ -1,6 +1,7 @@
+import { nextEntityId } from '../ids';
 import * as bodySchemas from '../schemas';
 import { resolveActiveGoogleToken, getOrgFolderId, getPartnerCategoryFolderId } from '../googleDrive';
-import { db, saveDb, generateNextContractId, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { db, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { getRequestTenantId, scopedRecords, addActivityLog, assertRecordAccess, assertRecordWritable, isMatchingOrg, logActivity } from '../recordAccess';
 import { createGoogleDocInFolder } from '../lib/googleDriveSync';
 import { sendRouteError } from '../apiErrors';
@@ -623,7 +624,7 @@ app.post("/api/contracts", validateBody(bodySchemas.contractCreateBody, { requir
   const { status: finalStatus, daysRemaining: diffDays } = contractLifecycle(lifecycleDraft, getTenantSettings(targetOrgId));
   const terminationDocument = terminationFile ? await persistContractTerminationFile(req, { organizationId: targetOrgId, partner_id }, terminationFile) : undefined;
   const newContract = {
-    contract_id: generateNextContractId(),
+    contract_id: await nextEntityId("contract"),
     organizationId: targetOrgId,
     document_type: document_type || "Master Agreement",
     parent_contract_id:

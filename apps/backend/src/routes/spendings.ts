@@ -1,7 +1,8 @@
+import { nextEntityId } from '../ids';
 import { normalizeSpendingMonths } from '../spendingMonths';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity } from '../recordAccess';
-import { db, countryNameForPrompt, saveDb, generateNextSpendingId, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { db, countryNameForPrompt, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { normalizeCurrencyCode, convertToUsdWithFallback, getDefaultUsdRate } from '@legalio/shared/currencyUtils';
 import { tenantDefaultCurrency, aiPolicyContext, findTenant } from '../tenantPolicy';
 import { upload } from '../uploadMiddleware';
@@ -326,7 +327,7 @@ app.post("/api/partner-spendings", validateBody(bodySchemas.spendingCreateBody, 
     }
   }
   const newSpending = {
-    id: generateNextSpendingId(),
+    id: await nextEntityId("spending"),
     organizationId: targetOrgId,
     vendor_id: partner ? partner.partner_id : vendor_id || void 0,
     vendor_name,

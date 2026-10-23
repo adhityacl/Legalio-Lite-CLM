@@ -32,6 +32,12 @@ A fresh install has no administrator, and the first visitor creates it on the se
 
 Upgrade notes: schema changes are versioned migrations (see POSTGRES_STORAGE.md). The server applies pending ones at boot under an advisory lock; to run them ahead of a deploy use `npm run migrate` (or `node apps/backend/dist/migrate.cjs` in the image) and check with `npm run migrate:status`. Existing databases adopt `0001_baseline`..`0005` without changes. Tables `reminder_ledger`, `upload_owners` and `ai_usage` are created automatically (additive). On first start the existing upload links are backfilled into `upload_owners` and earlier "Reminder Nd" notifications are copied into the ledger as sent; provider secrets in `app_settings` are re-encrypted by the first save. `audit_log` rejects UPDATE/DELETE; a deliberate maintenance transaction can lift that with `SELECT set_config('legalio.allow_audit_mutation', 'on', true)`. Activity log rows now live only in `activity_logs` (no 500-row cap).
 
+### Schema migrations and ids (Phase 2)
+
+- Migrations run at boot under an advisory lock, or ahead of a deploy with `npm run migrate` (`node apps/backend/dist/migrate.cjs` in the image); `npm run migrate:status` lists them and exits 1 while any is pending. See POSTGRES_STORAGE.md.
+- Record ids (`P0001`, `C0001`, `IO0001`, `SP0001`, `EVAL-2026-001`) now come from PostgreSQL sequences created by migration `0006_id_sequences`. At every start each sequence is moved past the highest number stored, so existing data continues without gaps; numbers of deleted records are no longer reused.
+- API request bodies for partners, contracts, IOs, spendings and evaluations are validated and whitelisted (HTTP 400 `VALIDATION_FAILED` with `issues`); errors use `{ error, code, message, status, requestId }` and no longer carry internal error text. Quote the `requestId` to find the cause in the logs.
+
 ### Health endpoints
 
 - `GET /api/health` is cheap liveness (process answers).

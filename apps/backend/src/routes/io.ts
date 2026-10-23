@@ -1,6 +1,7 @@
+import { nextEntityId } from '../ids';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, isMatchingOrg, logActivity } from '../recordAccess';
-import { db, countryNameForPrompt, saveDb, generateNextIOId, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { db, countryNameForPrompt, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { normalizeCurrencyCode, convertToUsdWithFallback, getDefaultUsdRate } from '@legalio/shared/currencyUtils';
 import { tenantDefaultCurrency, aiPolicyContext, getTenantSettings, findTenant, computeLifecycle } from '../tenantPolicy';
 import { upload } from '../uploadMiddleware';
@@ -352,7 +353,7 @@ app.post("/api/ios", validateBody(bodySchemas.ioCreateBody, { requiredMessage: "
   }
   const { status, daysRemaining: diffDays } = computeLifecycle(targetOrgId, end_date, "Active", false);
   const newIO = {
-    io_id: generateNextIOId(),
+    io_id: await nextEntityId("io"),
     organizationId: targetOrgId,
     contract_id: contract_id || void 0,
     contract_number: contract ? contract.contract_number : "-",

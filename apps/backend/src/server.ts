@@ -25,6 +25,7 @@ import { auth as betterAuthInstance, loadCoreData, reloadAuthConfiguration } fro
 import { hasServiceAccountCredentials } from "./lib/googleServiceAccountAuth";
 import { componentLog, errorResponder, requestLogging } from "./logger";
 import { mailTemplates, sendPlatformMail } from "./mailHelpers";
+import { syncIdSequences } from "./ids";
 import { coreSaver, db, demoData, migrateLegacyRecords, refreshTenantProjection, saveDb, sanitizePartnerTags, syncAdderNames } from "./memoryDb";
 import { resetSyncCache } from "./normalizedCoreStore";
 import { createOrganizationAdminRouter } from "./organizationAdminRoutes";
@@ -206,6 +207,7 @@ export async function init() {
   }
   syncAdderNames();
   await saveDb();
+  await syncIdSequences();
   await recalculateStatuses();
   await seedReminderLedger();
   reminderScheduler.start();

@@ -1,7 +1,8 @@
+import { nextEntityId } from '../ids';
 import { generateRedlineAnalysis } from '../redlineAnalysis';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity } from '../recordAccess';
-import { db, sanitizePartnerTags, sanitizeCountryCode, countryNameForPrompt, sanitizeIdentifiers, saveDb, generateNextPartnerId, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { db, sanitizePartnerTags, sanitizeCountryCode, countryNameForPrompt, sanitizeIdentifiers, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { upload } from '../uploadMiddleware';
 import { ensureAiAvailable, getValidAiModel, generateContentWithRetryAndFallback, withDocumentTranscriptField, extractAndCacheDocumentTranscript } from '../aiClient';
 import { computeInputSha256, globalOcrCache, buildCheapOcrContents } from '../lib/cheapOcrPipeline';
@@ -271,7 +272,7 @@ app.post("/api/partners", validateBody(bodySchemas.partnerCreateBody, { required
   const partnerCountry = sanitizeCountryCode(country);
   const defaultDD = normalizePartnerDocuments({ organizationId: targetOrgId, country: partnerCountry, dd_documents: [] });
   const newPartner = {
-    partner_id: generateNextPartnerId(),
+    partner_id: await nextEntityId("partner"),
     organizationId: targetOrgId,
     partner_name,
     codename: codename || "",

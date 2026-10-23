@@ -1,3 +1,4 @@
+import { nextEntityId } from '../ids';
 import { computeEvaluationScore } from '../evaluationScoring';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity } from '../recordAccess';
@@ -130,7 +131,7 @@ app.post("/api/partner-evaluations", validateBody(bodySchemas.evaluationCreateBo
     pricing,
   );
   const newEval = {
-    id: `EVAL-${new Date().getFullYear()}-${String((db.evaluations?.length || 0) + 1).padStart(3, "0")}`,
+    id: await nextEntityId("evaluation"),
     organizationId: targetOrgId,
     review_date,
     partner_id,

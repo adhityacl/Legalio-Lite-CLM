@@ -1,7 +1,8 @@
+import { nextEntityId } from '../ids';
 import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
 import { getRequestTenantId, isMatchingOrg, scopeOf, addActivityLog } from '../recordAccess';
 import { tenantDefaultCurrency, normalizePartnerDocuments, computeDueDiligenceStatus } from '../tenantPolicy';
-import { db, generateNextPartnerId, sanitizeCountryCode, sanitizeIdentifiers, sanitizePartnerTags, generateNextContractId, generateNextIOId, generateNextSpendingId } from '../memoryDb';
+import { db, sanitizeCountryCode, sanitizeIdentifiers, sanitizePartnerTags } from '../memoryDb';
 import { normalizeCurrencyCode, convertToUsdWithFallback } from '@legalio/shared/currencyUtils';
 import { computeEvaluationScore } from '../evaluationScoring';
 import { normalizeSpendingMonths } from '../spendingMonths';
@@ -135,7 +136,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
             ? `${(row.pic_email || "").trim()} / ${(row.pic_phone || "").trim()}`
             : "");
         const newPartner = {
-          partner_id: generateNextPartnerId(),
+          partner_id: await nextEntityId("partner"),
           partner_name: name,
           codename: partnerChannel,
           partner_channel: partnerChannel,
@@ -248,7 +249,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           continue;
         }
         const newContract = {
-          contract_id: generateNextContractId(),
+          contract_id: await nextEntityId("contract"),
           organizationId: tenantId,
           contract_number: nomor,
           contract_title: row.contract_title || nomor,
@@ -338,7 +339,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
       }
       try {
         const newIO = {
-          io_id: generateNextIOId(),
+          io_id: await nextEntityId("io"),
           organizationId: tenantId,
           io_number: nomor,
           io_title: row.io_title || nomor,
@@ -429,7 +430,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
       try {
         const year = (reviewDate.match(/^\d{4}/) || [String(new Date().getFullYear())])[0];
         const newEval = {
-          id: `EVAL-${year}-${String(db.evaluations.length + 1).padStart(3, "0")}`,
+          id: await nextEntityId("evaluation", year),
           organizationId: tenantId,
           review_date: reviewDate,
           year,
@@ -499,7 +500,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         const totalAmount = bulkNumber(row.total_amount);
         const currency = normalizeCurrencyCode(row.currency, tenantCurrency);
         const newSpending = {
-          id: generateNextSpendingId(),
+          id: await nextEntityId("spending"),
           organizationId: tenantId,
           vendor_id: partner?.partner_id || "",
           vendor_name: vendorName,
