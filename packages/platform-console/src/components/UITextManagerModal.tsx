@@ -1,6 +1,6 @@
 import { ModalFrame } from './ui/modal-frame';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { LANGUAGE_OPTIONS, useLanguage, type Language } from '../context/LanguageContext';
 import { useConfirm } from '../context/ConfirmDialogContext';
 import { AlertCircle, Check, Download, Edit2, FileSpreadsheet, Languages, RotateCcw, Search, Sparkles, Upload, X } from 'lucide-react';
@@ -28,7 +28,7 @@ const BADGE = 'text-xs font-normal px-g13 py-g2 rounded-full border inline-flex 
 
 /** Built-in and customised UI texts in every language, with inline editing and CSV round-trip. */
 export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen = true, onClose }) => {
-  const { t, translations, customTranslations, exportToCSV, importFromCSV, resetCustomTranslations, updateSingleTranslation, translationsBusy, translationsError } =
+  const { t, translations, loadAllLanguages, customTranslations, exportToCSV, importFromCSV, resetCustomTranslations, updateSingleTranslation, translationsBusy, translationsError } =
     useLanguage();
   const confirmDialog = useConfirm();
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,6 +38,10 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
   const [rowsPerPage, setRowsPerPage] = useState(5);
   // FileUpload keeps accepted files; remount after each import so the same CSV can be chosen again.
   const [importKey, setImportKey] = useState(0);
+
+  useEffect(() => {
+    if (isOpen) void loadAllLanguages();
+  }, [isOpen, loadAllLanguages]);
 
   if (!isOpen) return null;
 

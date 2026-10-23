@@ -1,8 +1,42 @@
 /**
  * Simplified Chinese (简体中文) catalog. Must contain every key of the Indonesian and
- * English catalogs — enforced by tests/i18n.test.ts.
+ * English catalogs — enforced by i18nCoverage.test.ts.
  */
 export const ZH_TRANSLATIONS: Record<string, string> = {
+    // Database view (keys keep their historical "sqlite." prefix).
+    "sqlite.read_only_table": "只读表",
+    "sqlite.edit_start_hint": "选择一行，然后点击“编辑行”以修改受支持的字段。",
+    "sqlite.protected_table_hint": "此表已禁用编辑。请选择 partners 或 contracts 等业务表来编辑其受支持的字段。",
+    "sqlite.editable": "可编辑字段",
+    "sqlite.edit_row": "编辑行",
+    "sqlite.edit_hint": "编辑下方字段后保存。主键和系统字段已锁定。",
+    "sqlite.saved": "更改已保存",
+    "sqlite.save_failed": "无法保存更改。",
+    "sqlite.number_required": "请输入有效数字",
+    "sqlite.read_only": "只读",
+    "sqlite.load_failed": "无法加载数据库。",
+    "sqlite.copied": "已复制到剪贴板",
+    "sqlite.copy_failed": "剪贴板不可用，请手动选择并复制该值。",
+    "sqlite.search_tables": "查找表",
+    "sqlite.select_table": "选择表",
+    "sqlite.no_tables": "未找到表",
+    "sqlite.records": "记录",
+    "sqlite.export_page": "导出当前页 CSV",
+    "sqlite.toggle_details": "切换行详情",
+    "sqlite.view": "数据库视图",
+    "sqlite.data": "数据",
+    "sqlite.structure": "结构",
+    "sqlite.field": "字段",
+    "sqlite.type": "类型",
+    "sqlite.constraints": "约束",
+    "sqlite.default": "默认值",
+    "sqlite.select_row": "选择行",
+    "sqlite.row_details": "行详情",
+    "sqlite.search_fields": "查找字段",
+    "sqlite.select_row_hint": "选择单元格或行以查看其值。",
+    "sqlite.copy_row": "复制行 JSON",
+    "sqlite.no_fields": "未找到字段",
+    "sqlite.copy_value": "复制值",
     // Spending form and monthly allocation.
     'spending.partner_details': "合作伙伴信息",
     'spending.partner_name': "合作伙伴名称",
