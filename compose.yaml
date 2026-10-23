@@ -4,10 +4,29 @@ services:
       context: .
       dockerfile: apps/backend/Dockerfile
     env_file: apps/backend/.env
+    environment:
+      DATABASE_URL: postgres://legalio:${POSTGRES_PASSWORD:-legalio}@postgres:5432/legalio
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
       - legalio-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: legalio
+      POSTGRES_DB: legalio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-legalio}
+    volumes:
+      - legalio-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U legalio -d legalio"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
   frontend:
     build:
@@ -20,3 +39,4 @@ services:
     restart: unless-stopped
 volumes:
   legalio-data:
+  legalio-pg:

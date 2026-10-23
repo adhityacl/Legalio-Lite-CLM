@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](apps/frontend/package.json)
 [![Turborepo](https://img.shields.io/badge/Turborepo-2-EF4444?logo=turborepo&logoColor=white)](turbo.json)
-[![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3-003B57?logo=sqlite&logoColor=white)](https://github.com/WiseLibs/better-sqlite3)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?logo=postgresql&logoColor=white)](POSTGRES_STORAGE.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#-feedback-and-contributing)
 
 [![Legalio in 15 seconds: partners, contracts, AI assistance, spending and key dates](assets/video/legalio-preview.gif)](assets/video/legalio-intro.mp4)
@@ -20,7 +20,7 @@
 - **Workspace search**: search a vendor name to find related contracts, service orders/IOs, spending invoices and partner evaluations within your access. Select a result to open its details or the matching spending list.
 - **Multi-tenant with role-based access**: organizations, departments and roles (admin, manager, editor, viewer), enforced on the server.
 - **AI assistance**: Google Gemini reads contracts, partner documents and invoices, drafts due diligence notes and generates templates.
-- **Standalone system console** (`/sys`) for superusers: accounts, organizations, Google credentials, AI model, SMTP, UI texts, database browser, backup and restore.
+- **Standalone system console** (`/sys`) for superusers: accounts, organizations, Google credentials, Tencent COS file storage, AI model, SMTP and UI texts.
 - **English, Bahasa Indonesia and Simplified Chinese** out of the box.
 
 
@@ -28,7 +28,7 @@
 
 Legalio is a contract lifecycle management (CLM) application for legal, procurement and finance teams who track many partners at once. It keeps every partner, contract, service order, invoice and evaluation in one place. It reminds you before notice periods run out and gives each organization its own workspace, branding and access rules.
 
-The app runs as a single Node.js server with an SQLite database file, so it can be self-hosted on one machine without extra infrastructure. The interface is built with React 19 and a design system based on [Moduix](https://moduix.dev) (Ark UI) components, sized on a golden-ratio scale.
+The app runs as a single Node.js server backed by PostgreSQL, with uploaded files stored in Tencent COS. The Docker setup includes PostgreSQL, so it can be self-hosted on one machine. See [POSTGRES_STORAGE.md](POSTGRES_STORAGE.md) for storage and backup details. The interface is built with React 19 and a design system based on [Moduix](https://moduix.dev) (Ark UI) components, sized on a golden-ratio scale.
 
 
 ![Legalio dashboard](assets/screenshots/dashboard.png)
@@ -47,11 +47,19 @@ Start the app and open **http://localhost:3000**:
 npm run dev
 ```
 
-On the first visit, confirm the website's public URL and create the superuser
-account. The URL starts with the address you opened; include `http://` or
-`https://` and the public port if needed. Setup saves it in the installation
-database and applies it to authentication immediately, without a restart. If you
-enter a different URL, setup sends you there to sign in. A demo workspace
+On the first visit, onboarding takes two steps:
+
+1. **Connect PostgreSQL** (host, port, user, password, database, SSL). This step
+   is skipped when `DATABASE_URL` is set, as in Docker. The app creates its
+   schema and starts without a restart.
+2. **Confirm the website's public URL, create the superuser account and enter
+   the Tencent COS bucket** (SecretId, SecretKey, bucket, region and optional
+   prefix) used for uploaded files. The bucket is tested before it is saved.
+
+The URL starts with the address you opened; include `http://` or `https://` and
+the public port if needed. Setup saves it in the installation database and
+applies it to authentication immediately, without a restart. If you enter a
+different URL, setup sends you there to sign in. A demo workspace
 (*Bank Mindiri*, with five partners and their contracts) is loaded so you can
 explore right away.
 
@@ -72,7 +80,7 @@ The system console for superusers is at **http://localhost:3000/sys**.
 
 ## ⬇️ Installation
 
-Requirements: **Node.js 20.19 or newer** (22 LTS recommended) and npm. It runs on Linux, macOS and Windows (WSL).
+Requirements: **Node.js 20.19 or newer** (22 LTS recommended) and npm, **PostgreSQL 14 or newer** (or the `postgres` service in `compose.yaml`) and a **Tencent COS bucket** for uploaded files. It runs on Linux, macOS and Windows (WSL).
 
 ```bash
 git clone https://github.com/adhityacl/NEW-CLM.git
@@ -81,9 +89,9 @@ npm install
 npm run dev
 ```
 
-`npm install` also creates `apps/backend/.env` with a random `BETTER_AUTH_SECRET`, so no configuration is needed to start. The Gemini key, SMTP and Google credentials are set later from the system console.
+`npm install` also creates `apps/backend/.env` with a random `BETTER_AUTH_SECRET`. Keep that secret: it also encrypts the stored Google and COS credentials. The database connection is entered on the first visit, or set with `DATABASE_URL` in `apps/backend/.env`. The Gemini key, SMTP and Google credentials are set later from the system console.
 
-For production, the quickest route is Docker. The workspace is served on **http://localhost:8080**, and data lives in a named volume:
+For production, the quickest route is Docker. The workspace is served on **http://localhost:8080**. PostgreSQL runs as the `postgres` service and its data lives in the `legalio-pg` volume (set `POSTGRES_PASSWORD` in your shell or a root `.env` file to change the default password before the first start):
 
 ```bash
 npm run setup
@@ -131,7 +139,7 @@ for `/api`, `/uploads`, and `/sys`. Rebuild the frontend image to apply template
 changes with `docker compose up -d --build frontend`. When using your own nginx
 configuration, preserve the public host and port there too.
 
-Without Docker, run `npm run build`, then start the API with `NODE_ENV=production npm start`. Serve `apps/frontend/dist` from a web server such as nginx, and proxy `/api`, `/uploads` and `/sys` to port 3000.
+Without Docker, run `npm run build`, then start the API with `NODE_ENV=production npm start` (set `DATABASE_URL` or use the onboarding form). Serve `apps/frontend/dist` from a web server such as nginx, and proxy `/api`, `/uploads` and `/sys` to port 3000.
 
 
 ## 💭 Feedback and Contributing

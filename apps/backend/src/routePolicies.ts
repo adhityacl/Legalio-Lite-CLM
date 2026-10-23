@@ -45,7 +45,7 @@ const orgParam = (permissions: string | string[], note?: string): RoutePolicy =>
 export const ROUTE_POLICIES: PolicyEntry[] = [
   /* ---------------- public ---------------- */
   ['GET', '/api/health', pub()],
-  ['GET', '/api/system/public-status', pub('first-run probe: app name + needsSetup only')],
+  ['GET', '/api/system/public-status', pub('first-run probe: app name + needsDatabase + needsSetup only')],
   ['POST', '/api/system/setup', pub('atomic; only while no superuser exists')],
   ['GET', '/api/exchange-rates', pub('public reference data')],
   ['GET', '/api/exchange-rate-historical', pub('public reference data')],

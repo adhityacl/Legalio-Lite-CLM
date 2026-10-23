@@ -2,7 +2,7 @@
 
 Status per 22 Oktober 2026. Branch: `PostgreSQL`.
 
-Pekerjaan dibagi menjadi 7 fase (A–G). Fase D dipecah menjadi D1 (backend pg dan skema, sifatnya hanya menambah) dan D2 (pindah engine). **Fase A sampai F selesai.** Aplikasi hanya berjalan di PostgreSQL, upload memakai Tencent COS, dan onboarding meminta koneksi DB serta kunci COS. Review keamanan fase B sudah dilakukan dan 10 temuannya sudah diperbaiki; semua tes hijau. **Tinggal fase G (Docker, compose, dokumentasi).**
+Pekerjaan dibagi menjadi 7 fase (A–G). Fase D dipecah menjadi D1 (backend pg dan skema, sifatnya hanya menambah) dan D2 (pindah engine). **Semua fase (A sampai G) selesai.** Aplikasi hanya berjalan di PostgreSQL, upload memakai Tencent COS, dan onboarding meminta koneksi DB serta kunci COS. Docker, compose dan dokumentasi sudah diperbarui. Review keamanan fase B sudah dilakukan dan 10 temuannya sudah diperbaiki; semua tes hijau. **Yang tersisa adalah tes di lingkungan nyata dan persiapan produksi (§9) sebelum merge ke `main`.**
 
 > Koneksi DB untuk dev: isi `DATABASE_URL=postgres://legalio:legalio@127.0.0.1:5432/legalio` di `apps/backend/.env`, atau kosongkan agar form "Hubungkan PostgreSQL" muncul di kunjungan pertama. File ini di-update dan di-push setiap kali satu fase selesai. Dokumen ini berisi semua yang perlu diketahui untuk melanjutkan. Catatan kerja sebelumnya (rencana arsitek dan review) hanya disimpan di `/tmp` dan sudah hilang, jadi isinya dirangkum ulang di sini.
 
@@ -253,6 +253,19 @@ Gate: lint ✅, build ✅, unit 66/66 ✅, e2e sqlite 32 ✅, data-entry 41 ✅,
 
 **Belum dites:** rollback tx setup yang memulihkan cache COS, karena butuh probe COS asli yang berhasil.
 
+### Fase G: deploy dan dokumentasi ✅
+- **`compose.yaml`:**
+  - Service `postgres` (`postgres:17`, user/db `legalio`, `POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-legalio}`, volume `legalio-pg`, healthcheck `pg_isready`, tanpa publish port).
+  - Backend mendapat `DATABASE_URL` dan `depends_on: postgres: service_healthy`. Volume `/data` tetap.
+- **`apps/backend/Dockerfile`:** `AUTH_DB_PATH`, `tar` dan `python3 make g++` dihapus, karena tidak ada lagi dependency native. `docker build` berhasil.
+- **`apps/backend/.env.example`:** `DATABASE_URL` sebagai komentar, dengan penjelasan alur onboarding.
+- **`README.md`:** badge PostgreSQL, highlight /sys, langkah onboarding, kebutuhan instalasi (PostgreSQL 14+ / service compose, bucket COS) dan catatan `BETTER_AUTH_SECRET`.
+- **`POSTGRES_STORAGE.md` baru,** di-track git karena README me-link ke sana. Isinya: urutan koneksi, skema saat boot, pencarian ILIKE, layout COS, enkripsi, single instance, `pg_dump` dan COS versioning, jangan hapus `/data/kaelyn.db`, serta cara menjalankan tes.
+- **`SQLITE_STORAGE.md` dihapus.** File ini dulu sengaja tidak di-track (`.gitignore`), jadi tidak bisa dipulihkan dari git.
+- **`routePolicies.ts`:** catatan untuk `public-status` sekarang menyebut `needsDatabase`.
+- **Gate:** lint ✅, build ✅, unit 78/78 ✅, `docker compose config` ✅, `docker build` ✅. Image backend berhasil boot terhadap Postgres compose: 46 tabel, data demo, `public-status` = `{needsDatabase:false, needsSetup:true}`.
+- **Belum bisa dites di codespace ini:** `docker compose up` lengkap. Firewall host (`iptables FORWARD DROP`) memblokir lalu lintas antar-container di jaringan compose, jadi backend tidak bisa mencapai service `postgres` dan keluar dengan kode 1 sesuai desain. Jalankan ulang di host dengan jaringan Docker normal.
+
 > **Perilaku baru di dev:** di luar `APP_TEST_MODE`, upload mengembalikan 503 sampai superuser menyimpan COS di /sys (tab Google credentials) atau, setelah fase F, di onboarding. File lama di `uploads/` tidak lagi dilayani; ini sesuai keputusan "tanpa impor".
 
 ---
@@ -463,7 +476,7 @@ Komponen ini dipakai oleh app (`apps/frontend/src/components/SignInForm.tsx`) da
 - `DATABASE_URL` menang atas file.
 - Config ada tetapi DB tidak bisa dihubungi: proses keluar dengan kode 1.
 
-### Fase G: deploy dan dokumentasi
+### Fase G: deploy dan dokumentasi ✅ SELESAI (lihat §3 dan §9)
 - `compose.yaml`: tambah service `postgres` (`postgres:17`, `POSTGRES_USER`/`POSTGRES_DB` `legalio`, `POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-legalio}`, volume `legalio-pg:/var/lib/postgresql/data`, healthcheck `pg_isready`, **tanpa publish port**).
   - Backend: `DATABASE_URL: postgres://legalio:${POSTGRES_PASSWORD:-legalio}@postgres:5432/legalio` dan `depends_on: postgres: condition: service_healthy`. Volume `/data` tetap dipakai untuk `database.json` dan index Drive.
 - `apps/backend/Dockerfile`: hapus `AUTH_DB_PATH=/data/kaelyn.db` dan paket `tar`. Hapus `python3 make g++` **hanya jika** `npm ci` masih berhasil tanpanya.
@@ -580,3 +593,29 @@ Kesepuluh temuan sudah diperbaiki (§3). Batasan yang tersisa:
 - **Save gagal saat ada perubahan lain di memori.** Jika save A gagal sementara request B sudah mengubah memori, reload membuang perubahan B, padahal save B tetap melaporkan sukses. Data tetap konsisten, tetapi edit B hilang. Perbaikannya butuh pelacakan perubahan per request; di luar scope.
 - **Baris `account` Google bisa dobel.** Login Google bersamaan masih bisa menyisipkan dua baris, karena tidak ada unique key (userId, providerId). Tidak berbahaya.
 - **Belum ada tes race** untuk temuan 3, 6 dan 8; tes ini perlu interleave ala pg. Tambahkan di fase D jika murah.
+
+---
+
+## 9. Sebelum merge ke `main` (produksi)
+
+`main` otomatis dideploy ke produksi. `.github/workflows/deploy.yml` hanya menjalankan `ssh user@host` tanpa perintah, jadi skrip deploy yang sebenarnya ada di server Tencent Lighthouse dan tidak terlihat dari repo.
+
+**Tes yang belum dijalankan** (lakukan di host dengan jaringan Docker normal):
+1. `docker compose up --build` dengan volume bersih. Pastikan halaman setup muncul (langkah DB terlewati karena `DATABASE_URL` sudah diisi compose).
+2. Setup memakai **bucket COS asli**: probe berhasil, upload, unduh lewat `/uploads/...`, lalu reset organisasi menghapus objeknya.
+3. Opsional: tanpa `DATABASE_URL`, pastikan form "Hubungkan PostgreSQL" berjalan di browser.
+
+**Yang harus disiapkan di server produksi:**
+1. **Pastikan skrip deploy di server memakai `compose.yaml` dari repo** (misalnya `git pull && docker compose up -d --build`). Jika tidak, backend akan restart terus dengan exit 1 karena tidak ada `DATABASE_URL`, atau malah menampilkan form DB tanpa login.
+2. **Isi `POSTGRES_PASSWORD`** di `.env` root server atau di environment shell **sebelum start pertama**.
+   - Gunakan nilai yang aman untuk URL: tanpa `@ : / ? #`, karena nilainya disisipkan ke dalam `DATABASE_URL`.
+   - Mengganti nilai ini nanti tidak mengubah password yang sudah tersimpan di volume `legalio-pg`.
+3. **Pakai `BETTER_AUTH_SECRET` yang sama** di `apps/backend/.env` server. Tanpanya, produksi tidak mau start. Jika diganti nanti, kredensial Google/COS yang tersimpan tidak bisa dibaca.
+4. **Siapkan bucket COS** (SecretId, SecretKey, Bucket, Region, Prefix). Pakai bucket atau prefix khusus aplikasi ini, karena reset aplikasi menghapus semua objek di bawah prefix tersebut.
+5. **Selesaikan setup sendiri tepat setelah deploy.** Postgres mulai kosong, jadi siapa pun yang pertama membuka situs bisa membuat superuser (§6 risiko 4). Alternatifnya, isi lebih dulu admin lewat `DEMO_ADMIN_*` / `SEED_DEMO_ADMIN`.
+6. **Jangan hapus `/data/kaelyn.db`** di volume `legalio-data`. File itu arsip instalasi SQLite lama dan tidak diimpor.
+
+**Risiko kecil yang diketahui:**
+- Tidak ada healthcheck backend di compose (sama seperti sebelumnya).
+- `.dockerignore` tidak mengecualikan `database.json` / `drive-backup.json`, tetapi keduanya tidak masuk image final.
+- Rollback tx setup yang memulihkan cache COS belum dites, karena butuh probe COS asli.
