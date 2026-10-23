@@ -55,9 +55,9 @@ export function requestIdOf(req: express.Request): string {
   return r.requestId;
 }
 
-/** Standard error body (§5.6): `{ error, message, requestId }`. */
+/** Standard error body (§5.6): `{ error, code, message, status, requestId }`; here `error` is the code (see apiErrors.ts). */
 export function sendError(req: express.Request, res: express.Response, status: number, error: string, message?: string) {
-  return res.status(status).json({ error, message: message || MESSAGES[error] || error, requestId: requestIdOf(req) });
+  return res.status(status).json({ error, code: error, message: message || MESSAGES[error] || error, status, requestId: requestIdOf(req) });
 }
 
 /* ------------------------------------------------------------------ */

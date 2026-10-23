@@ -6,6 +6,9 @@ import { appendActivity, listActivity } from "./activityLog";
 import { seedLedgerFromLegacy, createReminderScheduler, deliverDue as deliverDueReminders, enqueue as enqueueReminder, existingKeys as existingReminderKeys, planReminders, REMINDER_LOCK_KEY, schedulerOptionsFromEnv, type ReminderSender } from "./reminders";
 import { backfillUploadOwners, eligibleOwners, newUploadKey, recordUploadOwner } from "./uploadOwnership";
 import { componentLog, errorResponder, requestLogging } from "./logger";
+import { sendApiError, sendRouteError, PublicError } from "./apiErrors";
+import { validateBody } from "./validation";
+import * as bodySchemas from "./schemas";
 const log = componentLog("server");
 import { forwardAsyncRouteErrors } from './asyncRoutes';
 import { renameLegacyKeys, renameLegacyKeyTokens } from '@legalio/shared/fieldNames';
@@ -837,8 +840,10 @@ function getEffectiveGeminiApiKey() {
 function getGenAIClient(apiKey?: string) {
   const effectiveKey = (apiKey || getEffectiveGeminiApiKey()).trim();
   if (!effectiveKey) {
-    throw new Error(
+    throw new PublicError(
       "Missing GEMINI_API_KEY. Silakan masukkan Gemini API Key di menu Pengaturan (Settings) > Model AI & Parser.",
+      500,
+      "AI_NOT_CONFIGURED",
     );
   }
   return new GoogleGenAI({
@@ -908,8 +913,10 @@ function formatGeminiError(err: any): string {
 async function generateContentWithRetryAndFallback(params: any) {
   const apiKey = getEffectiveGeminiApiKey();
   if (!apiKey) {
-    throw new Error(
+    throw new PublicError(
       "Missing GEMINI_API_KEY. Silakan masukkan Gemini API Key di menu Pengaturan (Settings) > Model AI & Parser.",
+      500,
+      "AI_NOT_CONFIGURED",
     );
   }
   const aiClient = getGenAIClient(apiKey);
@@ -940,7 +947,7 @@ async function generateContentWithRetryAndFallback(params: any) {
       .catch((err) => log.warn("Could not record AI token usage:", err));
     return response;
   } catch (lastError) {
-    throw new Error(formatGeminiError(lastError));
+    throw new PublicError(formatGeminiError(lastError), 500, "AI_PROVIDER_ERROR");
   }
 }
 __name(
@@ -1853,6 +1860,10 @@ async function addActivityLog(
     details,
   });
 }
+/** Activity entry attributed to the verified session identity; names or roles in the request body or query are never used. */
+function logActivity(req: express.Request, actionType: string, moduleName: string, description: string) {
+  return addActivityLog("", "", "", actionType, moduleName, description, req);
+}
 async function getBetterAuthSession(req) {
   try {
     const identity = identityOf(req);
@@ -1970,7 +1981,7 @@ app.get("/api/dashboard/news-ticker", async (req: express.Request, res: express.
     if (Array.isArray(ticker.items) && ticker.items.length > 0 && !settingsChanged) {
       return res.json({ items: ticker.items, lastGeneratedAt: ticker.lastGeneratedAt, cached: true, stale: true });
     }
-    res.status(500).json({ error: err?.message || "Failed to load the news ticker." });
+    sendRouteError(req, res, err, "request failed", "Failed to load the news ticker.", { status: 500 });
   }
 });
 
@@ -2254,11 +2265,7 @@ app.post("/api/user/reset-password", async (req: express.Request, res: express.R
     });
   } catch (err) {
     log.error("Server error resetting password:", err);
-    res
-      .status(500)
-      .json({
-        error: err.message || "Terjadi kesalahan saat mereset password.",
-      });
+    sendRouteError(req, res, err, "request failed", "Terjadi kesalahan saat mereset password.", { status: 500 });
   }
 });
 /** Operational activity for the selected organization only (History drawer, tenant.audit.read). */
@@ -2426,13 +2433,7 @@ Return strictly one valid JSON object matching the schema.`;
     res.json(responsePayload);
   } catch (error) {
     log.error("Error parsing partner:", error);
-    res
-      .status(500)
-      .json({
-        error:
-          error?.message ||
-          "Failed to parse document. Google AI model is currently busy, please try again.",
-      });
+    sendRouteError(req, res, error, "request failed", "Failed to parse document. Google AI model is currently busy, please try again.", { status: 500 });
   }
 });
 app.post("/api/partners/generate-dd-notes", async (req: express.Request, res: express.Response) => {
@@ -2476,12 +2477,7 @@ Output rules: exactly one paragraph, no bullet points or headings, no opening or
     res.json({ success: true, notes: notesText });
   } catch (error) {
     log.error("Error generating DD notes:", error);
-    res
-      .status(500)
-      .json({
-        error:
-          error?.message || "Gagal menghasilkan ringkasan Due Diligence AI.",
-      });
+    sendRouteError(req, res, error, "request failed", "Gagal menghasilkan ringkasan Due Diligence AI.", { status: 500 });
   }
 });
 /** AI due-diligence review of the partner form's current values; an existing partner stores the result right away. */
@@ -2540,11 +2536,11 @@ Return JSON with exactly:
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
     log.error("Error during partner review:", error);
-    res.status(500).json({ error: error?.message || "Gagal melakukan analisis AI. Silakan coba kembali." });
+    sendRouteError(req, res, error, "request failed", "Gagal melakukan analisis AI. Silakan coba kembali.", { status: 500 });
   }
 });
 
-app.post("/api/partners", async (req: express.Request, res: express.Response) => {
+app.post("/api/partners", validateBody(bodySchemas.partnerCreateBody, { requiredMessage: "Nama Partner wajib diisi." }), async (req: express.Request, res: express.Response) => {
   const {
     partner_name,
     codename,
@@ -2560,9 +2556,6 @@ app.post("/api/partners", async (req: express.Request, res: express.Response) =>
     internal_pic,
     notes,
     tags,
-    userEmail,
-    userName,
-    userRole,
   } = req.body;
   if (!partner_name) {
     return res.status(400).json({ error: "Nama Partner wajib diisi." });
@@ -2637,19 +2630,11 @@ app.post("/api/partners", async (req: express.Request, res: express.Response) =>
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.partners.unshift(newPartner);
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Business Owner",
-    "CREATE",
-    "PARTNER",
-    `Menambahkan Partner baru: ${partner_name}${partnerCountry ? ` (${partnerCountry})` : ""}`,
-    req,
-  );
+  await logActivity(req, "CREATE", "PARTNER", `Menambahkan Partner baru: ${partner_name}${partnerCountry ? ` (${partnerCountry})` : ""}`);
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
   res.json({ success: true, partner: newPartner });
 });
-app.put("/api/partners/:id", async (req: express.Request, res: express.Response) => {
+app.put("/api/partners/:id", validateBody(bodySchemas.partnerUpdateBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const {
     partner_name,
@@ -2667,9 +2652,6 @@ app.put("/api/partners/:id", async (req: express.Request, res: express.Response)
     notes,
     tags,
     dd_documents,
-    userEmail,
-    userName,
-    userRole,
   } = req.body;
   const partnerIndex = db.partners.findIndex((p) => p.partner_id === id);
   if (partnerIndex === -1) {
@@ -2718,21 +2700,12 @@ app.put("/api/partners/:id", async (req: express.Request, res: express.Response)
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.partners[partnerIndex] = updatedPartner;
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Legal",
-    "DD_UPDATE",
-    "PARTNER",
-    `Memperbarui profil & status DD Partner ${updatedPartner.partner_name} menjadi '${status_dd}'`,
-    req,
-  );
+  await logActivity(req, "DD_UPDATE", "PARTNER", `Memperbarui profil & status DD Partner ${updatedPartner.partner_name} menjadi '${status_dd}'`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, partner: updatedPartner });
 });
 app.delete("/api/partners/:id", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const { userEmail, userName, userRole } = req.query;
   const partnerIndex = db.partners.findIndex((p) => p.partner_id === id);
   if (partnerIndex === -1) {
     return res.status(404).json({ error: "Partner tidak ditemukan." });
@@ -2756,15 +2729,7 @@ app.delete("/api/partners/:id", async (req: express.Request, res: express.Respon
   for (const evaluation of db.evaluations) if (sameOrg(evaluation) && evaluation.partner_id === id) evaluation.partner_id = null;
   db.partners.splice(partnerIndex, 1);
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Legal",
-    "DELETE",
-    "PARTNER",
-    `Menghapus Partner '${partner.partner_name}' beserta ${partnerContracts.length} Kontrak dan ${partnerIOs.length} Insertion Order pendukung.`,
-    req,
-  );
+  await logActivity(req, "DELETE", "PARTNER", `Menghapus Partner '${partner.partner_name}' beserta ${partnerContracts.length} Kontrak dan ${partnerIOs.length} Insertion Order pendukung.`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({
     success: true,
@@ -2865,11 +2830,11 @@ Return JSON with exactly:
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
     log.error("Error during evaluation review:", error);
-    res.status(500).json({ error: error?.message || "Gagal melakukan analisis AI. Silakan coba kembali." });
+    sendRouteError(req, res, error, "request failed", "Gagal melakukan analisis AI. Silakan coba kembali.", { status: 500 });
   }
 });
 
-app.post("/api/partner-evaluations", async (req: express.Request, res: express.Response) => {
+app.post("/api/partner-evaluations", validateBody(bodySchemas.evaluationCreateBody, { requiredMessage: "Harap lengkapi semua bidang isian formulir evaluasi yang wajib." }), async (req: express.Request, res: express.Response) => {
   const {
     review_date,
     partner_id,
@@ -2882,9 +2847,6 @@ app.post("/api/partner-evaluations", async (req: express.Request, res: express.R
     pricing,
     final_evaluation,
     notes,
-    userEmail,
-    userName,
-    userRole,
   } = req.body;
   if (
     !supplier_name ||
@@ -2927,8 +2889,8 @@ app.post("/api/partner-evaluations", async (req: express.Request, res: express.R
     // Review run on the add page before the evaluation existed.
     redline_analysis: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? req.body.redline_analysis : void 0,
     redline_analyzed_at: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? String(req.body.redline_analyzed_at || new Date().toISOString()) : void 0,
-    evaluator_email: userEmail || "user@app",
-    evaluator_name: userName || "User",
+    evaluator_email: identityOf(req).email,
+    evaluator_name: identityOf(req).name,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -2937,19 +2899,11 @@ app.post("/api/partner-evaluations", async (req: express.Request, res: express.R
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.evaluations.unshift(newEval);
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Legal",
-    "CREATE",
-    "PARTNER",
-    `Membuat Evaluasi Tahunan Vendor untuk '${newEval.supplier_name}' dengan hasil '${newEval.final_evaluation}' (Skor: ${calculated_score}/100)`,
-    req,
-  );
+  await logActivity(req, "CREATE", "PARTNER", `Membuat Evaluasi Tahunan Vendor untuk '${newEval.supplier_name}' dengan hasil '${newEval.final_evaluation}' (Skor: ${calculated_score}/100)`);
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
   res.json({ success: true, evaluation: newEval });
 });
-app.put("/api/partner-evaluations/:id", async (req: express.Request, res: express.Response) => {
+app.put("/api/partner-evaluations/:id", validateBody(bodySchemas.evaluationUpdateBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const {
     review_date,
@@ -2963,9 +2917,6 @@ app.put("/api/partner-evaluations/:id", async (req: express.Request, res: expres
     pricing,
     final_evaluation,
     notes,
-    userEmail,
-    userName,
-    userRole,
   } = req.body;
   const evalIndex = (db.evaluations || []).findIndex((e) => e.id === id);
   if (evalIndex === -1) {
@@ -3001,20 +2952,11 @@ app.put("/api/partner-evaluations/:id", async (req: express.Request, res: expres
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.evaluations[evalIndex] = updatedEval;
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Legal",
-    "UPDATE",
-    "PARTNER",
-    `Perbarui Evaluasi Tahunan Vendor '${updatedEval.supplier_name}' (${updatedEval.id})`,
-    req,
-  );
+  await logActivity(req, "UPDATE", "PARTNER", `Perbarui Evaluasi Tahunan Vendor '${updatedEval.supplier_name}' (${updatedEval.id})`);
   res.json({ success: true, evaluation: updatedEval });
 });
 app.delete("/api/partner-evaluations/:id", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const { userEmail, userName, userRole } = req.query;
   const evalIndex = (db.evaluations || []).findIndex((e) => e.id === id);
   if (evalIndex === -1) {
     return res.status(404).json({ error: "Data evaluasi tidak ditemukan." });
@@ -3024,15 +2966,7 @@ app.delete("/api/partner-evaluations/:id", async (req: express.Request, res: exp
   if (accessDenial) return res.status(accessDenial.status).json(accessDenial.body);
   db.evaluations.splice(evalIndex, 1);
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Legal",
-    "DELETE",
-    "PARTNER",
-    `Menghapus Evaluasi Tahunan Vendor '${removed.supplier_name}' (${removed.id})`,
-    req,
-  );
+  await logActivity(req, "DELETE", "PARTNER", `Menghapus Evaluasi Tahunan Vendor '${removed.supplier_name}' (${removed.id})`);
   res.json({ success: true });
 });
 app.get("/api/exchange-rates", async (req: express.Request, res: express.Response) => {
@@ -3047,7 +2981,7 @@ app.get("/api/exchange-rates", async (req: express.Request, res: express.Respons
     const rates = await getExchangeRates("", "", currencies);
     res.json({ USD: 1, ...rates });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendRouteError(req, res, err, "request failed", "Could not load exchange rates.", { status: 500 });
   }
 });
 app.get("/api/exchange-rate-historical", async (req: express.Request, res: express.Response) => {
@@ -3057,7 +2991,7 @@ app.get("/api/exchange-rate-historical", async (req: express.Request, res: expre
     const { rate, isFallback } = await getUsdRate(currency);
     res.json({ currency, date, rate, isFallback });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendRouteError(req, res, err, "request failed", "Could not load the exchange rate.", { status: 500 });
   }
 });
 app.get("/api/partner-spendings", async (req: express.Request, res: express.Response) => {
@@ -3162,13 +3096,7 @@ Return strictly one valid JSON object matching the schema. Use an empty string "
     res.json(responsePayload);
   } catch (error) {
     log.error("Error parsing Spending:", error);
-    res
-      .status(500)
-      .json({
-        error:
-          error?.message ||
-          "Failed to parse Spending document. Google AI model is currently busy, please try again.",
-      });
+    sendRouteError(req, res, error, "request failed", "Failed to parse Spending document. Google AI model is currently busy, please try again.", { status: 500 });
   }
 });
 const getEndOfMonthDate = __name((year, month) => {
@@ -3285,11 +3213,11 @@ Return JSON with exactly:
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
     log.error("Error during invoice review:", error);
-    res.status(500).json({ error: error?.message || "Gagal melakukan analisis AI. Silakan coba kembali." });
+    sendRouteError(req, res, error, "request failed", "Gagal melakukan analisis AI. Silakan coba kembali.", { status: 500 });
   }
 });
 
-app.post("/api/partner-spendings", async (req: express.Request, res: express.Response) => {
+app.post("/api/partner-spendings", validateBody(bodySchemas.spendingCreateBody, { requiredMessage: "Vendor Name, Invoice Number, and Total Amount are required." }), async (req: express.Request, res: express.Response) => {
   const {
     vendor_id,
     vendor_name,
@@ -3307,9 +3235,6 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
     bank_account_holder_name,
     invoice_file,
     billing_file,
-    userEmail,
-    userName,
-    userRole,
   } = req.body;
   if (!vendor_name || !invoice_number || total_amount === void 0) {
     return res
@@ -3363,10 +3288,12 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
   } else {
     total_amount_usd = Number(total_amount_usd);
   }
+  // Only this organization's partners: another tenant's partner of the same name must never be linked or described.
   const partner = db.partners.find(
     (p) =>
-      p.partner_id === vendor_id ||
-      p.partner_name.toLowerCase() === vendor_name.toLowerCase(),
+      p.organizationId === targetOrgId &&
+      (p.partner_id === vendor_id ||
+        String(p.partner_name || "").toLowerCase() === vendor_name.toLowerCase()),
   );
   if (invoice_file && invoice_file.fileData) {
     const targetInvoiceName = formatInvoiceFileName({
@@ -3385,15 +3312,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
         invoice_file.fileData,
         targetTenant?.id,
       );
-      await addActivityLog(
-        userEmail || "user@app",
-        userName || "User",
-        userRole || "Finance",
-        "UPLOAD_SUCCESS",
-        "PARTNER",
-        `File Invoice '${targetInvoiceName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
-        req,
-      );
+      await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `File Invoice '${targetInvoiceName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
     }
   }
   if (billing_file && billing_file.fileData) {
@@ -3413,19 +3332,11 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
         billing_file.fileData,
         targetTenant?.id,
       );
-      await addActivityLog(
-        userEmail || "user@app",
-        userName || "User",
-        userRole || "Finance",
-        "UPLOAD_SUCCESS",
-        "PARTNER",
-        `File Billing '${targetBillingName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
-        req,
-      );
+      await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `File Billing '${targetBillingName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
     }
   }
   const newSpending = {
-    id: req.body.id || generateNextSpendingId(),
+    id: generateNextSpendingId(),
     organizationId: targetOrgId,
     vendor_id: partner ? partner.partner_id : vendor_id || void 0,
     vendor_name,
@@ -3459,26 +3370,16 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.spendings.unshift(newSpending);
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Finance",
-    "CREATE",
-    "PARTNER",
-    `Menambahkan Catatan Partner Spending untuk '${vendor_name}' (Invoice #${invoice_number}) senilai ${formatAmountForTenant(total_amount, normalizeCurrencyCode(currency, tenantDefaultCurrency(targetOrgId)), targetOrgId)}`,
-    req,
-  );
+  await logActivity(req, "CREATE", "PARTNER", `Menambahkan Catatan Partner Spending untuk '${vendor_name}' (Invoice #${invoice_number}) senilai ${formatAmountForTenant(total_amount, normalizeCurrencyCode(currency, tenantDefaultCurrency(targetOrgId)), targetOrgId)}`);
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
   res.json({ success: true, spending: newSpending });
 });
-app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.Response) => {
+app.put("/api/partner-spendings/:id", validateBody(bodySchemas.spendingUpdateBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const {
-    userEmail,
-    userName,
-    userRole,
     invoice_file,
     billing_file,
+    accessToken: _accessToken,
     ...updates
   } = req.body;
   const idx = (db.spendings || []).findIndex((s) => s.id === id);
@@ -3528,6 +3429,9 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
   } else {
     updates.total_amount_usd = Number(updates.total_amount_usd);
   }
+  if (Object.prototype.hasOwnProperty.call(updates, "io_id")) {
+    updates.io_id = updates.io_id && db.ios.some((io) => io.io_id === String(updates.io_id) && io.organizationId === existing.organizationId) ? String(updates.io_id) : void 0;
+  }
   const updated = {
     ...existing,
     ...updates,
@@ -3535,8 +3439,9 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
   };
   const partner = db.partners.find(
     (p) =>
-      p.partner_id === updated.vendor_id ||
-      p.partner_name.toLowerCase() === updated.vendor_name.toLowerCase(),
+      p.organizationId === existing.organizationId &&
+      (p.partner_id === updated.vendor_id ||
+        String(p.partner_name || "").toLowerCase() === String(updated.vendor_name || "").toLowerCase()),
   );
   const token = await resolveActiveGoogleToken(
     req.headers["x-google-access-token"] || req.body.accessToken,
@@ -3564,15 +3469,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
         invoice_file.fileData,
         existing.organizationId,
       );
-      await addActivityLog(
-        userEmail || "user@app",
-        userName || "User",
-        userRole || "Finance",
-        "UPLOAD_SUCCESS",
-        "PARTNER",
-        `File Invoice '${targetInvoiceName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
-        req,
-      );
+      await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `File Invoice '${targetInvoiceName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
     }
     updated.invoice_file_url = invoice_file_url;
   }
@@ -3595,15 +3492,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
         billing_file.fileData,
         existing.organizationId,
       );
-      await addActivityLog(
-        userEmail || "user@app",
-        userName || "User",
-        userRole || "Finance",
-        "UPLOAD_SUCCESS",
-        "PARTNER",
-        `File Billing '${targetBillingName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
-        req,
-      );
+      await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `File Billing '${targetBillingName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
     }
     updated.billing_file_url = billing_file_url;
   }
@@ -3612,21 +3501,12 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.spendings[idx] = updated;
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Finance",
-    "UPDATE",
-    "PARTNER",
-    `Memperbarui Catatan Partner Spending untuk '${updated.vendor_name}' (Invoice #${updated.invoice_number})`,
-    req,
-  );
+  await logActivity(req, "UPDATE", "PARTNER", `Memperbarui Catatan Partner Spending untuk '${updated.vendor_name}' (Invoice #${updated.invoice_number})`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, spending: updated });
 });
 app.delete("/api/partner-spendings/:id", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const { userEmail, userName, userRole } = req.query;
   const idx = (db.spendings || []).findIndex((s) => s.id === id);
   if (idx === -1) {
     return res.status(404).json({ error: "Data spending tidak ditemukan." });
@@ -3636,19 +3516,11 @@ app.delete("/api/partner-spendings/:id", async (req: express.Request, res: expre
   if (accessDenial) return res.status(accessDenial.status).json(accessDenial.body);
   db.spendings.splice(idx, 1);
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Finance",
-    "DELETE",
-    "PARTNER",
-    `Menghapus Catatan Partner Spending '${removed.vendor_name}' (Invoice #${removed.invoice_number})`,
-    req,
-  );
+  await logActivity(req, "DELETE", "PARTNER", `Menghapus Catatan Partner Spending '${removed.vendor_name}' (Invoice #${removed.invoice_number})`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });
 });
-app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: express.Response) => {
+app.post("/api/partners/:id/upload-dd", validateBody(bodySchemas.partnerUploadDdBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const {
     docName,
@@ -3656,9 +3528,6 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
     fileData,
     documentNumber,
     expiryDate,
-    userEmail,
-    userName,
-    userRole,
   } = req.body;
   const partner = db.partners.find((p) => p.partner_id === id);
   if (!partner) {
@@ -3693,15 +3562,7 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
       fileData,
       partner.organizationId,
     );
-    await addActivityLog(
-      userEmail || "user@app",
-      userName || "User",
-      userRole || "Legal",
-      "UPLOAD_SUCCESS",
-      "PARTNER",
-      `Dokumen DD '${finalFileName}' untuk vendor '${partner.partner_name}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
-      req,
-    );
+    await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `Dokumen DD '${finalFileName}' untuk vendor '${partner.partner_name}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
   }
   partner.dd_documents = partner.dd_documents.map((doc) => {
     if (doc.name === docName) {
@@ -3764,21 +3625,13 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
   }
   partner.updated_at = new Date().toISOString();
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Legal",
-    "DD_UPDATE",
-    "PARTNER",
-    `Mengunggah dokumen DD '${docName}' untuk partner ${partner.partner_name}`,
-    req,
-  );
+  await logActivity(req, "DD_UPDATE", "PARTNER", `Mengunggah dokumen DD '${docName}' untuk partner ${partner.partner_name}`);
   void triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, partner });
 });
-app.delete("/api/partners/:id/dd-file", async (req: express.Request, res: express.Response) => {
+app.delete("/api/partners/:id/dd-file", validateBody(bodySchemas.partnerDdFileDeleteBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const { docName, fileId, userEmail, userName, userRole } = req.body;
+  const { docName, fileId } = req.body;
   const partner = db.partners.find((p) => p.partner_id === id);
   if (!partner) {
     return res.status(404).json({ error: "Partner tidak ditemukan." });
@@ -3806,15 +3659,7 @@ app.delete("/api/partners/:id/dd-file", async (req: express.Request, res: expres
   }
   partner.updated_at = new Date().toISOString();
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Legal",
-    "DELETE",
-    "PARTNER",
-    `Menghapus file dari dokumen DD '${docName}' partner ${partner.partner_name}`,
-    req,
-  );
+  await logActivity(req, "DELETE", "PARTNER", `Menghapus file dari dokumen DD '${docName}' partner ${partner.partner_name}`);
   res.json({ success: true, partner });
 });
 
@@ -3878,9 +3723,7 @@ app.post("/api/contracts/export-google-docs", async (req: express.Request, res: 
     });
   } catch (error: any) {
     log.error("Error creating Google Doc:", error);
-    res.status(500).json({
-      error: error?.message || "Gagal membuat dokumen Google Docs.",
-    });
+    sendRouteError(req, res, error, "request failed", "Gagal membuat dokumen Google Docs.", { status: 500 });
   }
 });
 
@@ -4102,13 +3945,7 @@ Return strictly one valid JSON object matching the schema. Use "" for any text f
     res.json(responsePayload);
   } catch (error) {
     log.error("Error parsing contract:", error);
-    res
-      .status(500)
-      .json({
-        error:
-          error?.message ||
-          "Failed to parse contract document. Google AI model is currently busy, please try again.",
-      });
+    sendRouteError(req, res, error, "request failed", "Failed to parse contract document. Google AI model is currently busy, please try again.", { status: 500 });
   }
 });
 app.get("/api/contracts/:id/redline-analysis", (req: express.Request, res: express.Response) => {
@@ -4280,7 +4117,7 @@ app.post("/api/contracts/redline-analysis", async (req: express.Request, res: ex
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
     log.error("Error during draft redline analysis:", error);
-    res.status(500).json({ error: error?.message || "Gagal melakukan analisis redline AI. Silakan coba kembali." });
+    sendRouteError(req, res, error, "request failed", "Gagal melakukan analisis redline AI. Silakan coba kembali.", { status: 500 });
   }
 });
 
@@ -4319,13 +4156,7 @@ app.post("/api/contracts/:id/redline-analysis", async (req: express.Request, res
     });
   } catch (error) {
     log.error("Error during redline analysis:", error);
-    res
-      .status(500)
-      .json({
-        error:
-          error?.message ||
-          "Gagal melakukan analisis redline AI. Silakan coba kembali.",
-      });
+    sendRouteError(req, res, error, "request failed", "Gagal melakukan analisis redline AI. Silakan coba kembali.", { status: 500 });
   }
 });
 
@@ -4423,7 +4254,7 @@ ${plainText}
     res.status(201).json({ success: true, created, skipped });
   } catch (error: any) {
     log.error("Error during AI redlining:", error);
-    res.status(500).json({ error: error?.message || "AI redlining failed. Please try again." });
+    sendRouteError(req, res, error, "request failed", "AI redlining failed. Please try again.", { status: 500 });
   }
 });
 
@@ -4473,7 +4304,7 @@ app.post("/api/templates", async (req, res) => {
     await saveDb();
     res.json({ success: true, template: templateData });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendRouteError(req, res, err, "request failed", "Could not save the template.", { status: 500 });
   }
 });
 
@@ -4589,7 +4420,7 @@ Rules:
     res.json({ success: true, title: String(parsed?.title || "").slice(0, 300), fields, sections });
   } catch (error: any) {
     log.error("Error generating AI template:", error);
-    res.status(500).json({ error: error?.message || "Gagal membuat template. Coba lagi." });
+    sendRouteError(req, res, error, "request failed", "Gagal membuat template. Coba lagi.", { status: 500 });
   }
 });
 
@@ -4616,7 +4447,7 @@ function terminationWriteError(res: express.Response, code: string) {
   return res.status(400).json({ code, error: CONTRACT_TERMINATION_TRANSLATIONS.EN[code] || code });
 }
 
-app.post("/api/contracts", async (req: express.Request, res: express.Response) => {
+app.post("/api/contracts", validateBody(bodySchemas.contractCreateBody, { requiredMessage: "Nomor Kontrak, Judul, Partner, dan Tanggal Mula/Selesai wajib diisi." }), async (req: express.Request, res: express.Response) => {
   const {
     contract_number,
     contract_title,
@@ -4641,9 +4472,6 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
     change_summary,
     fileName,
     fileData,
-    userEmail,
-    userName,
-    userRole,
   } = req.body;
   if (
     !contract_number ||
@@ -4686,7 +4514,7 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
   }
   const targetOrgId = getRequestTenantId(req);
   const targetTenant = findTenant(targetOrgId);
-  const partner = db.partners.find((p) => p.partner_id === partner_id);
+  const partner = db.partners.find((p) => p.partner_id === partner_id && p.organizationId === targetOrgId);
   if (!partner) return res.status(400).json({ error: "Partner tidak ditemukan." });
   const token = await resolveActiveGoogleToken(
     req.headers["x-google-access-token"] || req.body.accessToken,
@@ -4735,15 +4563,7 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
         fileData,
         targetTenant?.id,
       );
-      await addActivityLog(
-        userEmail || "user@app",
-        userName || "User",
-        userRole || "Legal",
-        "UPLOAD_SUCCESS",
-        "CONTRACT",
-        `File Kontrak '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
-        req,
-      );
+      await logActivity(req, "UPLOAD_SUCCESS", "CONTRACT", `File Kontrak '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
     }
   }
   const lifecycleDraft: any = {
@@ -4805,22 +4625,14 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.contracts.unshift(newContract);
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Legal",
-    "CREATE",
-    "CONTRACT",
-    `Membuat Kontrak Baru '${contract_number}' (${contract_title}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`,
-    req,
-  );
+  await logActivity(req, "CREATE", "CONTRACT", `Membuat Kontrak Baru '${contract_number}' (${contract_title}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`);
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
   res.json({ success: true, contract: newContract });
 });
-app.put("/api/contracts/:id", async (req: express.Request, res: express.Response) => {
+app.put("/api/contracts/:id", validateBody(bodySchemas.contractUpdateBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const { userEmail, userName, userRole, fileData, fileName, termination_document_file, ...updates } =
-    req.body;
+  // The schema is the whitelist: ids, organization, timestamps, creator and derived fields never come from the client.
+  const { fileData, fileName, termination_document_file, accessToken: _accessToken, ...updates } = req.body;
   const idx = db.contracts.findIndex((c) => c.contract_id === id);
   if (idx === -1) {
     return res.status(404).json({ error: "Kontrak tidak ditemukan." });
@@ -4828,8 +4640,6 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
   const existing = db.contracts[idx];
   const tenantDenial = assertRecordAccess(req, "contract", existing);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
-  delete (updates as any).organizationId;
-  delete updates.termination_document;
   const updated = {
     ...existing,
     ...updates,
@@ -4890,7 +4700,8 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
   if (updated.contract_number) {
     const dup = db.contracts.find(
       (c) =>
-        c.contract_number.trim().toLowerCase() ===
+        c.organizationId === existing.organizationId &&
+        String(c.contract_number || "").trim().toLowerCase() ===
           updated.contract_number.trim().toLowerCase() && c.contract_id !== id,
     );
     if (dup) {
@@ -4929,15 +4740,7 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
         fileData,
         existing.organizationId,
       );
-      await addActivityLog(
-        userEmail || "user@app",
-        userName || "User",
-        userRole || "Legal",
-        "UPLOAD_SUCCESS",
-        "CONTRACT",
-        `File Kontrak '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
-        req,
-      );
+      await logActivity(req, "UPLOAD_SUCCESS", "CONTRACT", `File Kontrak '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
     }
     updated.contract_file_link = contract_file_link;
     updated.fileName = targetFileName;
@@ -4954,21 +4757,12 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.contracts[idx] = updated;
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Legal",
-    "UPDATE",
-    "CONTRACT",
-    `Memperbarui data Kontrak '${updated.contract_number}'`,
-    req,
-  );
+  await logActivity(req, "UPDATE", "CONTRACT", `Memperbarui data Kontrak '${updated.contract_number}'`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, contract: updated });
 });
 app.delete("/api/contracts/:id", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const { userEmail, userName, userRole } = req.query;
   const ctr = db.contracts.find((c) => c.contract_id === id);
   if (!ctr) return res.status(404).json({ error: "Kontrak tidak ditemukan." });
   const tenantDenial = assertRecordAccess(req, "contract", ctr);
@@ -4978,15 +4772,7 @@ app.delete("/api/contracts/:id", async (req: express.Request, res: express.Respo
   db.notifications = db.notifications.filter((n) => !(n.organizationId === ctr.organizationId && n.parent_type === 'Contract' && n.parent_id === id));
   db.contracts = db.contracts.filter((c) => c !== ctr);
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Admin",
-    "DELETE",
-    "CONTRACT",
-    `Menghapus Kontrak '${ctr.contract_number}' (${ctr.contract_title})`,
-    req,
-  );
+  await logActivity(req, "DELETE", "CONTRACT", `Menghapus Kontrak '${ctr.contract_number}' (${ctr.contract_title})`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });
 });
@@ -5140,13 +4926,7 @@ Return strictly one valid JSON object matching the schema.`;
     res.json(responsePayload);
   } catch (error) {
     log.error("Error parsing IO:", error);
-    res
-      .status(500)
-      .json({
-        error:
-          error?.message ||
-          "Failed to parse IO document. Google AI model is currently busy, please try again.",
-      });
+    sendRouteError(req, res, error, "request failed", "Failed to parse IO document. Google AI model is currently busy, please try again.", { status: 500 });
   }
 });
 /** AI review of the service order form's current values (deliverables and commercial terms); an existing SO stores the result right away. */
@@ -5211,11 +4991,11 @@ Return JSON with exactly:
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
     log.error("Error during service order review:", error);
-    res.status(500).json({ error: error?.message || "Gagal melakukan analisis AI. Silakan coba kembali." });
+    sendRouteError(req, res, error, "request failed", "Gagal melakukan analisis AI. Silakan coba kembali.", { status: 500 });
   }
 });
 
-app.post("/api/ios", async (req: express.Request, res: express.Response) => {
+app.post("/api/ios", validateBody(bodySchemas.ioCreateBody, { requiredMessage: "Nomor IO, Judul, Partner, Tanggal, Pricing Model, & Charging Type wajib diisi." }), async (req: express.Request, res: express.Response) => {
   const {
     contract_id,
     io_number,
@@ -5234,9 +5014,6 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
     notice_type_required,
     fileName,
     fileData,
-    userEmail,
-    userName,
-    userRole,
   } = req.body;
   if (
     !io_number ||
@@ -5270,9 +5047,9 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
   }
   const targetOrgId = getRequestTenantId(req);
   const targetTenant = findTenant(targetOrgId);
-  const partner = db.partners.find((p) => p.partner_id === partner_id);
+  const partner = db.partners.find((p) => p.partner_id === partner_id && p.organizationId === targetOrgId);
   if (!partner) return res.status(400).json({ error: "Partner tidak ditemukan." });
-  const contract = db.contracts.find((c) => c.contract_id === contract_id);
+  const contract = db.contracts.find((c) => c.contract_id === contract_id && c.organizationId === targetOrgId);
   const token = await resolveActiveGoogleToken(
     req.headers["x-google-access-token"] || req.body.accessToken,
   );
@@ -5320,15 +5097,7 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
         fileData,
         targetTenant?.id,
       );
-      await addActivityLog(
-        userEmail || "user@app",
-        userName || "User",
-        userRole || "Business Owner",
-        "UPLOAD_SUCCESS",
-        "IO",
-        `File IO '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
-        req,
-      );
+      await logActivity(req, "UPLOAD_SUCCESS", "IO", `File IO '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
     }
   }
   const { status, daysRemaining: diffDays } = computeLifecycle(targetOrgId, end_date, "Active", false);
@@ -5369,34 +5138,28 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.ios.unshift(newIO);
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Business Owner",
-    "CREATE",
-    "IO",
-    `Membuat dokumen komersial baru '${io_number}' (${io_title}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`,
-    req,
-  );
+  await logActivity(req, "CREATE", "IO", `Membuat dokumen komersial baru '${io_number}' (${io_title}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`);
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
   res.json({ success: true, io: newIO });
 });
-app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
+app.put("/api/ios/:id", validateBody(bodySchemas.ioUpdateBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const { userEmail, userName, userRole, ...updates } = req.body;
+  const { fileData: uploadedData, fileName: uploadedName, accessToken: _accessToken, ...updates } = req.body;
   const idx = db.ios.findIndex((i) => i.io_id === id);
   if (idx === -1) return res.status(404).json({ error: "IO tidak ditemukan." });
   const existing = db.ios[idx];
   const tenantDenial = assertRecordAccess(req, "io", existing);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
-  delete (updates as any).organizationId;
   const updated = {
     ...existing,
     ...updates,
     updated_at: new Date().toISOString(),
   };
+  if (updates.contract_id !== undefined) {
+    const parent = db.contracts.find((c) => c.contract_id === updates.contract_id && c.organizationId === existing.organizationId);
+    updated.contract_number = parent ? parent.contract_number : "-";
+  }
   const cur = normalizeCurrencyCode(updated.currency || existing.currency, tenantDefaultCurrency(existing.organizationId));
-  updated.currency = cur;
   updated.currency = cur;
   const amt = Number(updated.io_value) || 0;
   let total_usd = updates.io_value_usd;
@@ -5426,14 +5189,13 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
   updated.io_value = amt;
   updated.io_value_usd = Number(total_usd);
   if (
-    updates.fileData &&
-    typeof updates.fileData === "string" &&
-    updates.fileData.includes("base64,")
+    uploadedData &&
+    typeof uploadedData === "string" &&
+    uploadedData.includes("base64,")
   ) {
-    const fileData = updates.fileData;
-    delete updated.fileData;
+    const fileData = uploadedData;
     const partner = db.partners.find(
-      (p) => p.partner_id === updated.partner_id,
+      (p) => p.partner_id === updated.partner_id && p.organizationId === existing.organizationId,
     );
     const targetFileName = formatIOFileName({
       partnerName: partner?.partner_name,
@@ -5441,7 +5203,7 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
       ioNumber: updated.io_number,
       startDate: updated.start_date,
       rawFileName:
-        updates.fileName || updated.fileName || `${updated.io_number}.pdf`,
+        uploadedName || updated.fileName || `${updated.io_number}.pdf`,
     });
     const token = await resolveActiveGoogleToken(
       req.headers["x-google-access-token"] || req.body.accessToken,
@@ -5455,15 +5217,7 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
         fileData,
         existing.organizationId,
       );
-      await addActivityLog(
-        userEmail || "user@app",
-        userName || "User",
-        userRole || "Business Owner",
-        "UPLOAD_SUCCESS",
-        "IO",
-        `File IO '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`,
-        req,
-      );
+      await logActivity(req, "UPLOAD_SUCCESS", "IO", `File IO '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
     }
     updated.io_file_link = io_file_link;
     updated.fileName = targetFileName;
@@ -5500,36 +5254,19 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   db.ios[idx] = updated;
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Business Owner",
-    "UPDATE",
-    "IO",
-    `Memperbarui data Insertion Order '${updated.io_number}'`,
-    req,
-  );
+  await logActivity(req, "UPDATE", "IO", `Memperbarui data Insertion Order '${updated.io_number}'`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, io: updated });
 });
 app.delete("/api/ios/:id", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const { userEmail, userName, userRole } = req.query;
   const item = db.ios.find((i) => i.io_id === id);
   if (!item) return res.status(404).json({ error: "IO tidak ditemukan." });
   const tenantDenial = assertRecordAccess(req, "io", item);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
   db.ios = db.ios.filter((i) => i !== item);
   await saveDb();
-  await addActivityLog(
-    userEmail || "user@app",
-    userName || "User",
-    userRole || "Admin",
-    "DELETE",
-    "IO",
-    `Menghapus Insertion Order '${item.io_number}' (${item.io_title})`,
-    req,
-  );
+  await logActivity(req, "DELETE", "IO", `Menghapus Insertion Order '${item.io_number}' (${item.io_title})`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });
 });
@@ -5639,11 +5376,7 @@ app.post(
       });
     } catch (err) {
       log.error("Error exchanging Google OAuth code:", err);
-      res
-        .status(500)
-        .json({
-          error: err.message || "Gagal menukarkan Google Authorization Code.",
-        });
+      sendRouteError(req, res, err, "request failed", "Gagal menukarkan Google Authorization Code.", { status: 500 });
     }
   },
 );
@@ -5664,12 +5397,7 @@ app.get(
         lastSyncTime: db.googleConfig?.lastSyncTime || null,
       });
     } catch (err) {
-      res
-        .status(500)
-        .json({
-          success: false,
-          error: err?.message || "Gagal memeriksa token Google.",
-        });
+      sendRouteError(req, res, err, "request failed", "Gagal memeriksa token Google.", { status: 500, extra: { success: false } });
     }
   },
 );
@@ -5681,12 +5409,7 @@ app.post(
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.json({ success: true, accessToken: freshToken });
     } catch (err) {
-      res
-        .status(500)
-        .json({
-          success: false,
-          error: err?.message || "Gagal me-refresh token Google.",
-        });
+      sendRouteError(req, res, err, "request failed", "Gagal me-refresh token Google.", { status: 500, extra: { success: false } });
     }
   },
 );
@@ -5771,10 +5494,7 @@ app.post(
       });
     } catch (err: any) {
       log.error("Error in /api/auth/google/sync-session:", err);
-      res.status(500).json({
-        success: false,
-        error: err?.message || "Gagal menyinkronkan sesi Google ke Better Auth.",
-      });
+      sendRouteError(req, res, err, "request failed", "Gagal menyinkronkan sesi Google ke Better Auth.", { status: 500, extra: { success: false } });
     }
   }
 );
@@ -5815,12 +5535,7 @@ app.post(
         config: redactProviderConfig(db.googleConfig),
       });
     } catch (err) {
-      res
-        .status(500)
-        .json({
-          success: false,
-          error: err?.message || "Gagal menyinkronkan status koneksi Google.",
-        });
+      sendRouteError(req, res, err, "request failed", "Gagal menyinkronkan status koneksi Google.", { status: 500, extra: { success: false } });
     }
   },
 );
@@ -5848,12 +5563,7 @@ app.post(
         message: "Akun Google berhasil diputuskan dari konfigurasi server.",
       });
     } catch (err) {
-      res
-        .status(500)
-        .json({
-          success: false,
-          error: err?.message || "Gagal memutuskan akun Google di server.",
-        });
+      sendRouteError(req, res, err, "request failed", "Gagal memutuskan akun Google di server.", { status: 500, extra: { success: false } });
     }
   },
 );
@@ -6118,11 +5828,9 @@ app.post("/api/smtp/test", async (req: express.Request, res: express.Response) =
     });
   } catch (err) {
     log.error("SMTP Test Error:", err);
-    res
-      .status(400)
-      .json({
-        error: `Gagal mengirim email via SMTP Relay: ${err.message || String(err)}`,
-      });
+    // Only the transport's error code (EAUTH, ECONNECTION, ...) is shown; the full error is in the log.
+    const smtpCode = typeof err?.code === "string" ? ` (${err.code.slice(0, 40)})` : "";
+    sendApiError(req, res, 400, "SMTP_TEST_FAILED", `Gagal mengirim email via SMTP Relay${smtpCode}. Periksa host, port, kredensial dan pengaturan TLS.`);
   }
 });
 app.post("/api/ai/test-key", async (req: express.Request, res: express.Response) => {
@@ -6247,11 +5955,7 @@ app.post("/api/google-integration/auto-provision-master", async (req: express.Re
     });
   } catch (err) {
     log.error("Auto provision master root error:", err);
-    return res
-      .status(500)
-      .json({
-        error: err.message || "Gagal membuat Master Root secara otomatis.",
-      });
+    return sendRouteError(req, res, err, "request failed", "Gagal membuat Master Root secara otomatis.", { status: 500 });
   }
 });
 app.post("/api/tenants/auto-provision-folders", async (req: express.Request, res: express.Response) => {
@@ -6284,13 +5988,7 @@ app.post("/api/tenants/auto-provision-folders", async (req: express.Request, res
     });
   } catch (err) {
     log.error("Auto provision tenant folders error:", err);
-    return res
-      .status(500)
-      .json({
-        error:
-          err.message ||
-          "Gagal menyinkronkan folder organisasi ke Master Root.",
-      });
+    return sendRouteError(req, res, err, "request failed", "Gagal menyinkronkan folder organisasi ke Master Root.", { status: 500 });
   }
 });
 const provisionFoldersHandler = __name(async (req: express.Request, res: express.Response) => {
@@ -6312,9 +6010,7 @@ const provisionFoldersHandler = __name(async (req: express.Request, res: express
       stats,
     });
   } catch (err) {
-    return res
-      .status(500)
-      .json({ error: err.message || "Gagal membuat folder kategori." });
+    return sendRouteError(req, res, err, "request failed", "Gagal membuat folder kategori.", { status: 500 });
   }
 }, "provisionFoldersHandler");
 app.post("/api/google-integration/provision-folders", provisionFoldersHandler);
@@ -6510,11 +6206,14 @@ app.get("/api/google-service-account/status", async (req: express.Request, res: 
         "Otentikasi Google Service Account untuk Google Sheets API berhasil dikonfigurasi.",
     });
   } catch (err: any) {
-    res
-      .status(500)
-      .json({ success: false, error: err?.message || String(err) });
+    sendRouteError(req, res, err, "service account setup failed", "Gagal mengonfigurasi Google Service Account.", { extra: { success: false } });
   }
 });
+/** Bulk-import row failure text: the cause is logged, the response carries only the row's generic message. */
+function bulkRowFailure(err: unknown, fallback: string) {
+  log.warn("[bulk-import] row failed:", err);
+  return fallback;
+}
 /** Case-insensitive match against an allowed list: "" when blank, null when not allowed. */
 function pickEnum(value: unknown, allowed: readonly string[]): string | null {
   const text = String(value ?? "").trim();
@@ -6669,7 +6368,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         failed.push({
           rowIndex,
           identifier: name,
-          message: err.message || "Gagal membuat partner.",
+          message: bulkRowFailure(err, "Gagal membuat partner."),
         });
       }
     }
@@ -6775,7 +6474,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         failed.push({
           rowIndex,
           identifier: nomor,
-          message: err.message || "Gagal membuat kontrak.",
+          message: bulkRowFailure(err, "Gagal membuat kontrak."),
         });
       }
     }
@@ -6950,7 +6649,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         failed.push({
           rowIndex,
           identifier,
-          message: err.message || "Gagal membuat evaluasi.",
+          message: bulkRowFailure(err, "Gagal membuat evaluasi."),
         });
       }
     }
@@ -7021,7 +6720,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         failed.push({
           rowIndex,
           identifier,
-          message: err.message || "Gagal membuat spending.",
+          message: bulkRowFailure(err, "Gagal membuat spending."),
         });
       }
     }
@@ -7095,7 +6794,8 @@ app.post("/api/tenants", async (req: express.Request, res: express.Response) => 
     await refreshTenantProjection();
     return res.status(201).json({ success: true, newTenant: findTenant(id), tenants: db.tenants });
   } catch (err: any) {
-    return sendError(req, res, 400, "INVALID_INPUT", err?.message);
+    if (err instanceof ApiError || err instanceof RequestDenied) return sendError(req, res, err.status, err.error, err.message);
+    return sendRouteError(req, res, err, "organization create failed", "The organization could not be created.", { status: 400, code: "INVALID_INPUT", extra: { error: "INVALID_INPUT" } });
   }
 });
 app.put("/api/tenants/:id", async (req: express.Request, res: express.Response) => {
@@ -7359,9 +7059,7 @@ Guidelines:
     res.json({ success: true, reply: (response as any).text });
   } catch (error: any) {
     log.error("AI Chat Error:", error);
-    res
-      .status(500)
-      .json({ error: error?.message || "Failed to process AI request" });
+    sendRouteError(req, res, error, "request failed", "Failed to process AI request", { status: 500 });
   }
 });
 /* ------------------------------------------------------------------ */
@@ -7465,7 +7163,9 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
   } catch (err: any) {
     // saveCos already updated the in-memory credentials; after a rollback the table is the truth again.
     if (storage) await googleCredentials.init().catch((reloadErr) => log.error("[setup] credential reload failed:", reloadErr));
-    return res.status(err?.status || 500).json({ error: "SETUP_FAILED", message: err?.message || "Setup failed." });
+    const known = err instanceof ApiError || err instanceof RequestDenied;
+    if (!known) log.error("[setup] failed:", err);
+    return sendApiError(req, res, known ? err.status : 500, "SETUP_FAILED", known ? err.message : "Setup failed.", { error: "SETUP_FAILED" });
   }
   await reloadAuthConfiguration();
   await appendAudit(sql, { actorId: id, actorPlatformRole: "superuser", accessMode: "platform", requestId: String((req as any).requestId || crypto.randomUUID()) }, {

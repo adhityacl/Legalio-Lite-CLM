@@ -131,7 +131,7 @@ export async function checkCosInput(input: unknown): Promise<CosConfig | { error
   try {
     await probe(cosStore(config));
   } catch (err: any) {
-    return { error: "storage_probe_failed", message: `Tencent COS test failed: ${err?.message || err?.code || "unknown error"}` };
+    return { error: "storage_probe_failed", message: `Tencent COS test failed: ${err?.code || "unknown error"}` };
   }
   return config;
 }

@@ -9,6 +9,7 @@
 import { Router, Request, Response } from 'express';
 import { sql } from './db';
 import { forwardAsyncRouteErrors } from './asyncRoutes';
+import { sendRouteError } from './apiErrors';
 import { hashPassword } from 'better-auth/crypto';
 import crypto from 'crypto';
 import { buildMatrix, isPlatformRole } from './rbac';
@@ -168,7 +169,7 @@ authConsoleRouter.get('/overview', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('Error fetching console overview:', err);
-    return res.status(500).json({ error: err.message || 'Failed to fetch console overview' });
+    return sendRouteError(req, res, err, "request failed", "Failed to fetch console overview", { status: 500 });
   }
 });
 
@@ -377,7 +378,7 @@ authConsoleRouter.get('/accounts', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('Error listing accounts:', err);
-    return res.status(500).json({ error: err.message || 'Failed to list accounts' });
+    return sendRouteError(req, res, err, "request failed", "Failed to list accounts", { status: 500 });
   }
 });
 
@@ -413,7 +414,7 @@ authConsoleRouter.get('/sessions', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('Error listing sessions:', err);
-    return res.status(500).json({ error: err.message || 'Failed to list sessions' });
+    return sendRouteError(req, res, err, "request failed", "Failed to list sessions", { status: 500 });
   }
 });
 
@@ -425,7 +426,7 @@ authConsoleRouter.delete('/sessions/:id', async (req: Request, res: Response) =>
     return res.json({ success: true, message: 'Session revoked successfully' });
   } catch (err: any) {
     console.error('Error revoking session:', err);
-    return res.status(500).json({ error: err.message || 'Failed to revoke session' });
+    return sendRouteError(req, res, err, "request failed", "Failed to revoke session", { status: 500 });
   }
 });
 
@@ -440,7 +441,7 @@ authConsoleRouter.post('/sessions/revoke-user', async (req: Request, res: Respon
     return res.json({ success: true, message: `All sessions revoked for user ${userId}` });
   } catch (err: any) {
     console.error('Error revoking user sessions:', err);
-    return res.status(500).json({ error: err.message || 'Failed to revoke user sessions' });
+    return sendRouteError(req, res, err, "request failed", "Failed to revoke user sessions", { status: 500 });
   }
 });
 
@@ -452,7 +453,7 @@ authConsoleRouter.post('/sessions/revoke-all/:userId', async (req: Request, res:
     return res.json({ success: true, message: `All sessions revoked for user ${userId}` });
   } catch (err: any) {
     console.error('Error revoking user sessions:', err);
-    return res.status(500).json({ error: err.message || 'Failed to revoke user sessions' });
+    return sendRouteError(req, res, err, "request failed", "Failed to revoke user sessions", { status: 500 });
   }
 });
 
@@ -597,7 +598,7 @@ authConsoleRouter.get('/api-keys', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('Error listing API keys:', err);
-    return res.status(500).json({ error: err.message || 'Failed to list API keys' });
+    return sendRouteError(req, res, err, "request failed", "Failed to list API keys", { status: 500 });
   }
 });
 
@@ -639,7 +640,7 @@ authConsoleRouter.post('/api-keys', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('Error generating API key:', err);
-    return res.status(500).json({ error: err.message || 'Failed to generate API key' });
+    return sendRouteError(req, res, err, "request failed", "Failed to generate API key", { status: 500 });
   }
 });
 
@@ -651,7 +652,7 @@ authConsoleRouter.post('/api-keys/:id/revoke', async (req: Request, res: Respons
     return res.json({ success: true, message: 'API key revoked successfully' });
   } catch (err: any) {
     console.error('Error revoking API key:', err);
-    return res.status(500).json({ error: err.message || 'Failed to revoke API key' });
+    return sendRouteError(req, res, err, "request failed", "Failed to revoke API key", { status: 500 });
   }
 });
 
@@ -663,7 +664,7 @@ authConsoleRouter.delete('/api-keys/:id', async (req: Request, res: Response) =>
     return res.json({ success: true, message: 'API key deleted successfully' });
   } catch (err: any) {
     console.error('Error deleting API key:', err);
-    return res.status(500).json({ error: err.message || 'Failed to delete API key' });
+    return sendRouteError(req, res, err, "request failed", "Failed to delete API key", { status: 500 });
   }
 });
 
