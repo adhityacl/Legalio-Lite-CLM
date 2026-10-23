@@ -149,6 +149,7 @@ tests/
 tools/
 docs/*
 !docs/RUNBOOK.md
+!docs/ARCHITECTURE-*.md
 playwright*.config.ts
 .devcontainer/
 handover.md
