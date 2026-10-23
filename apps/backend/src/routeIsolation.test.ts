@@ -81,7 +81,7 @@ after(async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-interface Reply { status: number; body: any; raw: string }
+interface Reply { status: number; body: any; raw: string; headers: Headers }
 async function api(user: string, method: string, route: string, options: { org?: string; body?: unknown } = {}): Promise<Reply> {
   const res = await fetch(base + route, {
     method,
@@ -94,7 +94,7 @@ async function api(user: string, method: string, route: string, options: { org?:
   const raw = await res.text();
   let body: any = raw;
   try { body = JSON.parse(raw); } catch { /* not JSON */ }
-  return { status: res.status, body, raw };
+  return { status: res.status, body, raw, headers: res.headers };
 }
 const ok = (reply: Reply, expected = 200) => { assert.equal(reply.status, expected, reply.raw.slice(0, 300)); return reply.body; };
 const denied = (reply: Reply, allowed: number[] = [403, 404]) => assert.ok(allowed.includes(reply.status), `expected ${allowed.join('/')} got ${reply.status}: ${reply.raw.slice(0, 200)}`);
@@ -419,4 +419,86 @@ test('saving other entities does not touch contract rows', async () => {
   ok(await api('adminA', 'PUT', `/api/ios/${fixtureA.io.io_id}`, { org: A, body: { io_title: 'snapshot save' } }));
   const after = await sql.all(`SELECT contract_id, xmin::text AS xmin, version FROM contracts ORDER BY contract_id`);
   assert.deepEqual(after, before);
+});
+
+/* ------------------------------ server-side paging and search ------------------------------ */
+
+test('GET /api/contracts pages, filters and sorts on the server and reports the total', async () => {
+  const all = ok(await api('adminA', 'GET', '/api/contracts', { org: A }));
+  assert.ok(Array.isArray(all) && all.length >= 6, 'without parameters the classic array is returned');
+  assert.equal(all[0].version >= 1, true);
+  const first = await api('adminA', 'GET', '/api/contracts?limit=2&offset=0&sort=contract_number&dir=asc', { org: A });
+  assert.equal(first.status, 200);
+  assert.equal(Number(first.headers.get('x-total-count')), all.length);
+  assert.equal(first.body.length, 2);
+  const second = await api('adminA', 'GET', '/api/contracts?limit=2&offset=2&sort=contract_number&dir=asc', { org: A });
+  const numbers = [...first.body, ...second.body].map((c: any) => c.contract_number);
+  assert.deepEqual(numbers, [...numbers].sort((x, y) => x.toLowerCase().localeCompare(y.toLowerCase())), 'pages continue each other in sort order');
+  assert.ok(!first.body.some((c: any) => second.body.some((d: any) => d.contract_id === c.contract_id)), 'pages do not overlap');
+  const filtered = await api('adminA', 'GET', '/api/contracts?q=ctr-par&limit=10', { org: A });
+  assert.ok(filtered.body.length >= 4 && filtered.body.every((c: any) => /CTR-PAR-/.test(c.contract_number)));
+  assert.equal(Number(filtered.headers.get('x-total-count')), filtered.body.length);
+  const byStatus = await api('adminA', 'GET', '/api/contracts?status=Terminated&limit=10', { org: A });
+  assert.equal(byStatus.body.length, 0);
+  assert.equal(Number(byStatus.headers.get('x-total-count')), 0);
+});
+
+test('paged lists keep tenant and department scoping (totals included) and never reveal other organizations', async () => {
+  const bList = await api('adminB', 'GET', '/api/contracts?limit=50&q=ctr', { org: B });
+  assert.ok(bList.body.every((c: any) => c.organizationId === B));
+  assert.equal(Number(bList.headers.get('x-total-count')), bList.body.length);
+  const bSearchesA = await api('adminB', 'GET', `/api/contracts?q=${fixtureA.contract.contract_id}&limit=10`, { org: B });
+  assert.deepEqual(bSearchesA.body, []);
+  denied(await api('adminB', 'GET', '/api/contracts?limit=5', { org: A }), [403, 404]);
+  // Sales editor: only the Sales department's contracts, and the total counts only those.
+  const sales = await api('salesEditorA', 'GET', '/api/contracts?limit=2&offset=0', { org: A });
+  const salesAll = ok(await api('salesEditorA', 'GET', '/api/contracts', { org: A }));
+  assert.equal(Number(sales.headers.get('x-total-count')), salesAll.length);
+  assert.ok(!sales.raw.includes(fixtureLegal.contract.contract_id) && !sales.raw.includes('CTR-A2'));
+  const salesPage2 = await api('salesEditorA', 'GET', `/api/contracts?limit=2&offset=2`, { org: A });
+  assert.equal(sales.body.length + salesPage2.body.length <= salesAll.length, true);
+  const legalSeen = await api('salesEditorA', 'GET', '/api/contracts?q=CTR-A2&limit=5', { org: A });
+  assert.deepEqual(legalSeen.body, []);
+  assert.equal(Number(legalSeen.headers.get('x-total-count')), 0);
+  const viewerNoDept = await api('viewerA', 'GET', '/api/contracts?limit=5', { org: A });
+  assert.equal(viewerNoDept.status, 200);
+  assert.equal(Number(viewerNoDept.headers.get('x-total-count')), 0);
+});
+
+test('partners, orders and spendings support the same server-side paging and filtering', async () => {
+  for (const [route, key, search, sort] of [
+    ['/api/partners', 'partner_id', 'Partner A', 'partner_name'],
+    ['/api/ios', 'io_id', 'IO-A', 'io_number'],
+    ['/api/partner-spendings', 'id', 'INV-A', 'invoice_date'],
+  ] as const) {
+    const all = ok(await api('adminA', 'GET', route, { org: A }));
+    assert.ok(Array.isArray(all) && all.length >= 2, route);
+    const page = await api('adminA', 'GET', `${route}?limit=1&offset=1&sort=${sort}`, { org: A });
+    assert.equal(page.body.length, 1, route);
+    assert.equal(Number(page.headers.get('x-total-count')), all.length, route);
+    const found = await api('adminA', 'GET', `${route}?q=${encodeURIComponent(search)}&limit=20`, { org: A });
+    assert.ok(found.body.length >= 2 && found.body.length === Number(found.headers.get('x-total-count')), route);
+    const otherOrg = await api('adminB', 'GET', `${route}?q=${encodeURIComponent(search)}&limit=20`, { org: B });
+    assert.ok(!otherOrg.body.some((row: any) => all.some((a: any) => a[key] === row[key])), `${route} leaked across organizations`);
+    const salesOnly = await api('salesEditorA', 'GET', `${route}?limit=50`, { org: A });
+    assert.ok(!salesOnly.raw.includes(' A2'), `${route} department scope`);
+  }
+});
+
+test('GET /api/search is tenant- and department-scoped, filterable by type and limited', async () => {
+  const adminA = ok(await api('adminA', 'GET', '/api/search?q=CTR-A1', { org: A }));
+  assert.ok(adminA.results.some((r: any) => r.entity_type === 'contracts' && r.entity_id === fixtureA.contract.contract_id));
+  assert.equal(adminA.total, adminA.results.length);
+  const onlyContracts = ok(await api('adminA', 'GET', '/api/search?q=A1&type=contracts', { org: A }));
+  assert.ok(onlyContracts.results.length >= 1 && onlyContracts.results.every((r: any) => r.entity_type === 'contracts'));
+  const limited = ok(await api('adminA', 'GET', '/api/search?q=A&limit=1', { org: A }));
+  assert.equal(limited.results.length, 1);
+  assert.ok(limited.total >= 1);
+  const fromB = ok(await api('adminB', 'GET', '/api/search?q=A1', { org: B }));
+  assert.ok(!JSON.stringify(fromB).includes(fixtureA.contract.contract_id), 'organization B never sees A records');
+  const legalRecord = ok(await api('salesEditorA', 'GET', '/api/search?q=A2', { org: A }));
+  assert.equal(legalRecord.total, 0, 'a Sales editor cannot find Legal department records');
+  const none = ok(await api('adminA', 'GET', '/api/search?q=%25_%5C', { org: A }));
+  assert.equal(none.total, 0, 'wildcard characters are literal');
+  denied(await api('adminB', 'GET', '/api/search?q=A1', { org: A }), [403, 404]);
 });

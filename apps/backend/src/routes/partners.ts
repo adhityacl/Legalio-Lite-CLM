@@ -1,4 +1,5 @@
 import { nextEntityId } from '../ids';
+import { pageRows, type ListSpec } from '../listQuery';
 import { contractRepository } from '../repositories/contractRepository';
 import { generateRedlineAnalysis } from '../redlineAnalysis';
 import * as bodySchemas from '../schemas';
@@ -26,13 +27,19 @@ export function createPartnersRouter() {
   const app = express.Router();
   forwardAsyncRouteErrors(app);
 
+const PARTNER_LIST: ListSpec<any> = {
+  search: ["partner_name", "codename", "partner_type", "internal_pic", "country", "notes", "partner_id", "pic_name"],
+  sorts: { partner_name: (p) => fold(p.partner_name), created_at: (p) => String(p.created_at ?? ""), updated_at: (p) => String(p.updated_at ?? ""), internal_pic: (p) => fold(p.internal_pic), status_dd: (p) => String(p.status_dd ?? "") },
+  filters: ["internal_pic", "partner_type", "status_dd", "country"],
+};
+const fold = (value: unknown) => String(value ?? "").toLowerCase();
 app.get("/api/partners", async (req: express.Request, res: express.Response) => {
   const partnerList = await scopedRecords(req, "partner", db.partners);
   const normalizedPartners = partnerList.map((p) => ({
     ...p,
     tags: sanitizePartnerTags(p.tags),
   }));
-  res.json(normalizedPartners);
+  res.json(pageRows(req, res, normalizedPartners, PARTNER_LIST) ?? normalizedPartners);
 });
 app.post("/api/partners/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
   if (!(await ensureAiAvailable(req, res))) return;

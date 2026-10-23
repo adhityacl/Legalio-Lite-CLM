@@ -1,4 +1,5 @@
 import { nextEntityId } from '../ids';
+import { pageRows, type ListSpec } from '../listQuery';
 import { contractRepository } from '../repositories/contractRepository';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, isMatchingOrg, logActivity } from '../recordAccess';
@@ -28,6 +29,11 @@ export function createIoRouter() {
   const app = express.Router();
   forwardAsyncRouteErrors(app);
 
+const IO_LIST: ListSpec<any> = {
+  search: ["io_number", "io_title", "media_channel", "deliverables", "contract_number", "internal_notes", "io_id"],
+  sorts: { end_date: (i) => String(i.end_date ?? ""), io_number: (i) => String(i.io_number ?? "").toLowerCase(), start_date: (i) => String(i.start_date ?? ""), created_at: (i) => String(i.created_at ?? "") },
+  filters: ["status", "partner_id", "contract_id"],
+};
 app.get("/api/ios", async (req: express.Request, res: express.Response) => {
   const iosList = await scopedRecords(req, "io", db.ios);
   const labels = await contractRepository.labels(getRequestTenantId(req), iosList.map((io) => io.contract_id));
@@ -48,7 +54,7 @@ app.get("/api/ios", async (req: express.Request, res: express.Response) => {
       contract_number: c ? c.contract_number : io.contract_number || "-",
     };
   });
-  res.json(result);
+  res.json(pageRows(req, res, result, IO_LIST) ?? result);
 });
 app.post("/api/ios/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
   if (!(await ensureAiAvailable(req, res))) return;

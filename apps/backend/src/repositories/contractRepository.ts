@@ -4,6 +4,7 @@
  */
 import { sql, type Sql } from '../db';
 import { departmentScope, type OrgContext } from '../rbac';
+import { SEARCH_TEXT, searchClauses, searchPatterns } from '../normalizedCoreStore';
 import { DuplicateValueError } from './errors';
 import { createEntityRepository, type Row, type UpdateOptions } from './entityRepository';
 
@@ -46,8 +47,6 @@ const SORT_SQL: Record<ContractSort, string> = {
   created_at: 'c.created_at, c.contract_id',
 };
 const lowerNumber = (value: unknown) => String(value ?? '').trim().toLowerCase();
-export const likeTokens = (query: string) =>
-  (query.match(/[\p{L}\p{N}_]+/gu)?.slice(0, 16) ?? []).map((token) => '%' + token.replaceAll('_', '\\_') + '%');
 
 export function createContractRepository(db: Sql) {
   const base = createEntityRepository(db, 'contracts');
@@ -75,11 +74,11 @@ export function createContractRepository(db: Sql) {
     if (query.endFrom) { clauses.push('c.end_date >= ?'); params.push(query.endFrom); }
     if (query.endTo) { clauses.push('c.end_date <= ?'); params.push(query.endTo); }
     if (query.q?.trim()) {
-      const patterns = likeTokens(query.q);
+      const patterns = searchPatterns(query.q);
       if (patterns.length) {
         clauses.push(`(c.contract_id ILIKE ? OR c.contract_id IN (
-          SELECT s.entity_id FROM search_records s WHERE s.entity_type = 'contracts' AND s.organization_id = ? AND (s.title || ' ' || s.body) ILIKE ALL(?)))`);
-        params.push(`${query.q.trim().replaceAll('_', '\\_')}%`, organizationId, patterns);
+          SELECT entity_id FROM search_records WHERE entity_type = 'contracts' AND organization_id = ? AND ${searchClauses(SEARCH_TEXT, patterns)}))`);
+        params.push(`${query.q.trim().replaceAll('_', '\\_')}%`, organizationId, ...patterns);
       }
     }
     return { sql: clauses.join(' AND '), params };

@@ -1,4 +1,5 @@
 import { nextEntityId } from '../ids';
+import { pageRows, type ListSpec } from '../listQuery';
 import { contractRepository } from '../repositories/contractRepository';
 import { normalizeSpendingMonths } from '../spendingMonths';
 import * as bodySchemas from '../schemas';
@@ -30,6 +31,11 @@ export function createSpendingsRouter() {
   const app = express.Router();
   forwardAsyncRouteErrors(app);
 
+const SPENDING_LIST: ListSpec<any> = {
+  search: ["vendor_name", "invoice_number", "invoice_title", "invoice_description", "payment_status", "id"],
+  sorts: { invoice_date: (s) => String(s.invoice_date ?? ""), vendor_name: (s) => String(s.vendor_name ?? "").toLowerCase(), total_amount_usd: (s) => Number(s.total_amount_usd) || 0, created_at: (s) => String(s.created_at ?? "") },
+  filters: ["payment_status", "vendor_id", "currency"],
+};
 app.get("/api/partner-spendings", async (req: express.Request, res: express.Response) => {
   const spendingsList = await scopedRecords(req, "spending", db.spendings);
   const list = spendingsList.map((s) => {
@@ -44,7 +50,7 @@ app.get("/api/partner-spendings", async (req: express.Request, res: express.Resp
     }
     return s;
   });
-  res.json(list);
+  res.json(pageRows(req, res, list, SPENDING_LIST) ?? list);
 });
 app.post("/api/spendings/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
   if (!(await ensureAiAvailable(req, res))) return;

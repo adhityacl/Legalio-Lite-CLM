@@ -302,13 +302,22 @@ export async function synchronizeBusinessRows(db: DB, data: Row) {
   syncedRows.set(db,written);
 }
 export interface SearchHit { entity_type: string; entity_id: string; title: string }
-export async function searchBusinessRows(db: DB, organizationId: string, query: string): Promise<SearchHit[]> {
+/** `ILIKE` patterns for each word of a free-text query (at most 16); `_` and `\` are literal. */
+export function searchPatterns(query: string): string[] {
   const tokens = query.match(/[\p{L}\p{N}_]+/gu)?.slice(0,16) || [];
-  if (!tokens.length) return [];
-  // Every token must occur somewhere; `_` is a LIKE wildcard, so it is escaped.
-  const patterns = tokens.map(token => '%' + token.replaceAll('_','\\_') + '%');
+  return tokens.map(token => '%' + token.replaceAll('_','\\_') + '%');
+}
+/** One `expression ILIKE ?` per pattern, ANDed: every word must occur, and each clause can use the trigram index on the expression. */
+export const searchClauses = (expression: string, patterns: string[]) => patterns.map(() => `${expression} ILIKE ?`).join(' AND ');
+export const SEARCH_TEXT = `(title || ' ' || body)`;
+export async function searchBusinessRows(db: DB, organizationId: string, query: string, options: { limit?: number; types?: string[] } = {}): Promise<SearchHit[]> {
+  const patterns = searchPatterns(query);
+  if (!patterns.length) return [];
   // Authorization by department is applied by the caller before returning any text/counts.
-  // shortcut: unindexed ILIKE scan without ranking or accent folding; move to pg_trgm or tsvector when organizations hold many thousand records.
+  const params: unknown[] = [organizationId, ...patterns];
+  let typeClause = '';
+  if (options.types?.length) { typeClause = ' AND entity_type = ANY(?)'; params.push(options.types); }
+  if (options.limit) params.push(options.limit);
   return db.all<SearchHit>(`SELECT entity_type, entity_id, title FROM search_records
-    WHERE organization_id = ? AND (title || ' ' || body) ILIKE ALL (?) ORDER BY entity_type, entity_id`, organizationId, patterns);
+    WHERE organization_id = ? AND ${searchClauses(SEARCH_TEXT, patterns)}${typeClause} ORDER BY entity_type, entity_id${options.limit ? ' LIMIT ?' : ''}`, ...params);
 }

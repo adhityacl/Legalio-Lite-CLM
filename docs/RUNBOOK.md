@@ -46,6 +46,20 @@ Upgrade notes: schema changes are versioned migrations (see POSTGRES_STORAGE.md)
 - Contract writes are committed row by row; a second editor saving a stale copy gets HTTP 409 `VERSION_CONFLICT` (reload and re-apply).
 - Contracts are no longer loaded into memory at boot; startup time and memory no longer grow with the number of contracts.
 
+### Paged lists and search (Phase 2B)
+
+- `GET /api/contracts`, `/api/partners`, `/api/ios`, `/api/partner-spendings` still return the complete array when called without parameters (and
+  `/api/init-data` is unchanged). With `limit` (1-500, default 50 when only `offset` is given), `offset`, `q` (words that must all match),
+  `sort` + `dir=asc|desc` and per-endpoint filters they return one page and the number of matching, *visible* records in `X-Total-Count`.
+  Tenant and department scoping apply before counting. Contracts page in SQL for organization-scope roles and filter-then-page for department roles;
+  the other lists page in memory after scoping (cheap until their repositories exist).
+  Filters: contracts `status`, `status_approval`, `document_type`, `partner_id`, `internal_pic`, `end_from`, `end_to`; partners `internal_pic`,
+  `partner_type`, `status_dd`, `country`; orders `status`, `partner_id`, `contract_id`; spendings `payment_status`, `vendor_id`, `currency`.
+- `GET /api/search?q=&type=&limit=` runs in SQL, reads the matching records of each type in one query, and returns only records the caller may see.
+- Migration `0008_search_trigram` creates the `pg_trgm` extension (if the database user is allowed to) and a GIN index on the search text. If the
+  extension cannot be created the migration still succeeds and search uses a sequential scan; ask a database administrator to run
+  `CREATE EXTENSION pg_trgm;` and `npm run migrate` again to get the index.
+
 ### Health endpoints
 
 - `GET /api/health` is cheap liveness (process answers).
