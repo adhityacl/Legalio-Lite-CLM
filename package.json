@@ -20,6 +20,8 @@
     "build": "turbo run build",
     "build:frontend": "npm run build --workspace @legalio/frontend",
     "build:backend": "npm run build --workspace @legalio/backend",
+    "migrate": "npm run migrate --workspace @legalio/backend --",
+    "migrate:status": "npm run migrate --workspace @legalio/backend -- status",
     "start": "npm run start --workspace @legalio/backend",
     "clean": "node scripts/clean-build.mjs",
     "lint": "turbo run lint //#lint:eslint --concurrency=1 && tsc --noEmit",

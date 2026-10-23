@@ -6,12 +6,15 @@
   "scripts": {
     "dev": "API_ONLY=true tsx watch src/main.ts",
     "dev:combined": "tsx watch src/main.ts",
-    "build": "npm run build:server && npm run build:console",
+    "build": "npm run build:server && npm run build:migrate && npm run build:console",
     "start": "node dist/server.cjs",
     "lint": "node --max-old-space-size=2048 ../../node_modules/typescript/bin/tsc --noEmit && node --max-old-space-size=2048 ../../node_modules/typescript/bin/tsc --noEmit --project console/tsconfig.json",
     "build:server": "esbuild src/main.ts --bundle --platform=node --format=cjs --packages=external --alias:@legalio/shared=../../packages/shared/src --alias:@legalio/types=../../packages/types/src --sourcemap --outfile=dist/server.cjs",
     "build:console": "vite build --config console/vite.config.ts",
-    "dev:console": "vite build --watch --config console/vite.config.ts"
+    "dev:console": "vite build --watch --config console/vite.config.ts",
+    "migrate": "tsx src/migrateCli.ts",
+    "migrate:prod": "node dist/migrate.cjs",
+    "build:migrate": "esbuild src/migrateCli.ts --bundle --platform=node --format=cjs --packages=external --alias:@legalio/shared=../../packages/shared/src --alias:@legalio/types=../../packages/types/src --sourcemap --outfile=dist/migrate.cjs"
   },
   "dependencies": {
     "@better-auth/infra": "^0.4.9",
