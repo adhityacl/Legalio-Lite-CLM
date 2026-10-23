@@ -112,7 +112,7 @@ export async function loadCoreData() {
   const rows = {
     allowedUsers: await payloads('allowed_users'),
     partners: (await business('partners')).map(migratePartnerContact),
-    contracts: await business('contracts'),
+    // Repository-backed (repositories/contractRepository.ts): never loaded into the snapshot.
     ios: await business('insertion_orders'),
     notifications: await business('notifications'),
     // Append-only table, read per organization through activityLog.ts: never loaded into memory.

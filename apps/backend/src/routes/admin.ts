@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import { buildDemoDataset } from '@legalio/shared/data/demoDataset';
 import { resolveTenantSettings } from '@legalio/shared/policy';
-import { DEFAULT_BRANDING, coreSaver, db, migrateLegacyRecords, saveDb } from '../memoryDb';
+import { DEFAULT_BRANDING, coreSaver, db, migrateLegacyRecords, normalizeContractRecord, saveDb } from '../memoryDb';
+import { contractRepository } from '../repositories/contractRepository';
 import { identityOf } from '../identity';
 import { sql } from '../db';
 import { removeDemoAccounts } from '../demoAccounts';
@@ -121,7 +122,6 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
         tenants,
         allowedUsers: [],
         partners: dataset.partners,
-        contracts: dataset.contracts,
         ios: dataset.ios,
         spendings: dataset.spendings,
         evaluations: dataset.evaluations,
@@ -154,6 +154,7 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       });
       try {
         migrateLegacyRecords();
+        dataset.contracts.forEach(normalizeContractRecord);
         snapshot = coreSaver.snapshot();
         nextState = { ...db };
       } finally {
@@ -162,6 +163,10 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       // search_records was emptied above, so no fingerprint may skip a row; the replacement and its business records commit together.
       resetSyncCache(sql);
       await saveCoreData(snapshot);
+      // Contracts are repository-backed: the snapshot sync neither removes the old ones nor writes the dataset's. Reverse order
+      // keeps the dataset's order (each insert goes to the front).
+      await contractRepository.removeAll();
+      for (const contract of [...dataset.contracts].reverse()) await contractRepository.insert(contract);
       await appendAudit(sql, auditActorFor(req, identity), {
         organizationId: null, action: "platform.application.reset", targetType: "installation", targetId: "installation",
         outcome: "success", changedFields: [`mode:${mode}`],

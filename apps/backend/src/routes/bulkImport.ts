@@ -1,4 +1,5 @@
 import { nextEntityId } from '../ids';
+import { contractRepository } from '../repositories/contractRepository';
 import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
 import { getRequestTenantId, isMatchingOrg, scopeOf, addActivityLog } from '../recordAccess';
 import { tenantDefaultCurrency, normalizePartnerDocuments, computeDueDiligenceStatus } from '../tenantPolicy';
@@ -196,9 +197,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         });
         continue;
       }
-      const exists = db.contracts.find(
-        (c) => inTenant(c) && c.contract_number?.toLowerCase() === nomor.toLowerCase(),
-      );
+      const exists = await contractRepository.findByNumber(tenantId, nomor);
       if (exists) {
         skipped.push({
           rowIndex,
@@ -229,9 +228,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           continue;
         }
         const parentNomor = (row.parent_contract_number || "").trim();
-        const parentContract = parentNomor
-          ? db.contracts.find((c) => inTenant(c) && c.contract_number?.toLowerCase() === parentNomor.toLowerCase())
-          : null;
+        const parentContract = parentNomor ? await contractRepository.findByNumber(tenantId, parentNomor) : null;
         if (parentNomor && !parentContract) {
           failed.push({ rowIndex, identifier: nomor, message: `Kontrak induk "${parentNomor}" tidak ditemukan. Impor kontrak induk lebih dulu.` });
           continue;
@@ -271,7 +268,8 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           created_at: now,
           updated_at: now,
         };
-        db.contracts.push(newContract);
+        // Row by row: each contract is committed on its own, so a later row's failure never discards the earlier ones.
+        await contractRepository.insert(newContract);
         succeeded.push({
           rowIndex,
           identifier: nomor,
@@ -322,9 +320,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         continue;
       }
       const contractNomor = (row.contract_number || "").trim();
-      const contract = db.contracts.find(
-        (c) => inTenant(c) && c.contract_number?.toLowerCase() === contractNomor.toLowerCase(),
-      );
+      const contract = contractNomor ? await contractRepository.findByNumber(tenantId, contractNomor) : undefined;
       const chargingType = pickEnum(row.charging_type, BULK_ENUMS.charging_type);
       const noticeTypeIo = pickEnum(row.notice_type_required, BULK_NOTICE_TYPES);
       if (chargingType === null || noticeTypeIo === null) {

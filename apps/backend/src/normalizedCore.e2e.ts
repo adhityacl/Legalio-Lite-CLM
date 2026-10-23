@@ -23,7 +23,10 @@ const {sql:fixtureSql}=await import('./db');
 const {seedOrganizationsFromDataset,createOrganizationRecord}=await import('./organizationProvisioning');
 const {synchronizeCoreData}=await import('./coreDataStore');
 await (await import('./schema')).ensureSchema();
-const dataset=buildDemoDataset();await seedOrganizationsFromDataset(fixtureSql,dataset);await synchronizeCoreData(fixtureSql,dataset);
+const dataset=buildDemoDataset();await seedOrganizationsFromDataset(fixtureSql,dataset);
+// Contracts are repository-backed (not part of the snapshot sync); they commit with the orders that reference them.
+const {contractRepository}=await import('./repositories/contractRepository');
+await fixtureSql.tx(async()=>{await synchronizeCoreData(fixtureSql,dataset);for(const row of [...dataset.contracts].reverse())await contractRepository.insert(row);});
 const now=new Date().toISOString();const password='E2e-local-password-1234';const hash=await hashPassword(password);
 for(const [id,email,role] of [['e2e-root','root@example.com','superuser'],['e2e-admin','admin@example.com','user'],['e2e-editor','editor@example.com','user']]){
  await fixtureSql.run('INSERT INTO "user"(id,name,email,"emailVerified",role,banned,"createdAt","updatedAt") VALUES(?,?,?,true,?,false,?,?)',id,id,email,role,now,now);

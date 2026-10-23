@@ -40,3 +40,10 @@ Rows in `integration_credentials` (Google and COS) are encrypted with AES-256-GC
 
 - `npm test`: unit tests against a running PostgreSQL (`TEST_DATABASE_URL`, default `postgres://legalio:legalio@127.0.0.1:5432/legalio`). Each run creates and drops its own `legalio_test_*` database.
 - `npm run build:sys`, then `npm run test:e2e:postgres` and `npm run test:e2e:data-entry`: real HTTP and Chromium checks against an isolated test database and an in-memory object store. They need Playwright Chromium.
+
+
+## Repository-backed contracts (Phase 2B)
+
+Contracts are no longer part of the in-memory snapshot or its full-database sync. They are read and written row by row by
+`apps/backend/src/repositories/contractRepository.ts`, with an optimistic-concurrency `version` column (migration `0007_contract_versions`).
+Existing rows are adopted in place (same table, version 1). See `docs/ARCHITECTURE-persistence.md`.

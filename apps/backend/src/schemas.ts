@@ -102,6 +102,8 @@ export const contractUpdateBody = z.object({
   start_date: optional(date),
   end_date: optional(date),
   status: optional(s(40)),
+  /** The version the client last read; a stale one is answered with 409 VERSION_CONFLICT. */
+  version: optional(z.union([z.number().int().positive(), z.string().regex(/^[1-9]\d{0,9}$/)])),
   ...contractFields,
 });
 

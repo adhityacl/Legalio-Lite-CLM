@@ -6,6 +6,7 @@ import { sql, isConstraintViolation } from './db';
 import { normalizeContractStatus, normalizeApprovalStatus } from '@legalio/types/domainStatus';
 import { normalizeCurrencyCode } from '@legalio/shared/currencyUtils';
 import { createCoreSaver } from './coreDataStore';
+import { contractRepository } from './repositories/contractRepository';
 import { loadCoreData } from './lib/auth';
 import { componentLog } from './logger';
 const log = componentLog('memoryDb');
@@ -27,10 +28,11 @@ export const demoData = buildDemoDataset();
 export const seedData = IS_TEST_MODE
   ? { partners: [], contracts: [], ios: [], notifications: [], activityLogs: [], evaluations: [], spendings: [] }
   : demoData;
+/** Demo contracts to insert (through the repository) when a first run seeds the demo workspace; empty in test mode. */
+export const seedContracts: any[] = seedData.contracts;
 export const db: any = {
   allowedUsers: [],
   partners: seedData.partners,
-  contracts: seedData.contracts,
   ios: seedData.ios,
   notifications: seedData.notifications,
   activityLogs: seedData.activityLogs,
@@ -55,6 +57,14 @@ export const db: any = {
     refreshToken: "",
   },
 };
+// Contracts are persisted row by row by repositories/contractRepository.ts; the snapshot holds none. Touching the old
+// collection would silently read an empty list or lose a write, so it fails loudly instead.
+const repositoryBacked = (collection: string, repository: string) => Object.defineProperty(db, collection, {
+  enumerable: false, configurable: true,
+  get() { throw new Error(`db.${collection} is not in memory: use ${repository}.`); },
+  set() { throw new Error(`db.${collection} is not in memory: write through ${repository}.`); },
+});
+repositoryBacked('contracts', 'repositories/contractRepository');
 bindTenantStore(() => db);
 
 /** Rebuilds the read-only `db.tenants` projection from canonical organization rows (PRD §7.3). */
@@ -80,11 +90,6 @@ export function migrateLegacyRecords() {
     p.dd_documents = normalizePartnerDocuments(p);
     p.status_dd = computeDueDiligenceStatus(p.dd_documents);
   });
-  (db.contracts || []).forEach((c: any) => {
-    c.status = normalizeContractStatus(c.status);
-    c.status_approval = normalizeApprovalStatus(c.status_approval);
-    c.currency = normalizeCurrencyCode(c.currency, tenantDefaultCurrency(c.organizationId));
-  });
   (db.ios || []).forEach((io: any) => {
     io.status = normalizeContractStatus(io.status);
     io.currency = normalizeCurrencyCode(io.currency, tenantDefaultCurrency(io.organizationId));
@@ -92,6 +97,29 @@ export function migrateLegacyRecords() {
   (db.spendings || []).forEach((sp: any) => {
     sp.currency = normalizeCurrencyCode(sp.currency, tenantDefaultCurrency(sp.organizationId));
   });
+}
+/** Stable status codes and a valid currency on a contract written by an earlier release (contracts are repository-backed, so this is applied row by row). */
+export function normalizeContractRecord(c: any) {
+  c.status = normalizeContractStatus(c.status);
+  c.status_approval = normalizeApprovalStatus(c.status_approval);
+  c.currency = normalizeCurrencyCode(c.currency, tenantDefaultCurrency(c.organizationId));
+  return c;
+}
+/** Brings stored contracts written by earlier releases to stable codes and a valid currency. Only rows that need it are read (SQL pre-filter). */
+export async function normalizeStoredContracts(): Promise<number> {
+  const stale = `status IS NULL OR status NOT IN ('Active','Expiring','Expired','Terminated')
+    OR status_approval IS NULL OR status_approval NOT IN ('Draft','Review','Signed','Active')
+    OR currency IS NULL OR currency !~ '^[A-Z]{3}$'`;
+  const signature = (c: any) => JSON.stringify([c.status, c.status_approval, c.currency]);
+  let changed = 0;
+  for await (const batch of contractRepository.batches(500, stale)) {
+    for (const contract of batch) {
+      if (signature(normalizeContractRecord({ ...contract })) === signature(contract)) continue;
+      await contractRepository.mutate(contract.organizationId, contract.contract_id, (row) => { normalizeContractRecord(row); }, { bumpVersion: false });
+      changed++;
+    }
+  }
+  return changed;
 }
 export function sanitizePartnerTags(tags) {
   if (!tags) return [];
@@ -146,11 +174,15 @@ export const saveListeners: Array<() => void> = [];
 /** Runs before every save: caches derived from the projection (upload index, lifecycle freshness) register here to be dropped. */
 export function onDbSaved(listener: () => void) { saveListeners.push(listener); }
 export const coreSaver = createCoreSaver(sql, () => db, async () => { Object.assign(db, await loadCoreData()); });
-/** Persists the in-memory projection: one writer at a time, never inside sql.tx. */
-export async function saveDb() {
+/**
+ * Persists the in-memory projection: one writer at a time, never inside sql.tx. `alongside` runs in the same transaction
+ * right after the sync, for repository writes that must commit or fail together with the snapshot change (e.g. deleting a
+ * contract together with the insertion orders and notifications that referenced it).
+ */
+export async function saveDb(alongside?: () => Promise<unknown>) {
   for (const listener of saveListeners) listener();
   try {
-    await coreSaver.save();
+    await coreSaver.save(alongside);
   } catch (err) {
     log.error("Failed to save core data", err);
     if (isConstraintViolation(err)) (err as any).status = 409;

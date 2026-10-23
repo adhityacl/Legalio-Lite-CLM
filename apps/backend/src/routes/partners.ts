@@ -1,4 +1,5 @@
 import { nextEntityId } from '../ids';
+import { contractRepository } from '../repositories/contractRepository';
 import { generateRedlineAnalysis } from '../redlineAnalysis';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity } from '../recordAccess';
@@ -387,8 +388,7 @@ app.delete("/api/partners/:id", async (req: express.Request, res: express.Respon
   const tenantDenial = assertRecordAccess(req, "partner", partner);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
   const sameOrg = (row: any) => row?.organizationId === partner.organizationId;
-  const partnerContracts = db.contracts.filter((c) => sameOrg(c) && c.partner_id === id);
-  const contractIds = partnerContracts.map((c) => c.contract_id);
+  const contractIds = await contractRepository.idsByPartner(partner.organizationId, id);
   const partnerIOs = db.ios.filter(
     (io) => sameOrg(io) && (io.partner_id === id || contractIds.includes(io.contract_id)),
   );
@@ -397,16 +397,16 @@ app.delete("/api/partners/:id", async (req: express.Request, res: express.Respon
     (n) => !(sameOrg(n) && (contractIds.includes(n.parent_id) || ioIds.includes(n.parent_id))),
   );
   db.ios = db.ios.filter((io) => !partnerIOs.includes(io));
-  db.contracts = db.contracts.filter((c) => !partnerContracts.includes(c));
   for (const spending of db.spendings) if (sameOrg(spending) && spending.vendor_id === id) spending.vendor_id = null;
   for (const evaluation of db.evaluations) if (sameOrg(evaluation) && evaluation.partner_id === id) evaluation.partner_id = null;
   db.partners.splice(partnerIndex, 1);
-  await saveDb();
-  await logActivity(req, "DELETE", "PARTNER", `Menghapus Partner '${partner.partner_name}' beserta ${partnerContracts.length} Kontrak dan ${partnerIOs.length} Insertion Order pendukung.`);
+  // The partner's contracts are rows of their own repository: removed in the same transaction as the partner and its orders.
+  await saveDb(() => contractRepository.removeByPartner(partner.organizationId, id));
+  await logActivity(req, "DELETE", "PARTNER", `Menghapus Partner '${partner.partner_name}' beserta ${contractIds.length} Kontrak dan ${partnerIOs.length} Insertion Order pendukung.`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({
     success: true,
-    deletedContractsCount: partnerContracts.length,
+    deletedContractsCount: contractIds.length,
     deletedIosCount: partnerIOs.length,
   });
 });

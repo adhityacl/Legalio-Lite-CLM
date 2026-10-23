@@ -29,13 +29,18 @@ const SPECS: Record<IdKind, Spec> = {
   evaluation: { sequence: 'legalio_evaluation_id_seq', collection: 'evaluations', key: 'id', table: 'evaluations', column: 'id', digits: '\\d+$', format: (n, year) => `EVAL-${year}-${pad(n, 3)}` },
 };
 
+/** Repository-backed collections are not in memory: ask the table. */
+async function idTaken(spec: Spec, id: string): Promise<boolean> {
+  if (spec.collection === 'contracts') return Boolean(await sql.get('SELECT 1 FROM contracts WHERE contract_id = ?', id));
+  return (db[spec.collection] || []).some((record: any) => record?.[spec.key] === id);
+}
 /** The next free id of `kind`. `year` only matters for evaluations (defaults to the current year). */
 export async function nextEntityId(kind: IdKind, year = String(new Date().getFullYear())): Promise<string> {
   const spec = SPECS[kind];
   for (let attempt = 0; attempt < 1000; attempt++) {
     const row = await sql.get<{ n: number }>(`SELECT nextval('${spec.sequence}') AS n`);
     const id = spec.format(Number(row!.n), year);
-    if (!(db[spec.collection] || []).some((record: any) => record?.[spec.key] === id)) return id;
+    if (!(await idTaken(spec, id))) return id;
   }
   throw new Error(`Could not allocate a ${kind} id.`);
 }

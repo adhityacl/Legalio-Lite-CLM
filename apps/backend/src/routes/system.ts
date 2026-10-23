@@ -1,3 +1,4 @@
+import { contractRepository } from '../repositories/contractRepository';
 import { LEGACY_DEFAULT_ADMIN_PASSWORD } from '../demoAdmin';
 import { db, DEFAULT_BRANDING } from '../memoryDb';
 import { normalizeCurrencyCode } from '@legalio/shared/currencyUtils';
@@ -29,7 +30,7 @@ app.get("/api/exchange-rates", async (req: express.Request, res: express.Respons
     const currencies = Array.from(
       new Set([
         ...(db.spendings || []).map((s) => s.currency),
-        ...(db.contracts || []).map((c) => c.currency),
+        ...(await contractRepository.currencies()),
         ...(db.ios || []).map((i) => i.currency),
       ].filter(Boolean).map((c) => normalizeCurrencyCode(c))),
     );

@@ -3,6 +3,7 @@ import { onDbSaved, db, saveDb } from './memoryDb';
 import { seedLedgerFromLegacy, planReminders, existingKeys as existingReminderKeys, enqueue as enqueueReminder, ReminderSender, deliverDue as deliverDueReminders, createReminderScheduler, schedulerOptionsFromEnv } from './reminders';
 import { sql } from './db';
 import { contractLifecycleMode, contractLifecycle } from '@legalio/shared/contractLifecycle';
+import { contractRepository } from './repositories/contractRepository';
 import { getTenantSettings, findTenant, computeLifecycle } from './tenantPolicy';
 import { todayInTimezone } from '@legalio/shared/policy';
 import { normalizeContractStatus } from '@legalio/types/domainStatus';
@@ -17,7 +18,7 @@ let lifecyclesFreshUntil = 0;
 onDbSaved(() => { lifecyclesFreshUntil = 0; });
 /** Notifications written by releases without a ledger count as already sent for the record's current renewal cycle. */
 export async function seedReminderLedger() {
-  const records = new Map(reminderRecords().map((item) => [`${item.kind}:${item.recordId}`, item]));
+  const records = new Map((await reminderRecords()).map((item) => [`${item.kind}:${item.recordId}`, item]));
   const entries: Array<{ organizationId: string; kind: "contract" | "commercial"; recordId: string; cycleEnd: string; offsetDays: number }> = [];
   for (const notification of db.notifications || []) {
     const match = /^Reminder (?:(\d+)d|H-(\d+))$/.exec(notification.notification_type || "");
@@ -55,16 +56,7 @@ export function reminderRecipients(tenantId: string, kind: "contract" | "commerc
 }
 /** Recomputes lifecycle status (and rolls auto-renewals forward) for contracts and commercial documents. Sends nothing. */
 export async function recalculateStatuses() {
-  // In place, not copies: a handler holding a record across an await must not end up mutating a detached object.
-  for (const contract of db.contracts || []) {
-    rollForwardAutoRenewal(contract);
-    const { daysRemaining, status } = contractLifecycle(contract, getTenantSettings(contract.organizationId));
-    Object.assign(contract, {
-      status,
-      days_remaining: daysRemaining ?? contract.days_remaining,
-      updated_at: contract.updated_at || new Date().toISOString(),
-    });
-  }
+  await refreshStoredContractLifecycles();
   for (const io of db.ios || []) {
     if (normalizeContractStatus(io.status) === "Terminated") { io.status = "Terminated"; continue; }
     const { daysRemaining, status } = computeLifecycle(io.organizationId, io.end_date, io.status, false);
@@ -76,24 +68,71 @@ export async function recalculateStatuses() {
   }
   await saveDb();
 }
+/**
+ * Rolls auto-renewals forward and refreshes the derived status / days_remaining of stored contracts, row by row. A stale
+ * display value is rewritten without a new version (nobody's edit becomes outdated); a rolled-forward end date gets one.
+ * Each row is re-read under a row lock, so a concurrent user edit is never overwritten with old data.
+ */
+async function refreshStoredContractLifecycles(): Promise<number> {
+  const settingsByOrg = new Map<string, ReturnType<typeof getTenantSettings>>();
+  const apply = (contract: any) => {
+    const previousEnd = contract.end_date;
+    rollForwardAutoRenewal(contract);
+    const orgKey = String(contract.organizationId ?? "");
+    if (!settingsByOrg.has(orgKey)) settingsByOrg.set(orgKey, getTenantSettings(contract.organizationId));
+    const lifecycle = contractLifecycle(contract, settingsByOrg.get(orgKey)!);
+    const remaining = lifecycle.daysRemaining ?? contract.days_remaining;
+    const changed = previousEnd !== contract.end_date || contract.status !== lifecycle.status || contract.days_remaining !== remaining;
+    if (changed) { contract.status = lifecycle.status; contract.days_remaining = remaining; }
+    return { changed, endMoved: previousEnd !== contract.end_date };
+  };
+  let updated = 0;
+  // A stored Terminated status is final until the contract is edited (an edit recomputes it), so those rows are never scanned.
+  for await (const batch of contractRepository.batches(500, "status IS DISTINCT FROM 'Terminated'")) {
+    for (const stale of batch) {
+      if (!apply({ ...stale }).changed) continue;
+      let endMoved = false;
+      await contractRepository.mutate(stale.organizationId, stale.contract_id, (row) => {
+        const outcome = apply(row);
+        endMoved = outcome.endMoved;
+        return outcome.changed ? undefined : false;
+      }, { bumpVersion: () => endMoved });
+      updated++;
+    }
+  }
+  return updated;
+}
 export const REMINDER_NOTICE_LEAD_DAYS = Math.max(0, Number(process.env.REMINDER_NOTICE_LEAD_DAYS ?? 7) || 0);
 export const reminderLog = componentLog("reminders");
 type ReminderRecord = { kind: "contract" | "commercial"; record: any; recordId: string; cycleEnd: string; daysRemaining: number };
+function contractReminder(contract: any): ReminderRecord | null {
+  const { daysRemaining, status } = contractLifecycle(contract, getTenantSettings(contract.organizationId));
+  if (status === "Terminated" || daysRemaining === null || !contract.end_date) return null;
+  return { kind: "contract", record: contract, recordId: contract.contract_id, cycleEnd: String(contract.end_date).slice(0, 10), daysRemaining };
+}
+function commercialReminder(io: any): ReminderRecord | null {
+  if (normalizeContractStatus(io.status) === "Terminated" || !io.end_date) return null;
+  const { daysRemaining } = computeLifecycle(io.organizationId, io.end_date, io.status, false);
+  if (daysRemaining === null) return null;
+  return { kind: "commercial", record: io, recordId: io.io_id, cycleEnd: String(io.end_date).slice(0, 10), daysRemaining };
+}
 /** Records that can carry reminders right now, with their renewal cycle (end date) and remaining days. */
-export function reminderRecords(): ReminderRecord[] {
+export async function reminderRecords(): Promise<ReminderRecord[]> {
   const found: ReminderRecord[] = [];
-  for (const contract of db.contracts || []) {
-    const { daysRemaining, status } = contractLifecycle(contract, getTenantSettings(contract.organizationId));
-    if (status === "Terminated" || daysRemaining === null || !contract.end_date) continue;
-    found.push({ kind: "contract", record: contract, recordId: contract.contract_id, cycleEnd: String(contract.end_date).slice(0, 10), daysRemaining });
+  for await (const batch of contractRepository.batches(500, "status IS DISTINCT FROM 'Terminated'")) {
+    for (const contract of batch) { const item = contractReminder(contract); if (item) found.push(item); }
   }
-  for (const io of db.ios || []) {
-    if (normalizeContractStatus(io.status) === "Terminated" || !io.end_date) continue;
-    const { daysRemaining } = computeLifecycle(io.organizationId, io.end_date, io.status, false);
-    if (daysRemaining === null) continue;
-    found.push({ kind: "commercial", record: io, recordId: io.io_id, cycleEnd: String(io.end_date).slice(0, 10), daysRemaining });
-  }
+  for (const io of db.ios || []) { const item = commercialReminder(io); if (item) found.push(item); }
   return found;
+}
+/** One ledger row's record, looked up directly (a delivery pass must not scan every contract per row). */
+async function reminderRecordFor(row: { organization_id: string; kind: string; record_id: string }): Promise<ReminderRecord | null> {
+  if (row.kind === "contract") {
+    const contract = await contractRepository.get(row.organization_id, row.record_id);
+    return contract ? contractReminder(contract) : null;
+  }
+  const io = (db.ios || []).find((candidate: any) => candidate.io_id === row.record_id && candidate.organizationId === row.organization_id);
+  return io ? commercialReminder(io) : null;
 }
 export function reminderContent(item: ReminderRecord, trigger: "offset" | "notice", offsetDays: number) {
   const { kind, record, daysRemaining } = item;
@@ -125,7 +164,7 @@ export async function enqueueDueReminders(): Promise<number> {
     WHERE m.status = 'active' AND m.role IN ('admin', 'manager') AND u.banned IS NOT TRUE
   `)) adminEmails.set(row.organizationId, [...(adminEmails.get(row.organizationId) || []), row.email]);
   let queued = 0;
-  for (const item of reminderRecords()) {
+  for (const item of await reminderRecords()) {
     const tenantId = item.record.organizationId;
     if (!findTenant(tenantId)) continue; // unowned records get no reminders
     const settings = getTenantSettings(tenantId);
@@ -164,7 +203,8 @@ export async function enqueueDueReminders(): Promise<number> {
 }
 /** Sends one ledger row through the platform SMTP relay. */
 export const sendLedgerReminder: ReminderSender = async (row) => {
-  const item = reminderRecords().find((r) => r.kind === row.kind && r.recordId === row.record_id && r.cycleEnd === row.cycle_end_date);
+  const found = await reminderRecordFor(row);
+  const item = found && found.cycleEnd === row.cycle_end_date ? found : undefined;
   if (!item) return { ok: false, skipped: true, error: "record changed or removed" };
   if (!db.googleConfig?.smtpEnabled) return { ok: false, skipped: true, error: "SMTP relay disabled" };
   const validRecipients = String(row.recipients || "").split(",").map((s) => s.trim()).filter((s) => s.includes("@"));
@@ -222,20 +262,5 @@ export function refreshContractLifecycles(): Promise<void> {
 export async function refreshLifecyclesOnce() {
   if (Date.now() < lifecyclesFreshUntil) return;
   lifecyclesFreshUntil = Date.now() + 60_000;
-  let changed = false;
-  const settingsByOrg = new Map<string, ReturnType<typeof getTenantSettings>>();
-  for (const contract of db.contracts || []) {
-    const previousEnd = contract.end_date;
-    rollForwardAutoRenewal(contract);
-    const orgKey = String(contract.organizationId ?? "");
-    if (!settingsByOrg.has(orgKey)) settingsByOrg.set(orgKey, getTenantSettings(contract.organizationId));
-    const lifecycle = contractLifecycle(contract, settingsByOrg.get(orgKey)!);
-    const remaining = lifecycle.daysRemaining ?? contract.days_remaining;
-    if (previousEnd !== contract.end_date || contract.status !== lifecycle.status || contract.days_remaining !== remaining) {
-      contract.status = lifecycle.status;
-      contract.days_remaining = remaining;
-      changed = true;
-    }
-  }
-  if (changed) await saveDb();
+  await refreshStoredContractLifecycles();
 }

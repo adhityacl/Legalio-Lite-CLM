@@ -4,8 +4,9 @@ import { migration as uploadOwners } from './0003_upload_owners';
 import { migration as aiUsage } from './0004_ai_usage';
 import { migration as auditImmutable } from './0005_audit_log_immutable';
 import { migration as idSequences } from './0006_id_sequences';
+import { migration as contractVersions } from './0007_contract_versions';
 import type { Migration } from './types';
 
 /** Append new migrations at the end with the next number. */
-export const MIGRATIONS: Migration[] = [baseline, reminderLedger, uploadOwners, aiUsage, auditImmutable, idSequences];
+export const MIGRATIONS: Migration[] = [baseline, reminderLedger, uploadOwners, aiUsage, auditImmutable, idSequences, contractVersions];
 export type { Migration };

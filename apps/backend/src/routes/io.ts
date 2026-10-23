@@ -1,4 +1,5 @@
 import { nextEntityId } from '../ids';
+import { contractRepository } from '../repositories/contractRepository';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, isMatchingOrg, logActivity } from '../recordAccess';
 import { db, countryNameForPrompt, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
@@ -29,8 +30,9 @@ export function createIoRouter() {
 
 app.get("/api/ios", async (req: express.Request, res: express.Response) => {
   const iosList = await scopedRecords(req, "io", db.ios);
+  const labels = await contractRepository.labels(getRequestTenantId(req), iosList.map((io) => io.contract_id));
   const result = iosList.map((io) => {
-    const c = db.contracts.find((ctr) => ctr.contract_id === io.contract_id && ctr.organizationId === io.organizationId);
+    const c = labels.get(io.contract_id);
     const cur = normalizeCurrencyCode(io.currency, tenantDefaultCurrency(io.organizationId));
     const amt = Number(io.io_value) || 0;
     const usdVal =
@@ -191,7 +193,7 @@ app.post("/api/ios/review-analysis", async (req: express.Request, res: express.R
   if (draft.io_id && (!saved || assertRecordAccess(req, "io", saved) || assertRecordWritable(req, "io", saved))) {
     return res.status(404).json({ error: "Service order not found." });
   }
-  const parent = draft.contract_id ? db.contracts.find((c) => c.contract_id === String(draft.contract_id)) : undefined;
+  const parent = draft.contract_id ? await contractRepository.get(organizationId, String(draft.contract_id)) : undefined;
   const parentVisible = parent && !assertRecordAccess(req, "contract", parent) ? parent : undefined;
   if (!(await ensureAiAvailable(req, res))) return;
   const pick = (k: string) => (draft[k] == null ? "-" : String(draft[k]).slice(0, 20000));
@@ -300,7 +302,7 @@ app.post("/api/ios", validateBody(bodySchemas.ioCreateBody, { requiredMessage: "
   const targetTenant = findTenant(targetOrgId);
   const partner = db.partners.find((p) => p.partner_id === partner_id && p.organizationId === targetOrgId);
   if (!partner) return res.status(400).json({ error: "Partner tidak ditemukan." });
-  const contract = db.contracts.find((c) => c.contract_id === contract_id && c.organizationId === targetOrgId);
+  const contract = contract_id ? await contractRepository.get(targetOrgId, contract_id) : undefined;
   const token = await resolveActiveGoogleToken(
     req.headers["x-google-access-token"] || req.body.accessToken,
   );
@@ -407,7 +409,7 @@ app.put("/api/ios/:id", validateBody(bodySchemas.ioUpdateBody), async (req: expr
     updated_at: new Date().toISOString(),
   };
   if (updates.contract_id !== undefined) {
-    const parent = db.contracts.find((c) => c.contract_id === updates.contract_id && c.organizationId === existing.organizationId);
+    const parent = updates.contract_id ? await contractRepository.get(existing.organizationId, updates.contract_id) : undefined;
     updated.contract_number = parent ? parent.contract_number : "-";
   }
   const cur = normalizeCurrencyCode(updated.currency || existing.currency, tenantDefaultCurrency(existing.organizationId));

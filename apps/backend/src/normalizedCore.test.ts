@@ -6,6 +6,7 @@ import { ENTITIES } from './normalizedSchema';
 import { decimalParts, readBusinessRows, resetSyncCache, searchBusinessRows, synchronizeBusinessRows } from './normalizedCoreStore';
 import { createCoreSaver } from './coreDataStore';
 import { sql as s } from './db';
+import { contractRepository } from './repositories/contractRepository';
 import { ensureSchema } from './schema';
 import { createTestDatabase } from './testDatabase';
 
@@ -29,14 +30,27 @@ async function fixture() {
   const io = { io_id:'i1', contract_id:'c1', partner_id:'p1', organizationId:'org-a', io_number:'IO-001', io_title:'Orchard Order', io_value:0.29, currency:'USD' };
   const spending = { id:'s1', organizationId:'org-a', vendor_id:'p1', vendor_name:'Orchard', total_amount:10.01, currency:'USD', invoice_month:['2026-01-31'], month_allocations:[{month:'2026-01',amount:10.01, custom:'allocation extra'}] };
   const rows: Record<string,any[]> = { partners:[partner,{ partner_id:'p2', organizationId:'org-b', partner_name:'Unique Orchard Secret', tags:[], identifiers:[], dd_documents:[] }],contracts:[contract],ios:[io],spendings:[spending],notifications:[{notif_id:'n1',organizationId:'org-a',parent_type:'IO',parent_id:'i1',message:'Reminder',is_read:false}],activityLogs:[],evaluations:[],templates:[] };
-  await synchronizeBusinessRows(s, rows);
+  // Contracts are repository-backed: the snapshot sync ignores `rows.contracts`, so they are written through their repository.
+  await s.tx(async () => {
+    await synchronizeBusinessRows(s, rows);
+    for (const row of [...rows.contracts].reverse()) await contractRepository.insert(row);
+  });
   return { rows };
 }
+/** Snapshot sync and a contract change in one transaction (the foreign keys are checked when it commits). */
+const syncWithContract = async (rows: Record<string, any[]>, contract: Record<string, any>) => {
+  try {
+    await s.tx(async () => {
+      await synchronizeBusinessRows(s, rows);
+      await contractRepository.update(contract, 1);
+    });
+  } catch (error) { resetSyncCache(s); throw error; } // like the core saver: a rolled-back outer transaction invalidates the fingerprints
+};
 
 test('stored rows read back with every field, child array, decimal and independent IO ID', async () => {
   const {rows} = await fixture();
   for (const entity of ENTITIES) {
-    assert.deepEqual(await readBusinessRows(s,entity.table), rows[entity.collection].map(row => entity.table==='partners' && row.pic_email ? {...row,pic_contact:'private@example.com / +62123'} : row));
+    assert.deepEqual(await readBusinessRows(s,entity.table), rows[entity.collection].map(row => entity.table==='partners' && row.pic_email ? {...row,pic_contact:'private@example.com / +62123'} : entity.table==='contracts' ? {...row,version:1} : row));
   }
   assert.deepEqual(await s.get('SELECT io_id, contract_id FROM insertion_orders'),{io_id:'i1',contract_id:'c1'});
   assert.deepEqual(await s.get('SELECT io_value_minor,io_value_scale FROM insertion_orders'),{io_value_minor:29,io_value_scale:2});
@@ -77,10 +91,8 @@ test('cross-organization references and duplicate IDs roll back all business cha
   const {rows} = await fixture();
   {
     rows.partners[0].partner_name='Must roll back';
-    rows.contracts[0].partner_id='p2';
-    await assert.rejects(() => synchronizeBusinessRows(s,rows),/foreign key/);
+    await assert.rejects(() => syncWithContract(rows,{...rows.contracts[0],partner_id:'p2'}),/foreign key/);
     assert.equal((await readBusinessRows(s,'partners'))[0].partner_name,'Unique Orchard Services');
-    rows.contracts[0].partner_id='p1';
     rows.ios.push({...rows.ios[0]});
     await assert.rejects(() => synchronizeBusinessRows(s,rows),/Duplicate io_id/);
     assert.equal((await readBusinessRows(s,'partners'))[0].partner_name,'Unique Orchard Services');
@@ -102,9 +114,7 @@ test('unchanged rows are skipped, yet direct writes, deletions and failed saves 
     assert.equal((await readBusinessRows(s,'insertion_orders')).length,0);
     // A rolled-back save forgets what it believed was written, so the retry persists the change.
     rows.partners[0].partner_name='Retry persists';
-    rows.contracts[0].partner_id='p2';
-    await assert.rejects(() => synchronizeBusinessRows(s,rows),/foreign key/);
-    rows.contracts[0].partner_id='p1';
+    await assert.rejects(() => syncWithContract(rows,{...rows.contracts[0],partner_id:'p2'}),/foreign key/);
     await synchronizeBusinessRows(s,rows);
     assert.equal((await readBusinessRows(s,'partners'))[0].partner_name,'Retry persists');
   }
@@ -174,7 +184,7 @@ test('organization reset empties one organization\'s business data, editor docum
       await insert("INSERT INTO approval_steps(id,request_id,step_no,approver_id) VALUES(?,?,?,?)",`s-${id}`,`r-${id}`,1,'u');
     }
     let saved = 0;
-    const result = await resetOrganizationData({ db: s, memory: rows, organizationId:'org-a', storage, save: async () => { saved++; await synchronizeBusinessRows(s,rows); } });
+    const result = await resetOrganizationData({ db: s, memory: rows, organizationId:'org-a', storage, save: async (alongside) => { saved++; await s.tx(async () => { await synchronizeBusinessRows(s,rows); await alongside?.(); }); } });
 
     assert.equal(saved,1);
     assert.equal(result.removed.partners,1);
@@ -201,9 +211,14 @@ test('a list read costs one query per table, not per parent row', async () => {
   const readCount = async (k: number) => {
     const ids = Array.from({ length: k }, (_, i) => `p${i}`);
     const rows = { partners: ids.map(partner), contracts: ids.map(id => ({ contract_id:`c-${id}`, organizationId:'org-a', cooperation_categories:[id,'y'] })), spendings: ids.map(id => spending(`s-${id}`)) };
-    await synchronizeBusinessRows(s, rows);
+    await s.run('DELETE FROM insertion_orders');
+    await contractRepository.removeAll();
+    await s.tx(async () => {
+      await synchronizeBusinessRows(s, rows);
+      for (const row of [...rows.contracts].reverse()) await contractRepository.insert(row);
+    });
     queries = 0;
-    for (const [table, collection] of [['partners','partners'],['contracts','contracts'],['spendings','spendings']]) assert.deepEqual(await readBusinessRows(counted, table), rows[collection as keyof typeof rows]);
+    for (const [table, collection] of [['partners','partners'],['contracts','contracts'],['spendings','spendings']]) assert.deepEqual(await readBusinessRows(counted, table), rows[collection as keyof typeof rows].map(row => table === 'contracts' ? { ...row, version: 1 } : row));
     return queries;
   };
   assert.equal(await readCount(1), await readCount(6));

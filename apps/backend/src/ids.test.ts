@@ -21,7 +21,7 @@ before(async () => {
 after(async () => { await database?.drop(); fs.rmSync(dir, { recursive: true, force: true }); });
 
 test('a fresh database hands out the first number of each kind in the familiar shape', async () => {
-  db.partners = []; db.contracts = []; db.ios = []; db.spendings = []; db.evaluations = [];
+  db.partners = []; db.ios = []; db.spendings = []; db.evaluations = [];
   assert.equal(await nextEntityId('partner'), 'P0001');
   assert.equal(await nextEntityId('contract'), 'C0001');
   assert.equal(await nextEntityId('io'), 'IO0001');
@@ -39,8 +39,8 @@ test('syncIdSequences moves past stored ids (including ids that were never drawn
   assert.equal(await nextEntityId('partner'), 'P0022');
 });
 
-test('an id that already exists in memory (explicit insert, restore) is skipped', async () => {
-  db.contracts = [{ contract_id: 'C0002' }, { contract_id: 'C0003' }];
+test('an id that already exists (explicit insert, restore) is skipped; contracts are checked in their table', async () => {
+  await sql.run(`INSERT INTO contracts (contract_id, organization_id, record_position) VALUES ('C0002', 'o', 1), ('C0003', 'o', 2)`);
   assert.equal(await nextEntityId('contract'), 'C0004');
 });
 

@@ -2,7 +2,10 @@ import { nextEntityId } from '../ids';
 import * as bodySchemas from '../schemas';
 import { resolveActiveGoogleToken, getOrgFolderId, getPartnerCategoryFolderId } from '../googleDrive';
 import { db, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
-import { getRequestTenantId, scopedRecords, addActivityLog, assertRecordAccess, assertRecordWritable, isMatchingOrg, logActivity } from '../recordAccess';
+import { contractRepository, CONTRACT_SORTS, type ContractQuery } from '../repositories/contractRepository';
+import { recordVisible } from '../recordScope';
+import { hasOrganizationScope } from '../rbac';
+import { getRequestTenantId, scopedRecords, addActivityLog, assertRecordAccess, assertRecordWritable, isMatchingOrg, logActivity, orgContextOf, scopeOf } from '../recordAccess';
 import { createGoogleDocInFolder } from '../lib/googleDriveSync';
 import { sendRouteError } from '../apiErrors';
 import { refreshContractLifecycles, rollForwardAutoRenewal } from '../reminderJobs';
@@ -99,25 +102,74 @@ app.post("/api/contracts/export-google-docs", async (req: express.Request, res: 
   }
 });
 
+/** Contract as the API presents it: normalized currency and a USD value. */
+function presentContract(c: any) {
+  const cur = normalizeCurrencyCode(c.currency, tenantDefaultCurrency(c.organizationId));
+  const amt = Number(c.contract_value) || 0;
+  const usdVal =
+    c.contract_value_usd !== void 0 && c.contract_value_usd !== null
+      ? c.contract_value_usd
+      : cur === "USD"
+        ? amt
+        : convertToUsdWithFallback(amt, cur);
+  return {
+    ...c,
+    currency: cur,
+    contract_value_usd: usdVal,
+  };
+}
+const queryText = (value: unknown, max = 200) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+const queryList = (value: unknown) => queryText(value, 500).split(",").map((v) => v.trim()).filter(Boolean).slice(0, 20);
+/** Paged-list parameters; undefined when the request asks for the classic full list. */
+function contractListQuery(query: express.Request["query"]): (ContractQuery & { paged: boolean }) {
+  const sort = queryText(query.sort, 40);
+  const dir = queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" as const : "asc" as const;
+  const limit = query.limit === undefined ? undefined : Math.min(500, Math.max(1, Math.trunc(Number(query.limit)) || 50));
+  const date = (value: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(queryText(value, 10)) ? queryText(value, 10) : undefined);
+  return {
+    paged: limit !== undefined || query.offset !== undefined,
+    q: queryText(query.q, 200) || undefined,
+    status: queryList(query.status).map((v) => normalizeContractStatus(v)),
+    statusApproval: queryList(query.status_approval).map((v) => normalizeApprovalStatus(v)),
+    documentType: queryText(query.document_type, 80) || undefined,
+    partnerId: queryText(query.partner_id, 100) || undefined,
+    internalPic: queryText(query.internal_pic, 300) || undefined,
+    endFrom: date(query.end_from),
+    endTo: date(query.end_to),
+    sort: (CONTRACT_SORTS as readonly string[]).includes(sort) ? sort as ContractQuery["sort"] : "default",
+    dir,
+    limit: limit ?? (query.offset !== undefined ? 50 : undefined),
+    offset: Math.max(0, Math.trunc(Number(query.offset)) || 0),
+  };
+}
+/**
+ * Without paging parameters: every visible contract as a bare array (unchanged). With `limit`/`offset`: one page of the
+ * matching, visible contracts, the total in `X-Total-Count`. Filters: q, status (comma list), status_approval, document_type,
+ * partner_id, internal_pic, end_from, end_to; sort: one of CONTRACT_SORTS with dir=asc|desc.
+ */
 app.get("/api/contracts", async (req: express.Request, res: express.Response) => {
   await refreshContractLifecycles();
-  const contractsList = await scopedRecords(req, "contract", db.contracts);
-  const result = contractsList.map((c) => {
-    const cur = normalizeCurrencyCode(c.currency, tenantDefaultCurrency(c.organizationId));
-    const amt = Number(c.contract_value) || 0;
-    const usdVal =
-      c.contract_value_usd !== void 0 && c.contract_value_usd !== null
-        ? c.contract_value_usd
-        : cur === "USD"
-          ? amt
-          : convertToUsdWithFallback(amt, cur);
-    return {
-      ...c,
-      currency: cur,
-      contract_value_usd: usdVal,
-    };
-  });
-  res.json(result);
+  const query = contractListQuery(req.query);
+  if (!query.paged && !query.q && !query.status?.length && !query.statusApproval?.length && !query.documentType && !query.partnerId && !query.internalPic && !query.endFrom && !query.endTo) {
+    return res.json((await scopedRecords(req, "contract", undefined)).map(presentContract));
+  }
+  const ctx = orgContextOf(req);
+  const organizationId = getRequestTenantId(req);
+  let rows: any[];
+  let total: number;
+  if (hasOrganizationScope(ctx)) {
+    // Everything the caller may see matches in SQL: page there.
+    ({ rows, total } = await contractRepository.list(organizationId, query));
+  } else {
+    // Department roles see a subset decided by partner/department ownership: filter the matches, then page.
+    const matched = (await contractRepository.list(organizationId, { ...query, limit: undefined, offset: 0 })).rows
+      .filter((row) => recordVisible(ctx, scopeOf(req), "contract", row));
+    total = matched.length;
+    rows = query.limit === undefined ? matched : matched.slice(query.offset, (query.offset ?? 0) + query.limit);
+  }
+  res.setHeader("X-Total-Count", String(total));
+  res.setHeader("Access-Control-Expose-Headers", "X-Total-Count");
+  res.json(rows.map(presentContract));
 });
 app.post("/api/contracts/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
   if (!(await ensureAiAvailable(req, res))) return;
@@ -283,9 +335,9 @@ Return strictly one valid JSON object matching the schema. Use "" for any text f
     sendRouteError(req, res, error, "request failed", "Failed to parse contract document. Google AI model is currently busy, please try again.", { status: 500 });
   }
 });
-app.get("/api/contracts/:id/redline-analysis", (req: express.Request, res: express.Response) => {
+app.get("/api/contracts/:id/redline-analysis", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const contract = db.contracts.find((c) => c.contract_id === id);
+  const contract = await contractRepository.get(getRequestTenantId(req), id);
   if (!contract || assertRecordAccess(req, "contract", contract)) {
     return res.status(404).json({ error: "Contract not found." });
   }
@@ -305,7 +357,7 @@ app.post("/api/contracts/redline-analysis", async (req: express.Request, res: ex
   const partner = db.partners.find((p) => p.partner_id === draft.partner_id && p.organizationId === organizationId);
   if (!partner || assertRecordAccess(req, "partner", partner)) return res.status(400).json({ error: "Partner tidak ditemukan." });
   // Editing an existing contract: the result is stored on it right away so it survives leaving without saving.
-  const saved = draft.contract_id ? db.contracts.find((c) => c.contract_id === String(draft.contract_id)) : undefined;
+  const saved = draft.contract_id ? await contractRepository.get(organizationId, String(draft.contract_id)) : undefined;
   if (draft.contract_id && (!saved || assertRecordAccess(req, "contract", saved) || assertRecordWritable(req, "contract", saved))) {
     return res.status(404).json({ error: "Contract not found." });
   }
@@ -330,13 +382,13 @@ app.post("/api/contracts/redline-analysis", async (req: express.Request, res: ex
   };
   try {
     const analysis = await runContractRedlineAnalysis(req, contract, partner);
-    if (saved) {
-      saved.redline_analysis = analysis;
-      saved.redline_analyzed_at = analysis.analyzed_at;
-      saved.updated_at = analysis.analyzed_at;
-      await saveDb();
-    }
-    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
+    // Only the analysis fields change, on the row as it is now: a concurrent edit of the contract is neither lost nor rejected.
+    const stored = saved ? await contractRepository.mutate(organizationId, saved.contract_id, (row) => {
+      row.redline_analysis = analysis;
+      row.redline_analyzed_at = analysis.analyzed_at;
+      row.updated_at = analysis.analyzed_at;
+    }) : undefined;
+    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(stored) });
   } catch (error) {
     log.error("Error during draft redline analysis:", error);
     sendRouteError(req, res, error, "request failed", "Gagal melakukan analisis redline AI. Silakan coba kembali.", { status: 500 });
@@ -345,7 +397,7 @@ app.post("/api/contracts/redline-analysis", async (req: express.Request, res: ex
 
 app.post("/api/contracts/:id/redline-analysis", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const contract = db.contracts.find((c) => c.contract_id === id);
+  const contract = await contractRepository.get(getRequestTenantId(req), id);
   if (!contract || assertRecordAccess(req, "contract", contract)) {
     return res.status(404).json({ error: "Contract not found." });
   }
@@ -366,10 +418,11 @@ app.post("/api/contracts/:id/redline-analysis", async (req: express.Request, res
   try {
     const parsed = await runContractRedlineAnalysis(req, contract, partner);
     const nowIso = parsed.analyzed_at;
-    contract.redline_analysis = parsed;
-    contract.redline_analyzed_at = nowIso;
-    contract.updated_at = nowIso;
-    await saveDb();
+    await contractRepository.mutate(contract.organizationId, id, (row) => {
+      row.redline_analysis = parsed;
+      row.redline_analyzed_at = nowIso;
+      row.updated_at = nowIso;
+    });
     res.json({
       success: true,
       cached: false,
@@ -544,12 +597,7 @@ app.post("/api/contracts", validateBody(bodySchemas.contractCreateBody, { requir
   try { terminationFile = parseTerminationFile(req.body.termination_document_file); }
   catch { return terminationWriteError(res, 'termination.file_invalid'); }
   const requestTenantId = getRequestTenantId(req);
-  const existingContractDup = db.contracts.find(
-    (c) =>
-      isMatchingOrg(c.organizationId, requestTenantId) &&
-      String(c.contract_number || "").trim().toLowerCase() ===
-      contract_number.trim().toLowerCase(),
-  );
+  const existingContractDup = await contractRepository.findByNumber(requestTenantId, contract_number);
   if (existingContractDup) {
     return res
       .status(400)
@@ -668,21 +716,28 @@ app.post("/api/contracts", validateBody(bodySchemas.contractCreateBody, { requir
   };
   const writeDenial = assertRecordWritable(req, "contract", newContract);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
-  db.contracts.unshift(newContract);
-  await saveDb();
+  const stored = await contractRepository.insert(newContract);
   await logActivity(req, "CREATE", "CONTRACT", `Membuat Kontrak Baru '${contract_number}' (${contract_title}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`);
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
-  res.json({ success: true, contract: newContract });
+  res.json({ success: true, contract: stored });
 });
+/** `version` from the body or an `If-Match` header (`"3"`, `W/"3"` or `3`); undefined when the client sent none. */
+function requestedVersion(req: express.Request, bodyVersion: unknown): number | undefined {
+  const raw = bodyVersion ?? String(req.headers["if-match"] ?? "").replace(/^W\//, "").replace(/"/g, "");
+  const version = Number(raw);
+  return raw !== "" && raw != null && Number.isInteger(version) && version > 0 ? version : undefined;
+}
 app.put("/api/contracts/:id", validateBody(bodySchemas.contractUpdateBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   // The schema is the whitelist: ids, organization, timestamps, creator and derived fields never come from the client.
-  const { fileData, fileName, termination_document_file, accessToken: _accessToken, ...updates } = req.body;
-  const idx = db.contracts.findIndex((c) => c.contract_id === id);
-  if (idx === -1) {
+  const { fileData, fileName, termination_document_file, accessToken: _accessToken, version: clientVersion, ...updates } = req.body;
+  const existing = await contractRepository.get(getRequestTenantId(req), id);
+  if (!existing) {
     return res.status(404).json({ error: "Kontrak tidak ditemukan." });
   }
-  const existing = db.contracts[idx];
+  // The version the client last saw (body `version` or If-Match) guards against overwriting someone else's edit; clients that
+  // send none are still protected for the duration of this request (the version read above).
+  const expectedVersion = requestedVersion(req, clientVersion) ?? existing.version;
   const tenantDenial = assertRecordAccess(req, "contract", existing);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
   const updated = {
@@ -743,12 +798,7 @@ app.put("/api/contracts/:id", validateBody(bodySchemas.contractUpdateBody), asyn
       .json({ error: "Tanggal Berakhir harus setelah Tanggal Mulai." });
   }
   if (updated.contract_number) {
-    const dup = db.contracts.find(
-      (c) =>
-        c.organizationId === existing.organizationId &&
-        String(c.contract_number || "").trim().toLowerCase() ===
-          updated.contract_number.trim().toLowerCase() && c.contract_id !== id,
-    );
+    const dup = await contractRepository.findByNumber(existing.organizationId, updated.contract_number, id);
     if (dup) {
       return res
         .status(400)
@@ -800,23 +850,22 @@ app.put("/api/contracts/:id", validateBody(bodySchemas.contractUpdateBody), asyn
   updated.organizationId = existing.organizationId;
   const writeDenial = assertRecordWritable(req, "contract", updated);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
-  db.contracts[idx] = updated;
-  await saveDb();
+  const stored = await contractRepository.update(updated, expectedVersion);
   await logActivity(req, "UPDATE", "CONTRACT", `Memperbarui data Kontrak '${updated.contract_number}'`);
   await triggerAutoPushToGoogleSheet(req);
-  res.json({ success: true, contract: updated });
+  res.json({ success: true, contract: stored });
 });
 app.delete("/api/contracts/:id", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const ctr = db.contracts.find((c) => c.contract_id === id);
+  const ctr = await contractRepository.get(getRequestTenantId(req), id);
   if (!ctr) return res.status(404).json({ error: "Kontrak tidak ditemukan." });
   const tenantDenial = assertRecordAccess(req, "contract", ctr);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
   for (const io of db.ios) if (io.organizationId === ctr.organizationId && io.contract_id === id) io.contract_id = null;
-  for (const child of db.contracts) if (child.organizationId === ctr.organizationId && child.parent_contract_id === id) child.parent_contract_id = null;
   db.notifications = db.notifications.filter((n) => !(n.organizationId === ctr.organizationId && n.parent_type === 'Contract' && n.parent_id === id));
-  db.contracts = db.contracts.filter((c) => c !== ctr);
-  await saveDb();
+  // Insertion orders and notifications live in the snapshot, the contract (and its children's parent link) in its repository:
+  // one transaction, so the contract is never gone while an order still points at it, or the other way round.
+  await saveDb(() => contractRepository.removeWithChildren(ctr.organizationId, id));
   await logActivity(req, "DELETE", "CONTRACT", `Menghapus Kontrak '${ctr.contract_number}' (${ctr.contract_title})`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });

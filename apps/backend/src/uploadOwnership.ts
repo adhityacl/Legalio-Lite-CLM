@@ -36,6 +36,10 @@ const keyOfLink = (link: string) => {
   try { return decodeURIComponent(link.split(/[?#]/)[0].slice('/uploads/'.length)); } catch { return null; }
 };
 
+export async function uploadBackfillPending(db: Sql): Promise<boolean> {
+  return !(await db.get('SELECT 1 FROM schema_migrations WHERE id = ?', BACKFILL_MARKER));
+}
+
 /**
  * One-time backfill from the same scan the legacy authorization used: a key referenced by records of exactly one
  * organization is assigned to it. A key referenced by several organizations is ambiguous and stays unassigned

@@ -26,7 +26,7 @@ import { hasServiceAccountCredentials } from "./lib/googleServiceAccountAuth";
 import { componentLog, errorResponder, requestLogging } from "./logger";
 import { mailTemplates, sendPlatformMail } from "./mailHelpers";
 import { syncIdSequences } from "./ids";
-import { coreSaver, db, demoData, migrateLegacyRecords, refreshTenantProjection, saveDb, sanitizePartnerTags, syncAdderNames } from "./memoryDb";
+import { coreSaver, db, demoData, migrateLegacyRecords, normalizeContractRecord, normalizeStoredContracts, refreshTenantProjection, saveDb, sanitizePartnerTags, seedContracts, syncAdderNames } from "./memoryDb";
 import { resetSyncCache } from "./normalizedCoreStore";
 import { createOrganizationAdminRouter } from "./organizationAdminRoutes";
 import { seedOrganizationsFromDataset } from "./organizationProvisioning";
@@ -60,7 +60,8 @@ import { IS_TEST_MODE } from "./runtimePaths";
 import { localizeApiMessages } from "./serverMessages";
 import { tenantSettingsPayload } from "./tenantSettingsView";
 import { getStore, UPLOAD_KINDS } from "./uploadStorage";
-import { backfillUploadOwners } from "./uploadOwnership";
+import { backfillUploadOwners, uploadBackfillPending } from "./uploadOwnership";
+import { contractRepository } from "./repositories/contractRepository";
 import { ensureSchema } from "./schema";
 
 const log = componentLog("server");
@@ -137,8 +138,9 @@ export async function init() {
     log.info(`Seeded bootstrap superuser: ${demoAdminEmail}`);
   }
   const initialData = await loadCoreData();
-  const hasCoreData = ["partners", "contracts", "ios", "spendings", "evaluations", "notifications", "templates", "activityLogs"]
-    .some((key) => Array.isArray((initialData as any)[key]) && (initialData as any)[key].length > 0);
+  const hasCoreData = ["partners", "ios", "spendings", "evaluations", "notifications", "templates", "activityLogs"]
+    .some((key) => Array.isArray((initialData as any)[key]) && (initialData as any)[key].length > 0) || await contractRepository.anyAtAll();
+  const seedDemoContracts = !(hasCoreData || !freshInstall);
 
   // An initialized workspace may intentionally contain no business records after a reset.
   if (hasCoreData || !freshInstall) {
@@ -163,6 +165,7 @@ export async function init() {
   delete db.activeTenantId;
   await refreshTenantProjection();
   migrateLegacyRecords();
+  await normalizeStoredContracts();
   // Demo-dataset logins share DEMO_ADMIN_PASSWORD, so a production server never keeps them —
   // including servers that created them before this rule existed.
   if (process.env.NODE_ENV === "production") {
@@ -170,8 +173,16 @@ export async function init() {
     db.allowedUsers = allowedUsers;
     if (removed) log.info(`Production: removed ${removed} demo login account(s).`);
   }
-  await saveDb();
-  await backfillUploadOwners(sql, UPLOAD_KINDS.flatMap(([, collection]) => (db[collection] || []).map((record: any) => ({ organizationId: record.organizationId, record }))));
+  // Demo contracts are repository-backed: they commit together with the partners and orders that reference each other.
+  // Reverse order keeps the dataset's order (each insert goes to the front).
+  await saveDb(seedDemoContracts ? async () => {
+    for (const contract of [...seedContracts].reverse()) await contractRepository.insert(normalizeContractRecord(contract));
+  } : undefined);
+  const uploadRecords = UPLOAD_KINDS.flatMap(([, collection]) => (db[collection] || []).map((record: any) => ({ organizationId: record.organizationId, record })));
+  if (await uploadBackfillPending(sql)) {
+    for await (const batch of contractRepository.batches()) for (const record of batch) uploadRecords.push({ organizationId: record.organizationId, record });
+  }
+  await backfillUploadOwners(sql, uploadRecords);
   // The auth console reads platform configuration (SMTP) from `db`; it no longer
   // hydrates identities, memberships or organizations from this projection.
   setConsoleDbReference(db, saveDb, getStore, async (organizationId?: string) => {
@@ -230,10 +241,10 @@ app.use("/api", createOrganizationAdminRouter({
   policyView: (organizationId: string) => tenantSettingsPayload(organizationId),
   providerConfigured: () => hasServiceAccountCredentials() || Boolean(db.googleConfig?.accessToken || db.googleConfig?.refreshToken),
   onOrganizationChanged,
-  departmentReferenced: (organizationId: string, department: { id: string; name: string }) => {
+  departmentReferenced: async (organizationId: string, department: { id: string; name: string }) => {
     const key = normalizeDepartmentName(department.name);
-    return ["partners", "contracts"].some((collection) => (db[collection] || []).some((row: any) =>
-      row?.organizationId === organizationId && normalizeDepartmentName(row.internal_pic) === key));
+    return (db.partners || []).some((row: any) => row?.organizationId === organizationId && normalizeDepartmentName(row.internal_pic) === key)
+      || await contractRepository.departmentReferenced(organizationId, key);
   },
   inviteUrl: (req: express.Request, token: string) => {
     const base = getPublicBaseUrl() || `${req.protocol}://${req.get("host")}`;

@@ -113,7 +113,7 @@ export async function synchronizeCoreData(db: Sql, data: any) {
 }
 
 /** Parts of the in-memory projection that synchronizeCoreData persists. */
-const PERSISTED = ['allowedUsers', ...ENTITIES.filter(entity => !entity.appendOnly).map(entity => entity.collection), 'branding', 'googleConfig', 'appSettings', 'newsTicker'];
+const PERSISTED = ['allowedUsers', ...ENTITIES.filter(entity => !entity.appendOnly && !entity.repository).map(entity => entity.collection), 'branding', 'googleConfig', 'appSettings', 'newsTicker'];
 
 /**
  * Serialized saves of the in-memory projection. Each save snapshots the collections synchronously when its turn

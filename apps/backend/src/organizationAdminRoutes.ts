@@ -275,7 +275,7 @@ export async function listDepartments(db: DB, ctx: OrgContext, query: any) {
 
 export interface DepartmentHooks {
   /** True when persisted business records reference the department (by canonical ID or exact legacy name). */
-  departmentReferenced: (organizationId: string, department: { id: string; name: string }) => boolean;
+  departmentReferenced: (organizationId: string, department: { id: string; name: string }) => boolean | Promise<boolean>;
 }
 
 export async function createDepartment(db: DB, ctx: OrgContext, actor: AuditActor, body: unknown) {
@@ -307,7 +307,7 @@ export async function renameDepartment(db: DB, ctx: OrgContext, actor: AuditActo
     if (row.name === name) return departmentDto(row);
     await assertUniqueDepartmentName(db, ctx.organizationId, name, row.id);
     // Legacy records point at departments by name; renaming would silently detach them.
-    if (hooks.departmentReferenced(ctx.organizationId, row)) throw new ApiError(409, 'DEPARTMENT_IN_USE', 'Records still reference this department.');
+    if (await hooks.departmentReferenced(ctx.organizationId, row)) throw new ApiError(409, 'DEPARTMENT_IN_USE', 'Records still reference this department.');
     await db.run(`UPDATE team SET name = ?, "updatedAt" = ? WHERE id = ? AND "organizationId" = ?`, name, new Date().toISOString(), row.id, ctx.organizationId);
     await appendAudit(db, actor, { organizationId: ctx.organizationId, action: 'department.update', targetType: 'department', targetId: row.id, outcome: 'success', changedFields: ['name'] });
     return departmentDto(await loadDepartment(db, ctx.organizationId, departmentId));
@@ -321,7 +321,7 @@ export async function deleteDepartment(db: DB, ctx: OrgContext, actor: AuditActo
     const hasMembers = await db.get(`SELECT 1 FROM "teamMember" WHERE "teamId" = ? LIMIT 1`, row.id);
     const pendingInvites = (await db.all(`SELECT "departmentIds", "teamId" FROM invitation WHERE "organizationId" = ? AND status = 'pending'`, ctx.organizationId) as any[])
       .some((inv) => invitationDepartmentIds(inv).includes(row.id));
-    if (hasMembers || pendingInvites || hooks.departmentReferenced(ctx.organizationId, row)) {
+    if (hasMembers || pendingInvites || await hooks.departmentReferenced(ctx.organizationId, row)) {
       throw new ApiError(409, 'DEPARTMENT_IN_USE', 'Members, invitations or records still reference this department.');
     }
     await db.run(`DELETE FROM team WHERE id = ? AND "organizationId" = ?`, row.id, ctx.organizationId);

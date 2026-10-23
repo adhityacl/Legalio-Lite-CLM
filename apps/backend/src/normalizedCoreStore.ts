@@ -100,7 +100,7 @@ export async function createNormalizedCoreSchema(db: DB) {
   `);
 }
 
-function canonicalize(entity: EntitySchema, input: Row): Row {
+export function canonicalize(entity: EntitySchema, input: Row): Row {
   const row = { ...input };
   if (entity.table === 'partners') {
     migratePartnerContact(row);
@@ -117,7 +117,7 @@ const apiField = (api: string, sql = api, kind: Field['kind'] = 'text'): Field =
 const identifierFields = ['scheme','value','country'].map(api => apiField(api));
 const ddFields = [apiField('key'), apiField('name'), apiField('required','required','boolean'), apiField('expires','expires','boolean'), apiField('status'), apiField('documentNumber','document_number'), apiField('expiryDate','expiry_date'), apiField('linkDrive','link_drive'), apiField('fileId','file_id'), apiField('fileSize','file_size'), apiField('uploadedAt','uploaded_at')];
 const fileFields = [apiField('id'), apiField('fileName','file_name'), apiField('linkDrive','link_drive'), apiField('fileSize','file_size'), apiField('uploadedAt','uploaded_at'), apiField('year'), apiField('expiryDate','expiry_date')];
-function encodeFields(row: Row, fields: Field[], omitted: string[] = []) {
+export function encodeFields(row: Row, fields: Field[], omitted: string[] = []) {
   const known = new Set([...fields.map(field => field.api), ...omitted]);
   const extra: Row = Object.fromEntries(Object.entries(row).filter(([key, value]) => !known.has(key) || value === null));
   const values: Row = {};
@@ -133,7 +133,7 @@ function encodeFields(row: Row, fields: Field[], omitted: string[] = []) {
   values.extra_json = JSON.stringify(extra);
   return values;
 }
-function decodeFields(record: Row, fields: Field[]) {
+export function decodeFields(record: Row, fields: Field[]) {
   const row: Row = JSON.parse(record.extra_json || '{}');
   for (const field of fields) {
     if (field.kind === 'money') {
@@ -150,12 +150,12 @@ function upsert(db: DB, table: string, key: string[], values: Row) {
     ON CONFLICT(${key.map(q).join(',')}) DO UPDATE SET ${changed.map(column => `${q(column)}=excluded.${q(column)}`).join(',')}
     WHERE ${changed.map(column => `${q(table)}.${q(column)} IS DISTINCT FROM excluded.${q(column)}`).join(' OR ')}`, values);
 }
-function arrayMarkers(row: Row, keys: string[]) {
+export function arrayMarkers(row: Row, keys: string[]) {
   const copy = { ...row };
   for (const key of keys) if (Array.isArray(copy[key])) copy[key] = [];
   return copy;
 }
-async function writeChildren(db: DB, entity: EntitySchema, row: Row) {
+export async function writeChildren(db: DB, entity: EntitySchema, row: Row) {
   const id = String(row[entity.key]);
   const insert = (table: string, record: Row) => { const columns = Object.keys(record); return db.run(`INSERT INTO ${q(table)} (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})`, record); };
   const replaceList = async (table: string, parentKey: string, list: any[], make: (value: any, index: number) => Row) => {
@@ -219,6 +219,20 @@ async function childArrays(db: DB, entity: EntitySchema, rows: Row[]) {
     }
   }
 }
+/** Marker keys whose child lists are stored in child tables: the parent row keeps an empty array placeholder in extra_json. */
+export const childMarkerKeys = (table: string) =>
+  table === 'partners' ? ['tags','identifiers','dd_documents'] : table === 'contracts' ? ['cooperation_categories'] : table === 'spendings' ? ['month_allocations','invoice_month'] : [];
+/** API rows from raw table records: decoded columns, the `version` column when the table has one, and the child lists. */
+export async function hydrateRecords(db: DB, entity: EntitySchema, records: Row[]): Promise<Row[]> {
+  const rows = records.map(record => {
+    const row = decodeFields(record,entity.fields);
+    row[entity.key] = record[entity.key]; row.organizationId = record.organization_id;
+    if (record.version != null) row.version = Number(record.version);
+    return row;
+  });
+  if (rows.length) await childArrays(db,entity,rows);
+  return rows;
+}
 export async function readBusinessRows(db: DB, table: string, organizationId?: string, searchIds?: string[]): Promise<Row[]> {
   const entity = entityFor(table);
   const clauses: string[] = []; const params: any[] = [];
@@ -228,9 +242,13 @@ export async function readBusinessRows(db: DB, table: string, organizationId?: s
     clauses.push(`${q(entity.key)} IN (${searchIds.map(() => '?').join(',')})`); params.push(...searchIds);
   }
   const records = await db.all<Row>(`SELECT * FROM ${q(table)}${clauses.length ? ' WHERE ' + clauses.join(' AND ') : ''} ORDER BY record_position, ${q(entity.key)}`, ...params);
-  const rows = records.map(record => { const row = decodeFields(record,entity.fields); row[entity.key] = record[entity.key]; row.organizationId = record.organization_id; return row; });
-  if (rows.length) await childArrays(db,entity,rows);
-  return rows;
+  return hydrateRecords(db,entity,records);
+}
+/** The row's entry in the workspace search index (no-op for entities without searchable text). */
+export async function writeSearchRecord(db: DB, entity: EntitySchema, row: Row, id: string) {
+  if (!entity.search.length) return;
+  const texts = entity.search.map(key => String(row[key] || ''));
+  await upsert(db,'search_records',['entity_type','entity_id'],{ organization_id: row.organizationId, entity_type: entity.table, entity_id: id, title: texts[0], body: texts.slice(1).join('\n') });
 }
 // Fingerprints of rows as last written, so an unchanged row costs one hash instead of several SQL round trips.
 // Business tables are written only through this function, so the cache stays valid until a rollback or a direct
@@ -246,7 +264,7 @@ export async function synchronizeBusinessRows(db: DB, data: Row) {
   try {
   await db.tx(async () => {
     for (const entity of ENTITIES) {
-      if (entity.appendOnly) continue;
+      if (entity.appendOnly || entity.repository) continue;
       const rows = Array.isArray(data[entity.collection]) ? data[entity.collection] : [];
       const seen = new Set<string>();
       for (const [position,input] of rows.entries()) {
@@ -264,14 +282,11 @@ export async function synchronizeBusinessRows(db: DB, data: Row) {
         if (seen.has(id)) throw new Error(`Duplicate ${entity.key} in ${entity.table}: ${id}`);
         seen.add(id);
         written.set(fingerprint,id);
-        const markerKeys = entity.table === 'partners' ? ['tags','identifiers','dd_documents'] : entity.table === 'contracts' ? ['cooperation_categories'] : entity.table === 'spendings' ? ['month_allocations','invoice_month'] : [];
+        const markerKeys = childMarkerKeys(entity.table);
         const values = { [entity.key]: id, organization_id: row.organizationId ?? null, record_position: position, ...encodeFields(arrayMarkers(row,markerKeys), entity.fields, [entity.key,'organizationId']) };
         await upsert(db,entity.table,[entity.key],values);
         await writeChildren(db,entity,row);
-        if (entity.search.length) {
-          const texts = entity.search.map(key => String(row[key] || ''));
-          await upsert(db,'search_records',['entity_type','entity_id'],{ organization_id: row.organizationId, entity_type: entity.table, entity_id: id, title: texts[0], body: texts.slice(1).join('\n') });
-        }
+        await writeSearchRecord(db,entity,row,id);
       }
       const stored = await db.all<{id:string}>(`SELECT ${q(entity.key)} AS id FROM ${q(entity.table)}`);
       for (const {id} of stored) if (!seen.has(id)) {

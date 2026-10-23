@@ -48,9 +48,11 @@ export function errorResponder(): express.ErrorRequestHandler {
     log[status >= 500 ? 'error' : 'warn']({ err, requestId, method: req.method, url: req.originalUrl?.split('?')[0], status }, 'request failed');
     if (res.headersSent) return next(err);
     if (!req.path.startsWith('/api/')) return next(err);
-    const message = TEXT[status] || (status >= 500 ? 'An internal error occurred.' : 'The request could not be processed.');
+    // Errors that carry curated text (repositories: version conflicts, duplicates) keep their own code and message.
+    const curated = err?.expose === true && typeof err.apiCode === 'string' && status < 500;
+    const message = curated ? String(err.message) : TEXT[status] || (status >= 500 ? 'An internal error occurred.' : 'The request could not be processed.');
     // `error` stays human-readable because existing clients display it; `code` is the stable identifier.
-    res.status(status).json({ error: message, code: status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_FAILED', message, status, requestId });
+    res.status(status).json({ error: message, code: curated ? err.apiCode : status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_FAILED', message, status, requestId, ...(curated && err.details ? { details: err.details } : {}) });
   };
 }
 

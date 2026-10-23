@@ -1,4 +1,5 @@
 import { nextEntityId } from '../ids';
+import { contractRepository } from '../repositories/contractRepository';
 import { normalizeSpendingMonths } from '../spendingMonths';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity } from '../recordAccess';
@@ -147,7 +148,7 @@ app.post("/api/spendings/review-analysis", async (req: express.Request, res: exp
   const visiblePartner = partner && !assertRecordAccess(req, "partner", partner) ? partner : undefined;
   const so = draft.io_id ? db.ios.find((io) => io.io_id === String(draft.io_id)) : undefined;
   const visibleSo = so && !assertRecordAccess(req, "io", so) ? so : undefined;
-  const parent = visibleSo?.contract_id ? db.contracts.find((c) => c.contract_id === visibleSo.contract_id && c.organizationId === organizationId) : undefined;
+  const parent = visibleSo?.contract_id ? await contractRepository.get(organizationId, visibleSo.contract_id) : undefined;
   if (!(await ensureAiAvailable(req, res))) return;
   const text = (v: unknown, max = 2000) => (v == null || v === "" ? "-" : String(v).slice(0, max));
   const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : null);

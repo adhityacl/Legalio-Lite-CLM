@@ -8,6 +8,7 @@ import { isMaskedSecret } from '../platformSettings';
 import { GoogleGenAI } from '@google/genai';
 import { RecordKind, recordVisible } from '../recordScope';
 import { readBusinessRows } from '../normalizedCoreStore';
+import { contractRepository } from '../repositories/contractRepository';
 import { sql } from '../db';
 import { boundChatHistory, boundWorkspaceContext } from '../aiLimits';
 import express from 'express';
@@ -211,7 +212,7 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
             }))
           : [],
       })),
-      contracts: (await readBusinessRows(sql, 'contracts', tenantId)).filter(visibleTo("contract")).map((c: any) => ({
+      contracts: (await contractRepository.list(tenantId)).rows.filter(visibleTo("contract")).map((c: any) => ({
         contract_id: c.contract_id || c.id,
         reference: c.contract_number,
         title: c.contract_title,

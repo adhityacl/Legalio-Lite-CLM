@@ -353,3 +353,70 @@ test('unknown API routes are denied by default', async () => {
   const noOrgMember = await api('rootA', 'GET', '/api/partners', {});
   assert.ok([400, 409].includes(noOrgMember.status), `superuser without a selected organization: ${noOrgMember.status}`);
 });
+
+/* ------------------------------ contract persistence (repository) ------------------------------ */
+
+test('contracts carry a version; concurrent edits of one contract never lose an update (409 VERSION_CONFLICT)', async () => {
+  const created = ok(await api('adminA', 'POST', '/api/contracts', { org: A, body: {
+    partner_id: fixtureA.partner.partner_id, contract_number: 'CTR-CONC', contract_title: 'Concurrent', start_date: '2026-01-01', end_date: '2099-12-31', currency: 'USD', contract_value: 1, internal_pic: 'Sales',
+  } })).contract;
+  assert.equal(created.version, 1);
+  const race = await Promise.all([
+    api('adminA', 'PUT', `/api/contracts/${created.contract_id}`, { org: A, body: { contract_title: 'Writer one', version: created.version } }),
+    api('adminA', 'PUT', `/api/contracts/${created.contract_id}`, { org: A, body: { contract_title: 'Writer two', version: created.version } }),
+  ]);
+  const statuses = race.map((reply) => reply.status).sort();
+  assert.deepEqual(statuses, [200, 409], race.map((r) => r.raw.slice(0, 120)).join(' | '));
+  const loser = race.find((reply) => reply.status === 409)!;
+  assert.equal(loser.body.code, 'VERSION_CONFLICT');
+  for (const key of ['error', 'code', 'message', 'status', 'requestId']) assert.ok(key in loser.body, key);
+  const winner = race.find((reply) => reply.status === 200)!.body.contract;
+  assert.equal(winner.version, 2);
+  const stored = ok(await api('adminA', 'GET', '/api/contracts', { org: A })).find((c: any) => c.contract_id === created.contract_id);
+  assert.equal(stored.contract_title, winner.contract_title);
+  assert.equal(stored.version, 2);
+  // A client that kept the old copy is told so, even long after the race.
+  const stale = await api('adminA', 'PUT', `/api/contracts/${created.contract_id}`, { org: A, body: { contract_title: 'Old copy', version: 1 } });
+  assert.equal(stale.status, 409);
+  // A client without a version is still protected inside its own request and simply overwrites the current row.
+  assert.equal((await api('adminA', 'PUT', `/api/contracts/${created.contract_id}`, { org: A, body: { contract_title: 'No version' } })).status, 200);
+});
+
+test('concurrent edits of different contracts all succeed', async () => {
+  const made = [];
+  for (const n of [1, 2, 3, 4]) {
+    made.push(ok(await api('adminA', 'POST', '/api/contracts', { org: A, body: {
+      partner_id: fixtureA.partner.partner_id, contract_number: `CTR-PAR-${n}`, contract_title: `Parallel ${n}`, start_date: '2026-01-01', end_date: '2099-12-31', currency: 'USD', contract_value: n, internal_pic: 'Sales',
+    } })).contract);
+  }
+  const replies = await Promise.all(made.map((c) => api('adminA', 'PUT', `/api/contracts/${c.contract_id}`, { org: A, body: { contract_title: `Edited ${c.contract_id}`, version: c.version } })));
+  assert.deepEqual(replies.map((r) => r.status), [200, 200, 200, 200]);
+});
+
+test('deleting a contract detaches its orders and children in one step; another organization cannot see the id', async () => {
+  const parent = ok(await api('adminA', 'POST', '/api/contracts', { org: A, body: {
+    partner_id: fixtureA.partner.partner_id, contract_number: 'CTR-DEL-P', contract_title: 'Parent', start_date: '2026-01-01', end_date: '2099-12-31', currency: 'USD', contract_value: 1, internal_pic: 'Sales',
+  } })).contract;
+  const child = ok(await api('adminA', 'POST', '/api/contracts', { org: A, body: {
+    partner_id: fixtureA.partner.partner_id, contract_number: 'CTR-DEL-C', contract_title: 'Child', document_type: 'Agreement Addendum', parent_contract_id: parent.contract_id,
+    start_date: '2026-01-01', end_date: '2099-12-31', currency: 'USD', contract_value: 1, internal_pic: 'Sales',
+  } })).contract;
+  const io = ok(await api('adminA', 'POST', '/api/ios', { org: A, body: {
+    partner_id: fixtureA.partner.partner_id, contract_id: parent.contract_id, io_number: 'IO-DEL', io_title: 'order', start_date: '2026-01-01', end_date: '2099-12-31',
+    currency: 'USD', io_value: 1, pricing_model: 'Fixed', charging_type: 'Postpaid', media_channel: 'Digital',
+  } })).io;
+  denied(await api('adminB', 'DELETE', `/api/contracts/${parent.contract_id}`, { org: B }), [404]);
+  ok(await api('adminA', 'DELETE', `/api/contracts/${parent.contract_id}`, { org: A }));
+  const contracts = ok(await api('adminA', 'GET', '/api/contracts', { org: A }));
+  assert.ok(!contracts.some((c: any) => c.contract_id === parent.contract_id));
+  assert.ok(!contracts.find((c: any) => c.contract_id === child.contract_id).parent_contract_id);
+  assert.ok(!ok(await api('adminA', 'GET', '/api/ios', { org: A })).find((i: any) => i.io_id === io.io_id).contract_id);
+});
+
+test('saving other entities does not touch contract rows', async () => {
+  const before = await sql.all(`SELECT contract_id, xmin::text AS xmin, version FROM contracts ORDER BY contract_id`);
+  ok(await api('adminA', 'PUT', `/api/partners/${fixtureA.partner.partner_id}`, { org: A, body: { notes: 'snapshot save' } }));
+  ok(await api('adminA', 'PUT', `/api/ios/${fixtureA.io.io_id}`, { org: A, body: { io_title: 'snapshot save' } }));
+  const after = await sql.all(`SELECT contract_id, xmin::text AS xmin, version FROM contracts ORDER BY contract_id`);
+  assert.deepEqual(after, before);
+});

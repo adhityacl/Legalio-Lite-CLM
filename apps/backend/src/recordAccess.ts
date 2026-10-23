@@ -4,6 +4,7 @@ import { RequestDenied } from './identity';
 import { createOrganizationScope, RecordKind, filterRecords, recordVisible } from './recordScope';
 import { db } from './memoryDb';
 import { readBusinessRows } from './normalizedCoreStore';
+import { contractRepository, contractDirectoryFor, type ContractDirectoryEntry } from './repositories/contractRepository';
 import { sql } from './db';
 import { appendActivity } from './activityLog';
 /** Request-scoped record access: verified organization context, department scope, and attribution of activity to the session. */
@@ -19,16 +20,25 @@ export function orgContextOf(req: express.Request): OrgContext {
 export function isMatchingOrg(entityOrgId, targetTenantId) {
   return Boolean(entityOrgId) && Boolean(targetTenantId) && entityOrgId === targetTenantId;
 }
+/** Record collections the scope resolver reads: partners and insertion orders from memory, contracts from the request's directory. */
+export function scopeCollectionsOf(req: express.Request) {
+  return { partners: db.partners, ios: db.ios, contracts: ((req as any).contractDirectory || []) as ContractDirectoryEntry[] };
+}
+/** Same for callers outside a request (upload authorization). */
+export async function scopeCollections(ctx: OrgContext) {
+  return { partners: db.partners, ios: db.ios, contracts: await contractDirectoryFor(sql, ctx) };
+}
 /** Request-local department resolver for the verified organization. */
 export function scopeOf(req: express.Request) {
   const r = req as any;
-  if (!r.recordScope) r.recordScope = createOrganizationScope(r.teams || [], orgContextOf(req).organizationId, db);
+  if (!r.recordScope) r.recordScope = createOrganizationScope(r.teams || [], orgContextOf(req).organizationId, scopeCollectionsOf(req));
   return r.recordScope as ReturnType<typeof createOrganizationScope>;
 }
 /** Records of `kind` the caller may see: own organization, department scope, before any aggregation. */
 export async function scopedRecords<T = any>(req: express.Request, kind: RecordKind, rows: T[] | undefined): Promise<T[]> {
   const tables: Record<RecordKind, string> = { partner: 'partners', contract: 'contracts', io: 'insertion_orders', spending: 'spendings', evaluation: 'evaluations', notification: 'notifications' };
-  const records = await readBusinessRows(sql, tables[kind], orgContextOf(req).organizationId) as T[];
+  const organizationId = orgContextOf(req).organizationId;
+  const records = (kind === 'contract' ? (await contractRepository.list(organizationId)).rows : await readBusinessRows(sql, tables[kind], organizationId)) as T[];
   return filterRecords(orgContextOf(req), scopeOf(req), kind, records);
 }
 /**
@@ -50,7 +60,7 @@ export function assertRecordWritable(req: express.Request, kind: RecordKind, rec
   const ctx = orgContextOf(req);
   if (hasOrganizationScope(ctx)) return null;
   // Rebuild so a just-edited partner/contract name or PIC is resolved fresh.
-  const fresh = createOrganizationScope((req as any).teams || [], ctx.organizationId, db);
+  const fresh = createOrganizationScope((req as any).teams || [], ctx.organizationId, scopeCollectionsOf(req));
   if (recordVisible(ctx, fresh, kind, { ...record, organizationId: ctx.organizationId })) return null;
   return { status: 403, body: { error: "INSUFFICIENT_PERMISSION", message: "The record must belong to one of your departments." } };
 }

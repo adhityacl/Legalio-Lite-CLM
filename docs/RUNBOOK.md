@@ -38,6 +38,14 @@ Upgrade notes: schema changes are versioned migrations (see POSTGRES_STORAGE.md)
 - Record ids (`P0001`, `C0001`, `IO0001`, `SP0001`, `EVAL-2026-001`) now come from PostgreSQL sequences created by migration `0006_id_sequences`. At every start each sequence is moved past the highest number stored, so existing data continues without gaps; numbers of deleted records are no longer reused.
 - API request bodies for partners, contracts, IOs, spendings and evaluations are validated and whitelisted (HTTP 400 `VALIDATION_FAILED` with `issues`); errors use `{ error, code, message, status, requestId }` and no longer carry internal error text. Quote the `requestId` to find the cause in the logs.
 
+### Contracts are repository-backed (Phase 2B)
+
+- Migration `0007_contract_versions` adds `contracts.version` (default 1) and two indexes; existing contract rows are adopted in place and the old
+  snapshot rows are the new rows: nothing is copied or re-imported. It is additive, so code rollback is safe (the old release ignores the column and
+  keeps working on the same table).
+- Contract writes are committed row by row; a second editor saving a stale copy gets HTTP 409 `VERSION_CONFLICT` (reload and re-apply).
+- Contracts are no longer loaded into memory at boot; startup time and memory no longer grow with the number of contracts.
+
 ### Health endpoints
 
 - `GET /api/health` is cheap liveness (process answers).

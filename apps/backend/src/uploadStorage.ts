@@ -5,6 +5,8 @@ import { googleCredentials } from './googleCredentialStore';
 import { IS_TEST_MODE } from './runtimePaths';
 import { ApiError } from './organizationSettingsStore';
 import { RecordKind, createOrganizationScope, teamsOf, recordVisible } from './recordScope';
+import { contractRepository } from './repositories/contractRepository';
+import { scopeCollections } from './recordAccess';
 import { onDbSaved, db } from './memoryDb';
 import { resolveIdentity, RequestDenied, sendError, resolveOrganizationContext } from './identity';
 import { sql } from './db';
@@ -36,8 +38,9 @@ export function getStore(): ObjectStore {
  * Folder names are never proof of ownership (two organizations can sanitize
  * to the same name), and unowned root files are denied, not deleted.
  */
+/** Collections of the in-memory projection that can own an upload (contracts are looked up in their repository on demand). */
 export const UPLOAD_KINDS: Array<[RecordKind, string]> = [
-  ["partner", "partners"], ["contract", "contracts"], ["io", "ios"], ["spending", "spendings"], ["evaluation", "evaluations"],
+  ["partner", "partners"], ["io", "ios"], ["spending", "spendings"], ["evaluation", "evaluations"],
 ];
 let uploadIndex: Map<string, Array<{ kind: RecordKind; record: any }>> | null = null;
 onDbSaved(() => { uploadIndex = null; });
@@ -53,7 +56,19 @@ export function normalizeUploadPath(value: string): string | null {
     return null;
   }
 }
-export function uploadOwners(urlPath: string) {
+const likeEscape = (value: string) => value.replace(/[\\%_]/g, (c) => "\\" + c);
+/** Contracts whose stored JSON links this upload; found by the file name first (cheap filter), then confirmed exactly. */
+async function contractOwners(urlPath: string) {
+  const name = urlPath.split("/").pop() || "";
+  if (!name) return [];
+  const variants = [...new Set([name, encodeURI(name), encodeURIComponent(name)])].map((v) => `%${likeEscape(v)}%`);
+  const records = await contractRepository.hydrate(await sql.all(
+    `SELECT * FROM contracts WHERE contract_file_link LIKE ANY(?) OR termination_document LIKE ANY(?) OR extra_json LIKE ANY(?)`, variants, variants, variants));
+  return records
+    .filter((record: any) => (JSON.stringify(record).match(/\/uploads\/[^"\\]+/g) || []).some((url) => normalizeUploadPath(url) === urlPath))
+    .map((record: any) => ({ kind: "contract" as RecordKind, record }));
+}
+export async function uploadOwners(urlPath: string) {
   if (!uploadIndex) {
     uploadIndex = new Map();
     for (const [kind, collection] of UPLOAD_KINDS) {
@@ -69,7 +84,7 @@ export function uploadOwners(urlPath: string) {
       }
     }
   }
-  return uploadIndex.get(urlPath) || [];
+  return [...(uploadIndex.get(urlPath) || []), ...(await contractOwners(urlPath))];
 }
 export async function authorizeUpload(req: express.Request, res: express.Response, next: express.NextFunction) {
   let identity;
@@ -87,7 +102,7 @@ export async function authorizeUpload(req: express.Request, res: express.Respons
   // The object served is the one whose key passed the checks below, never re-derived from the request.
   res.locals.uploadKey = key.slice("/uploads/".length);
   const scopes = new Map<string, any>();
-  for (const { kind, record } of await eligibleOwners(sql, key.slice("/uploads/".length), uploadOwners(key))) {
+  for (const { kind, record } of await eligibleOwners(sql, key.slice("/uploads/".length), await uploadOwners(key))) {
     if (!record?.organizationId) continue;
     let ctx: OrgContext;
     try {
@@ -96,7 +111,7 @@ export async function authorizeUpload(req: express.Request, res: express.Respons
       continue;
     }
     if (!can(ctx, "document.view")) continue;
-    if (!scopes.has(ctx.organizationId)) scopes.set(ctx.organizationId, createOrganizationScope(await teamsOf(sql, ctx.organizationId), ctx.organizationId, db));
+    if (!scopes.has(ctx.organizationId)) scopes.set(ctx.organizationId, createOrganizationScope(await teamsOf(sql, ctx.organizationId), ctx.organizationId, await scopeCollections(ctx)));
     if (recordVisible(ctx, scopes.get(ctx.organizationId), kind, record)) {
       if (req.method === "GET") {
         await addActivityLog(identity.email, identity.name, ctx.tenantRole || "User", "FILE_DOWNLOAD", "UPLOADS", `Opened file '${path.basename(key)}'`, undefined, ctx.organizationId, { key: key.slice("/uploads/".length), kind })

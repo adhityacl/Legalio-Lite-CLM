@@ -18,7 +18,7 @@ app.get("/api/init-data", async (req: express.Request, res: express.Response) =>
   res.setHeader("Cache-Control", "no-store");
   res.json({
     organizationId,
-    contracts: await scopedRecords(req, "contract", db.contracts),
+    contracts: await scopedRecords(req, "contract", undefined),
     ios: await scopedRecords(req, "io", db.ios),
     partners: await scopedRecords(req, "partner", db.partners),
     notifications: await scopedRecords(req, "notification", db.notifications),

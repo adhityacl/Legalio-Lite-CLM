@@ -1,3 +1,4 @@
+import { contractRepository } from './repositories/contractRepository';
 /**
  * System Admin console API — platform operations only (tenant-boundaries PRD §6.6, §10.1).
  *
@@ -25,12 +26,12 @@ export const authConsoleRouter = Router();
 forwardAsyncRouteErrors(authConsoleRouter);
 
 let globalDbRef: any = null;
-let saveDbFnRef: (() => Promise<void>) | null = null;
+let saveDbFnRef: ((alongside?: () => Promise<unknown>) => Promise<void>) | null = null;
 let organizationChangedRef: ((organizationId?: string) => Promise<void>) | null = null;
 let storeRef: (() => ObjectStore) | null = null;
 
 /** server.ts shares its projection (for SMTP/branding reads), upload storage and a refresh hook. No hydration happens here. */
-export function setConsoleDbReference(dbStore: any, saveFn: () => Promise<void>, getStore: () => ObjectStore, onOrganizationsChanged?: (organizationId?: string) => Promise<void>) {
+export function setConsoleDbReference(dbStore: any, saveFn: (alongside?: () => Promise<unknown>) => Promise<void>, getStore: () => ObjectStore, onOrganizationsChanged?: (organizationId?: string) => Promise<void>) {
   globalDbRef = dbStore;
   saveDbFnRef = saveFn;
   storeRef = getStore;
@@ -551,8 +552,8 @@ authConsoleRouter.post('/organizations/:id/reset', platformHandler(async (req, r
 authConsoleRouter.delete('/organizations/:id', platformHandler(async (req, res, identity) => {
   const id = req.params.id;
   await readOrganizationSettings(sql, id); // 404 for unknown IDs
-  const owned = ['partners', 'contracts', 'ios', 'spendings', 'evaluations', 'notifications', 'templates']
-    .some((key) => (globalDbRef?.[key] || []).some((row: any) => row?.organizationId === id));
+  const owned = ['partners', 'ios', 'spendings', 'evaluations', 'notifications', 'templates']
+    .some((key) => (globalDbRef?.[key] || []).some((row: any) => row?.organizationId === id)) || await contractRepository.anyIn(id);
   if (owned) throw new ApiError(409, 'ORGANIZATION_IN_USE', "Move or remove this organization's records first.");
   await sql.tx(async () => {
     await sql.run('DELETE FROM "teamMember" WHERE "teamId" IN (SELECT id FROM team WHERE "organizationId" = ?)', id);
