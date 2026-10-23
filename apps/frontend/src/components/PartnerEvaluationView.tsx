@@ -1,6 +1,7 @@
+import { evaluationsApi } from '../api/evaluations';
+import { errorMessage } from '../api/client';
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { BulkSelectionBar } from './ui/bulk-selection-bar';
-import { deleteRecords } from '../lib/bulkDelete';
 import { downloadCsv } from '../lib/csv';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { ModalFrame } from './ui/modal-frame';
@@ -66,9 +67,6 @@ interface PartnerEvaluationViewProps {
   spendings?: PartnerSpending[];
   evaluations: PartnerEvaluation[];
   onRefreshData: () => void;
-  userEmail?: string;
-  userName?: string;
-  userRole?: string;
   openEvaluationId?: string;
   onEvaluationOpened?: () => void;
 }
@@ -169,9 +167,6 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
   spendings = [],
   evaluations = [],
   onRefreshData,
-  userEmail,
-  userName,
-  userRole,
   openEvaluationId,
   onEvaluationOpened,
 }) => {
@@ -272,32 +267,17 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
     try {
       const isEdit = editingItem && editingItem.id && !editingItem.id.startsWith('NOT_REVIEWED');
-      const url = isEdit ? `/api/partner-evaluations/${editingItem.id}` : '/api/partner-evaluations';
-      const method = isEdit ? 'PUT' : 'POST';
-
       const payload = {
         ...formData,
         ...(redline && { redline_analysis: redline.analysis, redline_analyzed_at: redline.at }),
-        userEmail,
-        userName,
-        userRole,
       };
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || t('eval.terjadi_kesalahan_saat_menyimpan_evaluasi', 'Terjadi kesalahan saat menyimpan evaluasi.'));
-      }
+      if (isEdit) await evaluationsApi.update(editingItem.id, payload);
+      else await evaluationsApi.create(payload);
 
       onRefreshData();
       setShowFormModal(false);
     } catch (err: any) {
-      setFormError(err.message || t('eval.gagal_menyimpan_data', 'Gagal menyimpan data.'));
+      setFormError(errorMessage(err, t('eval.gagal_menyimpan_data', 'Gagal menyimpan data.')));
       console.warn(err);
     } finally {
       setIsSubmitting(false);
@@ -585,13 +565,10 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
       })
     ) {
       try {
-        const res = await fetch(`/api/partner-evaluations/${id}?userEmail=${encodeURIComponent(userEmail || '')}&userName=${encodeURIComponent(userName || '')}&userRole=${encodeURIComponent(userRole || '')}`, { method: 'DELETE' });
-        if (res.ok) {
-          onRefreshData();
-        } else {
-          showAlert({ title: t('eval.gagal_menghapus_data_evaluasi', 'Gagal menghapus data evaluasi'), variant: 'destructive' });
-        }
+        await evaluationsApi.remove(id);
+        onRefreshData();
       } catch (err) {
+        showAlert({ title: t('eval.gagal_menghapus_data_evaluasi', 'Gagal menghapus data evaluasi'), variant: 'destructive' });
         console.warn(err);
       }
     }
@@ -608,7 +585,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
       confirmLabel: t('io.action_delete', 'Hapus'),
     });
     if (!ok) return;
-    const failed = await deleteRecords('/api/partner-evaluations', targets, { userEmail, userName, userRole });
+    const failed = await evaluationsApi.removeMany(targets);
     onRefreshData();
     if (failed.length > 0) {
       showAlert({ title: t('bulk.delete_failed_title', 'Sebagian gagal dihapus'), description: t('bulk.delete_failed_message', '{failed} dari {total} gagal dihapus.', { failed: failed.length, total: targets.length }), variant: 'destructive' });

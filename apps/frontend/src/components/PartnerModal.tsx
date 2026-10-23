@@ -1,3 +1,5 @@
+import { partnersApi } from '../api/partners';
+import { api, errorMessage } from '../api/client';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { SuggestInput, SuggestTagsInput } from './ui/suggest-input';
 import React, { useState } from 'react';
@@ -149,26 +151,18 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
     setIsGeneratingNotes(true);
     setError(null);
     try {
-      const response = await fetch('/api/partners/generate-dd-notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          partner_name: namaPartner.trim(),
-          country,
-          entity_type: entityType,
-          tags: tags,
-          pdfBase64: fileData || undefined,
-        }),
+      const result = await api.post<{ success?: boolean; notes?: string }>('/partners/generate-dd-notes', {
+        partner_name: namaPartner.trim(),
+        country,
+        entity_type: entityType,
+        tags: tags,
+        pdfBase64: fileData || undefined,
       });
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || t('partners.gagal_menghasilkan_ringkasan_due_diligence_ai', 'Gagal menghasilkan ringkasan Due Diligence AI.'));
-      }
       if (result.success && result.notes) {
         setNotes(result.notes);
       }
     } catch (err: any) {
-      setError(err.message || t('partners.error_generating_due_diligence_notes', 'Error generating Due Diligence notes'));
+      setError(errorMessage(err, t('partners.error_generating_due_diligence_notes', 'Error generating Due Diligence notes')));
     } finally {
       setIsGeneratingNotes(false);
     }
@@ -198,32 +192,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
     setIsParsing(true);
     setError(null);
     try {
-      let response: Response;
-      if (rawFileObj) {
-        const formData = new FormData();
-        formData.append('file', rawFileObj);
-        response = await fetch('/api/partners/parse', {
-          method: 'POST',
-          body: formData,
-        });
-      } else {
-        response = await fetch('/api/partners/parse', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pdfBase64: fileData })
-        });
-      }
-      const contentType = response.headers.get('content-type');
-      let result;
-      if (contentType && contentType.includes('application/json')) {
-        result = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(text && text.trim().startsWith('<') ? t('partners.koneksi_ai_server_timeout_atau_sibuk', 'Koneksi AI Server timeout atau sibuk. Silakan coba kembali beberapa saat lagi.') : (text || t('partners.gagal_memproses_dokumen', 'Gagal memproses dokumen')));
-      }
-      if (!response.ok) {
-        throw new Error(result.error || t('partners.failed_to_parse', 'Failed to parse'));
-      }
+      const result = await partnersApi.parse(rawFileObj ?? { pdfBase64: fileData });
       if (result.success && result.data) {
         const parsed = result.data;
         if (parsed.partner_name) setNamaPartner(parsed.partner_name);
@@ -236,7 +205,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
         if (parsed.notes && parsed.notes !== '-') setNotes(parsed.notes);
       }
     } catch (err: any) {
-      setError(err.message || t('partners.error_parsing_document', 'Error parsing document'));
+      setError(errorMessage(err, t('partners.koneksi_ai_server_timeout_atau_sibuk', 'Koneksi AI Server timeout atau sibuk. Silakan coba kembali beberapa saat lagi.')));
     } finally {
       setIsParsing(false);
     }

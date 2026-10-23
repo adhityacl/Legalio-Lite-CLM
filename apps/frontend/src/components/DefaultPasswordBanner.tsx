@@ -1,3 +1,5 @@
+import { accountApi } from '../api/account';
+import { errorMessage } from '../api/client';
 import React, { useEffect, useId, useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Button } from '@legalio/ui-components/button';
@@ -48,8 +50,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
   const errorId = useId();
 
   const refresh = () =>
-    fetch('/api/system/status', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
+    accountApi.systemStatus()
       .then((data) => {
         setPasswordActive(Boolean(data?.defaultAdminPasswordActive));
         setGoogleIncomplete(Boolean(data?.googleSetupIncomplete));
@@ -74,14 +75,10 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
     }
     setState({ kind: 'saving' });
     try {
-      const res = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPassword: current, newPassword: next, revokeOtherSessions: true }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.message || t('security.password_change_failed', 'The password could not be changed. Check the current password.'));
+      try {
+        await accountApi.changePassword({ currentPassword: current, newPassword: next, revokeOtherSessions: true });
+      } catch (failure) {
+        throw new Error(errorMessage(failure, t('security.password_change_failed', 'The password could not be changed. Check the current password.')));
       }
       setState({ kind: 'done' });
       setPasswordActive(false);

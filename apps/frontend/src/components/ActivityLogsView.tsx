@@ -1,3 +1,4 @@
+import { api } from '../api/client';
 import { ModalFrame } from './ui/modal-frame';
 import { useRowsPerPage } from '../lib/tablePreferences';
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
@@ -9,7 +10,6 @@ import { Clock, Search, RefreshCw, Shield, Monitor, Filter, CheckCircle2, Eye } 
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import { useQuery } from '@tanstack/react-query';
-import { getAuthHeaders } from '../lib/apiFetch';
 import { useLanguage } from '../context/LanguageContext';
 import { ActionMenu } from './ui/action-menu';
 import { TablePagination } from './ui/TablePagination';
@@ -34,11 +34,7 @@ export const ActivityLogsView: React.FC = () => {
     queryKey: ['activity-logs', user?.email, activeTenantId],
     enabled: Boolean(user?.email && activeTenantId),
     queryFn: async ({ signal }) => {
-      const response = await fetch('/api/activity-logs', {
-        headers: { ...getAuthHeaders(), 'x-tenant-id': activeTenantId, 'x-organization-id': activeTenantId }, credentials: 'include', cache: 'no-store', signal,
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
+      const data = await api.get<ActivityLog[]>('/activity-logs', { organizationId: activeTenantId, headers: { 'x-tenant-id': activeTenantId }, cache: 'no-store', signal });
       return Array.isArray(data) ? data : [];
     },
   });

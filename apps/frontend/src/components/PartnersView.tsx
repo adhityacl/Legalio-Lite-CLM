@@ -56,7 +56,7 @@ import { ActionMenu } from './ui/action-menu';
 import { Badge, statusTone } from '@legalio/ui-components/badge';
 import { getSavedColumnPreferences, saveColumnPreferences, useRowsPerPage } from '../lib/tablePreferences';
 import { UploadDDModal } from './UploadDDModal';
-import { getAuthHeaders } from '../lib/apiFetch';
+import { partnersApi } from '../api/partners';
 import { usePermissions } from '../lib/permissions';
 
 import { TableColumnHeader, Table, TableHeader, TableRow, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
@@ -388,18 +388,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
     const ok = await confirmDialog({ description: t('partners.hapus_file_ini_dari_dokumen', 'Hapus file ini dari dokumen {docName}?', { docName: displayName }), tone: 'danger', confirmLabel: t('io.action_delete', 'Hapus') });
     if (!ok) return;
     try {
-      const res = await fetch(`/api/partners/${partnerId}/dd-file`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          docName,
-          fileId,
-          userEmail: user?.email,
-          userName: user?.name,
-          userRole: user?.role,
-        }),
-      });
-      const data = await res.json();
+      const data = await partnersApi.deleteDdFile(partnerId, { docName, fileId });
       if (data.partner) {
         setSelectedPartnerDetail(data.partner);
         onRefreshData?.();
@@ -421,9 +410,6 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
           spendings={spendings}
           evaluations={evaluations}
           onRefreshData={onRefreshData || (() => {})}
-          userEmail={user?.email}
-          userName={user?.name}
-          userRole={user?.role}
         />
       ) : (
         <>
@@ -929,10 +915,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
             setSelectedPartnerDetail(updatedPartner);
             onRefreshData?.();
           }}
-          getAuthHeaders={getAuthHeaders}
-          userEmail={user?.email}
-          userName={user?.name}
-          userRole={user?.role}
+
         />
       )}
         </>

@@ -1,3 +1,5 @@
+import { assistantApi } from '../api/assistant';
+import { isApiError } from '../api/client';
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, X, Send, User, Loader2, RotateCcw, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -129,31 +131,18 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
     setIsLoading(true);
 
     try {
-      const tokenData = localStorage.getItem('silegal_google_token');
-      const parsedAuth = tokenData ? JSON.parse(tokenData) : null;
-      const token = parsedAuth?.access_token || '';
-
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          query: userMessage.text,
-          history: historyPayload
-        })
-      });
-
-      const rawText = await res.text();
-      let data: any = {};
+      let data: { reply?: string; error?: string } = {};
+      let ok = true;
       try {
-        data = JSON.parse(rawText);
-      } catch {
-        data = { error: res.ok ? rawText : t('ai_chat.server_error_silakan_periksa_koneksi_atau', 'Server error ({status}): Silakan periksa koneksi atau kuota API Key.', { status: res.status }) };
+        data = await assistantApi.chat({ query: userMessage.text, history: historyPayload });
+      } catch (failure) {
+        ok = false;
+        data = { error: isApiError(failure) && failure.status > 0 && !/^HTTP \d+$/.test(failure.message)
+          ? failure.message
+          : t('ai_chat.server_error_silakan_periksa_koneksi_atau', 'Server error ({status}): Silakan periksa koneksi atau kuota API Key.', { status: isApiError(failure) ? failure.status : 0 }) };
       }
 
-      if (res.ok && data.reply) {
+      if (ok && data.reply) {
         setMessages((prev) => [
           ...prev,
           {

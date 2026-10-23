@@ -1,3 +1,5 @@
+import { accountApi } from '../../api/account';
+import { errorMessage, isApiError } from '../../api/client';
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Building2, Loader2, Users } from 'lucide-react';
 import { Button } from '@legalio/ui-components/button';
@@ -45,15 +47,14 @@ export function OrganizationOnboarding() {
     submitting.current = true;
     setBusy(true); setError('');
     try {
-      const response = await fetch(stage === 'join' ? `/api/invitations/${encodeURIComponent(code.trim())}/accept` : '/api/me/organization', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        ...(stage === 'region' ? { body: JSON.stringify({ ...profile, ...region }) } : {}),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const message = data.error === 'INVITATION_IDENTITY_MISMATCH' ? t('tb.invitation_other_account', 'This invitation was sent to a different account. Sign in with the invited email address.')
-          : stage === 'join' && [404, 409].includes(response.status) ? t('onboarding.invalid_invite', 'This invite code is invalid, expired, or already used. Ask an administrator for a new invitation.')
-          : data.message || t('onboarding.failed', 'Unable to set up your organization. Please try again.');
+      try {
+        if (stage === 'join') await accountApi.acceptInvitation(code.trim());
+        else await accountApi.createOrganization(stage === 'region' ? { ...profile, ...region } : {});
+      } catch (failure) {
+        const status = isApiError(failure) ? failure.status : 0;
+        const message = isApiError(failure) && failure.error === 'INVITATION_IDENTITY_MISMATCH' ? t('tb.invitation_other_account', 'This invitation was sent to a different account. Sign in with the invited email address.')
+          : stage === 'join' && [404, 409].includes(status) ? t('onboarding.invalid_invite', 'This invite code is invalid, expired, or already used. Ask an administrator for a new invitation.')
+          : errorMessage(failure, t('onboarding.failed', 'Unable to set up your organization. Please try again.'));
         throw new Error(message);
       }
       if (stage === 'join') { try { sessionStorage.removeItem('pendingInvitation'); } catch { /* storage unavailable */ } }

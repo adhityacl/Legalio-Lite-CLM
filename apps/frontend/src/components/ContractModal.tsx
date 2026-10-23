@@ -1,3 +1,5 @@
+import { contractsApi } from '../api/contracts';
+import { errorMessage, isAbortError, isApiError } from '../api/client';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { SuggestTagsInput } from './ui/suggest-input';
 import React, { useState, useEffect, useRef } from 'react';
@@ -235,38 +237,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     setError(null);
     setParseSuccessMsg(null);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout
-      
-      let response: Response;
-      if (rawFileObj) {
-        const formData = new FormData();
-        formData.append('file', rawFileObj);
-        response = await fetch('/api/contracts/parse', {
-          method: 'POST',
-          body: formData,
-          signal: controller.signal,
-        });
-      } else {
-        response = await fetch('/api/contracts/parse', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pdfBase64: fileData }),
-          signal: controller.signal,
-        });
-      }
-      clearTimeout(timeoutId);
-      const contentType = response.headers.get('content-type');
-      let result;
-      if (contentType && contentType.includes('application/json')) {
-        result = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(text && text.trim().startsWith('<') ? t('contracts.koneksi_ai_server_timeout_atau_sibuk', 'Koneksi AI Server timeout atau sibuk. Silakan coba kembali beberapa saat lagi.') : (text || t('contracts.gagal_memproses_dokumen', 'Gagal memproses dokumen')));
-      }
-      if (!response.ok) {
-        throw new Error(result.error || t('contracts.failed_to_parse', 'Failed to parse'));
-      }
+      const result = await contractsApi.parse(rawFileObj ?? { pdfBase64: fileData }, { timeoutMs: 90_000 });
       if (result.success && result.data) {
         const parsed = result.data;
         if (parsed.document_type) {
@@ -334,11 +305,11 @@ export const ContractModal: React.FC<ContractModalProps> = ({
           setTimeout(() => setParseSuccessMsg(null), 6000);
         }
       }
-    } catch (err: any) {
-      if (err?.name === 'AbortError') {
+    } catch (err) {
+      if (isAbortError(err) || (isApiError(err) && err.code === 'TIMEOUT')) {
         setError(t('contracts.parsing_timeout_server_terlalu_lama_merespon', 'Parsing timeout, server terlalu lama merespon. Silakan coba lagi.'));
       } else {
-        setError(err.message || t('contracts.error_parsing_document', 'Error parsing document'));
+        setError(errorMessage(err, t('contracts.koneksi_ai_server_timeout_atau_sibuk', 'Koneksi AI Server timeout atau sibuk. Silakan coba kembali beberapa saat lagi.')));
       }
     } finally {
       setIsParsing(false);

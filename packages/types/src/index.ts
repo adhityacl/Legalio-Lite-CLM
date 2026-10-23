@@ -105,6 +105,8 @@ export type JenisDokumenContract = 'Master Agreement' | 'Agreement Addendum';
 export interface Contract extends ContractLifecycleFields {
   contract_id: string;
   organizationId?: string;
+  /** Optimistic-concurrency token: send it back with an edit; a stale value is answered with 409 VERSION_CONFLICT. */
+  version?: number;
   document_type?: JenisDokumenContract;
   parent_contract_id?: string;
   parent_contract_number?: string;

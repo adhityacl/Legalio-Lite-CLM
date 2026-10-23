@@ -1,3 +1,4 @@
+import { downloadFile } from '../../api/assistant';
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Briefcase, Calendar, Check, CheckCircle2, Circle, Download, ExternalLink, FileText, Pencil, X, XCircle } from 'lucide-react';
@@ -87,9 +88,7 @@ export const ApprovalDetail: React.FC<Props> = ({ id, onBack, onRevise }) => {
         setPreview({ name: doc.name, content: doc.content });
         return;
       }
-      const res = await fetch(approvalsApi.fileUrl(id));
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const url = URL.createObjectURL(await res.blob());
+      const url = URL.createObjectURL(await downloadFile(approvalsApi.fileUrl(id)));
       window.open(url, '_blank', 'noopener');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {

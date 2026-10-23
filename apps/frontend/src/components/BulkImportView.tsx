@@ -1,3 +1,5 @@
+import { bulkImportApi } from '../api/bulkImport';
+import { errorMessage } from '../api/client';
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   Upload,
@@ -53,9 +55,6 @@ interface BulkImportViewProps {
   contracts: Contract[];
   ios: InsertionOrder[];
   onRefreshData: () => void;
-  userEmail: string;
-  userName: string;
-  userRole: string;
 }
 
 // ─── CSV Templates ─────────────────────────────────────────────────────────────
@@ -149,9 +148,6 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
   contracts,
   ios,
   onRefreshData,
-  userEmail,
-  userName,
-  userRole,
 }) => {
   const { t, language } = useLanguage();
   const { policy } = useTenantSettings();
@@ -237,22 +233,10 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
     setIsImporting(true);
     setReport(null);
     try {
-      const res = await fetch('/api/bulk-import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: activeType,
-          rows: parsedRows,
-          userEmail,
-          userName,
-          userRole,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) { setReport(data); onRefreshData(); }
-      else { setParseError(data.error || 'Import gagal.'); }
-    } catch (err: any) {
-      setParseError(err.message || 'Import gagal.');
+      setReport(await bulkImportApi.run({ type: activeType, rows: parsedRows }));
+      onRefreshData();
+    } catch (err) {
+      setParseError(errorMessage(err, 'Import gagal.'));
     } finally {
       setIsImporting(false);
     }

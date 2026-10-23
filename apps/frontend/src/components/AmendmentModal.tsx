@@ -1,3 +1,5 @@
+import { contractsApi } from '../api/contracts';
+import { errorMessage } from '../api/client';
 import { ModalFrame } from './ui/modal-frame';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { useLanguage } from '../context/LanguageContext';
@@ -68,22 +70,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
     setError(null);
     setParseSuccessMsg(null);
     try {
-      const response = await fetch('/api/contracts/parse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pdfBase64: fileData })
-      });
-      const contentType = response.headers.get('content-type');
-      let result;
-      if (contentType && contentType.includes('application/json')) {
-        result = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(text && text.trim().startsWith('<') ? t('amendments.koneksi_ai_server_timeout_atau_sibuk', 'Koneksi AI Server timeout atau sibuk. Silakan coba kembali beberapa saat lagi.') : (text || t('amendments.gagal_memproses_dokumen', 'Gagal memproses dokumen')));
-      }
-      if (!response.ok) {
-        throw new Error(result.error || t('amendments.failed_to_parse_document', 'Failed to parse document'));
-      }
+      const result = await contractsApi.parse({ pdfBase64: fileData });
       if (result.success && result.data) {
         const parsed = result.data;
         if (parsed.contract_number) setNomorAddendum(parsed.contract_number);
@@ -114,7 +101,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
         }
       }
     } catch (err: any) {
-      setError(err.message || t('amendments.gagal_memproses_dokumen_2', 'Gagal memproses dokumen.'));
+      setError(errorMessage(err, t('amendments.koneksi_ai_server_timeout_atau_sibuk', 'Koneksi AI Server timeout atau sibuk. Silakan coba kembali beberapa saat lagi.')));
     } finally {
       setIsParsing(false);
     }

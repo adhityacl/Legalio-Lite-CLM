@@ -1,19 +1,14 @@
-/** Deletes records one at a time (the API removes a single record per call) and returns the ids that failed. */
-export async function deleteRecords(
-  basePath: string,
-  ids: string[],
-  actor: { userEmail?: string; userName?: string; userRole?: string },
-): Promise<string[]> {
-  const query = new URLSearchParams({
-    userEmail: actor.userEmail || '',
-    userName: actor.userName || '',
-    userRole: actor.userRole || '',
-  }).toString();
+import { api } from '../api/client';
+
+/**
+ * Deletes records one at a time (the API removes a single record per call) and returns the ids that failed.
+ * The acting user is the verified session; nothing about the actor is sent.
+ */
+export async function deleteRecords(basePath: string, ids: string[]): Promise<string[]> {
   const failed: string[] = [];
   for (const id of ids) {
     try {
-      const response = await fetch(`${basePath}/${encodeURIComponent(id)}?${query}`, { method: 'DELETE' });
-      if (!response.ok) failed.push(id);
+      await api.delete(`${basePath}/${encodeURIComponent(id)}`);
     } catch {
       failed.push(id);
     }

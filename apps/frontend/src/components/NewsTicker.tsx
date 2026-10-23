@@ -1,7 +1,7 @@
+import { assistantApi } from '../api/assistant';
 import React, { useEffect, useState } from 'react';
 import { Megaphone } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { getAuthHeaders } from '../lib/apiFetch';
 import { Card } from '@legalio/ui-components/card';
 import { Badge } from '@legalio/ui-components/badge';
 import { Marquee, MarqueeContent, MarqueeItem, MarqueeViewport } from '@legalio/ui-components/marquee';
@@ -25,12 +25,10 @@ export const NewsTicker: React.FC = () => {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch('/api/dashboard/news-ticker', { headers: getAuthHeaders() });
-        const text = await res.text();
-        const data = text && !text.trim().startsWith('<') ? JSON.parse(text) : null;
+        const data = await assistantApi.newsTicker().catch(() => null);
         if (cancelled) return;
         const fetchedItems: string[] = Array.isArray(data?.items) ? data.items : [];
-        if (!res.ok || fetchedItems.length === 0) {
+        if (fetchedItems.length === 0) {
           setStatus('empty');
           return;
         }

@@ -1,3 +1,4 @@
+import { api, errorMessage } from '../api/client';
 import React, { useState } from 'react';
 import { Info, Send } from 'lucide-react';
 import { RedlineAnalysisData } from '@legalio/types';
@@ -41,16 +42,11 @@ export const ContractRedliningPanel: React.FC<ContractRedliningPanelProps> = ({ 
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.analysis) throw new Error(data.error || t('redline.gagal_memproses_analisis_redlining', 'Gagal memproses analisis redlining.'));
+      const data = await api.post<{ analysis?: any; analyzed_at?: string }>(endpoint, body);
+      if (!data?.analysis) throw new Error(t('redline.gagal_memproses_analisis_redlining', 'Gagal memproses analisis redlining.'));
       onAnalysis(data.analysis, data.analyzed_at || new Date().toISOString());
-    } catch (err: any) {
-      setError(err.message || t('redline.terjadi_kesalahan_saat_memproses_analisis', 'Terjadi kesalahan saat memproses analisis.'));
+    } catch (err) {
+      setError(errorMessage(err, t('redline.terjadi_kesalahan_saat_memproses_analisis', 'Terjadi kesalahan saat memproses analisis.')));
     } finally {
       setLoading(false);
     }

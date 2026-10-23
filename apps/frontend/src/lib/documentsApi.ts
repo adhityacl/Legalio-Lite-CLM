@@ -1,3 +1,4 @@
+import { apiRequest, isApiError, type RequestOptions } from '../api/client';
 import type { PageLayout } from '@legalio/shared/pageLayout';
 import type {
   CommentAction,
@@ -13,15 +14,15 @@ import type {
   MetadataValues,
 } from '@legalio/types/documents';
 
-// Session and organization headers are added by the global fetch interceptor (src/lib/apiFetch.ts).
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init.headers },
+// Transport, session/organization headers and the unified error shape come from the central client (src/api/client.ts).
+function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return apiRequest<T>(path, {
+    method: (init.method as RequestOptions['method']) ?? undefined,
+    body: init.body ?? undefined,
+    headers: { 'Content-Type': 'application/json', ...(init.headers as Record<string, string> | undefined) },
+    signal: init.signal ?? undefined,
+    keepalive: init.keepalive,
   });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.message || body.error || `HTTP ${res.status}`);
-  return body as T;
 }
 
 const json = (method: string, body?: unknown, extra: RequestInit = {}): RequestInit => ({
@@ -85,7 +86,7 @@ export const errorMessage = (err: unknown) => (err instanceof Error ? err.messag
 
 /** Request failures that say nothing about the request itself: a cut-off connection, timeout or busy gateway. */
 export const isTransientFailure = (err: unknown) =>
-  err instanceof TypeError || /^HTTP (408|429|502|503|504)$/.test(errorMessage(err));
+  err instanceof TypeError || (isApiError(err) && (err.code === 'NETWORK_ERROR' || [408, 429, 502, 503, 504].includes(err.status))) || /^HTTP (408|429|502|503|504)$/.test(errorMessage(err));
 
 /** Runs `request` again after a short pause when it failed for a transient reason (e.g. the dev tunnel's HTTP 408). */
 export async function withTransientRetry<T>(request: () => Promise<T>, delaysMs: number[] = [600, 1500]): Promise<T> {

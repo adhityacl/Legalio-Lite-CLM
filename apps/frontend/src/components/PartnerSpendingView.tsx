@@ -1,7 +1,8 @@
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { useRowsPerPage } from '../lib/tablePreferences';
 import { BulkSelectionBar } from './ui/bulk-selection-bar';
-import { deleteRecords } from '../lib/bulkDelete';
+import { spendingsApi } from '../api/spendings';
+import { errorMessage as apiErrorMessage, isApiError } from '../api/client';
 import { downloadCsv } from '../lib/csv';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { formatBusinessDate } from '../lib/displayDate';
@@ -127,9 +128,6 @@ interface PartnerSpendingViewProps {
   contracts: Contract[];
   ios: InsertionOrder[];
   onRefreshData: () => void;
-  userEmail?: string;
-  userName?: string;
-  userRole?: string;
   openSpendingId?: string;
   onSpendingOpened?: () => void;
 }
@@ -140,9 +138,6 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   contracts,
   ios,
   onRefreshData,
-  userEmail,
-  userName,
-  userRole,
   openSpendingId,
   onSpendingOpened,
 }) => {
@@ -299,32 +294,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
     setErrorMessage('');
     setParseSuccessMsg(null);
     try {
-      let response: Response;
-      if (invoiceFileObj.rawFile) {
-        const formData = new FormData();
-        formData.append('file', invoiceFileObj.rawFile);
-        response = await fetch('/api/spendings/parse', {
-          method: 'POST',
-          body: formData,
-        });
-      } else {
-        response = await fetch('/api/spendings/parse', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pdfBase64: invoiceFileObj.fileData }),
-        });
-      }
-      const contentType = response.headers.get('content-type');
-      let result;
-      if (contentType && contentType.includes('application/json')) {
-        result = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(text && text.trim().startsWith('<') ? t('spending.koneksi_ai_server_timeout_atau_sibuk', 'Koneksi AI Server timeout atau sibuk. Silakan coba kembali beberapa saat lagi.') : (text || t('spending.gagal_mengekstrak_dokumen_invoice', 'Gagal mengekstrak dokumen invoice.')));
-      }
-      if (!response.ok) {
-        throw new Error(result.error || t('spending.gagal_mengekstrak_dokumen_invoice', 'Gagal mengekstrak dokumen invoice.'));
-      }
+      const result = await spendingsApi.parse(invoiceFileObj.rawFile ?? { pdfBase64: invoiceFileObj.fileData });
       if (result.success && result.data) {
         const p = result.data;
         if (p.invoice_number) setFormInvoiceNumber(p.invoice_number);
@@ -373,8 +343,9 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
           setParseSuccessMsg(t('spending.parse_success', 'Invoice data filled by AI. Review before saving.'));
         }
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Terjadi kesalahan saat parsing invoice.');
+    } catch (err) {
+      // An error page instead of JSON (gateway timeout) reads as a busy AI server.
+      setErrorMessage(apiErrorMessage(err, t('spending.koneksi_ai_server_timeout_atau_sibuk', 'Koneksi AI Server timeout atau sibuk. Silakan coba kembali beberapa saat lagi.')));
     } finally {
       setIsParsing(false);
     }
@@ -405,9 +376,6 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
     setIsSubmitting(true);
     try {
       const isEdit = Boolean(editingSpending && editingSpending.id);
-      const url = isEdit ? `/api/partner-spendings/${editingSpending!.id}` : '/api/partner-spendings';
-      const method = isEdit ? 'PUT' : 'POST';
-
       const payload = {
         vendor_id: formVendorId || undefined,
         vendor_name: formVendorName,
@@ -428,26 +396,16 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
         io_id: formIoId || undefined,
         billed_quantity: formBilledQty === '' ? undefined : Number(formBilledQty),
         ...(redline && { redline_analysis: redline.analysis, redline_analyzed_at: redline.at }),
-        userEmail,
-        userName,
-        userRole,
       };
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(allocationMessages[data.allocation_error as keyof typeof allocationMessages] || data.error || t('spending.terjadi_kesalahan_saat_menyimpan_data_spending', 'Terjadi kesalahan saat menyimpan data spending.'));
-      }
+      if (isEdit) await spendingsApi.update(editingSpending!.id, payload as any);
+      else await spendingsApi.create(payload as any);
 
       onRefreshData();
       setShowModal(false);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Gagal menyimpan data spending.');
+    } catch (err) {
+      const allocationError = isApiError(err) ? (err.body.allocation_error as keyof typeof allocationMessages | undefined) : undefined;
+      setErrorMessage((allocationError && allocationMessages[allocationError]) || apiErrorMessage(err, t('spending.terjadi_kesalahan_saat_menyimpan_data_spending', 'Terjadi kesalahan saat menyimpan data spending.')));
     } finally {
       setIsSubmitting(false);
     }
@@ -479,11 +437,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
         const token = getCachedAccessToken();
         const headers: Record<string, string> = {};
         if (token) headers['x-google-access-token'] = token;
-        const res = await fetch('/api/exchange-rates', { headers, cache: 'no-store' });
-        if (res.ok) {
-           const data = await res.json();
-           setExchangeRates(data);
-        }
+        setExchangeRates(await spendingsApi.exchangeRates(headers));
       } catch (err) {
         console.error("Failed to fetch exchange rates:", err);
       }
@@ -631,11 +585,10 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
     const ok = await confirmDialog({ description: t('spending.hapus_data_spending_ini', 'Hapus data spending ini?'), tone: 'danger', confirmLabel: t('io.action_delete', 'Hapus') });
     if (!ok) return;
     try {
-      const res = await fetch(`/api/partner-spendings/${id}?userEmail=${encodeURIComponent(userEmail || '')}&userName=${encodeURIComponent(userName || '')}&userRole=${encodeURIComponent(userRole || '')}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(t('spending.gagal_menghapus', 'Gagal menghapus'));
+      await spendingsApi.remove(id);
       onRefreshData();
     } catch (e) {
-      showAlert({ title: t('spending.gagal_menghapus_data_spending', 'Gagal menghapus data spending'), description: (e as Error).message, variant: 'destructive' });
+      showAlert({ title: t('spending.gagal_menghapus_data_spending', 'Gagal menghapus data spending'), description: apiErrorMessage(e, t('spending.gagal_menghapus', 'Gagal menghapus')), variant: 'destructive' });
     }
   };
 
@@ -648,7 +601,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
       confirmLabel: t('io.action_delete', 'Hapus'),
     });
     if (!ok) return;
-    const failed = await deleteRecords('/api/partner-spendings', targets, { userEmail, userName, userRole });
+    const failed = await spendingsApi.removeMany(targets);
     onRefreshData();
     if (failed.length > 0) {
       showAlert({ title: t('bulk.delete_failed_title', 'Sebagian gagal dihapus'), description: t('bulk.delete_failed_message', '{failed} dari {total} gagal dihapus.', { failed: failed.length, total: targets.length }), variant: 'destructive' });

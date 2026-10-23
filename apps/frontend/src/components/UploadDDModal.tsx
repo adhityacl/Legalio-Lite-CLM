@@ -1,3 +1,5 @@
+import { partnersApi } from '../api/partners';
+import { errorMessage } from '../api/client';
 import { ModalFrame } from './ui/modal-frame';
 import React, { useState, useRef } from 'react';
 import { getActiveFormattingLocale } from '@legalio/shared/currencyUtils';
@@ -27,10 +29,6 @@ interface UploadDDModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (updatedPartner: Partner) => void;
-  getAuthHeaders: () => Record<string, string>;
-  userEmail?: string;
-  userName?: string;
-  userRole?: string;
 }
 
 export const UploadDDModal: React.FC<UploadDDModalProps> = ({
@@ -39,10 +37,6 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  getAuthHeaders,
-  userEmail,
-  userName,
-  userRole,
 }) => {
   const { t, language } = useLanguage();
   const { policy } = useTenantSettings();
@@ -101,26 +95,12 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
     setIsDeletingFileId(fileId);
     setError(null);
     try {
-      const res = await fetch(`/api/partners/${partner.partner_id}/dd-file`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          docName,
-          fileId,
-          userEmail: userEmail || 'user@app',
-          userName: userName || 'User',
-          userRole: userRole || 'Legal',
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || t('dd_upload.gagal_menghapus_file', 'Gagal menghapus file.'));
-      }
+      const data = await partnersApi.deleteDdFile(partner.partner_id, { docName, fileId });
       if (data.partner) {
         onSuccess(data.partner);
       }
     } catch (err: any) {
-      setError(err?.message || t('dd_upload.terjadi_kesalahan_saat_menghapus_file', 'Terjadi kesalahan saat menghapus file.'));
+      setError(errorMessage(err, t('dd_upload.terjadi_kesalahan_saat_menghapus_file', 'Terjadi kesalahan saat menghapus file.')));
     } finally {
       setIsDeletingFileId(null);
     }
@@ -152,21 +132,9 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
         fileName: finalFileName,
         fileData: fileBase64,
         expiryDate: expiryDate.trim(),
-        userEmail: userEmail || 'user@app',
-        userName: userName || 'User',
-        userRole: userRole || 'Legal',
       };
 
-      const res = await fetch(`/api/partners/${partner.partner_id}/upload-dd`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || t('dd_upload.gagal_mengunggah_dokumen_ke_google_drive', 'Gagal mengunggah dokumen ke Google Drive.'));
-      }
+      const data = await partnersApi.uploadDd(partner.partner_id, payload);
 
       if (data.partner) {
         onSuccess(data.partner);

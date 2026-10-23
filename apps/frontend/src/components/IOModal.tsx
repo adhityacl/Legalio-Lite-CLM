@@ -1,3 +1,5 @@
+import { ordersApi } from '../api/orders';
+import { errorMessage } from '../api/client';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { FormSection } from '@legalio/ui-components/blocks';
 import React, { useState, useEffect } from 'react';
@@ -223,32 +225,7 @@ export const IOModal: React.FC<IOModalProps> = ({
     setError(null);
     setParseSuccessMsg(null);
     try {
-      let response: Response;
-      if (rawFileObj) {
-        const formData = new FormData();
-        formData.append('file', rawFileObj);
-        response = await fetch('/api/ios/parse', {
-          method: 'POST',
-          body: formData,
-        });
-      } else {
-        response = await fetch('/api/ios/parse', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pdfBase64: fileData })
-        });
-      }
-      const contentType = response.headers.get('content-type');
-      let result;
-      if (contentType && contentType.includes('application/json')) {
-        result = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(text && text.trim().startsWith('<') ? t('io.koneksi_ai_server_timeout_atau_sibuk', 'Koneksi AI Server timeout atau sibuk. Silakan coba kembali beberapa saat lagi.') : (text || t('io.gagal_memproses_io', 'Gagal memproses IO')));
-      }
-      if (!response.ok) {
-        throw new Error(result.error || t('io.failed_to_parse_io', 'Failed to parse IO'));
-      }
+      const result = await ordersApi.parse(rawFileObj ?? { pdfBase64: fileData });
       if (result.success && result.data) {
         const parsed = result.data;
         if (parsed.io_number) setNomorIO(parsed.io_number);
@@ -308,8 +285,8 @@ export const IOModal: React.FC<IOModalProps> = ({
           setTimeout(() => setParseSuccessMsg(null), 6000);
         }
       }
-    } catch (err: any) {
-      setError(err.message || t('io.error_parsing_document', 'Error parsing document'));
+    } catch (err) {
+      setError(errorMessage(err, t('io.koneksi_ai_server_timeout_atau_sibuk', 'Koneksi AI Server timeout atau sibuk. Silakan coba kembali beberapa saat lagi.')));
     } finally {
       setIsParsing(false);
     }

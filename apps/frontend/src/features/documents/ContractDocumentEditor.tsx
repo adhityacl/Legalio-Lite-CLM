@@ -1,3 +1,5 @@
+import { templatesApi } from '../../api/templates';
+import { errorMessage as apiErrorMessage } from '../../api/client';
 import DOMPurify from 'dompurify';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlphabeticalSelect } from '../../components/ui/alphabetical-select';
@@ -65,7 +67,6 @@ import { useAlertToast } from '../../context/AlertToastContext';
 import { useTenant } from '../../context/TenantContext';
 import { useTenantSettings } from '../../context/TenantSettingsContext';
 import { useAuth } from '../../context/AuthContext';
-import { getAuthHeaders } from '../../lib/apiFetch';
 import { CommentAnchor, renderRedlineHtml, stripCommentAnchors } from '../../lib/tiptapCommentMark';
 import { documentsApi, errorMessage, withTransientRetry } from '../../lib/documentsApi';
 import { formatDateTime, type DocumentComment, type DocumentDetail, type DocumentStatus, type DocumentType } from '@legalio/types/documents';
@@ -563,19 +564,8 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
   const fetchTemplates = async () => {
     try {
       setIsLoadingTemplates(true);
-      const res = await fetch('/api/templates', {
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) {
-        throw new Error(t('contract_creator.http_error', 'HTTP error {status}', { status: res.status }));
-      }
-      const text = await res.text();
-      if (!text || text.trim().startsWith('<')) {
-        setSavedTemplates([]);
-        return;
-      }
-      const data = JSON.parse(text);
-      setSavedTemplates(Array.isArray(data) ? data : []);
+      const data = await templatesApi.list();
+      setSavedTemplates(Array.isArray(data) ? data as any[] : []);
     } catch (err) {
       console.error('Failed to fetch templates:', err);
     } finally {
@@ -605,34 +595,15 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
       // not every custom field the user has ever defined in this session.
       const usedKeys = new Set(extractSlotKeysFromHtml(content).map((s) => s.key));
       const templateCustomFields = customFields.filter((f) => usedKeys.has(f.key));
-      const res = await fetch('/api/templates', {
-        method: 'POST',
-        headers: {
-          ...getAuthHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: newTemplateName.trim(),
-          contentId: content,
-          customFields: templateCustomFields,
-        }),
-      });
-      const text = await res.text();
-      let data: any = {};
       try {
-        data = text && !text.trim().startsWith('<') ? JSON.parse(text) : { error: t('contract_creator.server_error_status', 'Server error (Status {status})', { status: res.status }) };
-      } catch {
-        data = { error: t('contract_creator.gagal_memproses_respon_server', 'Gagal memproses respon server.') };
-      }
-
-      if (res.ok && data.success) {
+        await templatesApi.create({ name: newTemplateName.trim(), contentId: content, customFields: templateCustomFields });
         setNewTemplateName('');
         showAlert({ title: t('contract_creator.msg.template_saved', 'Template kerjasama berhasil disimpan'), variant: 'success' });
         void fetchTemplates();
-      } else {
+      } catch (failure) {
         showAlert({
           title: t('contract_creator.msg.template_save_failed', 'Gagal menyimpan template'),
-          description: data.error || data.message || t('contract_creator.status', 'Status {status}.', { status: res.status }),
+          description: apiErrorMessage(failure, t('contract_creator.gagal_memproses_respon_server', 'Gagal memproses respon server.')),
           variant: 'destructive',
         });
       }
@@ -658,16 +629,13 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
     try {
       setIsGeneratingAiTemplate(true);
-      const res = await fetch('/api/templates/ai-generate', {
-        method: 'POST',
-        headers: {
-          ...getAuthHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ docType: aiTemplateDocType, prompt: aiTemplatePrompt.trim() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      let data: any;
+      try {
+        data = await templatesApi.aiGenerate({ docType: aiTemplateDocType, prompt: aiTemplatePrompt.trim() });
+      } catch (failure) {
+        data = { success: false, error: apiErrorMessage(failure, '') };
+      }
+      if (!data.success) {
         showAlert({
           title: t('contract_creator.ai_template.failed', 'Gagal membuat template'),
           description: data.error || data.message,
@@ -720,25 +688,14 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
       return;
     }
     try {
-      const res = await fetch(`/api/templates/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
-      const text = await res.text();
-      let data: any = {};
       try {
-        data = text && !text.trim().startsWith('<') ? JSON.parse(text) : { error: t('contract_creator.server_error_status', 'Server error (Status {status})', { status: res.status }) };
-      } catch {
-        data = { error: t('contract_creator.gagal_memproses_respon_server', 'Gagal memproses respon server.') };
-      }
-
-      if (res.ok && data.success) {
+        await templatesApi.remove(id);
         showAlert({ title: t('contract_creator.msg.template_deleted', 'Template kerjasama berhasil dihapus'), variant: 'success' });
         void fetchTemplates();
-      } else {
+      } catch (failure) {
         showAlert({
           title: t('contract_creator.msg.template_delete_failed', 'Gagal menghapus template'),
-          description: data.error || data.message || t('contract_creator.status', 'Status {status}.', { status: res.status }),
+          description: apiErrorMessage(failure, t('contract_creator.gagal_memproses_respon_server', 'Gagal memproses respon server.')),
           variant: 'destructive',
         });
       }

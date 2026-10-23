@@ -1,9 +1,9 @@
+import { templatesApi } from '../../api/templates';
 import React, { useEffect, useMemo, useState } from 'react';
 import { FileText, Plus, Search, X } from 'lucide-react';
 import { ModalFrame } from '../ui/modal-frame';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTenantSettings } from '../../context/TenantSettingsContext';
-import { getAuthHeaders } from '../../lib/apiFetch';
 import { jurisdictionFromSettings } from '@legalio/shared/data/cooperationAgreementTemplate';
 import {
   buildMasterServiceAgreementHtml,
@@ -41,10 +41,8 @@ export const NewDocumentDialog: React.FC<{
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/templates', { headers: getAuthHeaders() })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(String(res.status));
-        const data = await res.json();
+    templatesApi.list()
+      .then((data) => {
         if (!cancelled) {
           setSaved(Array.isArray(data) ? data : []);
           setStatus('ready');
