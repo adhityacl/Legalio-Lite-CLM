@@ -2,6 +2,7 @@ import { PDFDocument } from 'pdf-lib';
 import { PDFParse } from 'pdf-parse';
 import crypto from 'crypto';
 import { sql } from '../db';
+import { currentAiOrganization } from '../aiLimits';
 
 export interface PdfInspectionReport {
   isScanned: boolean;
@@ -126,9 +127,12 @@ export const globalOcrCache = new OcrMemoryCache();
  * a burst of unrelated writes could in theory evict a transcript early —
  * give transcripts their own table/quota if that's ever observed in practice.
  */
+/** Transcripts are cached per organization (key `transcript:<organizationId>:<hash>`), so tenants never share OCR output. */
+const transcriptScope = () => `transcript:${currentAiOrganization() ?? 'platform'}`;
+
 export async function getCachedTranscript(hash: string): Promise<string | null> {
   if (!hash) return null;
-  const row = await sql.get(`SELECT payload FROM ai_ocr_cache WHERE cache_key = ?`, `transcript:${hash}`) as
+  const row = await sql.get(`SELECT payload FROM ai_ocr_cache WHERE cache_key = ?`, `${transcriptScope()}:${hash}`) as
     | { payload: string }
     | undefined;
   if (!row) return null;
@@ -141,7 +145,7 @@ export async function getCachedTranscript(hash: string): Promise<string | null> 
 
 export async function setCachedTranscript(hash: string, text: string): Promise<void> {
   if (!hash || !text.trim()) return;
-  await globalOcrCache.set(hash, 'transcript', text);
+  await globalOcrCache.set(hash, transcriptScope(), text);
 }
 
 // Legal keyword taxonomy and category definitions
@@ -551,6 +555,9 @@ function cleanExtractedTextForLLM(rawText: string): string {
  * - PDF-Inspector Fast Route: If digital text is present (>100 chars), feeds clean text directly (< 1.5s execution time!).
  * - Vision Fallback Route: If scanned/image-heavy, feeds pre-filtered Base64 PDF for Gemini Multimodal OCR.
  */
+// TODO(perf): PDF inspection/text extraction (pdf-parse, pdf-lib) runs on the event loop and can stall other requests for large
+// scans. Move `inspectPdf`/`optimizePdf` into a worker_threads worker (Buffer transferred in, result JSON out); not done in
+// Phase 1 because pdf-parse/pdf-lib are bundled by esbuild into a single CJS file and the worker entry needs its own bundle.
 export async function buildCheapOcrContents(
   rawInput: string | Buffer,
   systemPrompt: string,

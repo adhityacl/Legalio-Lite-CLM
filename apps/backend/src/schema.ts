@@ -97,6 +97,10 @@ export async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS mail_templates (
       id text PRIMARY KEY, subject text NOT NULL, html text NOT NULL, version integer NOT NULL DEFAULT 1, updated_at text NOT NULL);
     CREATE TABLE IF NOT EXISTS integration_credentials (id text PRIMARY KEY, payload text NOT NULL, updated_by text, updated_at text NOT NULL);
+    -- Per-organization AI usage per UTC day (calls and tokens) for the daily budget.
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      organization_id text NOT NULL, day text NOT NULL, calls integer NOT NULL DEFAULT 0, tokens bigint NOT NULL DEFAULT 0,
+      PRIMARY KEY (organization_id, day));
     -- Reminder outbox: one row per (record, renewal cycle, trigger); status/attempts/last_error track delivery and retry.
     CREATE TABLE IF NOT EXISTS reminder_ledger (
       id text PRIMARY KEY, organization_id text NOT NULL, kind text NOT NULL, record_id text NOT NULL, cycle_end_date text NOT NULL,

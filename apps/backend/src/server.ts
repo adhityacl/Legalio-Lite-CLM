@@ -1,4 +1,5 @@
 import { createMailTemplateStore } from "./mailTemplateStore";
+import { aiContext, AiLimitError, AiRateLimiter, aiLimitsFromEnv, boundChatHistory, boundWorkspaceContext, currentAiOrganization, recordAiTokens, reserveAiCall, runModelChain } from "./aiLimits";
 import { verifyGoogleAccessToken } from "./googleAudience";
 import { smtpTlsOptions } from "./smtpTls";
 import { appendActivity, listActivity } from "./activityLog";
@@ -186,6 +187,10 @@ app.all(["/api/auth", "/api/auth/*"], async (req: express.Request, res: express.
   return toNodeHandler(betterAuthInstance)(req, res);
 });
 app.use(createAuthorizationMiddleware(sql));
+// Lets AI budgets and caches know the organization without threading it through every helper.
+app.use((req: express.Request, _res: express.Response, next: express.NextFunction) => {
+  aiContext.run({ organizationId: (req as any).orgContext?.organizationId ?? null }, next);
+});
 
 /** Verified organization context attached by the route policy (tenant/orgParam routes only). */
 function orgContextOf(req: express.Request): OrgContext {
@@ -916,41 +921,27 @@ async function generateContentWithRetryAndFallback(params: any) {
     "gemini-3.6-flash",
     "gemini-3.5-flash",
   ];
-  const fallbackModels = candidateFallbacks.filter((m) => m !== primaryModel);
-  const modelQueue = [primaryModel, ...fallbackModels];
-  let lastError: any = null;
-  const PER_ATTEMPT_TIMEOUT_MS = 35000;
-
-  for (const model of modelQueue) {
-    try {
-      log.info(`[Gemini API] Processing request with model=${model}...`);
-      const response = await Promise.race([
-        aiClient.models.generateContent({ ...params, model }),
-        new Promise((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  `Timeout: model ${model} took longer than ${PER_ATTEMPT_TIMEOUT_MS / 1000}s`,
-                ),
-              ),
-            PER_ATTEMPT_TIMEOUT_MS,
-          ),
-        ),
-      ]);
-      log.info(`[Gemini API] Success with model=${model}`);
-      return response;
-    } catch (err: any) {
-      lastError = err;
-      const errMsg = (err?.message || err?.toString() || "").toLowerCase();
-      log.warn(`[Gemini API] Model ${model} encountered an issue (${errMsg.slice(0, 120)}), trying fallback...`);
-    }
+  // At most aiLimits.maxAttempts (3) models are tried: the primary and the first fallbacks.
+  const models = [primaryModel, ...candidateFallbacks.filter((m) => m !== primaryModel)];
+  try {
+    const response = await runModelChain({
+      models,
+      limits: aiLimits,
+      call: (model, signal) => {
+        log.info(`[Gemini API] Processing request with model=${model}...`);
+        // abortSignal cancels the HTTP request itself when the attempt times out.
+        return aiClient.models.generateContent({ ...params, model, config: { ...(params.config || {}), abortSignal: signal } });
+      },
+      onAttemptFailed: (model, err, attempt) =>
+        log.warn(`[Gemini API] Model ${model} failed on attempt ${attempt}/${Math.min(aiLimits.maxAttempts, models.length)} (${String((err as any)?.message || err).toLowerCase().slice(0, 120)})`),
+    });
+    log.info("[Gemini API] Success");
+    await recordAiTokens(sql, currentAiOrganization(), Number((response as any)?.usageMetadata?.totalTokenCount) || 0)
+      .catch((err) => log.warn("Could not record AI token usage:", err));
+    return response;
+  } catch (lastError) {
+    throw new Error(formatGeminiError(lastError));
   }
-
-  if (!lastError) {
-    throw new Error("Google AI Gemini model sedang sibuk atau tidak merespons. Silakan coba lagi beberapa saat lagi.");
-  }
-  throw new Error(formatGeminiError(lastError));
 }
 __name(
   generateContentWithRetryAndFallback,
@@ -2302,7 +2293,10 @@ app.get("/api/partners", async (req: express.Request, res: express.Response) => 
  * AI is an optional, per-tenant capability (PRD §4.1, §5.1): it needs a
  * configured provider key AND the tenant's `aiAssistant` module switched on.
  */
-function ensureAiAvailable(req: express.Request, res: express.Response): boolean {
+/** Per-organization AI limits; read from AI_* env once (see aiLimits.ts). */
+const aiLimits = aiLimitsFromEnv();
+const aiRateLimiter = new AiRateLimiter();
+async function ensureAiAvailable(req: express.Request, res: express.Response): Promise<boolean> {
   const settings = getTenantSettings(getRequestTenantId(req));
   if (!settings.modules.aiAssistant) {
     res.status(403).json({ error: "AI_DISABLED", message: "AI features are disabled for this organization." });
@@ -2310,6 +2304,15 @@ function ensureAiAvailable(req: express.Request, res: express.Response): boolean
   }
   if (!getEffectiveGeminiApiKey()) {
     res.status(400).json({ error: "AI_NOT_CONFIGURED", message: "The AI assistant is not available. Ask your platform administrator to configure a provider." });
+    return false;
+  }
+  try {
+    // One AI request counts against the organization's per-minute rate and daily budget (cached results included).
+    await reserveAiCall(sql, getRequestTenantId(req), aiLimits, aiRateLimiter);
+  } catch (err) {
+    if (!(err instanceof AiLimitError)) throw err;
+    log.warn(`AI request refused for ${getRequestTenantId(req)}: ${err.code}`);
+    res.set("Retry-After", String(err.retryAfterSeconds)).status(429).json({ error: err.code, message: err.message, retryAfterSeconds: err.retryAfterSeconds });
     return false;
   }
   return true;
@@ -2351,7 +2354,7 @@ async function extractAndCacheDocumentTranscript(parsedData: any, fileHash: stri
   delete parsedData?.document_text;
 }
 app.post("/api/partners/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   try {
     const inputData = req.file?.buffer || req.body?.pdfBase64 || req.body?.fileBase64;
     const model = req.body?.model;
@@ -2433,7 +2436,7 @@ Return strictly one valid JSON object matching the schema.`;
   }
 });
 app.post("/api/partners/generate-dd-notes", async (req: express.Request, res: express.Response) => {
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   try {
     const { partner_name, country, entity_type, tags, model, pdfBase64 } = req.body;
     if (!partner_name) {
@@ -2491,7 +2494,7 @@ app.post("/api/partners/review-analysis", async (req: express.Request, res: expr
   if (draft.partner_id && (!saved || assertRecordAccess(req, "partner", saved) || assertRecordWritable(req, "partner", saved))) {
     return res.status(404).json({ error: "Partner tidak ditemukan." });
   }
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   const text = (v: unknown, max = 2000) => (v == null || v === "" ? "-" : String(v).slice(0, max));
   const country = sanitizeCountryCode(draft.country);
   const identifiers = sanitizeIdentifiers(draft.identifiers);
@@ -2808,7 +2811,7 @@ app.post("/api/partner-evaluations/review-analysis", async (req: express.Request
   }
   const partner = db.partners.find((p) => p.partner_id === draft.partner_id && p.organizationId === organizationId);
   const visiblePartner = partner && !assertRecordAccess(req, "partner", partner) ? partner : undefined;
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   const text = (v: unknown, max = 2000) => (v == null || v === "" ? "-" : String(v).slice(0, max));
   const num = (v: unknown) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
   const snap = req.body.snapshot && typeof req.body.snapshot === "object" ? req.body.snapshot : {};
@@ -3074,7 +3077,7 @@ app.get("/api/partner-spendings", async (req: express.Request, res: express.Resp
   res.json(list);
 });
 app.post("/api/spendings/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   try {
     const inputData = req.file?.buffer || req.body?.pdfBase64 || req.body?.fileBase64;
     const model = req.body?.model;
@@ -3226,7 +3229,7 @@ app.post("/api/spendings/review-analysis", async (req: express.Request, res: exp
   const so = draft.io_id ? db.ios.find((io) => io.io_id === String(draft.io_id)) : undefined;
   const visibleSo = so && !assertRecordAccess(req, "io", so) ? so : undefined;
   const parent = visibleSo?.contract_id ? db.contracts.find((c) => c.contract_id === visibleSo.contract_id && c.organizationId === organizationId) : undefined;
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   const text = (v: unknown, max = 2000) => (v == null || v === "" ? "-" : String(v).slice(0, max));
   const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : null);
   const c = req.body.computed && typeof req.body.computed === "object" ? req.body.computed : {};
@@ -3939,7 +3942,7 @@ app.get("/api/contracts", async (req: express.Request, res: express.Response) =>
   res.json(result);
 });
 app.post("/api/contracts/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   try {
     const inputData = req.file?.buffer || req.body?.pdfBase64 || req.body?.fileBase64;
     const model = req.body?.model;
@@ -4247,7 +4250,7 @@ app.post("/api/contracts/redline-analysis", async (req: express.Request, res: ex
   if (draft.contract_id && (!saved || assertRecordAccess(req, "contract", saved) || assertRecordWritable(req, "contract", saved))) {
     return res.status(404).json({ error: "Contract not found." });
   }
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   const pick = (k: string) => (draft[k] == null ? undefined : String(draft[k]).slice(0, 20000));
   const contract = {
     organizationId,
@@ -4299,7 +4302,7 @@ app.post("/api/contracts/:id/redline-analysis", async (req: express.Request, res
       analyzed_at: contract.redline_analyzed_at || contract.updated_at,
     });
   }
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   const partner = db.partners.find((p) => p.partner_id === contract.partner_id && p.organizationId === contract.organizationId);
   try {
     const parsed = await runContractRedlineAnalysis(req, contract, partner);
@@ -4343,7 +4346,7 @@ app.post("/api/documents/:id/ai-redline", async (req: express.Request, res: expr
   if (!document || !isMatchingOrg(document.organization_id, getRequestTenantId(req))) {
     return res.status(404).json({ error: "Document not found." });
   }
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   const plainText = String(req.body?.plainText || "").trim().slice(0, 40000);
   if (!plainText) {
     return res.status(400).json({ error: "The document has no text to review yet." });
@@ -4501,7 +4504,7 @@ app.post("/api/templates/ai-generate", async (req: express.Request, res: express
   if (!(templateCtx.accessMode === "platform" || templateCtx.tenantRole === "admin" || templateCtx.tenantRole === "manager")) {
     return res.status(403).json({ error: "INSUFFICIENT_PERMISSION", message: "Only administrators and managers can generate templates with AI." });
   }
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
 
   const docType = String(req.body?.docType || "");
   const docTypeLabel = AI_TEMPLATE_DOC_TYPES[docType];
@@ -5009,7 +5012,7 @@ app.get("/api/ios", async (req: express.Request, res: express.Response) => {
   res.json(result);
 });
 app.post("/api/ios/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   try {
     const inputData = req.file?.buffer || req.body?.pdfBase64 || req.body?.fileBase64;
     const model = req.body?.model;
@@ -5159,7 +5162,7 @@ app.post("/api/ios/review-analysis", async (req: express.Request, res: express.R
   }
   const parent = draft.contract_id ? db.contracts.find((c) => c.contract_id === String(draft.contract_id)) : undefined;
   const parentVisible = parent && !assertRecordAccess(req, "contract", parent) ? parent : undefined;
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   const pick = (k: string) => (draft[k] == null ? "-" : String(draft[k]).slice(0, 20000));
   const ctx = aiPolicyContext(organizationId);
   const prompt = `You are a senior commercial counsel and procurement reviewer acting for ${ctx.organizationName}, a ${ctx.industryName} organization in ${ctx.countryName}.
@@ -7192,7 +7195,7 @@ function maskTail(value: unknown, keep = 4): string {
   return text.length <= keep ? "•".repeat(text.length) : `${"•".repeat(Math.min(6, text.length - keep))}${text.slice(-keep)}`;
 }
 app.post("/api/chat", async (req: express.Request, res: express.Response) => {
-  if (!ensureAiAvailable(req, res)) return;
+  if (!(await ensureAiAvailable(req, res))) return;
   try {
     const { query, history } = req.body;
     if (!query && (!history || history.length === 0)) {
@@ -7314,6 +7317,10 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
         internal_notes: e.notes || "",
       })),
     };
+    // Bounded inputs: the last few messages and only the workspace rows relevant to the question, never the whole workspace.
+    const boundedHistory = boundChatHistory<{ role?: string; text: string }>(history, aiLimits);
+    const questionText = typeof query === "string" ? query.trim().slice(0, 4000) : "";
+    const boundedContext = boundWorkspaceContext(dbContext, questionText, boundedHistory.map((m) => m.text), aiLimits);
     const moduleNote = settings.modules.commercialDocuments
       ? `"commercial_documents" are ${ctx.commercialDocumentLabel}s issued under master agreements.`
       : "";
@@ -7321,8 +7328,8 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
 Answer strictly from the workspace JSON below and the ongoing conversation. ${moduleNote}
 Contact details, identity/tax numbers and full bank account numbers are intentionally withheld for privacy; if asked for them, say they are not available to the assistant.
 
-Workspace JSON:
-${JSON.stringify(dbContext, null, 2)}
+Workspace JSON (record_counts has the full totals; when context_note is present only the rows most relevant to the question are listed):
+${JSON.stringify(boundedContext)}
 
 Guidelines:
 1. When asked about notes, remarks or summaries, check every "internal_notes" field.
@@ -7332,23 +7339,15 @@ Guidelines:
 5. Never answer with Markdown tables (the chat widget is narrow). Use bullet lists with bold entity names and indented sub-bullets instead.
 6. Answer in ${ctx.responseLanguage} unless the user writes in, or asks for, another language.`;
     const contents = [];
-    if (Array.isArray(history) && history.length > 0) {
-      for (const msg of history) {
-        if (msg && typeof msg.text === "string" && msg.text.trim()) {
-          const role =
-            msg.role === "ai" || msg.role === "model" ? "model" : "user";
-          contents.push({ role, parts: [{ text: msg.text.trim() }] });
-        }
-      }
+    for (const msg of boundedHistory) {
+      const role = msg.role === "ai" || msg.role === "model" ? "model" : "user";
+      if (!contents.length && role === "model") continue; // trimming may leave a reply without its question
+      contents.push({ role, parts: [{ text: msg.text }] });
     }
-    if (query && typeof query === "string" && query.trim()) {
+    if (questionText) {
       const lastMsg = contents[contents.length - 1];
-      if (
-        !lastMsg ||
-        lastMsg.role !== "user" ||
-        lastMsg.parts[0]?.text !== query.trim()
-      ) {
-        contents.push({ role: "user", parts: [{ text: query.trim() }] });
+      if (!lastMsg || lastMsg.role !== "user" || lastMsg.parts[0]?.text !== questionText) {
+        contents.push({ role: "user", parts: [{ text: questionText }] });
       }
     }
     const modelToUse = getValidAiModel(db.googleConfig?.aiModel || "gemini-3.8-flash");
