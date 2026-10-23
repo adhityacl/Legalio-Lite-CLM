@@ -1,7 +1,8 @@
 /** Business schema. API names stay stable at the storage boundary. */
 export type FieldKind = 'text' | 'number' | 'boolean' | 'json' | 'money';
 export interface Field { api: string; sql: string; kind: FieldKind }
-export interface EntitySchema { table: string; key: string; collection: string; fields: Field[]; search: string[] }
+/** `appendOnly` tables are written by dedicated INSERTs, never by the full-projection sync (which deletes rows missing from memory). */
+export interface EntitySchema { table: string; key: string; collection: string; fields: Field[]; search: string[]; appendOnly?: boolean }
 const snake = (name: string) => name.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 const fields = (names: string, kind: FieldKind = 'text'): Field[] => names.split(/\s+/).filter(Boolean).map(api => ({ api, sql: snake(api), kind }));
 const dates = fields('created_at updated_at');
@@ -30,7 +31,7 @@ export const ENTITIES: EntitySchema[] = [
     ...fields('parent_type parent_id parent_number parent_title notification_type sent_at recipient message'),
     ...fields('is_sent is_read', 'boolean'), ...fields('message_params', 'json'),
   ] },
-  { table: 'activity_logs', key: 'id', collection: 'activityLogs', search: [], fields: [
+  { table: 'activity_logs', key: 'id', collection: 'activityLogs', search: [], appendOnly: true, fields: [
     ...fields('timestamp userEmail userName role actionType module description ipAddress userAgent'),
   ] },
   { table: 'templates', key: 'id', collection: 'templates', search: ['name'], fields: [

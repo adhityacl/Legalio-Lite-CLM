@@ -114,7 +114,8 @@ export async function loadCoreData() {
     contracts: await business('contracts'),
     ios: await business('insertion_orders'),
     notifications: await business('notifications'),
-    activityLogs: await business('activity_logs'),
+    // Append-only table, read per organization through activityLog.ts: never loaded into memory.
+    activityLogs: [] as any[],
     evaluations: await business('evaluations'),
     spendings: await business('spendings'),
     templates: await business('templates'),

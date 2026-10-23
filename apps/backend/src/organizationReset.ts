@@ -13,6 +13,8 @@ const SQL_STEPS: Array<{ table: string; sql: string }> = [
   { table: 'metadata_fields', sql: 'DELETE FROM metadata_fields WHERE organization_id = ?' },
   { table: 'approval_steps', sql: 'DELETE FROM approval_steps WHERE request_id IN (SELECT id FROM approval_requests WHERE organization_id = ?)' },
   { table: 'approval_events', sql: 'DELETE FROM approval_events WHERE request_id IN (SELECT id FROM approval_requests WHERE organization_id = ?)' },
+  { table: 'activity_logs', sql: 'DELETE FROM activity_logs WHERE organization_id = ?' },
+  { table: 'upload_owners', sql: 'DELETE FROM upload_owners WHERE organization_id = ?' },
   { table: 'approval_requests', sql: 'DELETE FROM approval_requests WHERE organization_id = ?' },
 ];
 

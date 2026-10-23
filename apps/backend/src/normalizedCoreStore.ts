@@ -246,6 +246,7 @@ export async function synchronizeBusinessRows(db: DB, data: Row) {
   try {
   await db.tx(async () => {
     for (const entity of ENTITIES) {
+      if (entity.appendOnly) continue;
       const rows = Array.isArray(data[entity.collection]) ? data[entity.collection] : [];
       const seen = new Set<string>();
       for (const [position,input] of rows.entries()) {

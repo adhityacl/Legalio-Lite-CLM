@@ -11,6 +11,9 @@ import { readFileSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import pg from 'pg';
 import { DATABASE_CONFIG_FILE, IS_TEST_MODE } from './runtimePaths';
+import { componentLog } from './logger';
+
+const log = componentLog('db');
 
 /** A duplicate key on insert; callers treat it as "someone else created it first" and re-read. */
 export const isUniqueViolation = (err: unknown) => (err as { code?: unknown } | null)?.code === '23505';
@@ -133,12 +136,33 @@ function clientConfig(cfg: DatabaseConfig): pg.ClientConfig {
 
 let currentPool: pg.Pool | null = null;
 
+const envMs = (name: string, fallback: number) => {
+  const raw = process.env[name];
+  const value = raw === undefined || raw.trim() === '' ? NaN : Number(raw);
+  return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : fallback;
+};
+
+/**
+ * Pool limits, all overridable by environment (0 disables a timeout):
+ * DB_POOL_MAX (10), DB_IDLE_TIMEOUT_MS (30000), DB_CONNECTION_TIMEOUT_MS (10000),
+ * DB_STATEMENT_TIMEOUT_MS (60000, enforced by the server), DB_QUERY_TIMEOUT_MS (75000, enforced by the client).
+ */
+export function poolLimits(): pg.PoolConfig {
+  return {
+    max: Math.max(1, envMs('DB_POOL_MAX', 10)),
+    idleTimeoutMillis: envMs('DB_IDLE_TIMEOUT_MS', 30_000),
+    connectionTimeoutMillis: envMs('DB_CONNECTION_TIMEOUT_MS', 10_000),
+    statement_timeout: envMs('DB_STATEMENT_TIMEOUT_MS', 60_000),
+    query_timeout: envMs('DB_QUERY_TIMEOUT_MS', 75_000),
+  };
+}
+
 export function connect(cfg: DatabaseConfig): pg.Pool {
   const config = clientConfig(cfg);
   if (currentPool) throw new Error('The database is already connected.');
-  const created = new pg.Pool(config);
+  const created = new pg.Pool({ ...poolLimits(), ...config });
   // An idle connection dropped by the server must not crash the process; the pool replaces it.
-  created.on('error', (err) => console.error('[db] idle connection error:', err.message));
+  created.on('error', (err) => log.error('idle connection error:', err));
   return currentPool = created;
 }
 
@@ -151,6 +175,25 @@ export async function end() {
   const closing = currentPool;
   currentPool = null;
   await closing?.end();
+}
+
+/**
+ * Runs `fn` only if the PostgreSQL session advisory lock `key` is free (on a dedicated connection, held for the duration).
+ * `ran: false` means another process holds it. The lock is released when `fn` ends, or by the server if this process dies.
+ */
+export async function withAdvisoryLock<T>(key: number, fn: () => Promise<T>): Promise<{ ran: boolean; value?: T }> {
+  const client = await pool().connect();
+  try {
+    const { rows } = await client.query('SELECT pg_try_advisory_lock($1) AS locked', [key]);
+    if (!rows[0]?.locked) return { ran: false };
+    try {
+      return { ran: true, value: await fn() };
+    } finally {
+      await client.query('SELECT pg_advisory_unlock($1)', [key]).catch(() => undefined);
+    }
+  } finally {
+    client.release();
+  }
 }
 
 export type Sql = ReturnType<typeof buildPg>;

@@ -97,10 +97,42 @@ export async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS mail_templates (
       id text PRIMARY KEY, subject text NOT NULL, html text NOT NULL, version integer NOT NULL DEFAULT 1, updated_at text NOT NULL);
     CREATE TABLE IF NOT EXISTS integration_credentials (id text PRIMARY KEY, payload text NOT NULL, updated_by text, updated_at text NOT NULL);
+    -- Reminder outbox: one row per (record, renewal cycle, trigger); status/attempts/last_error track delivery and retry.
+    CREATE TABLE IF NOT EXISTS reminder_ledger (
+      id text PRIMARY KEY, organization_id text NOT NULL, kind text NOT NULL, record_id text NOT NULL, cycle_end_date text NOT NULL,
+      trigger text NOT NULL CHECK (trigger IN ('offset', 'notice')), offset_days integer NOT NULL,
+      status text NOT NULL CHECK (status IN ('pending', 'sent', 'failed', 'dead', 'skipped')),
+      attempts integer NOT NULL DEFAULT 0, last_error text, next_attempt_at text, recipients text, notification_id text,
+      created_at text NOT NULL, updated_at text NOT NULL, sent_at text,
+      UNIQUE (kind, record_id, cycle_end_date, trigger, offset_days));
+    CREATE INDEX IF NOT EXISTS idx_reminder_ledger_due ON reminder_ledger (status, next_attempt_at);
+    CREATE INDEX IF NOT EXISTS idx_reminder_ledger_org ON reminder_ledger (organization_id, created_at);
+    -- Server-written ownership of stored upload objects (key without the /uploads/ prefix).
+    CREATE TABLE IF NOT EXISTS upload_owners (
+      storage_key text PRIMARY KEY, organization_id text NOT NULL, source text NOT NULL DEFAULT 'upload', created_at text NOT NULL);
+    CREATE INDEX IF NOT EXISTS idx_upload_owners_org ON upload_owners (organization_id);
     CREATE TABLE IF NOT EXISTS installation_settings (id text PRIMARY KEY CHECK (id = 'installation'), "publicUrl" text NOT NULL);
 
     -- better-auth does not create these; membership lookups rely on one row per (organization, user).
     CREATE UNIQUE INDEX IF NOT EXISTS uq_member_org_user ON member ("organizationId", "userId");
     CREATE UNIQUE INDEX IF NOT EXISTS uq_team_member ON "teamMember" ("teamId", "userId");
+  `);
+  // audit_log is append-only at the database level. A deliberate maintenance transaction may lift this with
+  // `SELECT set_config('legalio.allow_audit_mutation', 'on', true)` (transaction-local); nothing in the app does so.
+  await sql.exec(`
+    CREATE OR REPLACE FUNCTION audit_log_immutable() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    BEGIN
+      IF current_setting('legalio.allow_audit_mutation', true) = 'on' THEN
+        IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+        RETURN NEW;
+      END IF;
+      RAISE EXCEPTION 'audit_log is append-only (% rejected)', TG_OP USING ERRCODE = 'insufficient_privilege';
+    END
+    $fn$;
+    DO $do$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'audit_log_immutable' AND tgrelid = 'audit_log'::regclass) THEN
+        CREATE TRIGGER audit_log_immutable BEFORE UPDATE OR DELETE ON audit_log FOR EACH ROW EXECUTE FUNCTION audit_log_immutable();
+      END IF;
+    END $do$;
   `);
 }

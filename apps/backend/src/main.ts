@@ -4,7 +4,10 @@ import path from "node:path";
 import { connect, end, parseDatabaseConfig, resolveDatabaseConfig, saveDatabaseConfig, testConnection, type DatabaseConfig } from "./db";
 import { createSensitiveRateLimiter, trustProxySetting } from "./edgeConfig";
 import { REPOSITORY_DIR } from "./runtimePaths";
+import { componentLog, requestLogging } from "./logger";
 import { mountSystemConsole } from "./systemConsoleHosting";
+
+const log = componentLog("main");
 
 /*
  * Process entry. Until a database is configured only the onboarding database step answers; the application
@@ -12,24 +15,27 @@ import { mountSystemConsole } from "./systemConsoleHosting";
  */
 // lib/auth.ts checks this too, but only when ./server loads, which can be after a stranger filled in the database form.
 if (process.env.NODE_ENV === "production" && !process.env.BETTER_AUTH_SECRET) {
-  console.error("BETTER_AUTH_SECRET must be set in production (use a long random value).");
+  log.error("BETTER_AUTH_SECRET must be set in production (use a long random value).");
   process.exit(1);
 }
 
 const PORT = Number(process.env.PORT) || 3000;
 let realApp: express.Express | null = null;
+let applicationModule: typeof import("./server") | null = null;
 let connecting = false;
 
 /** Connects, then loads and initializes the application; the caller ends the pool if this throws. */
 async function startApplication(config: DatabaseConfig) {
   connect(config);
   const server = await import("./server");
+  applicationModule = server;
   await server.init();
   return server.app;
 }
 
 const app = express();
 app.set("trust proxy", trustProxySetting());
+app.use(requestLogging());
 app.use(createSensitiveRateLimiter());
 // Ahead of the hand-off below so it keeps answering 409 once the application runs. Its own small JSON parser only:
 // a global one would consume the application's 25 MB request bodies.
@@ -52,13 +58,13 @@ app.post("/api/system/database", express.json(), async (req: express.Request, re
     // Saved only once the schema exists, so a failed attempt leaves the form available.
     await saveDatabaseConfig(config);
     realApp = ready;
-    console.log("Onboarding: database connected and saved.");
+    log.info("Onboarding: database connected and saved.");
     res.status(201).json({ success: true });
   } catch (err: any) {
     await end().catch(() => undefined);
     const raw = String(err?.message || err?.code || "Could not connect to the database.");
     const message = config.password && raw.includes(config.password) ? "Could not connect to the database." : raw;
-    console.error("[onboarding] database step failed:", message);
+    log.error("[onboarding] database step failed:", message);
     res.status(400).json({ error: "DATABASE_CONNECTION_FAILED", message });
   } finally {
     connecting = false;
@@ -80,7 +86,7 @@ async function main() {
       realApp = await startApplication(config);
     } catch (err: any) {
       // Never fall back to the form: while the database is down anyone could point the installation elsewhere.
-      console.error("Cannot start: the configured database is unavailable:", err?.message || err);
+      log.error("Cannot start: the configured database is unavailable:", err?.message || err);
       process.exit(1);
     }
   }
@@ -104,25 +110,39 @@ async function main() {
     viteServer = vite;
   }
   const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Pengelola Kontrak & IO Server running on http://0.0.0.0:${PORT}`);
+    log.info(`Pengelola Kontrak & IO Server running on http://0.0.0.0:${PORT}`);
   });
-  const shutdown = async () => {
-    console.log("Shutting down server...");
-    if (viteServer) await viteServer.close();
-    server.close(() => {
-      console.log("Server closed");
-      process.exit(0);
-    });
+  let shuttingDown = false;
+  /** Stops accepting requests, lets in-flight requests, background jobs and queued database saves finish, then closes the pool. */
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    const limit = Math.max(1000, Number(process.env.SHUTDOWN_TIMEOUT_MS) || 30_000);
+    log.info({ signal, timeoutMs: limit }, "Shutting down server...");
     setTimeout(() => {
-      console.error("Forcing shutdown after 3s");
+      log.error("Forcing shutdown: in-flight work did not finish in time.");
       process.exit(1);
-    }, 3e3).unref();
+    }, limit).unref();
+    try {
+      if (viteServer) await viteServer.close();
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+        server.closeIdleConnections();
+      });
+      await applicationModule?.drain();
+      await end();
+      log.info("Server closed");
+      process.exit(0);
+    } catch (err) {
+      log.error("Shutdown failed:", err);
+      process.exit(1);
+    }
   };
-  process.on("SIGTERM", shutdown);
-  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  process.on("SIGINT", () => void shutdown("SIGINT"));
 }
 
 main().catch((err) => {
-  console.error("Startup failed:", err);
+  log.error("Startup failed:", err);
   process.exit(1);
 });

@@ -65,6 +65,8 @@ export interface DocumentRouterOptions {
   db: Sql;
   /** Organization of the verified request context; never widened by client input. */
   tenantOf: (req: express.Request) => string;
+  /** Records a document access event (view/download/export) in the activity log; failures never fail the request. */
+  onActivity?: (req: express.Request, event: { actionType: string; description: string; details?: Record<string, unknown> }) => Promise<unknown>;
 }
 
 const nameOf = (column: string) => `(SELECT u.name FROM "user" u WHERE u.id = ${column})`;
@@ -84,7 +86,7 @@ const sha256 = (text: string) => crypto.createHash("sha256").update(text).digest
 const newId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
 const cleanName = (value: unknown) => str(value).slice(0, 200);
 
-export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
+export function createDocumentRouter({ db, tenantOf, onActivity }: DocumentRouterOptions) {
   const router = express.Router();
   forwardAsyncRouteErrors(router);
   const actorOf = (req: express.Request) => (req as unknown as { actor?: Actor | null }).actor ?? null;
@@ -239,7 +241,10 @@ export function createDocumentRouter({ db, tenantOf }: DocumentRouterOptions) {
     res.status(201).json(await documentDetail(id));
   });
 
-  router.get("/documents/:id", withDocument(async (_req, res, doc) => res.json(await documentDetail(doc.id))));
+  router.get("/documents/:id", withDocument(async (req, res, doc) => {
+    await onActivity?.(req, { actionType: "DOCUMENT_VIEW", description: `Viewed document '${doc.name}'`, details: { documentId: doc.id } }).catch(() => undefined);
+    res.json(await documentDetail(doc.id));
+  }));
 
   router.patch(
     "/documents/:id",

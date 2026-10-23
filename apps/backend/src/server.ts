@@ -1,4 +1,10 @@
 import { createMailTemplateStore } from "./mailTemplateStore";
+import { smtpTlsOptions } from "./smtpTls";
+import { appendActivity, listActivity } from "./activityLog";
+import { seedLedgerFromLegacy, createReminderScheduler, deliverDue as deliverDueReminders, enqueue as enqueueReminder, existingKeys as existingReminderKeys, planReminders, REMINDER_LOCK_KEY, schedulerOptionsFromEnv, type ReminderSender } from "./reminders";
+import { backfillUploadOwners, eligibleOwners, newUploadKey, recordUploadOwner } from "./uploadOwnership";
+import { componentLog, errorResponder, requestLogging } from "./logger";
+const log = componentLog("server");
 import { forwardAsyncRouteErrors } from './asyncRoutes';
 import { renameLegacyKeys, renameLegacyKeyTokens } from '@legalio/shared/fieldNames';
 import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
@@ -19,7 +25,7 @@ import { buildMatrix as buildRbacMatrix, can, hasOrganizationScope, type OrgCont
 import {
   RequestDenied, accessibleOrganizations, identityOf, isIdentityBanned, resolveIdentity, resolveLegacyContext, resolveOrganizationContext, sendError,
 } from "./identity";
-import { isConstraintViolation, isUniqueViolation, sql } from "./db";
+import { isConstraintViolation, isUniqueViolation, sql, withAdvisoryLock } from "./db";
 import { ensureSchema } from "./schema";
 import { BETTER_AUTH_ALLOWED, createAuthorizationMiddleware, isBetterAuthPathAllowed } from "./routePolicies";
 import { createOrganizationScope, filterRecords, recordVisible, normalizeDepartmentName, teamsOf, type RecordKind } from "./recordScope";
@@ -138,6 +144,7 @@ forwardAsyncRouteErrors(app);
 // (override with TRUST_PROXY: a hop count or address list; see edgeConfig.ts).
 // `true` would let any client choose its own req.ip with a forged header.
 app.set("trust proxy", trustProxySetting());
+app.use(requestLogging());
 app.use(createSensitiveRateLimiter());
 // Google JSON credentials uploaded in the app win over the GOOGLE_* env vars.
 const googleCredentials = createGoogleCredentialStore(sql);
@@ -225,7 +232,7 @@ async function persistTenantFolder(tenantId: string, folderId: string) {
     await writeIntegrationRow(sql, { ...current, driveFolderId: folderId, version: current.version + 1 }, null);
     await refreshTenantProjection();
   } catch (err: any) {
-    console.warn(`[Drive] Could not record folder mapping for ${tenantId}:`, err?.message);
+    log.warn(`[Drive] Could not record folder mapping for ${tenantId}:`, err?.message);
   }
 }
 async function getOrgFolderId(tenantInput, token) {
@@ -253,7 +260,7 @@ async function getOrgFolderId(tenantInput, token) {
       return orgFolder;
     }
   } catch (err) {
-    console.warn(
+    log.warn(
       `[Drive Hierarchical] Error creating org folder '${orgFolderName}':`,
       err?.message || err,
     );
@@ -282,7 +289,7 @@ async function autoEnsureTenantGoogleResources(token, forceNew = false) {
         try {
           orgFolder = await createNewDriveFolderInParent(orgFolderName, masterRootId, activeToken);
         } catch (createErr) {
-          console.warn(`[AutoProvision] createNewDriveFolderInParent failed, falling back to getOrCreateDriveFolder:`, createErr?.message);
+          log.warn(`[AutoProvision] createNewDriveFolderInParent failed, falling back to getOrCreateDriveFolder:`, createErr?.message);
         }
       }
       if (!orgFolder || !orgFolder.id) {
@@ -293,7 +300,7 @@ async function autoEnsureTenantGoogleResources(token, forceNew = false) {
         updatedCount++;
       }
     } catch (err) {
-      console.warn(`[AutoProvision] Failed to create folder for tenant '${tenant.name}':`, err?.message || err);
+      log.warn(`[AutoProvision] Failed to create folder for tenant '${tenant.name}':`, err?.message || err);
     }
   }
   return { success: true, updatedCount };
@@ -322,7 +329,7 @@ async function getPartnerFolderId(partner, token, orgId) {
       await saveDb();
       return folderRes.id;
     } catch (err) {
-      console.warn(
+      log.warn(
         `[Drive Hierarchical] Failed creating partner folder for '${partner.partner_name}':`,
         err,
       );
@@ -343,7 +350,7 @@ async function getPartnerCategoryFolderId(partner: any, category: string, token?
     );
     return categoryFolder.id;
   } catch (err) {
-    console.error(`Error getting/creating category folder '${category}':`, err);
+    log.error(`Error getting/creating category folder '${category}':`, err);
     return vendorFolderId;
   }
 }
@@ -417,7 +424,7 @@ async function authorizeUpload(req: express.Request, res: express.Response, next
   // The object served is the one whose key passed the checks below, never re-derived from the request.
   res.locals.uploadKey = key.slice("/uploads/".length);
   const scopes = new Map<string, any>();
-  for (const { kind, record } of uploadOwners(key)) {
+  for (const { kind, record } of await eligibleOwners(sql, key.slice("/uploads/".length), uploadOwners(key))) {
     if (!record?.organizationId) continue;
     let ctx: OrgContext;
     try {
@@ -427,7 +434,13 @@ async function authorizeUpload(req: express.Request, res: express.Response, next
     }
     if (!can(ctx, "document.view")) continue;
     if (!scopes.has(ctx.organizationId)) scopes.set(ctx.organizationId, createOrganizationScope(await teamsOf(sql, ctx.organizationId), ctx.organizationId, db));
-    if (recordVisible(ctx, scopes.get(ctx.organizationId), kind, record)) return next();
+    if (recordVisible(ctx, scopes.get(ctx.organizationId), kind, record)) {
+      if (req.method === "GET") {
+        await addActivityLog(identity.email, identity.name, ctx.tenantRole || "User", "FILE_DOWNLOAD", "UPLOADS", `Opened file '${path.basename(key)}'`, undefined, ctx.organizationId, { key: key.slice("/uploads/".length), kind })
+          .catch((err) => log.warn("Could not record file access:", err));
+      }
+      return next();
+    }
   }
   return res.status(404).end();
 }
@@ -443,21 +456,15 @@ app.use("/uploads", (req: express.Request, res: express.Response, next: express.
   (req: express.Request, res: express.Response, next: express.NextFunction) => { serveUpload(req, res, next).catch(next); });
 /** Stores an upload and returns its `/uploads/...` link. Throws rather than return a link to a file that was not stored. */
 async function saveUpload(
-  partnerName: any,
+  _partnerName: any,
   category: string,
   safeFileName: string,
   base64Data: string,
-  orgName?: string,
+  organizationId: string | null | undefined,
 ) {
-  const cleanOrg = (orgName || "Organization")
-    .replace(/[/\\?%*:|"<>]/g, "_")
-    .replace(/^\.+$/, "_")
-    .trim();
-  const cleanVendor = (partnerName || "Vendor")
-    .replace(/[/\\?%*:|"<>]/g, "_")
-    .replace(/^\.+$/, "_")
-    .trim();
-  const link = `/uploads/${encodeURIComponent(cleanOrg)}/${encodeURIComponent(cleanVendor)}/${encodeURIComponent(category)}/${safeFileName}`;
+  // Keys carry the organization id and a random segment, never organization or vendor names (names can collide across tenants).
+  if (!organizationId) throw new ApiError(400, "ORGANIZATION_REQUIRED", "An upload needs an owning organization.");
+  const link = `/uploads/${newUploadKey(organizationId, category, safeFileName).split("/").map(encodeURIComponent).join("/")}`;
   // The key is derived from the link so /uploads can always find what was stored.
   const key = keyFromLink(link);
   if (!key) throw new ApiError(400, "INVALID_FILE_NAME", "This file name cannot be stored.");
@@ -465,6 +472,7 @@ async function saveUpload(
     ? base64Data.split("base64,")[1]
     : base64Data;
   await getStore().put(key, Buffer.from(cleanContent, "base64"));
+  await recordUploadOwner(sql, key, organizationId);
   scheduleDriveBackup(key);
   return link;
 }
@@ -545,7 +553,7 @@ async function backupLocalFilesToGoogleDrive(token?, only?: string[]) {
         backedUpCount++;
       } catch (err) {
         failedCount++;
-        console.warn(`[Drive Backup] Gagal mencadangkan '${key}':`, err?.message);
+        log.warn(`[Drive Backup] Gagal mencadangkan '${key}':`, err?.message);
       }
     }
   } finally {
@@ -553,10 +561,10 @@ async function backupLocalFilesToGoogleDrive(token?, only?: string[]) {
     try {
       fs.writeFileSync(DRIVE_BACKUP_INDEX, JSON.stringify(done));
     } catch (err) {
-      console.warn("[Drive Backup] Gagal menyimpan indeks backup:", err?.message);
+      log.warn("[Drive Backup] Gagal menyimpan indeks backup:", err?.message);
     }
   }
-  if (backedUpCount) console.log(`[Drive Backup] ${backedUpCount} file dicadangkan ke Google Drive.`);
+  if (backedUpCount) log.info(`[Drive Backup] ${backedUpCount} file dicadangkan ke Google Drive.`);
   return { backedUpCount, failedCount, alreadyBackedUpCount };
 }
 const pendingDriveBackups = new Set<string>();
@@ -572,7 +580,7 @@ function scheduleDriveBackup(key: string) {
       const result = await backupLocalFilesToGoogleDrive(undefined, batch);
       if (result.busy) for (const key of batch) pendingDriveBackups.add(key);
     } catch (e) {
-      console.warn("[Drive Backup]", e?.message);
+      log.warn("[Drive Backup]", e?.message);
     }
     if (pendingDriveBackups.size) scheduleDriveBackup([...pendingDriveBackups][0]);
   }, 5000);
@@ -667,7 +675,7 @@ async function ensureAllPartnersFolders(token?: string, targetTenantId?: string)
           driveFoldersCreated++;
         }
       } catch (err) {
-        console.error(
+        log.error(
           `Error provisioning Drive folders for partner ${partner.partner_name} (${cleanOrg}):`,
           err?.message || err,
         );
@@ -744,11 +752,11 @@ async function refreshTenantProjection() {
 }
 setInvalidTokenCallback((badToken) => {
   if (db.googleConfig && db.googleConfig.accessToken === badToken) {
-    console.warn(
+    log.warn(
       "[Server] Membersihkan Google accessToken yang kedaluwarsa dari database.",
     );
     db.googleConfig.accessToken = "";
-    saveDb().catch((err) => console.error("[Server] Could not save the cleared Google token:", err));
+    saveDb().catch((err) => log.error("[Server] Could not save the cleared Google token:", err));
   }
 });
 async function getFreshGoogleAccessToken() {
@@ -776,18 +784,18 @@ async function getFreshGoogleAccessToken() {
       db.googleConfig.accessToken = freshToken;
       db.googleConfig.lastSyncTime = new Date().toISOString();
       await saveDb();
-      console.log(
+      log.info(
         "[Google Auth] Access Token berhasil di-refresh otomatis menggunakan Refresh Token.",
       );
     }
     return freshToken || currentToken || null;
   } catch (err) {
-    console.error(
+    log.error(
       "[Google Auth] Gagal me-refresh Google Access Token:",
       err.message || err,
     );
     if (err?.message?.includes("invalid_grant")) {
-      console.warn(
+      log.warn(
         "[Google Auth] Refresh token tidak lagi valid (invalid_grant). Menghapus kredensial.",
       );
       db.googleConfig.refreshToken = "";
@@ -914,7 +922,7 @@ async function generateContentWithRetryAndFallback(params: any) {
 
   for (const model of modelQueue) {
     try {
-      console.log(`[Gemini API] Processing request with model=${model}...`);
+      log.info(`[Gemini API] Processing request with model=${model}...`);
       const response = await Promise.race([
         aiClient.models.generateContent({ ...params, model }),
         new Promise((_, reject) =>
@@ -929,12 +937,12 @@ async function generateContentWithRetryAndFallback(params: any) {
           ),
         ),
       ]);
-      console.log(`[Gemini API] Success with model=${model}`);
+      log.info(`[Gemini API] Success with model=${model}`);
       return response;
     } catch (err: any) {
       lastError = err;
       const errMsg = (err?.message || err?.toString() || "").toLowerCase();
-      console.warn(`[Gemini API] Model ${model} encountered an issue (${errMsg.slice(0, 120)}), trying fallback...`);
+      log.warn(`[Gemini API] Model ${model} encountered an issue (${errMsg.slice(0, 120)}), trying fallback...`);
     }
   }
 
@@ -1169,7 +1177,7 @@ export async function init() {
     await seedOrganizationsFromDataset(sql, { tenants: [], departments: [], allowedUsers: [] }, {
       bootstrapSuperuser: { id: "demo-admin", email: demoAdminEmail, name: "Legalio Admin" },
     });
-    console.log(`Seeded bootstrap superuser: ${demoAdminEmail}`);
+    log.info(`Seeded bootstrap superuser: ${demoAdminEmail}`);
   }
   const initialData = await loadCoreData();
   const hasCoreData = ["partners", "contracts", "ios", "spendings", "evaluations", "notifications", "templates", "activityLogs"]
@@ -1182,7 +1190,7 @@ export async function init() {
       googleConfig: initialData.googleConfig ?? db.googleConfig,
       newsTicker: initialData.newsTicker ?? db.newsTicker,
     };
-    console.log("Database loaded from PostgreSQL as the source of truth.");
+    log.info("Database loaded from PostgreSQL as the source of truth.");
   } else {
     db = {
       ...db,
@@ -1191,7 +1199,7 @@ export async function init() {
       googleConfig: initialData.googleConfig || db.googleConfig,
       newsTicker: initialData.newsTicker || db.newsTicker,
     };
-    console.log("The database is empty; using seed defaults for the first initialization.");
+    log.info("The database is empty; using seed defaults for the first initialization.");
   }
   // Only the canonical tables define organizations; legacy snapshot rows are migration input.
   db.tenants = [];
@@ -1204,9 +1212,10 @@ export async function init() {
   if (process.env.NODE_ENV === "production") {
     const { allowedUsers, removed } = await removeDemoAccounts(sql, db.allowedUsers || []);
     db.allowedUsers = allowedUsers;
-    if (removed) console.log(`Production: removed ${removed} demo login account(s).`);
+    if (removed) log.info(`Production: removed ${removed} demo login account(s).`);
   }
   await saveDb();
+  await backfillUploadOwners(sql, UPLOAD_KINDS.flatMap(([, collection]) => (db[collection] || []).map((record: any) => ({ organizationId: record.organizationId, record }))));
   // The auth console reads platform configuration (SMTP) from `db`; it no longer
   // hydrates identities, memberships or organizations from this projection.
   setConsoleDbReference(db, saveDb, getStore, async (organizationId?: string) => {
@@ -1216,7 +1225,7 @@ export async function init() {
   if (!IS_TEST_MODE) {
     await ensureUserAccountsExist();
     ensureAllPartnersFolders().catch((err) =>
-      console.error("Startup category folder provisioning error:", err),
+      log.error("Startup category folder provisioning error:", err),
     );
   }
   if (db.spendings && db.spendings.length > 0) {
@@ -1243,6 +1252,23 @@ export async function init() {
   syncAdderNames();
   await saveDb();
   await recalculateStatuses();
+  await seedReminderLedger();
+  reminderScheduler.start();
+}
+/** Notifications written by releases without a ledger count as already sent for the record's current renewal cycle. */
+async function seedReminderLedger() {
+  const records = new Map(reminderRecords().map((item) => [`${item.kind}:${item.recordId}`, item]));
+  const entries: Array<{ organizationId: string; kind: "contract" | "commercial"; recordId: string; cycleEnd: string; offsetDays: number }> = [];
+  for (const notification of db.notifications || []) {
+    const match = /^Reminder (?:(\d+)d|H-(\d+))$/.exec(notification.notification_type || "");
+    if (!match) continue;
+    const offsetDays = Number(match[1] ?? match[2]);
+    const item = records.get(`${notification.parent_type === "Contract" ? "contract" : "commercial"}:${notification.parent_id}`);
+    if (!item || !item.record.organizationId || item.daysRemaining > offsetDays) continue; // a reminder of an earlier cycle
+    entries.push({ organizationId: item.record.organizationId, kind: item.kind, recordId: item.recordId, cycleEnd: item.cycleEnd, offsetDays });
+  }
+  const seeded = await seedLedgerFromLegacy(sql, entries);
+  if (seeded) reminderLog.info(`Reminder ledger seeded with ${seeded} earlier reminder(s).`);
 }
 /**
  * Bring records written by earlier releases in line with the current model:
@@ -1405,7 +1431,7 @@ async function saveDb() {
   try {
     await coreSaver.save();
   } catch (err) {
-    console.error("Failed to save core data", err);
+    log.error("Failed to save core data", err);
     if (isConstraintViolation(err)) (err as any).status = 409;
     throw err;
   }
@@ -1447,14 +1473,6 @@ function syncAdderNames() {
       }
     }
   });
-  db.activityLogs.forEach((log) => {
-    if (log.userEmail) {
-      const matchedUser = userByEmail.get(log.userEmail.trim().toLowerCase());
-      if (matchedUser) {
-        log.userName = matchedUser.name;
-      }
-    }
-  });
 }
 const mailTemplates = createMailTemplateStore(sql);
 async function sendSmtpEmail({
@@ -1482,7 +1500,7 @@ async function sendSmtpEmail({
       port,
       secure: config.smtpSecure ?? port === 465,
       auth: { user: config.smtpUser, pass: config.smtpPassword || "" },
-      tls: { rejectUnauthorized: false },
+      tls: smtpTlsOptions(config),
     });
     const fromAddress = config.smtpFromEmail || config.smtpUser;
     const fromName = config.smtpFromName || "Sistem Notifikasi Kontrak & IO";
@@ -1495,12 +1513,12 @@ async function sendSmtpEmail({
       text: text || html.replace(/<[^>]*>/g, ""),
       html,
     });
-    console.log(
+    log.info(
       `[SMTP Relay] Email successfully sent to ${recipients} (MessageId: ${info.messageId})`,
     );
     return { success: true, messageId: info.messageId };
   } catch (err) {
-    console.error("[SMTP Relay Error]", err);
+    log.error("[SMTP Relay Error]", err);
     return { success: false, error: err.message || String(err) };
   }
 }
@@ -1549,6 +1567,7 @@ async function buildReminderEmail(params: {
   endDate: string;
   daysRemaining: number;
   rows: Array<[string, string]>;
+  variant?: "offset" | "notice";
 }): Promise<{ subject: string; html: string }> {
   const settings = getTenantSettings(params.tenantId);
   const tenant = findTenant(params.tenantId);
@@ -1559,13 +1578,24 @@ async function buildReminderEmail(params: {
   const docLabel = params.kind === "contract"
     ? pick("Contract", "Kontrak", "合同")
     : getIndustryPack(settings.industry).commercialDocument.label;
-  const subject = pick(
+  const notice = params.variant === "notice";
+  const subject = notice ? pick(
+    `[Notice deadline] ${docLabel} ${params.reference} — ${params.title}`,
+    `[Batas pemberitahuan] ${docLabel} ${params.reference} — ${params.title}`,
+    `【通知期限】${docLabel} ${params.reference} — ${params.title}`,
+  ) : pick(
     `[${params.daysRemaining}-day reminder] ${docLabel} ${params.reference} — ${params.title}`,
     `[Pengingat ${params.daysRemaining} hari] ${docLabel} ${params.reference} — ${params.title}`,
     `【提醒：还剩 ${params.daysRemaining} 天】${docLabel} ${params.reference} — ${params.title}`,
   );
-  const heading = pick(`${docLabel} approaching expiry`, `${docLabel} akan berakhir`, `${docLabel}即将到期`);
-  const intro = pick(
+  const heading = notice
+    ? pick(`${docLabel} notice deadline reached`, `Batas pemberitahuan ${docLabel} tiba`, `${docLabel}通知期限已到`)
+    : pick(`${docLabel} approaching expiry`, `${docLabel} akan berakhir`, `${docLabel}即将到期`);
+  const intro = notice ? pick(
+    `The notice deadline for the following ${docLabel.toLowerCase()} has arrived (${params.daysRemaining} days until expiry). Send any required renewal or termination notice now.`,
+    `Batas pemberitahuan untuk ${docLabel} berikut telah tiba (sisa ${params.daysRemaining} hari hingga berakhir). Kirim pemberitahuan perpanjangan atau pengakhiran yang diperlukan sekarang.`,
+    `以下${docLabel}的通知期限已到（距到期还有 ${params.daysRemaining} 天），请立即发出所需的续约或终止通知。`,
+  ) : pick(
     `The following ${docLabel.toLowerCase()} expires in ${params.daysRemaining} days. Please review any notice, renewal or termination action required.`,
     `${docLabel} berikut akan berakhir dalam ${params.daysRemaining} hari. Mohon tinjau kebutuhan pemberitahuan, perpanjangan, atau pengakhiran.`,
     `以下${docLabel}将在 ${params.daysRemaining} 天后到期，请审阅所需的通知、续约或终止事项。`,
@@ -1611,85 +1641,12 @@ function reminderRecipients(tenantId: string, kind: "contract" | "commercial", o
   const configured = dedicated ? [dedicated] : notifications.notificationEmails || [];
   return Array.from(new Set([owner, ...configured, ...admins].filter(Boolean))).join(", ");
 }
-/**
- * Recompute lifecycle status for contracts and commercial documents and emit
- * reminders at the tenant's configured offsets (default 90/60/30/14 days).
- */
+/** Recomputes lifecycle status (and rolls auto-renewals forward) for contracts and commercial documents. Sends nothing. */
 async function recalculateStatuses() {
-  let newNotifsCount = 0;
-  // Active admin/manager emails per organization, read once so the reminder pass below stays synchronous.
-  const adminEmails = new Map<string, string[]>();
-  for (const row of await sql.all(`
-    SELECT m."organizationId", u.email FROM member m JOIN "user" u ON u.id = m."userId"
-    WHERE m.status = 'active' AND m.role IN ('admin', 'manager') AND u.banned IS NOT TRUE
-  `)) adminEmails.set(row.organizationId, [...(adminEmails.get(row.organizationId) || []), row.email]);
-  const emitReminder = (kind: "contract" | "commercial", record: any, daysRemaining: number) => {
-    const tenantId = record.organizationId;
-    if (!findTenant(tenantId)) return; // unowned records get no reminders
-    const settings = getTenantSettings(tenantId);
-    if (!settings.reminderOffsetsDays.includes(daysRemaining)) return;
-    const parentId = kind === "contract" ? record.contract_id : record.io_id;
-    const jenis = `Reminder ${daysRemaining}d`;
-    const legacyJenis = `Reminder H-${daysRemaining}`;
-    const exists = (db.notifications || []).some(
-      (n: any) => n.parent_id === parentId && (n.notification_type === jenis || n.notification_type === legacyJenis),
-    );
-    if (exists) return;
-    const reference = kind === "contract" ? record.contract_number : record.io_number;
-    const title = kind === "contract" ? record.contract_title : record.io_title;
-    const amount = kind === "contract" ? record.contract_value : record.io_value;
-    const recipients = reminderRecipients(tenantId, kind, record.internal_pic && String(record.internal_pic).includes("@") ? record.internal_pic : "", adminEmails.get(tenantId) || []);
-    // en/id/zh in that order, matching settings.language.
-    const pick = <T,>(en: T, id: T, zh: T): T => (settings.language === "ID" ? id : settings.language === "ZH" ? zh : en);
-    const noticeType = record.notice_type_required || "Termination";
-    const noticeDays = record.notice_period_days || 30;
-    const notif = {
-      notif_id: `notif-${kind === "contract" ? "ctr" : "doc"}-${Date.now()}-${Math.floor(Math.random() * 1e3)}`,
-      organizationId: tenantId,
-      parent_type: kind === "contract" ? "Contract" : "IO",
-      parent_id: parentId,
-      parent_number: reference,
-      parent_title: title,
-      notification_type: jenis,
-      sent_at: new Date().toISOString(),
-      is_sent: true,
-      recipient: recipients,
-      message: pick(
-        `${reference} (${title}) expires in ${daysRemaining} days.${kind === "contract" ? ` ${noticeType} notice is due ${noticeDays} days before expiry.` : ""}`,
-        `${reference} (${title}) berakhir dalam ${daysRemaining} hari.${kind === "contract" ? ` Pemberitahuan ${noticeType} diperlukan ${noticeDays} hari sebelumnya.` : ""}`,
-        `${reference}（${title}）将在 ${daysRemaining} 天后到期。${kind === "contract" ? `需在到期前 ${noticeDays} 天发出${noticeType}通知。` : ""}`,
-      ),
-      // Lets the UI render the message in the viewer's language; `message` stays
-      // in the organization language for e-mail/export and older clients.
-      message_params: { kind, daysRemaining, noticeType, noticeDays },
-      is_read: false,
-    };
-    db.notifications.unshift(notif);
-    newNotifsCount++;
-    if (db.googleConfig?.smtpEnabled) {
-      const rows: Array<[string, string]> = [
-        [pick("Value", "Nilai", "金额"), formatAmountForTenant(amount, record.currency, tenantId)],
-      ];
-      if (kind === "contract") {
-        rows.push([pick("Notice period", "Periode pemberitahuan", "通知期"), `${noticeDays} ${pick("days", "hari", "天")} (${noticeType})`]);
-        rows.push([pick("Auto-renewal", "Perpanjangan otomatis", "自动续约"), record.auto_renewal ? pick("Yes", "Ya", "是") : pick("No", "Tidak", "否")]);
-      } else {
-        rows.push([pick("Pricing model", "Model harga", "定价模式"), record.pricing_model || "-"]);
-      }
-      const validRecipients = recipients.split(",").map((s: string) => s.trim()).filter((s: string) => s.includes("@"));
-      if (validRecipients.length > 0) {
-        buildReminderEmail({ tenantId, kind, reference, title, endDate: record.end_date, daysRemaining, rows })
-          .then(({ subject, html }) => sendSmtpEmail({ to: validRecipients, subject, html }))
-          .catch((err) => console.error("[Reminder email]", err));
-      }
-    }
-  };
-
   // In place, not copies: a handler holding a record across an await must not end up mutating a detached object.
   for (const contract of db.contracts || []) {
     rollForwardAutoRenewal(contract);
     const { daysRemaining, status } = contractLifecycle(contract, getTenantSettings(contract.organizationId));
-    if (status !== 'Terminated' && daysRemaining !== null) emitReminder("contract", contract, daysRemaining);
     Object.assign(contract, {
       status,
       days_remaining: daysRemaining ?? contract.days_remaining,
@@ -1699,7 +1656,6 @@ async function recalculateStatuses() {
   for (const io of db.ios || []) {
     if (normalizeContractStatus(io.status) === "Terminated") { io.status = "Terminated"; continue; }
     const { daysRemaining, status } = computeLifecycle(io.organizationId, io.end_date, io.status, false);
-    if (daysRemaining !== null) emitReminder("commercial", io, daysRemaining);
     Object.assign(io, {
       status,
       days_remaining: daysRemaining ?? io.days_remaining,
@@ -1707,7 +1663,144 @@ async function recalculateStatuses() {
     });
   }
   await saveDb();
-  return newNotifsCount;
+}
+const REMINDER_NOTICE_LEAD_DAYS = Math.max(0, Number(process.env.REMINDER_NOTICE_LEAD_DAYS ?? 7) || 0);
+const reminderLog = componentLog("reminders");
+type ReminderRecord = { kind: "contract" | "commercial"; record: any; recordId: string; cycleEnd: string; daysRemaining: number };
+/** Records that can carry reminders right now, with their renewal cycle (end date) and remaining days. */
+function reminderRecords(): ReminderRecord[] {
+  const found: ReminderRecord[] = [];
+  for (const contract of db.contracts || []) {
+    const { daysRemaining, status } = contractLifecycle(contract, getTenantSettings(contract.organizationId));
+    if (status === "Terminated" || daysRemaining === null || !contract.end_date) continue;
+    found.push({ kind: "contract", record: contract, recordId: contract.contract_id, cycleEnd: String(contract.end_date).slice(0, 10), daysRemaining });
+  }
+  for (const io of db.ios || []) {
+    if (normalizeContractStatus(io.status) === "Terminated" || !io.end_date) continue;
+    const { daysRemaining } = computeLifecycle(io.organizationId, io.end_date, io.status, false);
+    if (daysRemaining === null) continue;
+    found.push({ kind: "commercial", record: io, recordId: io.io_id, cycleEnd: String(io.end_date).slice(0, 10), daysRemaining });
+  }
+  return found;
+}
+function reminderContent(item: ReminderRecord, trigger: "offset" | "notice", offsetDays: number) {
+  const { kind, record, daysRemaining } = item;
+  const settings = getTenantSettings(record.organizationId);
+  // en/id/zh in that order, matching settings.language.
+  const pick = <T,>(en: T, id: T, zh: T): T => (settings.language === "ID" ? id : settings.language === "ZH" ? zh : en);
+  const reference = kind === "contract" ? record.contract_number : record.io_number;
+  const title = kind === "contract" ? record.contract_title : record.io_title;
+  const noticeType = record.notice_type_required || "Termination";
+  const noticeDays = record.notice_period_days || 30;
+  const message = trigger === "notice"
+    ? pick(
+      `${reference} (${title}): the ${noticeType} notice deadline is here (${noticeDays} days before expiry, ${daysRemaining} days left).`,
+      `${reference} (${title}): batas pemberitahuan ${noticeType} tiba (${noticeDays} hari sebelum berakhir, sisa ${daysRemaining} hari).`,
+      `${reference}（${title}）：${noticeType}通知期限已到（到期前 ${noticeDays} 天，剩余 ${daysRemaining} 天）。`,
+    )
+    : pick(
+      `${reference} (${title}) expires in ${daysRemaining} days.${kind === "contract" ? ` ${noticeType} notice is due ${noticeDays} days before expiry.` : ""}`,
+      `${reference} (${title}) berakhir dalam ${daysRemaining} hari.${kind === "contract" ? ` Pemberitahuan ${noticeType} diperlukan ${noticeDays} hari sebelumnya.` : ""}`,
+      `${reference}（${title}）将在 ${daysRemaining} 天后到期。${kind === "contract" ? `需在到期前 ${noticeDays} 天发出${noticeType}通知。` : ""}`,
+    );
+  return { settings, pick, reference, title, noticeType, noticeDays, message, type: trigger === "notice" ? "Notice deadline" : `Reminder ${offsetDays}d` };
+}
+/** Finds due reminders and records them in the ledger (once per record, renewal cycle and trigger) with an in-app notification. */
+async function enqueueDueReminders(): Promise<number> {
+  const adminEmails = new Map<string, string[]>();
+  for (const row of await sql.all(`
+    SELECT m."organizationId", u.email FROM member m JOIN "user" u ON u.id = m."userId"
+    WHERE m.status = 'active' AND m.role IN ('admin', 'manager') AND u.banned IS NOT TRUE
+  `)) adminEmails.set(row.organizationId, [...(adminEmails.get(row.organizationId) || []), row.email]);
+  let queued = 0;
+  for (const item of reminderRecords()) {
+    const tenantId = item.record.organizationId;
+    if (!findTenant(tenantId)) continue; // unowned records get no reminders
+    const settings = getTenantSettings(tenantId);
+    const input = { daysRemaining: item.daysRemaining, offsets: settings.reminderOffsetsDays, noticeDays: item.record.notice_period_days ? Number(item.record.notice_period_days) : null, noticeLeadDays: REMINDER_NOTICE_LEAD_DAYS };
+    if (!planReminders({ ...input, existing: new Set() }).length) continue;
+    const planned = planReminders({ ...input, existing: await existingReminderKeys(sql, item.kind, item.recordId, item.cycleEnd) });
+    for (const plan of planned) {
+      const content = reminderContent(item, plan.trigger, plan.offsetDays);
+      const recipients = reminderRecipients(tenantId, item.kind, item.record.internal_pic && String(item.record.internal_pic).includes("@") ? item.record.internal_pic : "", adminEmails.get(tenantId) || []);
+      const entry = { organizationId: tenantId, kind: item.kind, recordId: item.recordId, cycleEnd: item.cycleEnd, trigger: plan.trigger, offsetDays: plan.offsetDays, recipients };
+      if (plan.skip) { await enqueueReminder(sql, { ...entry, skip: true }); continue; }
+      const notificationId = `notif-${item.kind === "contract" ? "ctr" : "doc"}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+      if (!await enqueueReminder(sql, { ...entry, notificationId })) continue; // another pass or instance got there first
+      db.notifications.unshift({
+        notif_id: notificationId,
+        organizationId: tenantId,
+        parent_type: item.kind === "contract" ? "Contract" : "IO",
+        parent_id: item.recordId,
+        parent_number: content.reference,
+        parent_title: content.title,
+        notification_type: content.type,
+        sent_at: new Date().toISOString(),
+        // Becomes true only once the e-mail was delivered.
+        is_sent: false,
+        recipient: recipients,
+        message: content.message,
+        // Lets the UI render the message in the viewer's language; `message` stays in the organization language.
+        ...(plan.trigger === "offset" ? { message_params: { kind: item.kind, daysRemaining: item.daysRemaining, noticeType: content.noticeType, noticeDays: content.noticeDays } } : {}),
+        is_read: false,
+      });
+      queued++;
+    }
+  }
+  if (queued) await saveDb();
+  return queued;
+}
+/** Sends one ledger row through the platform SMTP relay. */
+const sendLedgerReminder: ReminderSender = async (row) => {
+  const item = reminderRecords().find((r) => r.kind === row.kind && r.recordId === row.record_id && r.cycleEnd === row.cycle_end_date);
+  if (!item) return { ok: false, skipped: true, error: "record changed or removed" };
+  if (!db.googleConfig?.smtpEnabled) return { ok: false, skipped: true, error: "SMTP relay disabled" };
+  const validRecipients = String(row.recipients || "").split(",").map((s) => s.trim()).filter((s) => s.includes("@"));
+  if (!validRecipients.length) return { ok: false, skipped: true, error: "no recipients" };
+  const content = reminderContent(item, row.trigger, row.offset_days);
+  const { pick, noticeDays, noticeType, reference, title } = content;
+  const tenantId = item.record.organizationId;
+  const rows: Array<[string, string]> = [
+    [pick("Value", "Nilai", "金额"), formatAmountForTenant(item.kind === "contract" ? item.record.contract_value : item.record.io_value, item.record.currency, tenantId)],
+  ];
+  if (item.kind === "contract") {
+    rows.push([pick("Notice period", "Periode pemberitahuan", "通知期"), `${noticeDays} ${pick("days", "hari", "天")} (${noticeType})`]);
+    rows.push([pick("Auto-renewal", "Perpanjangan otomatis", "自动续约"), item.record.auto_renewal ? pick("Yes", "Ya", "是") : pick("No", "Tidak", "否")]);
+  } else {
+    rows.push([pick("Pricing model", "Model harga", "定价模式"), item.record.pricing_model || "-"]);
+  }
+  const { subject, html } = await buildReminderEmail({
+    tenantId, kind: item.kind, reference, title, endDate: item.record.end_date, daysRemaining: item.daysRemaining, rows, variant: row.trigger,
+  });
+  const result = await sendSmtpEmail({ to: validRecipients, subject, html });
+  return result.success ? { ok: true } : { ok: false, error: String(result.error || "SMTP send failed") };
+};
+async function deliverReminders() {
+  const result = await deliverDueReminders(sql, sendLedgerReminder, {
+    onSent: (row) => {
+      const notification = (db.notifications || []).find((n: any) => n.notif_id === row.notification_id);
+      if (notification) notification.is_sent = true;
+    },
+  });
+  if (result.sent) await saveDb();
+  if (result.attempted) reminderLog.info(`Reminder delivery: ${result.sent} sent, ${result.failed} failed (will retry), ${result.dead} abandoned, ${result.skipped} skipped.`);
+  return result;
+}
+/** Full pass: refresh statuses, queue what is due, deliver (with retries). Used by the scheduler and POST /api/cron/trigger-check. */
+async function runReminderPass() {
+  await recalculateStatuses();
+  const queued = await enqueueDueReminders();
+  const delivery = await deliverReminders();
+  reminderLog.info(`Reminder pass finished: ${queued} queued.`);
+  return { queued, delivery };
+}
+const reminderScheduler = createReminderScheduler({
+  ...schedulerOptionsFromEnv(process.env, IS_TEST_MODE),
+  fullPass: runReminderPass,
+  retryPass: async () => { await deliverReminders(); },
+});
+function stopReminderScheduler() {
+  return reminderScheduler.stop();
 }
 let lifecycleRefresh: Promise<void> | null = null;
 /** Reads refresh date-driven status without sending reminders or requiring a cron run. Concurrent reads share one in-flight refresh, so none returns before its save lands. */
@@ -1748,6 +1841,7 @@ async function addActivityLog(
   description,
   req,
   organizationId?: string | null,
+  details?: Record<string, unknown>,
 ) {
   const identity = req?.identity;
   const ctx: OrgContext | undefined = req?.orgContext;
@@ -1758,25 +1852,14 @@ async function addActivityLog(
       ? ctx.tenantRole.replace(/^./, (c: string) => c.toUpperCase())
       : identity.platformRole === "superuser" ? "Platform administrator" : "User";
   }
-  const log = {
-    id: `act-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,
+  // One INSERT, no full-database save: the log is append-only and uncapped.
+  return await appendActivity(sql, {
     organizationId: organizationId !== undefined ? organizationId : ctx?.organizationId ?? null,
-    timestamp: new Date().toISOString(),
-    userEmail,
-    userName,
-    role,
-    actionType,
-    module: moduleName,
-    description,
+    userEmail, userName, role, actionType, module: moduleName, description,
     ipAddress: req?.ip || "127.0.0.1",
     userAgent: req?.headers["user-agent"] || "Browser Client",
-  };
-  db.activityLogs.unshift(log);
-  if (db.activityLogs.length > 500) {
-    db.activityLogs = db.activityLogs.slice(0, 500);
-  }
-  await saveDb();
-  return log;
+    details,
+  });
 }
 async function getBetterAuthSession(req) {
   try {
@@ -1835,7 +1918,7 @@ async function generateNewsTickerText(tenantId: string): Promise<string> {
   } catch (groundedErr: any) {
     // The search-grounding tool has a much stricter quota than plain
     // generation; fall back to an un-grounded call rather than failing.
-    console.warn(
+    log.warn(
       `[News Ticker] Grounded generation failed (${(groundedErr?.message || "").slice(0, 160)}), falling back to plain generation...`,
     );
     const response = await generateContentWithRetryAndFallback({
@@ -1889,7 +1972,7 @@ app.get("/api/dashboard/news-ticker", async (req: express.Request, res: express.
     await saveDb();
     res.json({ items: entry.items, lastGeneratedAt: entry.lastGeneratedAt, cached: false });
   } catch (err: any) {
-    console.error("Error generating news ticker:", err);
+    log.error("Error generating news ticker:", err);
     // A stale cache in the previous language/industry beats nothing, unless the
     // settings just changed and no fresh headlines exist yet for the new choice.
     if (Array.isArray(ticker.items) && ticker.items.length > 0 && !settingsChanged) {
@@ -2188,7 +2271,7 @@ app.post("/api/user/reset-password", async (req: express.Request, res: express.R
       message: `Password untuk '${email}' berhasil direset!`,
     });
   } catch (err) {
-    console.error("Server error resetting password:", err);
+    log.error("Server error resetting password:", err);
     res
       .status(500)
       .json({
@@ -2197,9 +2280,11 @@ app.post("/api/user/reset-password", async (req: express.Request, res: express.R
   }
 });
 /** Operational activity for the selected organization only (History drawer, tenant.audit.read). */
-app.get("/api/activity-logs", (req: express.Request, res: express.Response) => {
-  const orgId = getRequestTenantId(req);
-  res.json((db.activityLogs || []).filter((log: any) => log?.organizationId === orgId));
+app.get("/api/activity-logs", async (req: express.Request, res: express.Response) => {
+  const page = await listActivity(sql, getRequestTenantId(req), { limit: req.query.limit, offset: req.query.offset });
+  // Body stays the array older clients expect (newest first); paging metadata travels in headers.
+  res.set({ "X-Total-Count": String(page.total), "X-Limit": String(page.limit), "X-Offset": String(page.offset) });
+  res.json(page.rows);
 });
 app.get("/api/search", async (req: express.Request, res: express.Response) => {
   const organizationId = getRequestTenantId(req);
@@ -2311,7 +2396,7 @@ Return strictly one valid JSON object matching the schema.`;
       inputData,
       prompt,
     );
-    console.log(
+    log.info(
       `[PDF-Inspector Partner Parser] Mode: ${ocrStats.mode.toUpperCase()} (${ocrStats.classification}), Inspected in ${ocrStats.inspectionMs}ms, Pages: ${ocrStats.originalPages} (${ocrStats.originalKb}KB) -> ${ocrStats.processedPages} (${ocrStats.optimizedKb}KB), DigitalText: ${ocrStats.hasDigitalText}, Hash: ${ocrStats.fileHash.slice(0, 8)}`,
     );
     const selectedModel = getValidAiModel(model);
@@ -2346,7 +2431,7 @@ Return strictly one valid JSON object matching the schema.`;
     }
     res.json(responsePayload);
   } catch (error) {
-    console.error("Error parsing partner:", error);
+    log.error("Error parsing partner:", error);
     res
       .status(500)
       .json({
@@ -2396,7 +2481,7 @@ Output rules: exactly one paragraph, no bullet points or headings, no opening or
     const notesText = ((response as any).text || "").trim();
     res.json({ success: true, notes: notesText });
   } catch (error) {
-    console.error("Error generating DD notes:", error);
+    log.error("Error generating DD notes:", error);
     res
       .status(500)
       .json({
@@ -2460,7 +2545,7 @@ Return JSON with exactly:
     }
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
-    console.error("Error during partner review:", error);
+    log.error("Error during partner review:", error);
     res.status(500).json({ error: error?.message || "Gagal melakukan analisis AI. Silakan coba kembali." });
   }
 });
@@ -2518,7 +2603,7 @@ app.post("/api/partners", async (req: express.Request, res: express.Response) =>
         await getOrCreateDriveFolder("Folder DD", vendorFolder.id, token);
       }
     } catch (err) {
-      console.warn(
+      log.warn(
         `[Drive Hierarchical] Error creating folders for partner '${partner_name}':`,
         err?.message || err,
       );
@@ -2785,7 +2870,7 @@ Return JSON with exactly:
     }
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
-    console.error("Error during evaluation review:", error);
+    log.error("Error during evaluation review:", error);
     res.status(500).json({ error: error?.message || "Gagal melakukan analisis AI. Silakan coba kembali." });
   }
 });
@@ -3038,7 +3123,7 @@ Return strictly one valid JSON object matching the schema. Use an empty string "
       inputData,
       prompt,
     );
-    console.log(
+    log.info(
       `[PDF-Inspector Spending Parser] Mode: ${ocrStats.mode.toUpperCase()} (${ocrStats.classification}), Inspected in ${ocrStats.inspectionMs}ms, Pages: ${ocrStats.originalPages} (${ocrStats.originalKb}KB) -> ${ocrStats.processedPages} (${ocrStats.optimizedKb}KB), DigitalText: ${ocrStats.hasDigitalText}, Hash: ${ocrStats.fileHash.slice(0, 8)}`,
     );
     const selectedModel = getValidAiModel(model);
@@ -3082,7 +3167,7 @@ Return strictly one valid JSON object matching the schema. Use an empty string "
     }
     res.json(responsePayload);
   } catch (error) {
-    console.error("Error parsing Spending:", error);
+    log.error("Error parsing Spending:", error);
     res
       .status(500)
       .json({
@@ -3205,7 +3290,7 @@ Return JSON with exactly:
     }
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
-    console.error("Error during invoice review:", error);
+    log.error("Error during invoice review:", error);
     res.status(500).json({ error: error?.message || "Gagal melakukan analisis AI. Silakan coba kembali." });
   }
 });
@@ -3304,7 +3389,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
         "Folder Invoice & Billing",
         targetInvoiceName,
         invoice_file.fileData,
-        targetTenant?.name,
+        targetTenant?.id,
       );
       await addActivityLog(
         userEmail || "user@app",
@@ -3332,7 +3417,7 @@ app.post("/api/partner-spendings", async (req: express.Request, res: express.Res
         "Folder Invoice & Billing",
         targetBillingName,
         billing_file.fileData,
-        targetTenant?.name,
+        targetTenant?.id,
       );
       await addActivityLog(
         userEmail || "user@app",
@@ -3483,6 +3568,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
         "Folder Invoice & Billing",
         targetInvoiceName,
         invoice_file.fileData,
+        existing.organizationId,
       );
       await addActivityLog(
         userEmail || "user@app",
@@ -3513,6 +3599,7 @@ app.put("/api/partner-spendings/:id", async (req: express.Request, res: express.
         "Folder Invoice & Billing",
         targetBillingName,
         billing_file.fileData,
+        existing.organizationId,
       );
       await addActivityLog(
         userEmail || "user@app",
@@ -3610,7 +3697,7 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
       "Folder DD",
       finalFileName,
       fileData,
-      findTenant(partner.organizationId)?.name,
+      partner.organizationId,
     );
     await addActivityLog(
       userEmail || "user@app",
@@ -3769,7 +3856,7 @@ app.post("/api/contracts/export-google-docs", async (req: express.Request, res: 
           );
         }
       } catch (fErr) {
-        console.warn("Folder resolve fallback:", fErr);
+        log.warn("Folder resolve fallback:", fErr);
       }
     }
 
@@ -3783,6 +3870,7 @@ app.post("/api/contracts/export-google-docs", async (req: express.Request, res: 
       token
     );
 
+    await addActivityLog("", "", "", "DOCUMENT_EXPORT", "DOCUMENTS", `Exported '${title}' to Google Docs`, req, undefined, { documentId: docResult.id }).catch((err) => log.warn("Could not record export activity:", err));
     res.json({
       success: true,
       documentId: docResult.id,
@@ -3795,7 +3883,7 @@ app.post("/api/contracts/export-google-docs", async (req: express.Request, res: 
       },
     });
   } catch (error: any) {
-    console.error("Error creating Google Doc:", error);
+    log.error("Error creating Google Doc:", error);
     res.status(500).json({
       error: error?.message || "Gagal membuat dokumen Google Docs.",
     });
@@ -3920,7 +4008,7 @@ Return strictly one valid JSON object matching the schema. Use "" for any text f
       inputData,
       prompt,
     );
-    console.log(
+    log.info(
       `[PDF-Inspector Contract Parser] Mode: ${ocrStats.mode.toUpperCase()} (${ocrStats.classification}), Inspected in ${ocrStats.inspectionMs}ms, Pages: ${ocrStats.originalPages} (${ocrStats.originalKb}KB) -> ${ocrStats.processedPages} (${ocrStats.optimizedKb}KB), DigitalText: ${ocrStats.hasDigitalText}, Hash: ${ocrStats.fileHash.slice(0, 8)}`,
     );
     const selectedModel = getValidAiModel(model);
@@ -4019,7 +4107,7 @@ Return strictly one valid JSON object matching the schema. Use "" for any text f
     }
     res.json(responsePayload);
   } catch (error) {
-    console.error("Error parsing contract:", error);
+    log.error("Error parsing contract:", error);
     res
       .status(500)
       .json({
@@ -4197,7 +4285,7 @@ app.post("/api/contracts/redline-analysis", async (req: express.Request, res: ex
     }
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
-    console.error("Error during draft redline analysis:", error);
+    log.error("Error during draft redline analysis:", error);
     res.status(500).json({ error: error?.message || "Gagal melakukan analisis redline AI. Silakan coba kembali." });
   }
 });
@@ -4236,7 +4324,7 @@ app.post("/api/contracts/:id/redline-analysis", async (req: express.Request, res
       analyzed_at: nowIso,
     });
   } catch (error) {
-    console.error("Error during redline analysis:", error);
+    log.error("Error during redline analysis:", error);
     res
       .status(500)
       .json({
@@ -4340,7 +4428,7 @@ ${plainText}
     }
     res.status(201).json({ success: true, created, skipped });
   } catch (error: any) {
-    console.error("Error during AI redlining:", error);
+    log.error("Error during AI redlining:", error);
     res.status(500).json({ error: error?.message || "AI redlining failed. Please try again." });
   }
 });
@@ -4506,7 +4594,7 @@ Rules:
 
     res.json({ success: true, title: String(parsed?.title || "").slice(0, 300), fields, sections });
   } catch (error: any) {
-    console.error("Error generating AI template:", error);
+    log.error("Error generating AI template:", error);
     res.status(500).json({ error: error?.message || "Gagal membuat template. Coba lagi." });
   }
 });
@@ -4514,7 +4602,11 @@ Rules:
 app.use("/api", createGoogleCredentialsRouter(googleCredentials));
 
 // Create Contract documents: explorer, draft versions, metadata, comments/redlines.
-app.use("/api", createDocumentRouter({ db: sql, tenantOf: getRequestTenantId }));
+app.use("/api", createDocumentRouter({
+  db: sql,
+  tenantOf: getRequestTenantId,
+  onActivity: (req, event) => addActivityLog("", "", "", event.actionType, "DOCUMENTS", event.description, req, undefined, event.details),
+}));
 // Document Approval: sequential sign-off on a My Documents item or an uploaded file.
 app.use("/api", createApprovalRouter({ db: sql, tenantOf: getRequestTenantId }));
 
@@ -4522,7 +4614,7 @@ async function persistContractTerminationFile(req: express.Request, record: { or
   const partner = db.partners.find(p => p.partner_id === record.partner_id);
   const tenant = findTenant(record.organizationId);
   const storedName = `termination-${randomUUID()}.${file.extension}`;
-  const url = await saveUpload(partner?.partner_name, 'Folder Termination', storedName, file.fileData, tenant?.name);
+  const url = await saveUpload(partner?.partner_name, 'Folder Termination', storedName, file.fileData, record.organizationId);
   return { fileName: file.fileName, url };
 }
 
@@ -4623,7 +4715,7 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
           start_date,
         );
       } catch (e) {
-        console.error("Failed fetching historical rate for contract:", e);
+        log.error("Failed fetching historical rate for contract:", e);
       }
       total_usd = Math.round(amt * rate * 100) / 100;
     }
@@ -4647,7 +4739,7 @@ app.post("/api/contracts", async (req: express.Request, res: express.Response) =
         "Folder Contract",
         targetFileName,
         fileData,
-        targetTenant?.name,
+        targetTenant?.id,
       );
       await addActivityLog(
         userEmail || "user@app",
@@ -4784,7 +4876,7 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
           startDate,
         );
       } catch (e) {
-        console.error("Failed fetching rate for edit contract:", e);
+        log.error("Failed fetching rate for edit contract:", e);
       }
       total_usd = Math.round(amt * rate * 100) / 100;
     }
@@ -4841,6 +4933,7 @@ app.put("/api/contracts/:id", async (req: express.Request, res: express.Response
         "Folder Contract",
         targetFileName,
         fileData,
+        existing.organizationId,
       );
       await addActivityLog(
         userEmail || "user@app",
@@ -4973,7 +5066,7 @@ Return strictly one valid JSON object matching the schema.`;
       inputData,
       prompt,
     );
-    console.log(
+    log.info(
       `[PDF-Inspector IO Parser] Mode: ${ocrStats.mode.toUpperCase()} (${ocrStats.classification}), Inspected in ${ocrStats.inspectionMs}ms, Pages: ${ocrStats.originalPages} (${ocrStats.originalKb}KB) -> ${ocrStats.processedPages} (${ocrStats.optimizedKb}KB), DigitalText: ${ocrStats.hasDigitalText}, Hash: ${ocrStats.fileHash.slice(0, 8)}`,
     );
     const selectedModel = getValidAiModel(model);
@@ -5052,7 +5145,7 @@ Return strictly one valid JSON object matching the schema.`;
     }
     res.json(responsePayload);
   } catch (error) {
-    console.error("Error parsing IO:", error);
+    log.error("Error parsing IO:", error);
     res
       .status(500)
       .json({
@@ -5123,7 +5216,7 @@ Return JSON with exactly:
     }
     res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
   } catch (error) {
-    console.error("Error during service order review:", error);
+    log.error("Error during service order review:", error);
     res.status(500).json({ error: error?.message || "Gagal melakukan analisis AI. Silakan coba kembali." });
   }
 });
@@ -5207,7 +5300,7 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
           start_date,
         );
       } catch (e) {
-        console.error("Failed fetching historical rate for IO:", e);
+        log.error("Failed fetching historical rate for IO:", e);
       }
       total_usd = Math.round(amt * rate * 100) / 100;
     }
@@ -5231,7 +5324,7 @@ app.post("/api/ios", async (req: express.Request, res: express.Response) => {
         "Folder IO",
         targetFileName,
         fileData,
-        targetTenant?.name,
+        targetTenant?.id,
       );
       await addActivityLog(
         userEmail || "user@app",
@@ -5330,7 +5423,7 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
           startDate,
         );
       } catch (e) {
-        console.error("Failed fetching rate for edit IO:", e);
+        log.error("Failed fetching rate for edit IO:", e);
       }
       total_usd = Math.round(amt * rate * 100) / 100;
     }
@@ -5366,6 +5459,7 @@ app.put("/api/ios/:id", async (req: express.Request, res: express.Response) => {
         "Folder IO",
         targetFileName,
         fileData,
+        existing.organizationId,
       );
       await addActivityLog(
         userEmail || "user@app",
@@ -5476,8 +5570,11 @@ app.post("/api/notification-logs/delete", async (req: express.Request, res: expr
   res.json({ success: true, notifications: await scopedRecords(req, "notification", db.notifications) });
 });
 app.post("/api/cron/trigger-check", async (req: express.Request, res: express.Response) => {
-  const count = await recalculateStatuses();
-  res.json({ success: true, newNotificationsGenerated: count });
+  // Same pass as the scheduler, under the same lock: a concurrent run on another instance makes this one a no-op.
+  const outcome = await withAdvisoryLock(REMINDER_LOCK_KEY, runReminderPass);
+  if (!outcome.ran) return res.status(202).json({ success: true, newNotificationsGenerated: 0, skipped: "another reminder pass is running" });
+  const { queued, delivery } = outcome.value!;
+  res.json({ success: true, newNotificationsGenerated: queued, delivery });
 });
 app.get(
   ["/api/auth/google/client-id", "/api/google-auth/client-id"],
@@ -5534,7 +5631,7 @@ app.post(
           };
         }
       } catch (profileErr) {
-        console.warn(
+        log.warn(
           "Gagal memuat profil pengguna di exchange-code:",
           profileErr,
         );
@@ -5547,7 +5644,7 @@ app.post(
         profile,
       });
     } catch (err) {
-      console.error("Error exchanging Google OAuth code:", err);
+      log.error("Error exchanging Google OAuth code:", err);
       res
         .status(500)
         .json({
@@ -5679,7 +5776,7 @@ app.post(
         user: { id: userId, email: cleanEmail, name: existingUser.name || userName, photoURL: photoURL || null },
       });
     } catch (err: any) {
-      console.error("Error in /api/auth/google/sync-session:", err);
+      log.error("Error in /api/auth/google/sync-session:", err);
       res.status(500).json({
         success: false,
         error: err?.message || "Gagal menyinkronkan sesi Google ke Better Auth.",
@@ -5711,7 +5808,7 @@ app.post(
       await saveDb();
       if (token) {
         backupLocalFilesToGoogleDrive(token).catch((e) => {
-          console.warn(
+          log.warn(
             "[Google Auth] Background backup error on connect:",
             e?.message,
           );
@@ -5949,7 +6046,7 @@ app.post("/api/google-integration", async (req: express.Request, res: express.Re
     throw err;
   }
   if (!IS_TEST_MODE && db.googleConfig?.driveFolderId && db.googleConfig.driveFolderId !== previousFolder) {
-    autoEnsureTenantGoogleResources(db.googleConfig.accessToken, true).catch((e) => console.warn("[Google Integration Save]", e?.message));
+    autoEnsureTenantGoogleResources(db.googleConfig.accessToken, true).catch((e) => log.warn("[Google Integration Save]", e?.message));
   }
   const config = readPlatformConfiguration();
   res.json({ success: true, config: { ...config.google, ...config.ai, ...config.smtp } });
@@ -6003,7 +6100,7 @@ app.post("/api/smtp/test", async (req: express.Request, res: express.Response) =
       port,
       secure: smtpSecure ?? port === 465,
       auth: { user, pass },
-      tls: { rejectUnauthorized: false },
+      tls: smtpTlsOptions(db.googleConfig),
     });
     await transporter.verify();
     const fromAddress = (
@@ -6026,7 +6123,7 @@ app.post("/api/smtp/test", async (req: express.Request, res: express.Response) =
       message: `Email uji coba berhasil dikirim ke '${recipient}'! (Message ID: ${info.messageId})`,
     });
   } catch (err) {
-    console.error("SMTP Test Error:", err);
+    log.error("SMTP Test Error:", err);
     res
       .status(400)
       .json({
@@ -6071,7 +6168,7 @@ app.post("/api/ai/test-key", async (req: express.Request, res: express.Response)
         }
       } catch (err) {
         lastErr = err;
-        console.warn(
+        log.warn(
           `[Test API Key] Model ${targetModel} attempt failed:`,
           err?.message || err,
         );
@@ -6079,7 +6176,7 @@ app.post("/api/ai/test-key", async (req: express.Request, res: express.Response)
     }
     throw lastErr || new Error("Tidak ada respon dari Gemini API.");
   } catch (err) {
-    console.error("Test API Key error:", err);
+    log.error("Test API Key error:", err);
     return res.status(400).json({ error: formatGeminiError(err) });
   }
 });
@@ -6139,7 +6236,7 @@ app.post("/api/google-integration/auto-provision-master", async (req: express.Re
     try {
       await autoEnsureTenantGoogleResources(token, true);
     } catch (orgErr) {
-      console.warn(
+      log.warn(
         "[AutoProvision] Warning auto-ensuring org folders:",
         orgErr?.message,
       );
@@ -6155,7 +6252,7 @@ app.post("/api/google-integration/auto-provision-master", async (req: express.Re
       tenants: db.tenants,
     });
   } catch (err) {
-    console.error("Auto provision master root error:", err);
+    log.error("Auto provision master root error:", err);
     return res
       .status(500)
       .json({
@@ -6192,7 +6289,7 @@ app.post("/api/tenants/auto-provision-folders", async (req: express.Request, res
       tenants: db.tenants,
     });
   } catch (err) {
-    console.error("Auto provision tenant folders error:", err);
+    log.error("Auto provision tenant folders error:", err);
     return res
       .status(500)
       .json({
@@ -6302,7 +6399,7 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
   try {
     await coreSaver.withSaveLock(() => sql.tx(async () => {
       // Clear editor data and extraction caches with the same reset.
-      for (const table of ["contract_comments", "document_metadata", "contract_drafts", "contract_documents", "metadata_fields", "ai_ocr_cache", "search_records"]) {
+      for (const table of ["contract_comments", "document_metadata", "contract_drafts", "contract_documents", "metadata_fields", "ai_ocr_cache", "search_records", "activity_logs", "upload_owners"]) {
         await sql.run(`DELETE FROM "${table}"`);
       }
       await removeDemoAccounts(sql, [], identity.userId);
@@ -6374,7 +6471,7 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
     }));
   } catch (err) {
     resetSyncCache(sql);
-    console.error("Error resetting auth organization tables:", err);
+    log.error("Error resetting auth organization tables:", err);
     return res.status(500).json({ error: "Failed to reset organization tables." });
   }
   // Mutate `db` in place: the auth console holds a reference to this object.
@@ -6385,10 +6482,10 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
   try {
     const storage = getStore();
     for (const { key } of await storage.list("")) {
-      await storage.delete(key).catch((e) => console.error("Error deleting upload during reset:", key, e));
+      await storage.delete(key).catch((e) => log.error("Error deleting upload during reset:", key, e));
     }
   } catch (e) {
-    console.error("Error cleaning uploads during reset:", e);
+    log.error("Error cleaning uploads during reset:", e);
   }
 
   await recalculateStatuses();
@@ -7271,7 +7368,7 @@ Guidelines:
     });
     res.json({ success: true, reply: (response as any).text });
   } catch (error: any) {
-    console.error("AI Chat Error:", error);
+    log.error("AI Chat Error:", error);
     res
       .status(500)
       .json({ error: error?.message || "Failed to process AI request" });
@@ -7377,7 +7474,7 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
     }
   } catch (err: any) {
     // saveCos already updated the in-memory credentials; after a rollback the table is the truth again.
-    if (storage) await googleCredentials.init().catch((reloadErr) => console.error("[setup] credential reload failed:", reloadErr));
+    if (storage) await googleCredentials.init().catch((reloadErr) => log.error("[setup] credential reload failed:", reloadErr));
     return res.status(err?.status || 500).json({ error: "SETUP_FAILED", message: err?.message || "Setup failed." });
   }
   await reloadAuthConfiguration();
@@ -7386,7 +7483,7 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
   });
   // Outside production the demo-workspace logins stay usable with the same password.
   if (!IS_TEST_MODE) await ensureUserAccountsExist(password);
-  console.log(`First-run setup: created superuser ${email}`);
+  log.info(`First-run setup: created superuser ${email}`);
   res.status(201).json({ success: true, publicUrl });
 });
 
@@ -7524,19 +7621,10 @@ app.all("/api/*", (req: express.Request, res: express.Response) => {
     .status(404)
     .json({ error: `API route not found: ${req.method} ${req.path}` });
 });
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error("[API Unhandled Error]", err);
-  if (res.headersSent) {
-    return next(err);
-  }
-  if (req.path.startsWith("/api/")) {
-    return res
-      .status(err.status || 500)
-      .json({
-        error: err.message || "Terjadi kesalahan internal server.",
-        status: err.status || 500,
-      });
-  }
-  next(err);
-});
+app.use(errorResponder());
+/** Graceful shutdown: stop background work, then wait for queued database saves. The caller closes the pool afterwards. */
+export async function drain() {
+  await stopReminderScheduler();
+  await coreSaver.idle();
+}
 export { app, getFreshGoogleAccessToken, isMatchingOrg, resolveActiveGoogleToken };

@@ -111,7 +111,7 @@ export async function synchronizeCoreData(db: Sql, data: any) {
 }
 
 /** Parts of the in-memory projection that synchronizeCoreData persists. */
-const PERSISTED = ['allowedUsers', ...ENTITIES.map(entity => entity.collection), 'branding', 'googleConfig', 'appSettings', 'newsTicker'];
+const PERSISTED = ['allowedUsers', ...ENTITIES.filter(entity => !entity.appendOnly).map(entity => entity.collection), 'branding', 'googleConfig', 'appSettings', 'newsTicker'];
 
 /**
  * Serialized saves of the in-memory projection. Each save snapshots the collections synchronously when its turn
@@ -142,5 +142,7 @@ export function createCoreSaver(db: Sql, memory: () => Record<string, any>, relo
       throw error;
     }
   });
-  return { save, withSaveLock, snapshot };
+  /** Resolves once every save queued so far has finished (successfully or not); used by graceful shutdown. */
+  const idle = async () => { let seen; do { seen = queue; await seen; } while (seen !== queue); };
+  return { save, withSaveLock, snapshot, idle };
 }
