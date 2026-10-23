@@ -1,6 +1,7 @@
 import { readBusinessRows } from '../normalizedCoreStore';
 import { migratePartnerContact } from '../partnerContact';
 import { synchronizeCoreData } from '../coreDataStore';
+import { openProviderSecrets } from '../providerSecrets';
 import { betterAuth, type BetterAuthOptions, type BetterAuthPlugin } from "better-auth";
 import { APIError } from "better-auth/api";
 import { hasApprovalInvitation } from "../organizationAdminRoutes";
@@ -120,7 +121,7 @@ export async function loadCoreData() {
     spendings: await business('spendings'),
     templates: await business('templates'),
     branding: await single(`SELECT payload FROM branding WHERE id = 'branding'`),
-    googleConfig: await single(`SELECT payload FROM app_settings WHERE id = 'google_config'`),
+    googleConfig: await single(`SELECT payload FROM app_settings WHERE id = 'google_config'`).then(config => config && openProviderSecrets(config)),
     newsTicker: await single(`SELECT payload FROM news_ticker WHERE id = 'default'`),
   };
   return rows;

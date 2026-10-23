@@ -5883,7 +5883,7 @@ function readPlatformConfiguration() {
     ai: { aiModel: g.aiModel || "gemini-3.8-flash", hasGeminiApiKey: Boolean(getEffectiveGeminiApiKey()) },
     smtp: {
       smtpEnabled: Boolean(g.smtpEnabled), smtpHost: g.smtpHost || "", smtpPort: g.smtpPort ?? null,
-      smtpSecure: Boolean(g.smtpSecure), smtpUser: g.smtpUser || "", smtpFromEmail: g.smtpFromEmail || "",
+      smtpSecure: Boolean(g.smtpSecure), smtpAllowSelfSigned: Boolean(g.smtpAllowSelfSigned), smtpUser: g.smtpUser || "", smtpFromEmail: g.smtpFromEmail || "",
       smtpFromName: g.smtpFromName || "", hasSmtpPassword: Boolean(g.smtpPassword),
     },
   };
@@ -5896,7 +5896,7 @@ const PLATFORM_SECTIONS: Record<string, string[]> = {
   branding: ["appName", "logoUrl", "primaryColor", "footerText", "loginHeadline"],
   google: ["driveFolderId", "spreadsheetId", "masterSpreadsheetId"],
   ai: ["aiModel", "geminiApiKey"],
-  smtp: ["smtpEnabled", "smtpHost", "smtpPort", "smtpSecure", "smtpUser", "smtpPassword", "smtpFromEmail", "smtpFromName"],
+  smtp: ["smtpEnabled", "smtpHost", "smtpPort", "smtpSecure", "smtpAllowSelfSigned", "smtpUser", "smtpPassword", "smtpFromEmail", "smtpFromName"],
 };
 function validatePlatformValue(section: string, key: string, value: unknown): unknown {
   const str = (max: number) => {
@@ -5940,7 +5940,7 @@ function validatePlatformValue(section: string, key: string, value: unknown): un
       return value;
     }
     case "ai.aiModel": return getValidAiModel(str(100));
-    case "smtp.smtpEnabled": case "smtp.smtpSecure":
+    case "smtp.smtpEnabled": case "smtp.smtpSecure": case "smtp.smtpAllowSelfSigned":
       if (typeof value !== "boolean") platformConfigError(`${key} must be true or false.`);
       return value;
     case "smtp.smtpPort":

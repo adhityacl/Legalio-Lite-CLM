@@ -1,6 +1,7 @@
 import { resetSyncCache, synchronizeBusinessRows } from './normalizedCoreStore';
 import { ENTITIES } from './normalizedSchema';
 import type { Sql } from './db';
+import { sealProviderSecrets } from './providerSecrets';
 
 export function normalizeSqliteId(row: any, fallback: string) {
   if (row?.id) return String(row.id);
@@ -85,7 +86,8 @@ async function synchronizeCoreDataTransaction(db: Sql, data: any) {
     `, {
       id: 'google_config',
       organizationId: googleConfigPayload.organizationId ?? null,
-      payload: JSON.stringify(googleConfigPayload),
+      // SMTP password, Gemini key and Google tokens are encrypted at rest (providerSecrets.ts).
+      payload: JSON.stringify(sealProviderSecrets(googleConfigPayload)),
       updatedAt: new Date().toISOString(),
     });
   }
