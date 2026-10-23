@@ -1,3 +1,7 @@
+import { checkIsAdmin } from './adminCheck';
+import { tenantSettingsPayload } from './tenantSettingsView';
+import { createSystemSettingsRouter } from "./routes/systemSettings";
+import { onOrganizationChanged, redactProviderConfig, readPlatformConfiguration, PLATFORM_SECTIONS, isMaskedSecret, applyPlatformConfiguration } from './platformSettings';
 import { withCurrentUiTextKeys } from './uiTextKeys';
 import { createInitDataRouter } from "./routes/initData";
 import { normalizeSpendingMonths } from './spendingMonths';
@@ -500,49 +504,6 @@ app.post("/api/user/log-activity", async (req: express.Request, res: express.Res
 let verifyGoogleToken: (accessToken: unknown, clientId: string | null | undefined) => Promise<string | null> = verifyGoogleAccessToken;
 function verifyGoogleAccessTokenEmail(accessToken: unknown): Promise<string | null> {
   return verifyGoogleToken(accessToken, googleCredentials.getOAuthClient().clientId);
-}
-/*
- * Provider secrets never leave the server (PRD §5.1). Clients receive a
- * masked hint; a masked value posted back means "keep the stored secret".
- */
-const SECRET_MASK_CHAR = "•";
-function maskSecret(value: unknown): string {
-  const text = String(value ?? "");
-  if (!text) return "";
-  return `${SECRET_MASK_CHAR.repeat(8)}${text.length > 8 ? text.slice(-4) : ""}`;
-}
-function isMaskedSecret(value: unknown): boolean {
-  const text = String(value ?? "");
-  return text.includes(SECRET_MASK_CHAR) || /^\*{4,}$/.test(text);
-}
-function redactProviderConfig(config: any) {
-  const { accessToken, refreshToken, smtpPassword, geminiApiKey, ...rest } = config || {};
-  return {
-    ...rest,
-    geminiApiKey: maskSecret(geminiApiKey),
-    hasGeminiApiKey: Boolean(geminiApiKey),
-    smtpPassword: maskSecret(smtpPassword),
-    hasSmtpPassword: Boolean(smtpPassword),
-    hasGoogleSession: Boolean(accessToken || refreshToken),
-  };
-}
-/**
- * Admin check based ONLY on the verified session identity. Earlier versions
- * also trusted e-mail addresses supplied in headers, body or query string;
- * the unused `_fallback*` parameters are kept for call-site compatibility.
- */
-/**
- * Platform-administrator check from the verified identity only. Routes that
- * call this are already gated by a platform policy; this is defence in depth.
- * A tenant admin membership never makes this true.
- */
-async function checkIsAdmin(req: express.Request, _fallbackEmail?: string, _fallbackName?: string) {
-  try {
-    const identity = identityOf(req);
-    return { isAdmin: identity.platformRole === "superuser", adminEmail: identity.email, adminName: identity.name || "Admin" };
-  } catch {
-    return { isAdmin: false, adminEmail: "", adminName: "" };
-  }
 }
 app.get("/api/user/allowed-users", (req: express.Request, res: express.Response) => {
   syncAdderNames();
@@ -1054,272 +1015,6 @@ app.post(
     }
   },
 );
-/*
- * Platform configuration (PRD §7.1, §7.5, §9.4): deployment branding, the
- * master Google resources, AI provider/model and SMTP relay. Platform-only;
- * tenant settings never read this. Secrets are write-only: omitted keeps the
- * stored value, a non-empty string replaces it, explicit null clears it.
- */
-const GOOGLE_RESOURCE_ID = /^[A-Za-z0-9_-]{10,200}$/;
-function platformConfigError(message: string): never {
-  throw new ApiError(400, "INVALID_INPUT", message);
-}
-function readPlatformConfiguration() {
-  const g = db.googleConfig || {};
-  const b = { ...DEFAULT_BRANDING, ...(db.branding || {}) };
-  return {
-    uiTexts: { overrides: withCurrentUiTextKeys(g.uiTextOverrides || { ID: {}, EN: {}, ZH: {} }) as UITextOverrides },
-    branding: { appName: b.appName, logoUrl: b.logoUrl, primaryColor: b.primaryColor, footerText: b.footerText, loginHeadline: b.loginHeadline },
-    google: {
-      driveFolderId: g.driveFolderId || "",
-      spreadsheetId: g.spreadsheetId || "",
-      masterSpreadsheetId: g.masterSpreadsheetId || "",
-      masterSpreadsheetUrl: g.masterSpreadsheetId ? `https://docs.google.com/spreadsheets/d/${g.masterSpreadsheetId}/edit` : "",
-      isConnected: Boolean(g.isConnected && (g.accessToken || g.refreshToken)),
-      hasGoogleSession: Boolean(g.accessToken || g.refreshToken),
-      serviceAccountConfigured: hasServiceAccountCredentials(),
-      lastSyncTime: g.lastSyncTime || "",
-    },
-    ai: { aiModel: g.aiModel || "gemini-3.8-flash", hasGeminiApiKey: Boolean(getEffectiveGeminiApiKey()) },
-    smtp: {
-      smtpEnabled: Boolean(g.smtpEnabled), smtpHost: g.smtpHost || "", smtpPort: g.smtpPort ?? null,
-      smtpSecure: Boolean(g.smtpSecure), smtpAllowSelfSigned: Boolean(g.smtpAllowSelfSigned), smtpUser: g.smtpUser || "", smtpFromEmail: g.smtpFromEmail || "",
-      smtpFromName: g.smtpFromName || "", hasSmtpPassword: Boolean(g.smtpPassword),
-    },
-  };
-}
-app.get('/api/system/ui-texts', (_req, res) => {
-  res.set('Cache-Control', 'no-store').json(readPlatformConfiguration().uiTexts);
-});
-const PLATFORM_SECTIONS: Record<string, string[]> = {
-  uiTexts: ['overrides', 'reset'],
-  branding: ["appName", "logoUrl", "primaryColor", "footerText", "loginHeadline"],
-  google: ["driveFolderId", "spreadsheetId", "masterSpreadsheetId"],
-  ai: ["aiModel", "geminiApiKey"],
-  smtp: ["smtpEnabled", "smtpHost", "smtpPort", "smtpSecure", "smtpAllowSelfSigned", "smtpUser", "smtpPassword", "smtpFromEmail", "smtpFromName"],
-};
-function validatePlatformValue(section: string, key: string, value: unknown): unknown {
-  const str = (max: number) => {
-    if (typeof value !== "string" || value.trim().length > max) platformConfigError(`${key} must be text up to ${max} characters.`);
-    return (value as string).trim();
-  };
-  switch (`${section}.${key}`) {
-    case 'uiTexts.reset':
-      if (value !== true) platformConfigError('reset must be true.');
-      return true;
-    case 'uiTexts.overrides': {
-      if (!value || typeof value !== 'object' || Array.isArray(value)) platformConfigError('overrides must be a language dictionary.');
-      const result: Partial<UITextOverrides> = {};
-      for (const [language, catalog] of Object.entries(value)) {
-        if (!['ID', 'EN', 'ZH'].includes(language) || !catalog || typeof catalog !== 'object' || Array.isArray(catalog)) platformConfigError('Supported UI languages are ID, EN and ZH.');
-        const entries = Object.entries(catalog);
-        if (entries.length > 10_000) platformConfigError('A dictionary can contain up to 10000 texts per language.');
-        for (const [textKey, text] of entries) {
-          if (!/^[\w.-]{1,160}$/.test(textKey) || ['__proto__', 'prototype', 'constructor'].includes(textKey) || typeof text !== 'string' || text.length > 10_000) platformConfigError('Each UI text needs a valid key and text up to 10000 characters.');
-        }
-        result[language as keyof UITextOverrides] = Object.fromEntries(entries) as Record<string, string>;
-      }
-      return result;
-    }
-    case "branding.appName": case "branding.loginHeadline": return str(200);
-    case "branding.footerText": return str(500);
-    case "branding.primaryColor": {
-      const v = str(7);
-      if (!/^#[0-9a-fA-F]{6}$/.test(v)) platformConfigError("primaryColor must be a six-digit hex color.");
-      return v;
-    }
-    case "branding.logoUrl": {
-      const v = str(2048);
-      if (v && !(v.startsWith("/") && !v.startsWith("//")) && !/^https:\/\//i.test(v)) platformConfigError("logoUrl must be an HTTPS URL or a path on this site.");
-      if (/[<>"'\s]/.test(v)) platformConfigError("logoUrl is invalid.");
-      return v;
-    }
-    case "google.driveFolderId": case "google.spreadsheetId": case "google.masterSpreadsheetId": {
-      if (value === null || value === "") return "";
-      if (typeof value !== "string" || !GOOGLE_RESOURCE_ID.test(value)) platformConfigError(`${key} is not a valid Google resource ID.`);
-      return value;
-    }
-    case "ai.aiModel": return getValidAiModel(str(100));
-    case "smtp.smtpEnabled": case "smtp.smtpSecure": case "smtp.smtpAllowSelfSigned":
-      if (typeof value !== "boolean") platformConfigError(`${key} must be true or false.`);
-      return value;
-    case "smtp.smtpPort":
-      if (value === null) return null;
-      if (!Number.isInteger(value) || (value as number) < 1 || (value as number) > 65535) platformConfigError("smtpPort must be 1–65535.");
-      return value;
-    case "smtp.smtpHost": case "smtp.smtpUser": case "smtp.smtpFromName": return str(254);
-    case "smtp.smtpFromEmail": {
-      const v = str(254);
-      if (v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) platformConfigError("smtpFromEmail is not a valid email address.");
-      return v;
-    }
-  }
-  platformConfigError(`Unknown field: ${section}.${key}`);
-}
-async function applyPlatformConfiguration(section: unknown, values: unknown, actor: ReturnType<typeof auditActorFor>) {
-  if (typeof section !== "string" || !Object.hasOwn(PLATFORM_SECTIONS, section)) platformConfigError("section must be branding, google, ai, smtp or uiTexts.");
-  if (!values || typeof values !== "object" || Array.isArray(values)) platformConfigError("values must be an object.");
-  const allowed = PLATFORM_SECTIONS[section as string];
-  const input = values as Record<string, unknown>;
-  if (section === 'uiTexts' && input.reset !== undefined && input.overrides !== undefined) platformConfigError('Choose overrides or reset.');
-  const next: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(input)) {
-    if (!allowed.includes(key)) platformConfigError(`Unknown field: ${section}.${key}`);
-    if (key === "geminiApiKey" || key === "smtpPassword") {
-      if (value === undefined) continue;
-      if (value === null) { next[key] = ""; continue; }
-      if (typeof value !== "string" || !value.trim() || value.length > 512) platformConfigError(`${key} must be a non-empty string or null.`);
-      next[key] = value.trim();
-      continue;
-    }
-    next[key] = validatePlatformValue(section as string, key, value);
-  }
-  const before = JSON.stringify({ branding: db.branding, googleConfig: db.googleConfig });
-  if (section === 'uiTexts') {
-    const overrides: UITextOverrides = { ID: {}, EN: {}, ZH: {} };
-    if (!next.reset) {
-      const current = readPlatformConfiguration().uiTexts.overrides;
-      for (const language of ['ID', 'EN', 'ZH'] as const) {
-        const merged = { ...current[language], ...(next.overrides as Partial<UITextOverrides>)?.[language] };
-        overrides[language] = Object.fromEntries(Object.entries(merged).filter(([, text]) => text !== ''));
-        if (Object.keys(overrides[language]).length > 10_000) platformConfigError('A dictionary can contain up to 10000 texts per language.');
-      }
-    }
-    db.googleConfig = { ...(db.googleConfig || {}), uiTextOverrides: overrides };
-  }
-  else if (section === "branding") db.branding = { ...DEFAULT_BRANDING, ...(db.branding || {}), ...next };
-  else db.googleConfig = { ...(db.googleConfig || {}), ...next, ...(section === "google" && next.masterSpreadsheetId !== undefined ? { masterSpreadsheetUrl: "" } : {}) };
-  if (section === "ai" && next.geminiApiKey !== undefined) process.env.GEMINI_API_KEY = String(next.geminiApiKey);
-  try {
-    await coreSaver.save(() => appendAudit(sql, actor, {
-      organizationId: null, action: "platform.configuration.update", targetType: "installation", targetId: "installation",
-      outcome: "success", changedFields: Object.keys(next).map((k) => `${section}.${k}`),
-    }));
-  } catch (err) {
-    const restored = JSON.parse(before);
-    db.branding = restored.branding;
-    db.googleConfig = restored.googleConfig;
-    throw err;
-  }
-  return (readPlatformConfiguration() as any)[section as string];
-}
-/** Committed organization change: rebuild projections and re-derive policy-dependent state. */
-async function onOrganizationChanged(organizationId: string) {
-  await refreshTenantProjection();
-  (db.partners || []).forEach((p: any) => {
-    if (p.organizationId !== organizationId) return;
-    p.dd_documents = normalizePartnerDocuments(p);
-    p.status_dd = computeDueDiligenceStatus(p.dd_documents);
-  });
-  await recalculateStatuses();
-  await saveDb();
-}
-app.get("/api/google-integration", (_req: express.Request, res: express.Response) => {
-  const config = readPlatformConfiguration();
-  res.json({ ...config.google, ...config.ai, ...config.smtp });
-});
-/** Legacy platform write adapter: splits a flat body into strict sections. Tenant fields are rejected. */
-app.post("/api/google-integration", async (req: express.Request, res: express.Response) => {
-  const identity = identityOf(req);
-  const body = req.body && typeof req.body === "object" ? req.body : {};
-  const sections: Record<string, Record<string, unknown>> = {};
-  for (const [key, value] of Object.entries(body)) {
-    const section = Object.keys(PLATFORM_SECTIONS).find((name) => name !== "branding" && PLATFORM_SECTIONS[name].includes(key));
-    if (!section) return sendError(req, res, 400, "INVALID_INPUT", `Unknown or tenant-owned field: ${key}`);
-    if ((key === "geminiApiKey" || key === "smtpPassword") && (value === "" || isMaskedSecret(value))) continue;
-    (sections[section] ||= {})[key] = value;
-  }
-  const previousFolder = db.googleConfig?.driveFolderId;
-  try {
-    for (const [section, values] of Object.entries(sections)) await applyPlatformConfiguration(section, values, auditActorFor(req, identity));
-  } catch (err: any) {
-    if (err instanceof ApiError) return sendError(req, res, err.status, err.error, err.message);
-    throw err;
-  }
-  if (!IS_TEST_MODE && db.googleConfig?.driveFolderId && db.googleConfig.driveFolderId !== previousFolder) {
-    autoEnsureTenantGoogleResources(db.googleConfig.accessToken, true).catch((e) => log.warn("[Google Integration Save]", e?.message));
-  }
-  const config = readPlatformConfiguration();
-  res.json({ success: true, config: { ...config.google, ...config.ai, ...config.smtp } });
-});
-app.get('/api/mailer/templates', async (_req, res) => res.json({ templates: await mailTemplates.list() }));
-app.put('/api/mailer/templates/:id', async (req, res) => {
-  const { subject, html, expectedVersion } = req.body || {};
-  const template = await sql.tx(async () => {
-    const saved = await mailTemplates.save(String(req.params.id), { subject, html }, expectedVersion);
-    await appendAudit(sql, auditActorFor(req, identityOf(req)), {
-      organizationId: null, action: 'platform.configuration.update', targetType: 'mail_template', targetId: String(req.params.id),
-      outcome: 'success', changedFields: ['subject', 'html'],
-    });
-    return saved;
-  });
-  res.json({ template });
-});
-app.post("/api/smtp/test", async (req: express.Request, res: express.Response) => {
-  const adminCheck = await checkIsAdmin(req);
-  if (!adminCheck.isAdmin) {
-    return res
-      .status(403)
-      .json({ error: "Forbidden: Only Admins can test SMTP settings." });
-  }
-  const {
-    smtpHost,
-    smtpPort,
-    smtpSecure,
-    smtpUser,
-    smtpPassword,
-    smtpFromEmail,
-    smtpFromName,
-    testRecipient,
-  } = req.body;
-  const host = (smtpHost || db.googleConfig.smtpHost || "").trim();
-  const user = (smtpUser || db.googleConfig.smtpUser || "").trim();
-  const pass =
-    smtpPassword && !isMaskedSecret(smtpPassword) ? smtpPassword : db.googleConfig.smtpPassword || "";
-  const recipient = (testRecipient || "").trim();
-  if (!host || !user || !recipient) {
-    return res
-      .status(400)
-      .json({
-        error: "SMTP Host, Username, dan Email Penerima Uji Coba wajib diisi.",
-      });
-  }
-  try {
-    const port = Number(smtpPort) || (smtpSecure ? 465 : 587);
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: smtpSecure ?? port === 465,
-      auth: { user, pass },
-      tls: smtpTlsOptions(db.googleConfig),
-    });
-    await transporter.verify();
-    const fromAddress = (
-      smtpFromEmail ||
-      db.googleConfig.smtpFromEmail ||
-      user
-    ).trim();
-    const fromName = (
-      smtpFromName ||
-      db.googleConfig.smtpFromName ||
-      "Sistem Notifikasi Kontrak & IO"
-    ).trim();
-    const info = await transporter.sendMail({
-      from: `"${fromName}" <${fromAddress}>`,
-      to: recipient,
-      ...await mailTemplates.render('smtp-test', { host, port: String(port), fromAddress, testedAt: new Date().toISOString() }),
-    });
-    res.json({
-      success: true,
-      message: `Email uji coba berhasil dikirim ke '${recipient}'! (Message ID: ${info.messageId})`,
-    });
-  } catch (err) {
-    log.error("SMTP Test Error:", err);
-    // Only the transport's error code (EAUTH, ECONNECTION, ...) is shown; the full error is in the log.
-    const smtpCode = typeof err?.code === "string" ? ` (${err.code.slice(0, 40)})` : "";
-    sendApiError(req, res, 400, "SMTP_TEST_FAILED", `Gagal mengirim email via SMTP Relay${smtpCode}. Periksa host, port, kredensial dan pengaturan TLS.`);
-  }
-});
 app.post("/api/ai/test-key", async (req: express.Request, res: express.Response) => {
   const { apiKey, model } = req.body;
   const keyToTest = (apiKey && !isMaskedSecret(apiKey) ? String(apiKey) : getEffectiveGeminiApiKey()).trim();
@@ -2358,23 +2053,6 @@ app.post("/api/tenants/:id/setup-google", async (req: express.Request, res: expr
 });
 app.post("/api/tenants/:id/sync-google", (req: express.Request, res: express.Response) =>
   sendError(req, res, 409, "SYNC_UNAVAILABLE", "Google synchronization is not available in this release."));
-/** Public presentation branding only (PRD §5.5). */
-app.get("/api/branding", (req: express.Request, res: express.Response) => {
-  const b = { ...DEFAULT_BRANDING, ...(db.branding || {}) };
-  return res.json({
-    success: true,
-    branding: { appName: b.appName, logoUrl: b.logoUrl, primaryColor: b.primaryColor, footerText: b.footerText, loginHeadline: b.loginHeadline },
-  });
-});
-app.post("/api/branding", async (req: express.Request, res: express.Response) => {
-  try {
-    const branding = await applyPlatformConfiguration("branding", req.body, auditActorFor(req, identityOf(req)));
-    return res.json({ success: true, branding });
-  } catch (err: any) {
-    if (err instanceof ApiError) return sendError(req, res, err.status, err.error, err.message);
-    throw err;
-  }
-});
 /** Mask all but the last `keep` characters, e.g. bank account numbers. */
 function maskTail(value: unknown, keep = 4): string {
   const text = String(value ?? "").trim();
@@ -2702,68 +2380,6 @@ app.get("/api/policy-packs", (_req: express.Request, res: express.Response) => {
   });
 });
 
-function tenantSettingsPayload(tenantId: string) {
-  const tenant = findTenant(tenantId);
-  const settings = resolveTenantSettings(tenant);
-  const country = getCountryPack(settings.countryCode);
-  const industry = getIndustryPack(settings.industry);
-  return {
-    tenantId: tenant?.id || tenantId,
-    tenantName: tenant?.name || "",
-    settings,
-    country: {
-      code: country.code,
-      name: country.name,
-      legalForms: country.legalForms,
-      identifierSchemes: country.identifierSchemes,
-      governingLaw: country.governingLaw,
-      disputeVenue: country.disputeVenue,
-      dataProtectionLaw: country.dataProtectionLaw,
-      indirectTaxName: country.indirectTaxName,
-      stampDutyConvention: country.stampDutyConvention || null,
-      weekend: country.weekend,
-      callingCode: country.callingCode,
-      formattingLocale: country.formattingLocale,
-    },
-    industry: {
-      key: industry.key,
-      name: industry.name,
-      partnerCategories: industry.partnerCategories,
-      commercialDocument: industry.commercialDocument,
-      counterpartyTypes: industry.counterpartyTypes,
-      contractCurrency: industry.contractCurrency || null,
-    },
-    dueDiligenceChecklist: buildDueDiligenceChecklist(settings, { includeDisabled: true }),
-  };
-}
-
-/** Runtime policy view for operational forms. Not an administrative grant. */
-app.get("/api/tenant-settings", (req: express.Request, res: express.Response) => {
-  res.json(tenantSettingsPayload(getRequestTenantId(req)));
-});
-/** Legacy write adapter (PRD §10.1): strict policy/legalEntity fields through the settings service. */
-app.put("/api/tenant-settings", async (req: express.Request, res: express.Response) => {
-  const ctx = orgContextOf(req);
-  const body = req.body && typeof req.body === "object" ? req.body : {};
-  for (const key of Object.keys(body)) {
-    if (!["settings", "legalEntity", "expectedVersion", "organizationId"].includes(key)) {
-      return sendError(req, res, 400, "INVALID_INPUT", `Unknown field: ${key}`);
-    }
-  }
-  try {
-    const current = await readOrganizationSettings(sql, ctx.organizationId);
-    const patch: any = { expectedVersion: typeof body.expectedVersion === "number" ? body.expectedVersion : current.version };
-    if (body.settings !== undefined) patch.policy = body.settings;
-    if (typeof body.legalEntity === "string") patch.profile = { legalEntity: body.legalEntity };
-    await patchOrganizationSettings(sql, ctx.organizationId, patch, auditActorFor(req, identityOf(req), ctx));
-    await onOrganizationChanged(ctx.organizationId);
-    res.json({ success: true, ...tenantSettingsPayload(ctx.organizationId) });
-  } catch (err: any) {
-    if (err instanceof ApiError) return sendError(req, res, err.status, err.error, err.message);
-    throw err;
-  }
-});
-
 /* Canonical tenant administration API (PRD §9). */
 app.use("/api", createOrganizationAdminRouter({
   db: sql,
@@ -2803,6 +2419,7 @@ app.use(createNotificationsRouter());
 app.use(createSearchRouter());
 app.use(createActivityLogsRouter());
 app.use(createInitDataRouter());
+app.use(createSystemSettingsRouter());
 app.use("/api/auth-console", authConsoleRouter);
 app.all("/api/*", (req: express.Request, res: express.Response) => {
   sendApiError(req, res, 404, "ROUTE_NOT_FOUND", `API route not found: ${req.method} ${req.path}`);
