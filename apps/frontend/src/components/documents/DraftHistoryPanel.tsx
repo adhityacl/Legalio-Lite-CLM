@@ -147,7 +147,7 @@ export const DraftHistoryPanel: React.FC<DraftHistoryPanelProps> = ({
                   </Text>
 
                   {editing?.version === draft.version_number ? (
-                    <form className="grid gap-g8" onSubmit={(e) => { e.preventDefault(); saveLabel(); }}>
+                    <form className="grid gap-g8" onSubmit={(e) => { e.preventDefault(); void saveLabel(); }}>
                       <Field>
                         <FieldLabel>{t('documents.history.name_label', 'Nama versi')}</FieldLabel>
                         <Input autoFocus value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} placeholder="final-before-signature" />

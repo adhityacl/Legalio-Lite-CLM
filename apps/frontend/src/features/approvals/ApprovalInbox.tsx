@@ -100,7 +100,7 @@ export const ApprovalInbox: React.FC<Props> = ({ onOpen, onCreate }) => {
     try {
       await approvalsApi.remove(item.id);
       showAlert({ title: t('approval.deleted', 'Approval deleted'), variant: 'success' });
-      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      void queryClient.invalidateQueries({ queryKey: ['approvals'] });
     } catch (err) {
       showAlert({ title: t('documents.msg.action_failed', 'Aksi gagal'), description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     }

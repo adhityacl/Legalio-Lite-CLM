@@ -39,7 +39,7 @@ export const AdminApiKeysTab: React.FC<AdminApiKeysTabProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(text).catch(() => undefined);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };

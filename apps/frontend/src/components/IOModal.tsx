@@ -107,7 +107,7 @@ export const IOModal: React.FC<IOModalProps> = ({
       if (isMounted && res.rate) {
         setHistoricalRate(res.rate);
       }
-    });
+    }).catch(() => undefined);
     return () => { isMounted = false; };
   }, [currency, tanggalMulai]);
 

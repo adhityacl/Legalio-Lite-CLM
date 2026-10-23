@@ -94,7 +94,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let mounted = true;
     fetchIdentity()
       .then((next) => { if (mounted) adopt(next); })
-      .finally(() => { if (mounted) setLoading(false); });
+      .finally(() => { if (mounted) setLoading(false); })
+      .catch(() => undefined);
     // A revoked/expired session elsewhere (another tab, an admin action) ends here too.
     const onDenied = () => { void refreshUser(); };
     window.addEventListener('auth-session-invalid', onDenied);

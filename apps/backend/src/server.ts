@@ -3773,7 +3773,7 @@ app.post("/api/partners/:id/upload-dd", async (req: express.Request, res: expres
     `Mengunggah dokumen DD '${docName}' untuk partner ${partner.partner_name}`,
     req,
   );
-  triggerAutoPushToGoogleSheet(req);
+  void triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, partner });
 });
 app.delete("/api/partners/:id/dd-file", async (req: express.Request, res: express.Response) => {

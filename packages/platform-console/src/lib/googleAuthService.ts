@@ -25,7 +25,7 @@ declare global {
             access_type?: 'offline' | 'online';
             prompt?: string;
             redirect_uri?: string;
-            callback: (response: { code?: string; error?: string; error_description?: string }) => void;
+            callback: (response: { code?: string; error?: string; error_description?: string }) => void | Promise<void>;
             error_callback?: (error: any) => void;
           }) => {
             requestCode: () => void;
@@ -464,18 +464,19 @@ export const initBackgroundGoogleTokenRefresh = () => {
   };
 
   // Run periodically every 45 seconds
-  setInterval(checkAndRefreshToken, 45000);
+  const refreshInBackground = () => { void checkAndRefreshToken(); };
+  setInterval(refreshInBackground, 45000);
 
   // Run when user returns to window/tab
-  window.addEventListener('focus', checkAndRefreshToken);
+  window.addEventListener('focus', refreshInBackground);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      checkAndRefreshToken();
+      refreshInBackground();
     }
   });
 
   // Run initial check
-  checkAndRefreshToken();
+  refreshInBackground();
 };
 
 // Automatically initialize background refresh

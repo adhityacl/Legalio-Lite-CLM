@@ -92,7 +92,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
       if (isMounted && res.rate) {
         setHistoricalRate(res.rate);
       }
-    });
+    }).catch(() => undefined);
     return () => { isMounted = false; };
   }, [currency, tanggalMulai]);
 

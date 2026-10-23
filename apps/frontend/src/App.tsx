@@ -105,14 +105,18 @@ const LoadingState: React.FC<{ label: string; delayed?: boolean }> = ({ label, d
   );
 };
 
+type SignedInUser = NonNullable<ReturnType<typeof useAuth>['user']>;
+
+/** Mounts the signed-in application only while there is a user, so its hooks never run conditionally. */
 const MainApp: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  return user ? <AuthenticatedApp user={user} /> : null;
+};
+
+const AuthenticatedApp: React.FC<{ user: SignedInUser }> = ({ user }) => {
+  const { logout } = useAuth();
   const { t } = useLanguage();
   const showAlert = useAlertToast();
-
-  if (!user) {
-    return null;
-  }
 
   const caps = usePermissions();
   const { hasPermission, hasPlatformPermission } = caps;
@@ -204,7 +208,7 @@ const MainApp: React.FC = () => {
     if (!ok) return;
     await cancelPendingLoad();
     const failed = await deleteRecords(path, ids, { userEmail: user.email, userName: user.name, userRole: user.role });
-    loadAllData();
+    void loadAllData();
     if (failed.length > 0) {
       showToast({
         type: 'error',
@@ -261,7 +265,7 @@ const MainApp: React.FC = () => {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.code ? t(errData.code, errData.error) : errData.error || t('app.terjadi_kesalahan_saat_menyimpan_ke_backend'));
       }
-      loadAllData();
+      void loadAllData();
     } catch (err: any) {
       rollback();
       showToast({
@@ -269,7 +273,7 @@ const MainApp: React.FC = () => {
         title: t('app.gagal_menyimpan_kontrak', 'Gagal Menyimpan Kontrak'),
         message: err?.message || t('app.gagal_terhubung_ke_server', 'Gagal terhubung ke server.'),
       });
-      loadAllData();
+      void loadAllData();
       throw err;
     }
   };
@@ -302,7 +306,7 @@ const MainApp: React.FC = () => {
             message: (await res.json()).error || t('app.gagal_menghapus', 'Gagal menghapus'),
           });
         }
-        loadAllData();
+        void loadAllData();
       } catch (err: any) {
         rollback();
         showToast({
@@ -310,7 +314,7 @@ const MainApp: React.FC = () => {
           title: t('app.error', 'Error'),
           message: err?.message || t('app.gagal_menghapus_kontrak_2', 'Gagal menghapus kontrak.'),
         });
-        loadAllData();
+        void loadAllData();
       }
     }
   };
@@ -365,7 +369,7 @@ const MainApp: React.FC = () => {
           message: errData.error || t('app.gagal_menyimpan_insertion_order', 'Gagal menyimpan Insertion Order.'),
         });
       }
-      loadAllData();
+      void loadAllData();
     } catch (err: any) {
       rollback();
       showToast({
@@ -373,7 +377,7 @@ const MainApp: React.FC = () => {
         title: t('app.error_koneksi', 'Error Koneksi'),
         message: err?.message || t('app.gagal_menghubungi_server', 'Gagal menghubungi server.'),
       });
-      loadAllData();
+      void loadAllData();
     }
   };
 
@@ -404,7 +408,7 @@ const MainApp: React.FC = () => {
             message: (await res.json()).error || t('app.gagal_menghapus', 'Gagal menghapus'),
           });
         }
-        loadAllData();
+        void loadAllData();
       } catch (e: any) {
         rollback();
         showToast({
@@ -412,7 +416,7 @@ const MainApp: React.FC = () => {
           title: t('app.error', 'Error'),
           message: e.message,
         });
-        loadAllData();
+        void loadAllData();
       }
     }
   };
@@ -457,7 +461,7 @@ const MainApp: React.FC = () => {
         }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
-      loadAllData();
+      void loadAllData();
     } catch (err: any) {
       rollback();
       showToast({
@@ -465,7 +469,7 @@ const MainApp: React.FC = () => {
         title: t('app.error', 'Error'),
         message: err?.message || t('app.gagal_menyimpan_partner', 'Gagal menyimpan partner.'),
       });
-      loadAllData();
+      void loadAllData();
     }
   };
 
@@ -501,7 +505,7 @@ const MainApp: React.FC = () => {
             message: (await res.json()).error || t('app.gagal_menghapus', 'Gagal menghapus'),
           });
         }
-        loadAllData();
+        void loadAllData();
       } catch (e: any) {
         rollback();
         showToast({
@@ -509,13 +513,13 @@ const MainApp: React.FC = () => {
           title: t('app.error', 'Error'),
           message: e.message,
         });
-        loadAllData();
+        void loadAllData();
       }
     }
   };
 
   const handleUploadDDDoc = async (_partnerId: string, _docName: string) => {
-    loadAllData();
+    void loadAllData();
   };
 
   // Amendment CRUD Handler
@@ -543,7 +547,7 @@ const MainApp: React.FC = () => {
         }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
-      loadAllData();
+      void loadAllData();
     } catch (err: any) {
       rollback();
       showToast({
@@ -551,13 +555,13 @@ const MainApp: React.FC = () => {
         title: t('app.error', 'Error'),
         message: err?.message || t('app.gagal_menyimpan_adendum', 'Gagal menyimpan adendum.'),
       });
-      loadAllData();
+      void loadAllData();
     }
   };
 
   // Reminder generation is a platform system job; tenant users only refresh their scoped view.
   const handleTriggerCheck = async () => {
-    loadAllData();
+    void loadAllData();
   };
 
   const handleMarkReadNotifications = async (notifId?: string, markAll?: boolean) => {
@@ -566,7 +570,7 @@ const MainApp: React.FC = () => {
       headers: getAuthHeaders(),
       body: JSON.stringify({ notif_id: notifId, markAll }),
     });
-    loadAllData();
+    void loadAllData();
   };
 
   const handleDeleteNotifications = async (notifId?: string, notifIds?: string[], deleteAll?: boolean) => {
@@ -575,7 +579,7 @@ const MainApp: React.FC = () => {
       headers: getAuthHeaders(),
       body: JSON.stringify({ notif_id: notifId, notif_ids: notifIds, deleteAll }),
     });
-    loadAllData();
+    void loadAllData();
   };
 
   const expiringContractsCount = contracts.filter((c) => c.status === 'Expiring').length;

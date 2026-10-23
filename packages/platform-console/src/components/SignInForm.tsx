@@ -80,7 +80,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
     })
     .then((status) => { setNeedsDatabase(Boolean(status?.needsDatabase)); setSetupMode(Boolean(status?.needsSetup)); setPublicUrl(status?.publicUrl || window.location.origin); setStatusReady(true); })
     .catch((err) => { if (!allowRegistration) setError(err.message); });
-  useEffect(() => { loadStatus(); }, [allowRegistration]);
+  useEffect(() => { void loadStatus(); }, [allowRegistration]);
 
   const connectDatabase = async (e: React.FormEvent) => {
     e.preventDefault();

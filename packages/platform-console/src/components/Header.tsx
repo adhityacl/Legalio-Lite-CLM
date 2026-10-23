@@ -168,7 +168,7 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
 
         <Menu ids={{ trigger: 'header-user-trigger' }} positioning={{ placement: 'bottom-end', gutter: 8 }} onSelect={details => {
           if (details.value === 'security') setAccountDialog('security');
-          if (details.value === 'sign-out') logout();
+          if (details.value === 'sign-out') void logout();
         }}>
           <Tooltip ids={{ trigger: 'header-user-trigger' }}><TooltipTrigger asChild><MenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-g8" aria-label={t('header.menu_pengguna', 'Menu Pengguna')}>

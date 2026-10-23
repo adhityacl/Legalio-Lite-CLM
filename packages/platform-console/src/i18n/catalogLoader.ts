@@ -23,7 +23,7 @@ export const loadedCatalog = (language: CatalogLanguage): Catalog | undefined =>
 export function loadCatalog(language: CatalogLanguage): Promise<Catalog> {
   if (loaded[language]) return Promise.resolve(loaded[language]!);
   let promise = pending.get(language);
-  if (!promise) {
+  if (promise === undefined) {
     promise = LOADERS[language]().then((module) => (loaded[language] = module.default)).finally(() => pending.delete(language));
     pending.set(language, promise);
   }

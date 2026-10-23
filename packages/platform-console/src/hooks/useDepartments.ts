@@ -28,10 +28,10 @@ export function useDepartments() {
   }, [activeTenantId]);
 
   useEffect(() => {
-    fetchDepartments();
+    void fetchDepartments();
 
     const handleUpdate = () => {
-      fetchDepartments();
+      void fetchDepartments();
     };
     window.addEventListener('departments-updated', handleUpdate);
     window.addEventListener('organization-updated', handleUpdate);

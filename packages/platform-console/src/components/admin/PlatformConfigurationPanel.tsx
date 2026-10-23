@@ -228,7 +228,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
   const handleCopyLink = (text: string, key: string) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(text).catch(() => undefined);
     setCopiedKey(key);
     setTimeout(() => {
       setCopiedKey((prev) => (prev === key ? null : prev));

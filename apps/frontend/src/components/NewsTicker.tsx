@@ -23,7 +23,7 @@ export const NewsTicker: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const res = await fetch('/api/dashboard/news-ticker', { headers: getAuthHeaders() });
         const text = await res.text();

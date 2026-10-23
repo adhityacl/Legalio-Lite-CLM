@@ -168,7 +168,7 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
     setSaves({ profile: { kind: 'idle' }, region: { kind: 'idle' }, contracts: { kind: 'idle' }, notifications: { kind: 'idle' } });
   };
 
-  const sectionShell = (id: SectionId, icon: React.ReactNode, title: string, description: string, body: React.ReactNode, onSubmit: () => void, valid = true) => {
+  const sectionShell = (id: SectionId, icon: React.ReactNode, title: string, description: string, body: React.ReactNode, onSubmit: () => unknown, valid = true) => {
     const state = saves[id];
     return (
       <AccordionItem value={id}>

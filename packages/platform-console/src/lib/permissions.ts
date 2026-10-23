@@ -67,7 +67,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
       ? prev
       : { ...EMPTY, status: 'loading', loading: true, organizationId: activeTenantId, tenantId: activeTenantId }));
     const controller = new AbortController();
-    (async () => {
+    void (async () => {
       try {
         const res = await fetch(`/api/organizations/${encodeURIComponent(activeTenantId)}/capabilities`, { cache: 'no-store', signal: controller.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -127,12 +127,12 @@ const allowed = (ctx: PermissionContextValue, permission: string) =>
   ctx.status === 'ready' && ctx.permissions.includes(permission);
 
 /** Tenant permission in the selected organization; false until capabilities are ready. */
-export function hasPermission(permission: string): boolean {
+export function useHasPermission(permission: string): boolean {
   return allowed(useContext(PermissionContext), permission);
 }
 
-export function can(resource: string, action: string): boolean {
-  return hasPermission(`${resource}.${action}`);
+export function useCan(resource: string, action: string): boolean {
+  return useHasPermission(`${resource}.${action}`);
 }
 
 export function usePermissions(): PermissionContextValue & {

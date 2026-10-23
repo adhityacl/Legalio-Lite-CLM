@@ -57,7 +57,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
       .catch(() => undefined);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, []);
 
   if (!passwordActive && !(googleIncomplete && showGoogleSetup)) return null;

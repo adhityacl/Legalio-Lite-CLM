@@ -227,7 +227,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   };
 
   const handleDelete = (id: string) => {
-    handleDeleteClick(id);
+    void handleDeleteClick(id);
   };
 
   const handleVendorSelect = (name: string, id?: string) => {
@@ -465,7 +465,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
       if (isMounted && res.rate) {
         setHistoricalRate(res.rate);
       }
-    });
+    }).catch(() => undefined);
     return () => { isMounted = false; };
   }, [formCurrency, formInvoiceDate]);
 
@@ -488,7 +488,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
         console.error("Failed to fetch exchange rates:", err);
       }
     };
-    fetchRates();
+    void fetchRates();
   }, []);
 
   const availableYears = useMemo(() => {

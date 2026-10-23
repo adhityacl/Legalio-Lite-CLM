@@ -24,6 +24,18 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "//#lint:eslint": {
+      "inputs": [
+        "apps/**/*.ts",
+        "apps/**/*.tsx",
+        "packages/**/*.ts",
+        "packages/**/*.tsx",
+        "eslint.config.mjs",
+        "tsconfig.json",
+        "packages/ts-config/*.json"
+      ],
+      "outputs": []
     }
   }
 }

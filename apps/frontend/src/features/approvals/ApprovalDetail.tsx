@@ -66,7 +66,7 @@ export const ApprovalDetail: React.FC<Props> = ({ id, onBack, onRevise }) => {
       setComment('');
       showAlert({ title: decision === 'approve' ? t('approval.detail.approved_toast', 'Approval granted') : t('approval.detail.rejected_toast', 'Approval rejected'), variant: 'success' });
       await queryClient.invalidateQueries({ queryKey: ['approval', id] });
-      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      void queryClient.invalidateQueries({ queryKey: ['approvals'] });
     } catch (err) {
       showAlert({ title: t('approval.detail.decision_failed', 'Decision failed'), description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     } finally {

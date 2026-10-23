@@ -585,7 +585,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
   };
 
   useEffect(() => {
-    fetchTemplates();
+    void fetchTemplates();
   }, []);
 
   const handleSaveTemplate = async () => {
@@ -628,7 +628,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
       if (res.ok && data.success) {
         setNewTemplateName('');
         showAlert({ title: t('contract_creator.msg.template_saved', 'Template kerjasama berhasil disimpan'), variant: 'success' });
-        fetchTemplates();
+        void fetchTemplates();
       } else {
         showAlert({
           title: t('contract_creator.msg.template_save_failed', 'Gagal menyimpan template'),
@@ -734,7 +734,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
       if (res.ok && data.success) {
         showAlert({ title: t('contract_creator.msg.template_deleted', 'Template kerjasama berhasil dihapus'), variant: 'success' });
-        fetchTemplates();
+        void fetchTemplates();
       } else {
         showAlert({
           title: t('contract_creator.msg.template_delete_failed', 'Gagal menghapus template'),
@@ -1136,7 +1136,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
 
   /** Serialized so autosave, manual save and leave-page saves never overlap. Resolves to the document id. */
   const saveNow = async (kind: 'auto' | 'manual', keepalive = false): Promise<string | null> => {
-    if (inFlightSaveRef.current) await inFlightSaveRef.current;
+    if (inFlightSaveRef.current !== null) await inFlightSaveRef.current;
     const pending = performSave(kind, keepalive);
     inFlightSaveRef.current = pending;
     try {

@@ -139,7 +139,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
     if (!renaming) return;
     const { id, value } = renaming;
     setRenaming(null);
-    if (value.trim()) runAction(() => documentsApi.update(id, { name: value.trim() }), t('documents.msg.renamed', 'Nama dokumen diperbarui'));
+    if (value.trim()) void runAction(() => documentsApi.update(id, { name: value.trim() }), t('documents.msg.renamed', 'Nama dokumen diperbarui'));
   };
 
   const toggleArchive = (doc: DocumentSummary) =>
@@ -158,7 +158,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
       tone: 'danger',
       confirmLabel: t('contract_creator.confirm.delete_label', 'Hapus'),
     });
-    if (ok) runAction(() => documentsApi.remove(doc.id), t('documents.msg.deleted', 'Dokumen dihapus'));
+    if (ok) void runAction(() => documentsApi.remove(doc.id), t('documents.msg.deleted', 'Dokumen dihapus'));
   };
 
   const rowActions = (doc: DocumentSummary): ActionMenuItem[] => {
