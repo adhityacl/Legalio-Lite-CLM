@@ -1,4 +1,5 @@
 import { normalizeSpendingMonths } from './spendingMonths';
+import { createNotificationsRouter } from "./routes/notifications";
 import { createTemplatesRouter } from "./routes/templates";
 import { createUploadsRouter } from "./routes/uploads";
 import { createIoRouter } from "./routes/io";
@@ -846,43 +847,6 @@ app.use("/api", createDocumentRouter({
 }));
 // Document Approval: sequential sign-off on a My Documents item or an uploaded file.
 app.use("/api", createApprovalRouter({ db: sql, tenantOf: getRequestTenantId }));
-app.get("/api/notification-logs", async (req: express.Request, res: express.Response) => {
-  res.json(await scopedRecords(req, "notification", db.notifications));
-});
-/**
- * Matches in-memory notifications the caller may touch. scopedRecords re-reads rows from the database,
- * so this matches by organization + notif_id; object identity never matches db.notifications.
- */
-async function visibleNotificationFilter(req: express.Request) {
-  const org = orgContextOf(req).organizationId;
-  const ids = new Set((await scopedRecords(req, "notification", db.notifications)).map((n: any) => n.notif_id));
-  return { has: (n: any) => n.organizationId === org && ids.has(n.notif_id) };
-}
-/** Only notifications attached to records the caller can see are touched (PRD §4.5.2). */
-app.post("/api/notification-logs/mark-read", async (req: express.Request, res: express.Response) => {
-  const { notif_id, markAll } = req.body || {};
-  const visible = await visibleNotificationFilter(req);
-  db.notifications = (db.notifications || []).map((n) =>
-    visible.has(n) && (markAll || (notif_id && n.notif_id === notif_id)) ? { ...n, is_read: true } : n,
-  );
-  await saveDb();
-  res.json({ success: true, notifications: await scopedRecords(req, "notification", db.notifications) });
-});
-app.post("/api/notification-logs/delete", async (req: express.Request, res: express.Response) => {
-  const { notif_id, notif_ids, deleteAll } = req.body || {};
-  const visible = await visibleNotificationFilter(req);
-  const chosen = new Set<string>(Array.isArray(notif_ids) ? notif_ids : notif_id ? [notif_id] : []);
-  db.notifications = (db.notifications || []).filter((n) => !(visible.has(n) && (deleteAll || chosen.has(n.notif_id))));
-  await saveDb();
-  res.json({ success: true, notifications: await scopedRecords(req, "notification", db.notifications) });
-});
-app.post("/api/cron/trigger-check", async (req: express.Request, res: express.Response) => {
-  // Same pass as the scheduler, under the same lock: a concurrent run on another instance makes this one a no-op.
-  const outcome = await withAdvisoryLock(REMINDER_LOCK_KEY, runReminderPass);
-  if (!outcome.ran) return res.status(202).json({ success: true, newNotificationsGenerated: 0, skipped: "another reminder pass is running" });
-  const { queued, delivery } = outcome.value!;
-  res.json({ success: true, newNotificationsGenerated: queued, delivery });
-});
 app.get(
   ["/api/auth/google/client-id", "/api/google-auth/client-id"],
   (req: express.Request, res: express.Response) => {
@@ -2888,6 +2852,7 @@ app.use(createContractsRouter());
 app.use(createIoRouter());
 app.use(createUploadsRouter());
 app.use(createTemplatesRouter());
+app.use(createNotificationsRouter());
 app.use("/api/auth-console", authConsoleRouter);
 app.all("/api/*", (req: express.Request, res: express.Response) => {
   sendApiError(req, res, 404, "ROUTE_NOT_FOUND", `API route not found: ${req.method} ${req.path}`);
