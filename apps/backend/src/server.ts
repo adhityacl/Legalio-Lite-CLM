@@ -1,4 +1,5 @@
 import { createMailTemplateStore } from "./mailTemplateStore";
+import { verifyGoogleAccessToken } from "./googleAudience";
 import { smtpTlsOptions } from "./smtpTls";
 import { appendActivity, listActivity } from "./activityLog";
 import { seedLedgerFromLegacy, createReminderScheduler, deliverDue as deliverDueReminders, enqueue as enqueueReminder, existingKeys as existingReminderKeys, planReminders, REMINDER_LOCK_KEY, schedulerOptionsFromEnv, type ReminderSender } from "./reminders";
@@ -2000,23 +2001,13 @@ app.post("/api/user/log-activity", async (req: express.Request, res: express.Res
   res.json({ success: true });
 });
 /**
- * Resolve the verified e-mail behind a Google OAuth access token using
- * Google's userinfo endpoint. Returns null when the token is invalid or the
- * e-mail is not verified.
+ * Resolve the verified e-mail behind a Google OAuth access token: the token must have been issued to this
+ * installation's OAuth client (tokeninfo audience) and Google must report the e-mail as verified.
+ * `verifyGoogleToken` is swappable so tests can run without contacting Google.
  */
-async function verifyGoogleAccessTokenEmail(accessToken: unknown): Promise<string | null> {
-  if (!accessToken || typeof accessToken !== "string") return null;
-  try {
-    const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!response.ok) return null;
-    const info: any = await response.json();
-    if (!info?.email || info.email_verified === false) return null;
-    return String(info.email).toLowerCase().trim();
-  } catch {
-    return null;
-  }
+let verifyGoogleToken: (accessToken: unknown, clientId: string | null | undefined) => Promise<string | null> = verifyGoogleAccessToken;
+function verifyGoogleAccessTokenEmail(accessToken: unknown): Promise<string | null> {
+  return verifyGoogleToken(accessToken, googleCredentials.getOAuthClient().clientId);
 }
 /*
  * Provider secrets never leave the server (PRD §5.1). Clients receive a
@@ -7627,4 +7618,6 @@ export async function drain() {
   await stopReminderScheduler();
   await coreSaver.idle();
 }
+/** Tests only: replaces the Google token verifier. */
+export function setGoogleTokenVerifier(verifier: typeof verifyGoogleToken) { verifyGoogleToken = verifier; }
 export { app, getFreshGoogleAccessToken, isMatchingOrg, resolveActiveGoogleToken };
