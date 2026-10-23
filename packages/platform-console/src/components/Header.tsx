@@ -102,7 +102,8 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
 
         <Menu ids={{ trigger: 'header-language-trigger' }} positioning={{ placement: 'bottom-end', gutter: 8 }}>
           <Tooltip ids={{ trigger: 'header-language-trigger' }}><TooltipTrigger asChild><MenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" aria-label={t('header.switch_language', 'Pilih bahasa')}>
+            {/* The accessible name starts with the visible text (WCAG 2.5.3 label in name). */}
+            <Button variant="ghost" size="icon-sm" aria-label={`${language}: ${t('header.switch_language', 'Pilih bahasa')}`}>
               {language}
             </Button>
           </MenuTrigger></TooltipTrigger><TooltipBody>{t('header.switch_language', 'Pilih bahasa')}</TooltipBody></Tooltip>
@@ -171,12 +172,13 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
           if (details.value === 'sign-out') void logout();
         }}>
           <Tooltip ids={{ trigger: 'header-user-trigger' }}><TooltipTrigger asChild><MenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-g8" aria-label={t('header.menu_pengguna', 'Menu Pengguna')}>
-              <Avatar size="sm">
+            {/* No aria-label: the name is the visible text (WCAG 2.5.3), kept for screen readers below the breakpoint where it is visually hidden. */}
+            <Button variant="ghost" size="sm" className="gap-g8">
+              <Avatar size="sm" aria-hidden="true">
                 {identity?.image && <AvatarImage src={identity.image} alt="" />}
                 <AvatarFallback>{user?.name ? user.name.charAt(0).toUpperCase() : <UserRound aria-hidden="true" />}</AvatarFallback>
               </Avatar>
-              <span className="hidden min-w-0 flex-col items-start text-start lg:flex">
+              <span className="sr-only min-w-0 flex-col items-start text-start lg:not-sr-only lg:flex">
                 <Text as="strong" size="sm" truncate>{user?.name || t('admin.generic_user', 'Pengguna')}</Text>
               </span>
               <ChevronDown className="hidden sm:block" aria-hidden="true" />

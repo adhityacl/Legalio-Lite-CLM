@@ -68,8 +68,11 @@ const FileUploadDropzone = forwardRef<
   return (
     <FileUploadPrimitive.Dropzone
       ref={ref}
+      // The dropzone holds its own "Choose file" button; a button inside a button is a nested interactive control (axe nested-interactive).
+      // The zone stays focusable and still opens the file dialog on Enter/Space and click.
+      role="group"
       className={cn(
-        'box-border grid min-h-g144 w-full place-items-center gap-g13 rounded-md border border-dashed border-border bg-background p-g21 text-center text-muted-foreground transition-[border-color,background-color,color,opacity] duration-200 ease-in-out focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring data-disabled:cursor-default data-disabled:opacity-50 data-dragging:border-primary data-dragging:bg-accent data-dragging:text-foreground data-invalid:border-destructive data-readonly:cursor-default data-readonly:opacity-50 motion-reduce:transition-none [&[role=button]:not([data-disabled],[data-readonly])]:cursor-pointer',
+        'box-border grid min-h-g144 w-full place-items-center gap-g13 rounded-md border border-dashed border-border bg-background p-g21 text-center text-muted-foreground transition-[border-color,background-color,color,opacity] duration-200 ease-in-out focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring data-disabled:cursor-default data-disabled:opacity-50 data-dragging:border-primary data-dragging:bg-accent data-dragging:text-foreground data-invalid:border-destructive data-readonly:cursor-default data-readonly:opacity-50 motion-reduce:transition-none [&:not([data-disabled],[data-readonly])]:cursor-pointer',
         className,
       )}
       {...props}

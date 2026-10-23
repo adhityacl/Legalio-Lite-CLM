@@ -29,6 +29,7 @@
     "dev:sys": "npm run dev:console --workspace @legalio/backend",
     "test": "node --import tsx --test apps/backend/src/*.test.ts apps/frontend/src/lib/*.test.ts apps/frontend/src/api/*.test.ts apps/frontend/src/routes/*.test.ts apps/frontend/src/features/*/*.test.ts packages/*/src/*.test.ts packages/*/src/*/*.test.ts",
     "test:e2e:data-entry": "npm run build --workspace @legalio/backend && node --import tsx apps/backend/src/dataEntry.e2e.ts",
+    "test:e2e:smoke": "npm run build --workspace @legalio/backend && node --import tsx apps/backend/src/smoke.e2e.ts",
     "test:e2e:postgres": "npm run build --workspace @legalio/backend && node --import tsx apps/backend/src/normalizedCore.e2e.ts",
     "lint:eslint": "eslint ."
   },

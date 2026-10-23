@@ -439,7 +439,7 @@ const LanguageSwitcher: React.FC<{ language: Language; setLanguage: (lang: Langu
     {LANGUAGE_OPTIONS.map((option, index) => (
       <React.Fragment key={option.code}>
         {index > 0 && <span aria-hidden="true" className="text-auth-muted/60">/</span>}
-        <Button type="button" variant="link" size="sm" lang={option.htmlLang} aria-pressed={language === option.code} aria-label={option.nativeName} onClick={() => setLanguage(option.code)}
+        <Button type="button" variant="link" size="sm" lang={option.htmlLang} aria-pressed={language === option.code} aria-label={`${option.label} ${option.nativeName}`} onClick={() => setLanguage(option.code)}
           className={`h-auto px-0 text-xs font-semibold no-underline hover:underline ${language === option.code ? 'text-auth-foreground' : 'text-auth-muted/70'} hover:text-auth-foreground`}>
           {option.label}
         </Button>
