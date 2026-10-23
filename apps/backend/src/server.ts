@@ -9,6 +9,7 @@ import type { UITextOverrides } from '@legalio/types/uiTexts';
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 import express from "express";
+import { createSensitiveRateLimiter, trustProxySetting } from "./edgeConfig";
 import { allocationInvoiceMonths, validateSpendingAllocations } from "@legalio/shared/spendingAllocations";
 import path from "path";
 import fs from "fs";
@@ -133,8 +134,11 @@ const app = express();
 forwardAsyncRouteErrors(app);
 // This app is only ever meant to run behind a reverse proxy (nginx, Cloud
 // Run, Codespaces' tunnel — see README: "keep port 3000 closed to the
-// internet"), so trust its X-Forwarded-* headers for req.ip/req.protocol.
-app.set("trust proxy", true);
+// internet"), so trust X-Forwarded-* only from loopback/private-range hops
+// (override with TRUST_PROXY: a hop count or address list; see edgeConfig.ts).
+// `true` would let any client choose its own req.ip with a forged header.
+app.set("trust proxy", trustProxySetting());
+app.use(createSensitiveRateLimiter());
 // Google JSON credentials uploaded in the app win over the GOOGLE_* env vars.
 const googleCredentials = createGoogleCredentialStore(sql);
 setStoredServiceAccountProvider(googleCredentials.getServiceAccount);
@@ -7278,6 +7282,20 @@ Guidelines:
 /* ------------------------------------------------------------------ */
 app.get("/api/health", (_req: express.Request, res: express.Response) => {
   res.json({ status: "ok", time: new Date().toISOString() });
+});
+// Readiness: the process is up AND PostgreSQL answers. Used by the Docker/compose healthchecks. A fresh install that still
+// needs its first-run setup is ready (the setup page must be reachable), so that is reported but is not an error.
+app.get("/api/health/ready", async (_req: express.Request, res: express.Response) => {
+  res.set("Cache-Control", "no-store");
+  try {
+    await Promise.race([
+      sql.get("SELECT 1 AS ok"),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000).unref()),
+    ]);
+  } catch {
+    return res.status(503).json({ status: "unavailable", database: "down", time: new Date().toISOString() });
+  }
+  res.json({ status: "ok", database: "up", time: new Date().toISOString() });
 });
 
 /** True while an install upgraded from an older release still uses the old shipped admin password. */

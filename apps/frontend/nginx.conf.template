@@ -1,29 +1,111 @@
+# Rendered by the nginx image's envsubst step; ${API_UPSTREAM} is the only variable used here.
+
+# Throttle credential/setup writes per client address. GET/HEAD get an empty key and are never limited.
+map $request_method $write_limit_key {
+    POST    $binary_remote_addr;
+    PUT     $binary_remote_addr;
+    PATCH   $binary_remote_addr;
+    DELETE  $binary_remote_addr;
+    default "";
+}
+limit_req_zone $write_limit_key zone=legalio_sensitive:10m rate=30r/m;
+limit_req_status 429;
+
+# HSTS only over TLS (direct, or behind a TLS-terminating proxy that sets X-Forwarded-Proto). Empty value = header omitted.
+map "$scheme:$http_x_forwarded_proto" $hsts {
+    ~^https:    "max-age=31536000; includeSubDomains";
+    ~:https$    "max-age=31536000; includeSubDomains";
+    default     "";
+}
+
+gzip on;
+gzip_vary on;
+gzip_proxied any;
+gzip_min_length 1024;
+gzip_comp_level 5;
+gzip_types text/plain text/css text/xml application/json application/javascript text/javascript application/xml image/svg+xml font/ttf application/vnd.ms-fontobject;
+# The build already emits .gz files next to the assets; serve them without recompressing.
+# Brotli (.br) needs ngx_brotli, which the stock nginx image does not include; add the module and `brotli_static on;` to use them.
+gzip_static on;
+
 server {
     listen 80;
+    server_tokens off;
     client_max_body_size 32m;
     root /usr/share/nginx/html;
-    # Preserve the public port (for example :8080) for auth origin checks.
+    include /etc/nginx/snippets/security-headers.conf;
+
     location = /sys {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        include /etc/nginx/snippets/security-headers.conf;
+        limit_req zone=legalio_sensitive burst=20 nodelay;
         proxy_pass ${API_UPSTREAM};
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
     location /sys/ {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        include /etc/nginx/snippets/security-headers.conf;
+        limit_req zone=legalio_sensitive burst=20 nodelay;
         proxy_pass ${API_UPSTREAM};
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    location /api/auth/ {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        include /etc/nginx/snippets/security-headers.conf;
+        limit_req zone=legalio_sensitive burst=20 nodelay;
+        proxy_pass ${API_UPSTREAM};
+    }
+    location /api/google-auth/ {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        include /etc/nginx/snippets/security-headers.conf;
+        limit_req zone=legalio_sensitive burst=20 nodelay;
+        proxy_pass ${API_UPSTREAM};
+    }
+    location /api/system/ {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        include /etc/nginx/snippets/security-headers.conf;
+        limit_req zone=legalio_sensitive burst=20 nodelay;
+        proxy_pass ${API_UPSTREAM};
     }
     location /api/ {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        include /etc/nginx/snippets/security-headers.conf;
         proxy_pass ${API_UPSTREAM};
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
     location /uploads/ {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        include /etc/nginx/snippets/security-headers.conf;
         proxy_pass ${API_UPSTREAM};
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
-    location / { try_files $uri /index.html; }
+
+    # Hashed build output: cache for a year.
+    location /assets/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+    # The entry document references the hashed files, so it must always be revalidated.
+    location = /index.html {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+    }
+    location / {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+        try_files $uri /index.html;
+    }
 }
+
+# Optional TLS termination in this container. Mount a certificate and key, uncomment, and publish port 443 in compose.yaml
+# (FRONTEND_TLS_PORT). Keep the port-80 server above, or replace its body with `return 301 https://$host$request_uri;`.
+# Plain-HTTP self-hosting works without any of this; HSTS is only ever sent on https requests.
+#
+# server {
+#     listen 443 ssl;
+#     http2 on;
+#     server_tokens off;
+#     ssl_certificate     /etc/nginx/certs/fullchain.pem;
+#     ssl_certificate_key /etc/nginx/certs/privkey.pem;
+#     ssl_protocols TLSv1.2 TLSv1.3;
+#     client_max_body_size 32m;
+#     root /usr/share/nginx/html;
+#     # ...repeat the locations from the server block above...
+# }

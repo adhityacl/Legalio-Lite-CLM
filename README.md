@@ -91,12 +91,15 @@ npm run dev
 
 `npm install` also creates `apps/backend/.env` with a random `BETTER_AUTH_SECRET`. Keep that secret: it also encrypts the stored Google and COS credentials. The database connection is entered on the first visit, or set with `DATABASE_URL` in `apps/backend/.env`. The Gemini key, SMTP and Google credentials are set later from the system console.
 
-For production, the quickest route is Docker. The workspace is served on **http://localhost:8080**. PostgreSQL runs as the `postgres` service and its data lives in the `legalio-pg` volume (set `POSTGRES_PASSWORD` in your shell or a root `.env` file to change the default password before the first start):
+For production, the quickest route is Docker. The workspace is served on **http://localhost:8080**. PostgreSQL runs as the `postgres` service and its data lives in the `legalio-pg` volume. **`POSTGRES_PASSWORD` is required**: Compose refuses to start without it. Copy `.env.example` to `.env` in the repository root and set a strong value (`openssl rand -base64 24`), or export it in your shell, before the first start. (An existing install that started with the old default must set `POSTGRES_PASSWORD=legalio` to keep its current database.) `FRONTEND_BIND` / `FRONTEND_PORT` choose the published address (default `0.0.0.0:8080`; use `127.0.0.1` behind a host reverse proxy):
 
 ```bash
+cp .env.example .env   # then set POSTGRES_PASSWORD
 npm run setup
 docker compose up --build
 ```
+
+The first visit shows the one-time setup page that creates the administrator. It is open to whoever reaches the URL first by design, so complete it before you expose the address publicly. Backups, restore, deployment and rollback are in [docs/RUNBOOK.md](docs/RUNBOOK.md).
 
 First-run onboarding stores the website URL in the database, including for
 Docker installations. `BETTER_AUTH_URL` is an optional deployment override and

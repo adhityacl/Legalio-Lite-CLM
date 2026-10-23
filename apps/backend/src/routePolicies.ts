@@ -45,6 +45,7 @@ const orgParam = (permissions: string | string[], note?: string): RoutePolicy =>
 export const ROUTE_POLICIES: PolicyEntry[] = [
   /* ---------------- public ---------------- */
   ['GET', '/api/health', pub()],
+  ['GET', '/api/health/ready', pub('liveness plus PostgreSQL SELECT 1; Docker healthcheck')],
   ['GET', '/api/system/public-status', pub('first-run probe: app name + needsDatabase + needsSetup only')],
   ['POST', '/api/system/setup', pub('atomic; only while no superuser exists')],
   ['GET', '/api/exchange-rates', pub('public reference data')],

@@ -5,21 +5,30 @@ services:
       dockerfile: apps/backend/Dockerfile
     env_file: apps/backend/.env
     environment:
-      DATABASE_URL: postgres://legalio:${POSTGRES_PASSWORD:-legalio}@postgres:5432/legalio
+      DATABASE_URL: postgres://legalio:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file or your shell before starting (see .env.example)}@postgres:5432/legalio
+      # Only the bundled nginx (a private Docker network address) may set X-Forwarded-*. Override with a hop count or address list.
+      TRUST_PROXY: ${TRUST_PROXY:-loopback, linklocal, uniquelocal}
     ports:
-      - "127.0.0.1:3000:3000"
+      - "${BACKEND_BIND:-127.0.0.1}:${BACKEND_PORT:-3000}:3000"
     volumes:
       - legalio-data:/data
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      # Readiness = process up and PostgreSQL answering SELECT 1.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
   postgres:
-    image: postgres:17
+    image: postgres:17-bookworm
     environment:
       POSTGRES_USER: legalio
       POSTGRES_DB: legalio
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-legalio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file or your shell before starting (see .env.example)}
     volumes:
       - legalio-pg:/var/lib/postgresql/data
     healthcheck:
@@ -33,9 +42,18 @@ services:
       context: .
       dockerfile: apps/frontend/Dockerfile
     ports:
-      - "8080:80"
+      # FRONTEND_BIND=0.0.0.0 (default) exposes the app on all interfaces; use 127.0.0.1 when a reverse proxy on the host fronts it.
+      - "${FRONTEND_BIND:-0.0.0.0}:${FRONTEND_PORT:-8080}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # Goes through nginx to the backend readiness probe.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/api/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
 volumes:
   legalio-data:

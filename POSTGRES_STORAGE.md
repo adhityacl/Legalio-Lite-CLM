@@ -33,7 +33,7 @@ Rows in `integration_credentials` (Google and COS) are encrypted with AES-256-GC
 ## Operations
 
 - **Run one instance only.** The backend keeps an in-memory copy of the workspace and caches credentials per process. Do not run two backends against the same database.
-- **Backups:** use `pg_dump` for the database, for example `docker compose exec postgres pg_dump -U legalio legalio > legalio.sql`, and enable versioning on the COS bucket for files. The optional Google Drive backup copies uploaded files only, not the database.
+- **Backups:** run `scripts/backup.sh` (pg_dump custom format, timestamped, with retention) and `scripts/restore.sh`, and enable versioning on the COS bucket for files. Back up `BETTER_AUTH_SECRET` separately. See [docs/RUNBOOK.md](docs/RUNBOOK.md). The optional Google Drive backup copies uploaded files only, not the database.
 - **Old SQLite data is not imported.** Do not delete `/data/kaelyn.db` on existing servers; it is the archive of the old SQLite installation.
 
 ## Verification

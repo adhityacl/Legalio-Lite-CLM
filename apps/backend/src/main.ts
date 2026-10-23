@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import path from "node:path";
 import { connect, end, parseDatabaseConfig, resolveDatabaseConfig, saveDatabaseConfig, testConnection, type DatabaseConfig } from "./db";
+import { createSensitiveRateLimiter, trustProxySetting } from "./edgeConfig";
 import { REPOSITORY_DIR } from "./runtimePaths";
 import { mountSystemConsole } from "./systemConsoleHosting";
 
@@ -28,7 +29,8 @@ async function startApplication(config: DatabaseConfig) {
 }
 
 const app = express();
-app.set("trust proxy", true);
+app.set("trust proxy", trustProxySetting());
+app.use(createSensitiveRateLimiter());
 // Ahead of the hand-off below so it keeps answering 409 once the application runs. Its own small JSON parser only:
 // a global one would consume the application's 25 MB request bodies.
 app.post("/api/system/database", express.json(), async (req: express.Request, res: express.Response) => {

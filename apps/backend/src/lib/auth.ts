@@ -234,6 +234,22 @@ export const authOptions = (database: BetterAuthOptions["database"]) => ({
   // request instead of once at startup — see selfOrigin() above.
   trustedOrigins: async (request?: Request) => [...extraOrigins, ...(getPublicBaseUrl() ? [getPublicBaseUrl()] : []), ...selfOrigin(request)],
   secret: authSecret || "insecure-development-secret-change-me",
+  // Explicit (Better Auth only enables its limiter by default in production): in-memory per process, keyed on the client IP from
+  // X-Forwarded-For, which nginx sets from the real peer address. Stricter rules for credential endpoints.
+  rateLimit: {
+    enabled: process.env.RATE_LIMIT_DISABLED !== "true" && process.env.APP_TEST_MODE !== "1",
+    window: 60,
+    max: 100,
+    storage: "memory",
+    customRules: {
+      "/sign-in/email": { window: 60, max: 10 },
+      "/sign-up/email": { window: 60, max: 5 },
+      "/forget-password": { window: 60, max: 5 },
+      "/request-password-reset": { window: 60, max: 5 },
+      "/reset-password": { window: 60, max: 5 },
+      "/send-verification-email": { window: 60, max: 5 },
+    },
+  },
 }) satisfies BetterAuthOptions;
 
 const createAuth = () => betterAuth(authOptions(pool()));
