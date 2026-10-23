@@ -118,7 +118,8 @@ Thumbs.db
 .vscode/
 .idea/
 .cursor/
-.claude/
+.claude/*
+!.claude/settings.json
 .aistudio/
 .agents/
 .codex/
