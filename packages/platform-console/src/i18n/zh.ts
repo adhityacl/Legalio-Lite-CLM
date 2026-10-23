@@ -2009,7 +2009,7 @@ export const ZH_TRANSLATIONS: Record<string, string> = {
   'login.password_label': '密码',
   'login.welcome': '欢迎',
   'login.welcome_app': '欢迎使用 {appName}',
-  'login.setup_title': '创建管理员账户',
+  'login.setup_title': '设置 Legalio 网站',
   'login.setup_subtitle': '设置网站地址、创建首个超级用户账户并连接文件存储。',
   'login.setup_submit': '创建管理员账户',
   'login.setup_failed': '无法创建管理员账户。',

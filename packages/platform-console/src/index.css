@@ -47,13 +47,16 @@
   .auth-language { padding-top: 8px; }
   .auth-layout { padding-block: 13px; }
   .auth-card { padding: 13px 21px; gap: 8px; }
-  .auth-card form { gap: 8px; }
+  /* The setup card holds account + storage fields and scrolls with the page, so it keeps normal spacing. */
+  .auth-card:not(.auth-setup-card) form { gap: 8px; }
   .auth-form { gap: 8px; }
   .auth-hero p:first-child { font-size: 26px; }
-  .auth-setup-card { padding-block: 8px; }
-  .auth-setup-card h1 { font-size: 21px; line-height: 26px; }
-  .auth-setup-card form { gap: 5px; }
 }
+
+/* Long setup form: keep roomy padding, and space between the card, footer and page bottom at any height. */
+.auth-card.auth-setup-card { padding: 21px 21px 28px; }
+@media (min-width: 40rem) { .auth-card.auth-setup-card { padding: 34px; } }
+.auth-form:has(.auth-setup-card) { gap: 26px; padding-bottom: 34px; }
 
 /* Keyboard users can jump past the navigation; visible only while focused. */
 .skip-link {

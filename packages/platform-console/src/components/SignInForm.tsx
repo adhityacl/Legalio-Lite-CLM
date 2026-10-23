@@ -297,7 +297,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
     );
   }
 
-  const title = invited ? t('invite.title', 'You’ve been invited to join {org}', { org: invitation.organizationName }) : setupMode ? t('login.setup_title', 'Create your admin account') : isRegister ? t('login.create_account') : t('login.welcome_back', 'Welcome back');
+  const title = invited ? t('invite.title', 'You’ve been invited to join {org}', { org: invitation.organizationName }) : setupMode ? t('login.setup_title', 'Setup Legalio Website') : isRegister ? t('login.create_account') : t('login.welcome_back', 'Welcome back');
   const subtitle = invited ? (isRegister
     ? t('invite.register_hint', 'Create your account to accept your invitation and get started with your team.')
     : t('invite.signin_hint', 'Sign in with your existing account to accept your invitation.')) : setupMode ? t('login.setup_subtitle', 'Set your website URL, create the first superuser and connect file storage.') : isRegister ? t('login.fill_form_reg') : t('login.welcome_subtitle', 'Please sign in with your Legalio account');
@@ -317,12 +317,11 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
         </Alert>
       )}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-g13" aria-busy={loading}>
+      <form onSubmit={handleSubmit} className={`flex flex-col ${setupMode ? 'gap-[11px]' : 'gap-g13'}`} aria-busy={loading}>
         {setupMode && (
           <Field required>
             <FieldLabel htmlFor="setup-public-url">{t('login.public_url_label', 'Website URL')}</FieldLabel>
-            <Input id="setup-public-url" type="url" required autoComplete="url" value={publicUrl} onChange={e => setPublicUrl(e.target.value)} aria-describedby="setup-public-url-help" />
-            <Text id="setup-public-url-help" size="xs" tone="muted">{t('login.public_url_help', 'Include http:// or https:// and the public port if needed.')}</Text>
+            <Input id="setup-public-url" type="url" required autoComplete="url" value={publicUrl} onChange={e => setPublicUrl(e.target.value)} />
           </Field>
         )}
         {(isRegister || setupMode) && (
@@ -343,9 +342,11 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
           </PasswordInputControl>
         </PasswordInput>
         {setupMode && (
-          <fieldset className="flex min-w-0 flex-col gap-g13 border-t border-border pt-g13">
-            <legend className="float-left mb-g5 w-full text-sm font-semibold">{t('cos_setup.title', 'File storage (Tencent COS)')}</legend>
-            <Text size="xs" tone="muted">{t('cos_setup.purpose', 'Uploaded files are stored in this bucket. Saving tests the credentials first.')}</Text>
+          <fieldset aria-labelledby="setup-cos-title" className="mt-g8 flex min-w-0 flex-col gap-[11px] border-t border-border pt-g21">
+            <div className="flex flex-col gap-g5">
+              <p id="setup-cos-title" className="text-sm font-semibold">{t('cos_setup.title', 'File storage (Tencent COS)')}</p>
+              <Text size="xs" tone="muted">{t('cos_setup.purpose', 'Uploaded files are stored in this bucket. Saving tests the credentials first.')}</Text>
+            </div>
             <Field required>
               <FieldLabel htmlFor="setup-cos-secret-id">SecretId</FieldLabel>
               <Input id="setup-cos-secret-id" required autoComplete="off" spellCheck={false} value={storage.secretId} onChange={setCos('secretId')} />
@@ -385,7 +386,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
             <Input id="signin-invite-code" value={inviteCode} onChange={e => setInviteCode(e.target.value)} maxLength={128} autoComplete="off" spellCheck={false} />
           </Field>
         )}
-        <Button type="submit" loading={loading} disabled={blocked} className="w-full">
+        <Button type="submit" loading={loading} disabled={blocked} className={`w-full ${setupMode ? 'mt-[5px]' : ''}`}>
           {invited ? (isRegister ? t('invite.create_account', 'Create account & continue') : t('invite.sign_in', 'Sign in & continue')) : setupMode ? t('login.setup_submit', 'Create admin account') : isRegister ? t('login.btn_register') : t('login.sign_in_securely', 'Sign in securely')}
         </Button>
       </form>
@@ -405,7 +406,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
 /** Full-page sign-in scene: dark backdrop, product pitch on the major side, the card on the minor side. */
 const AuthShell: React.FC<{ children: React.ReactNode; invitationContext?: boolean; language: Language; setLanguage: (lang: Language) => void; t: (k: string, d?: string, v?: Record<string, unknown>) => string; onOpenPrivacy: (e: React.MouseEvent) => void; onOpenTerms: (e: React.MouseEvent) => void }> = ({ children, invitationContext = false, language, setLanguage, t, onOpenPrivacy, onOpenTerms }) => (
   <main className="auth-backdrop relative isolate flex h-dvh w-full flex-col overflow-x-hidden overflow-y-auto bg-auth-ink text-auth-foreground">
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
       <div className="auth-glow-blue absolute -start-g55 -top-g55 size-g233 rounded-full lg:start-g68 lg:top-g89 lg:size-g610" />
       <div className="auth-glow-violet absolute end-0 top-g377 size-g233 rounded-full lg:end-g89 lg:top-g110 lg:size-g377" />
     </div>
