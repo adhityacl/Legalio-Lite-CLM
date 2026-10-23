@@ -44,7 +44,8 @@ export function errorResponder(): express.ErrorRequestHandler {
   return (err, req, res, next) => {
     const requestId = (req as any).requestId || crypto.randomUUID();
     const status = Number.isInteger(err?.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
-    log.error({ err, requestId, method: req.method, url: req.originalUrl?.split('?')[0], status }, 'unhandled error');
+    // Client mistakes (malformed JSON, oversized bodies) are expected traffic; only server faults are errors.
+    log[status >= 500 ? 'error' : 'warn']({ err, requestId, method: req.method, url: req.originalUrl?.split('?')[0], status }, 'request failed');
     if (res.headersSent) return next(err);
     if (!req.path.startsWith('/api/')) return next(err);
     const message = TEXT[status] || (status >= 500 ? 'An internal error occurred.' : 'The request could not be processed.');
