@@ -3,7 +3,6 @@ import { forwardAsyncRouteErrors } from './asyncRoutes';
 import { renameLegacyKeys, renameLegacyKeyTokens } from '@legalio/shared/fieldNames';
 import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
 import { readBusinessRows, searchBusinessRows } from './normalizedCoreStore';
-import { mountSystemConsole } from './systemConsoleHosting';
 import "dotenv/config";
 import { getPublicBaseUrl, normalizePublicUrl, saveInstallationPublicUrl } from './installationSettings';
 import type { UITextOverrides } from '@legalio/types/uiTexts';
@@ -19,11 +18,11 @@ import { buildMatrix as buildRbacMatrix, can, hasOrganizationScope, type OrgCont
 import {
   RequestDenied, accessibleOrganizations, identityOf, isIdentityBanned, resolveIdentity, resolveLegacyContext, resolveOrganizationContext, sendError,
 } from "./identity";
-import { connect, isConstraintViolation, isUniqueViolation, resolveDatabaseConfig, sql } from "./db";
+import { isConstraintViolation, isUniqueViolation, sql } from "./db";
 import { ensureSchema } from "./schema";
 import { BETTER_AUTH_ALLOWED, createAuthorizationMiddleware, isBetterAuthPathAllowed } from "./routePolicies";
 import { createOrganizationScope, filterRecords, recordVisible, normalizeDepartmentName, teamsOf, type RecordKind } from "./recordScope";
-import { IS_TEST_MODE, REPOSITORY_DIR, APP_DATA_DIR } from "./runtimePaths";
+import { IS_TEST_MODE, APP_DATA_DIR } from "./runtimePaths";
 import { cosStore, keyFromLink, memoryStore, type CosConfig, type ObjectStore } from "./objectStore";
 import {
   ApiError, appendAudit, buildTenantProjection, isEmptyInstall, readIntegration, writeIntegrationRow, patchOrganizationSettings, readOrganizationSettings, patchIntegration,
@@ -81,7 +80,7 @@ import {
   getGoogleSheetsClient,
   setStoredServiceAccountProvider,
 } from "./lib/googleServiceAccountAuth";
-import { createGoogleCredentialStore, createGoogleCredentialsRouter } from "./googleCredentials";
+import { checkCosInput, createGoogleCredentialStore, createGoogleCredentialsRouter } from "./googleCredentials";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
 import { contractLifecycle, contractLifecycleMode, validateContractTermination } from "@legalio/shared/contractLifecycle";
@@ -136,7 +135,6 @@ forwardAsyncRouteErrors(app);
 // Run, Codespaces' tunnel — see README: "keep port 3000 closed to the
 // internet"), so trust its X-Forwarded-* headers for req.ip/req.protocol.
 app.set("trust proxy", true);
-const PORT = Number(process.env.PORT) || 3000;
 // Google JSON credentials uploaded in the app win over the GOOGLE_* env vars.
 const googleCredentials = createGoogleCredentialStore(sql);
 setStoredServiceAccountProvider(googleCredentials.getServiceAccount);
@@ -1145,14 +1143,12 @@ __name(
   "computeContractEndDateFromDuration",
 );
 /*
- * Startup (PRD §14.1): connects, creates or completes the schema, and on a fresh install seeds the demo workspace.
- * Everything that reads or writes the database runs here; startServer() awaits it before listening.
+ * Startup (PRD §14.1): creates or completes the schema on the connected pool, and on a fresh install seeds the demo workspace.
+ * Everything that reads or writes the database runs here; main.ts connects first and awaits it before serving this app.
  */
 export async function init() {
-  // Phase F replaces this with the onboarding database step.
-  const config = resolveDatabaseConfig();
-  if (!config) throw new Error("No database configured. Set DATABASE_URL to a PostgreSQL connection string.");
-  connect(config);
+  // Onboarding retries init() after a failure, possibly against another database: forget what an earlier attempt wrote.
+  resetSyncCache(sql);
   await ensureSchema();
   await reloadAuthConfiguration();
   await googleCredentials.init();
@@ -7304,6 +7300,7 @@ const needsFirstRunSetup = async () => !await sql.get(`SELECT 1 FROM "user" WHER
 app.get("/api/system/public-status", async (_req: express.Request, res: express.Response) => {
   res.set('Cache-Control', 'no-store').json({
     appName: db.branding?.appName || DEFAULT_BRANDING.appName,
+    needsDatabase: false,
     needsSetup: await needsFirstRunSetup(),
     publicUrl: getPublicBaseUrl(),
   });
@@ -7329,6 +7326,10 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
   if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8) {
     return res.status(400).json({ error: "INVALID_SETUP", message: "Enter your name, a valid email, and a password of at least 8 characters." });
   }
+  // Uploads have no local fallback, so outside test mode the first admin also connects Tencent COS; tested before the transaction.
+  const checked = req.body?.storage || !IS_TEST_MODE ? await checkCosInput(req.body?.storage) : null;
+  if (checked && "error" in checked) return res.status(400).json(checked);
+  const storage = checked as CosConfig | null; // the tsconfig is not strict, so `checked &&` above does not narrow
   const hashed = await hashPassword(password);
   const id = `usr_${crypto.randomUUID()}`;
   const now = new Date().toISOString();
@@ -7350,17 +7351,20 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
         VALUES (?, ?, 'credential', ?, ?, ?, ?)
       `, `acc_${id}`, id, id, hashed, now, now);
       await saveInstallationPublicUrl(sql, publicUrl);
+      if (storage) await googleCredentials.saveCos(storage, id);
       return true;
     });
     if (!created) {
       return res.status(409).json({ error: "ALREADY_SET_UP", message: "An administrator already exists. Please sign in." });
     }
   } catch (err: any) {
+    // saveCos already updated the in-memory credentials; after a rollback the table is the truth again.
+    if (storage) await googleCredentials.init().catch((reloadErr) => console.error("[setup] credential reload failed:", reloadErr));
     return res.status(err?.status || 500).json({ error: "SETUP_FAILED", message: err?.message || "Setup failed." });
   }
   await reloadAuthConfiguration();
   await appendAudit(sql, { actorId: id, actorPlatformRole: "superuser", accessMode: "platform", requestId: String((req as any).requestId || crypto.randomUUID()) }, {
-    organizationId: null, action: "platform.setup", targetType: "installation", targetId: "installation", outcome: "success", changedFields: ["superuser", "publicUrl"],
+    organizationId: null, action: "platform.setup", targetType: "installation", targetId: "installation", outcome: "success", changedFields: storage ? ["superuser", "publicUrl", "storage"] : ["superuser", "publicUrl"],
   });
   // Outside production the demo-workspace logins stay usable with the same password.
   if (!IS_TEST_MODE) await ensureUserAccountsExist(password);
@@ -7517,47 +7521,4 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   }
   next(err);
 });
-async function startServer() {
-  await init();
-  mountSystemConsole(app, process.env.SYSTEM_CONSOLE_DIR || path.join(REPOSITORY_DIR, "apps/backend/dist/console"));
-  let viteServer;
-  // API_ONLY=true (set by `npm run dev:backend`) skips Vite entirely, for
-  // running the backend as its own process against a separate `npm run
-  // dev:frontend` — the default `npm run dev` still runs both combined.
-  if (process.env.NODE_ENV !== "production" && process.env.API_ONLY !== "true") {
-    // Dynamically imported so `vite` never ends up in the production
-    // server bundle — the backend is a standalone API in production, the
-    // frontend build is served separately (see README).
-    const { createServer: createViteServer } = await import("vite");
-    viteServer = await createViteServer({
-      root: path.join(REPOSITORY_DIR, "apps/frontend"),
-      configFile: path.join(REPOSITORY_DIR, "apps/frontend/vite.config.ts"),
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(viteServer.middlewares);
-  }
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(
-      `Pengelola Kontrak & IO Server running on http://0.0.0.0:${PORT}`,
-    );
-  });
-  const shutdown = __name(async () => {
-    console.log("Shutting down server...");
-    if (viteServer) {
-      await viteServer.close();
-    }
-    server.close(() => {
-      console.log("Server closed");
-      process.exit(0);
-    });
-    setTimeout(() => {
-      console.error("Forcing shutdown after 3s");
-      process.exit(1);
-    }, 3e3).unref();
-  }, "shutdown");
-  process.on("SIGTERM", shutdown);
-  process.on("SIGINT", shutdown);
-}
-startServer();
-export { getFreshGoogleAccessToken, isMatchingOrg, resolveActiveGoogleToken };
+export { app, getFreshGoogleAccessToken, isMatchingOrg, resolveActiveGoogleToken };

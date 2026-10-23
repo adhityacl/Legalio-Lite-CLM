@@ -45,6 +45,12 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
   // True on a fresh install with no admin yet: this screen becomes "create the admin account".
   const [setupMode, setSetupMode] = useState(false);
   const [statusReady, setStatusReady] = useState(false);
+  // First step of a brand-new install: no DATABASE_URL and no saved connection yet.
+  const [needsDatabase, setNeedsDatabase] = useState(false);
+  const [database, setDatabase] = useState({ host: '', port: '5432', user: '', password: '', database: '', ssl: false });
+  const [storage, setStorage] = useState({ secretId: '', secretKey: '', bucket: '', region: '', prefix: '' });
+  const setDb = (key: keyof typeof database) => (e: React.ChangeEvent<HTMLInputElement>) => setDatabase(prev => ({ ...prev, [key]: e.target.value }));
+  const setCos = (key: keyof typeof storage) => (e: React.ChangeEvent<HTMLInputElement>) => setStorage(prev => ({ ...prev, [key]: e.target.value }));
 
   // An invitation link survives sign-in/registration in this tab (PRD §8.4).
   const [invitation, setInvitation] = useState<InvitationPreview | null>(null);
@@ -67,15 +73,39 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
     return () => { active = false; };
   }, [allowRegistration, linkToken, previewAttempt]);
 
-  useEffect(() => {
-    fetch('/api/system/public-status', { cache: 'no-store' })
-      .then((res) => {
-        if (!res.ok && !allowRegistration) throw new Error(t('sys.status_failed', 'Could not load system status. Refresh to retry.'));
-        return res.ok ? res.json() : null;
-      })
-      .then((status) => { setSetupMode(Boolean(status?.needsSetup)); setPublicUrl(status?.publicUrl || window.location.origin); setStatusReady(true); })
-      .catch((err) => { if (!allowRegistration) setError(err.message); });
-  }, [allowRegistration]);
+  const loadStatus = () => fetch('/api/system/public-status', { cache: 'no-store' })
+    .then((res) => {
+      if (!res.ok && !allowRegistration) throw new Error(t('sys.status_failed', 'Could not load system status. Refresh to retry.'));
+      return res.ok ? res.json() : null;
+    })
+    .then((status) => { setNeedsDatabase(Boolean(status?.needsDatabase)); setSetupMode(Boolean(status?.needsSetup)); setPublicUrl(status?.publicUrl || window.location.origin); setStatusReady(true); })
+    .catch((err) => { if (!allowRegistration) setError(err.message); });
+  useEffect(() => { loadStatus(); }, [allowRegistration]);
+
+  const connectDatabase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/system/database', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...database, port: Number(database.port) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      // 409: the database was connected meanwhile (another tab or visitor); the status below shows the next step.
+      if (!res.ok && res.status !== 409) {
+        setError(data.message || t('db_setup.failed', 'Could not connect to the database.'));
+        return;
+      }
+      setDatabase(prev => ({ ...prev, password: '' }));
+      await loadStatus();
+    } catch (err: any) {
+      setError(err?.message || t('db_setup.failed', 'Could not connect to the database.'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenPrivacy = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -113,7 +143,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
         const res = await fetch('/api/system/setup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password, publicUrl }),
+          body: JSON.stringify({ name, email, password, publicUrl, storage }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -122,6 +152,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
           return;
         }
         setSetupMode(false);
+        setStorage(prev => ({ ...prev, secretKey: '' }));
         if (data.publicUrl && data.publicUrl !== window.location.origin) {
           window.location.assign(data.publicUrl);
           return;
@@ -170,9 +201,56 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
   const isPending = /menunggu|pending/i.test(error);
   const blocked = loading || (!allowRegistration && !statusReady) || (Boolean(linkToken) && invitationState !== 'ready');
   const invited = invitationState === 'ready' && invitation !== null && !setupMode;
+  const errorAlert = error && (
+    <Alert status={isPending ? 'warning' : 'error'} role="alert">
+      <AlertIndicator />
+      <AlertContent><AlertDescription className="text-sm">{error}</AlertDescription></AlertContent>
+    </Alert>
+  );
   const shell = (card: React.ReactNode) => (
     <AuthShell invitationContext={Boolean(linkToken)} language={language} setLanguage={setLanguage} t={t} onOpenPrivacy={handleOpenPrivacy} onOpenTerms={handleOpenTerms}>{card}</AuthShell>
   );
+
+  if (needsDatabase) {
+    return shell(
+      <Card className="auth-card auth-setup-card w-full gap-g21 rounded-xl p-g21 shadow-xl sm:p-g34">
+        <div className="flex flex-col gap-g8">
+          <CardTitle asChild className="break-words text-xl font-extrabold leading-tight sm:text-2xl"><h1>{t('db_setup.title', 'Connect PostgreSQL')}</h1></CardTitle>
+          <CardDescription>{t('db_setup.subtitle', 'Enter the database this installation will use. The connection is tested and the tables are created before it is saved.')}</CardDescription>
+        </div>
+        {errorAlert}
+        <form onSubmit={connectDatabase} className="grid grid-cols-[1fr_6rem] gap-g13" aria-busy={loading}>
+          <Field required>
+            <FieldLabel htmlFor="db-host">{t('db_setup.host', 'Host')}</FieldLabel>
+            <Input id="db-host" required autoComplete="off" spellCheck={false} placeholder="127.0.0.1" value={database.host} onChange={setDb('host')} />
+          </Field>
+          <Field required>
+            <FieldLabel htmlFor="db-port">{t('db_setup.port', 'Port')}</FieldLabel>
+            <Input id="db-port" type="number" required min={1} max={65535} step={1} inputMode="numeric" value={database.port} onChange={setDb('port')} />
+          </Field>
+          <Field required className="col-span-2">
+            <FieldLabel htmlFor="db-user">{t('db_setup.user', 'Username')}</FieldLabel>
+            <Input id="db-user" required autoComplete="off" spellCheck={false} value={database.user} onChange={setDb('user')} />
+          </Field>
+          <PasswordInput className="col-span-2" ids={{ input: 'db-password' }} autoComplete="new-password">
+            <PasswordInputLabel>{t('login.password_label')}</PasswordInputLabel>
+            <PasswordInputControl>
+              <PasswordInputInput value={database.password} onChange={setDb('password')} />
+              <PasswordInputVisibilityTrigger><PasswordInputIndicator /></PasswordInputVisibilityTrigger>
+            </PasswordInputControl>
+          </PasswordInput>
+          <Field required className="col-span-2">
+            <FieldLabel htmlFor="db-name">{t('db_setup.database', 'Database name')}</FieldLabel>
+            <Input id="db-name" required autoComplete="off" spellCheck={false} placeholder="legalio" value={database.database} onChange={setDb('database')} />
+          </Field>
+          <Checkbox className="col-span-2" checked={database.ssl} onCheckedChange={details => setDatabase(prev => ({ ...prev, ssl: details.checked === true }))}>
+            <CheckboxControl /><CheckboxLabel>{t('db_setup.ssl', 'Use SSL (verified certificate)')}</CheckboxLabel><CheckboxHiddenInput />
+          </Checkbox>
+          <Button type="submit" loading={loading} disabled={loading} className="col-span-2 w-full">{t('db_setup.submit', 'Connect database')}</Button>
+        </form>
+      </Card>
+    );
+  }
 
   if (linkToken && !setupMode && invitationState !== 'ready' && invitationState !== 'idle') {
     const checking = invitationState === 'loading';
@@ -222,7 +300,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
   const title = invited ? t('invite.title', 'You’ve been invited to join {org}', { org: invitation.organizationName }) : setupMode ? t('login.setup_title', 'Create your admin account') : isRegister ? t('login.create_account') : t('login.welcome_back', 'Welcome back');
   const subtitle = invited ? (isRegister
     ? t('invite.register_hint', 'Create your account to accept your invitation and get started with your team.')
-    : t('invite.signin_hint', 'Sign in with your existing account to accept your invitation.')) : setupMode ? t('login.setup_subtitle', 'Set your website URL and create the first superuser.') : isRegister ? t('login.fill_form_reg') : t('login.welcome_subtitle', 'Please sign in with your Legalio account');
+    : t('invite.signin_hint', 'Sign in with your existing account to accept your invitation.')) : setupMode ? t('login.setup_subtitle', 'Set your website URL, create the first superuser and connect file storage.') : isRegister ? t('login.fill_form_reg') : t('login.welcome_subtitle', 'Please sign in with your Legalio account');
 
   return shell(
     <Card className={`auth-card ${setupMode ? 'auth-setup-card' : ''} w-full gap-g21 rounded-xl p-g21 shadow-xl sm:p-g34`}>
@@ -231,12 +309,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
         <CardTitle asChild className="break-words text-xl font-extrabold leading-tight sm:text-2xl"><h1>{title}</h1></CardTitle>
         <CardDescription>{subtitle}</CardDescription>
       </div>
-      {error && (
-        <Alert status={isPending ? 'warning' : 'error'}>
-          <AlertIndicator />
-          <AlertContent><AlertDescription className="text-sm">{error}</AlertDescription></AlertContent>
-        </Alert>
-      )}
+      {errorAlert}
       {resetHint && !isRegister && !setupMode && (
         <Alert status="info" role="status">
           <AlertIndicator />
@@ -269,6 +342,35 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
             <PasswordInputVisibilityTrigger><PasswordInputIndicator /></PasswordInputVisibilityTrigger>
           </PasswordInputControl>
         </PasswordInput>
+        {setupMode && (
+          <fieldset className="flex min-w-0 flex-col gap-g13 border-t border-border pt-g13">
+            <legend className="float-left mb-g5 w-full text-sm font-semibold">{t('cos_setup.title', 'File storage (Tencent COS)')}</legend>
+            <Text size="xs" tone="muted">{t('cos_setup.purpose', 'Uploaded files are stored in this bucket. Saving tests the credentials first.')}</Text>
+            <Field required>
+              <FieldLabel htmlFor="setup-cos-secret-id">SecretId</FieldLabel>
+              <Input id="setup-cos-secret-id" required autoComplete="off" spellCheck={false} value={storage.secretId} onChange={setCos('secretId')} />
+            </Field>
+            <PasswordInput ids={{ input: 'setup-cos-secret-key' }} autoComplete="new-password">
+              <PasswordInputLabel>SecretKey</PasswordInputLabel>
+              <PasswordInputControl>
+                <PasswordInputInput required value={storage.secretKey} onChange={setCos('secretKey')} />
+                <PasswordInputVisibilityTrigger><PasswordInputIndicator /></PasswordInputVisibilityTrigger>
+              </PasswordInputControl>
+            </PasswordInput>
+            <Field required>
+              <FieldLabel htmlFor="setup-cos-bucket">Bucket</FieldLabel>
+              <Input id="setup-cos-bucket" required spellCheck={false} placeholder="legalio-1250000000" value={storage.bucket} onChange={setCos('bucket')} />
+            </Field>
+            <Field required>
+              <FieldLabel htmlFor="setup-cos-region">Region</FieldLabel>
+              <Input id="setup-cos-region" required spellCheck={false} placeholder="ap-jakarta" value={storage.region} onChange={setCos('region')} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="setup-cos-prefix">{t('cos_setup.prefix', 'Prefix (optional)')}</FieldLabel>
+              <Input id="setup-cos-prefix" spellCheck={false} placeholder="legalio/" value={storage.prefix} onChange={setCos('prefix')} />
+            </Field>
+          </fieldset>
+        )}
         {!isRegister && !setupMode && (
           <div className="flex flex-wrap items-center justify-between gap-g8">
             <Checkbox checked={rememberMe} onCheckedChange={details => setRememberMe(details.checked === true)}>

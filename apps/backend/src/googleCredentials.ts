@@ -120,6 +120,22 @@ export type GoogleCredentialStore = ReturnType<typeof createGoogleCredentialStor
 
 const KINDS: GoogleCredentialKind[] = ["service-account", "oauth-client"];
 
+/** Validates COS input, then proves it against the bucket (network: never call inside sql.tx). Used here and by first-run setup. */
+export async function checkCosInput(input: unknown): Promise<CosConfig | { error: string; message: string }> {
+  let config: CosConfig;
+  try {
+    config = parseCosConfig(input);
+  } catch (err) {
+    return { error: "invalid_storage_config", message: (err as Error).message };
+  }
+  try {
+    await probe(cosStore(config));
+  } catch (err: any) {
+    return { error: "storage_probe_failed", message: `Tencent COS test failed: ${err?.message || err?.code || "unknown error"}` };
+  }
+  return config;
+}
+
 const MESSAGES: Record<string, string> = {
   invalid_json: "The file is not a JSON object.",
   looks_like_oauth_client: "This is an OAuth client file; upload it in the OAuth client slot.",
@@ -179,17 +195,8 @@ export function createGoogleCredentialsRouter(store: GoogleCredentialStore) {
 
   // Saving replaces the credentials (key rotation); there is deliberately no DELETE, uploads need storage.
   router.put(storage, async (req, res) => {
-    let config: CosConfig;
-    try {
-      config = parseCosConfig(req.body);
-    } catch (err) {
-      return res.status(400).json({ error: "invalid_storage_config", message: (err as Error).message });
-    }
-    try {
-      await probe(cosStore(config));
-    } catch (err: any) {
-      return res.status(400).json({ error: "storage_probe_failed", message: `Tencent COS test failed: ${err?.message || err?.code || "unknown error"}` });
-    }
+    const config = await checkCosInput(req.body);
+    if ("error" in config) return res.status(400).json(config);
     const identity = (req as unknown as { identity: Identity }).identity;
     await store.saveCos(config, identity.userId);
     res.json(store.storageStatus());

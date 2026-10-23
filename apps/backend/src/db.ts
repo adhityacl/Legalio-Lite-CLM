@@ -115,6 +115,16 @@ function buildPg(pool: () => pg.Pool) {
 /** `database.json` (onboarding form) or `{ connectionString }` from DATABASE_URL. */
 export interface DatabaseConfig { connectionString?: string; host?: string; port?: number; user?: string; password?: string; database?: string; ssl?: boolean }
 
+/** The onboarding form's fields, validated at the trust boundary; the error message is safe to show. */
+export function parseDatabaseConfig(input: any): DatabaseConfig {
+  const text = (name: string) => (typeof input?.[name] === 'string' ? input[name].trim() : '');
+  const cfg = { host: text('host'), port: input?.port, user: text('user'), password: typeof input?.password === 'string' ? input.password : '', database: text('database'), ssl: input?.ssl };
+  if (!cfg.host || !cfg.user || !cfg.database) throw new Error('Host, user and database are required.');
+  if (!Number.isInteger(cfg.port) || cfg.port < 1 || cfg.port > 65535) throw new Error('Port must be a whole number from 1 to 65535.');
+  if (typeof cfg.ssl !== 'boolean') throw new Error('SSL must be true or false.');
+  return cfg;
+}
+
 function clientConfig(cfg: DatabaseConfig): pg.ClientConfig {
   const name = cfg.connectionString ? decodeURIComponent(new URL(cfg.connectionString).pathname.slice(1)) : cfg.database ?? '';
   if (IS_TEST_MODE && !name.startsWith('legalio_test_')) throw new Error(`APP_TEST_MODE=1 only uses legalio_test_* databases, not "${name}".`);

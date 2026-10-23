@@ -2,9 +2,9 @@
 
 Status per 22 Oktober 2026. Branch: `PostgreSQL`.
 
-Pekerjaan dibagi menjadi 7 fase (A–G). Fase D dipecah menjadi D1 (backend pg dan skema, sifatnya hanya menambah) dan D2 (pindah engine). **Fase A, B, C, D1, D2 dan E selesai: aplikasi sekarang hanya berjalan di PostgreSQL.** Review keamanan fase B sudah dilakukan dan 10 temuannya sudah diperbaiki; semua tes hijau. **Fase F dan G belum dikerjakan.**
+Pekerjaan dibagi menjadi 7 fase (A–G). Fase D dipecah menjadi D1 (backend pg dan skema, sifatnya hanya menambah) dan D2 (pindah engine). **Fase A sampai F selesai.** Aplikasi hanya berjalan di PostgreSQL, upload memakai Tencent COS, dan onboarding meminta koneksi DB serta kunci COS. Review keamanan fase B sudah dilakukan dan 10 temuannya sudah diperbaiki; semua tes hijau. **Tinggal fase G (Docker, compose, dokumentasi).**
 
-> Sampai fase F selesai, backend butuh env `DATABASE_URL` (atau `APP_DATA_DIR/database.json`) untuk start. Contoh untuk dev: `DATABASE_URL=postgres://legalio:legalio@127.0.0.1:5432/legalio`. File ini di-update dan di-push setiap kali satu fase selesai. Dokumen ini berisi semua yang perlu diketahui untuk melanjutkan. Catatan kerja sebelumnya (rencana arsitek dan review) hanya disimpan di `/tmp` dan sudah hilang, jadi isinya dirangkum ulang di sini.
+> Koneksi DB untuk dev: isi `DATABASE_URL=postgres://legalio:legalio@127.0.0.1:5432/legalio` di `apps/backend/.env`, atau kosongkan agar form "Hubungkan PostgreSQL" muncul di kunjungan pertama. File ini di-update dan di-push setiap kali satu fase selesai. Dokumen ini berisi semua yang perlu diketahui untuk melanjutkan. Catatan kerja sebelumnya (rencana arsitek dan review) hanya disimpan di `/tmp` dan sudah hilang, jadi isinya dirangkum ulang di sini.
 
 > **Jangan merge ke `main` sebelum fase G selesai.** `.github/workflows/deploy.yml` men-deploy `main` ke produksi secara otomatis. Fase A dan B tidak aman dideploy sendirian (lihat §6). Setelah merge, produksi akan mulai dengan PostgreSQL kosong. Itu memang keputusannya, tetapi **jangan hapus `/data/kaelyn.db`** di server; biarkan sebagai arsip.
 
@@ -207,6 +207,52 @@ Gate: lint ✅, build ✅, unit 66/66 ✅, e2e sqlite 32 ✅, data-entry 41 ✅,
 - **Belum dioptimalkan:** jalur tulis `writeChildren` masih menjalankan satu DELETE plus satu INSERT per item anak, tetapi hanya untuk baris yang berubah. Penghapusan baris basi juga masih 2 query per id; ini bisa diganti satu `= ANY(?)` nanti.
 - **Gate:** lint ✅, build ✅, unit 74/74 ✅, e2e postgres ✅, data-entry 41 ✅, cek promise ✅.
 
+### Fase F: onboarding (DB dan COS) ✅
+
+**Entry baru `apps/backend/src/main.ts`.** Bundle tetap `dist/server.cjs`; `dev`/`dev:combined` sekarang memakai `src/main.ts`.
+- **Urutan boot:**
+  1. `dotenv`.
+  2. Produksi tanpa `BETTER_AUTH_SECRET` langsung keluar dengan kode 1.
+  3. Jika ada config: `testConnection` (5 dtk) → `connect` → `import('./server')` → `init()`. Jika gagal: **exit 1, tidak pernah kembali ke form**.
+  4. `/sys`, Vite (dev), lalu `listen`.
+- **Urutan middleware shell:**
+  1. `POST /api/system/database`, dengan `express.json()` hanya di route ini.
+  2. Hand-off ke `realApp`.
+  3. `GET /api/system/public-status` mengembalikan `{needsDatabase:true}`.
+  4. `/api/*` lainnya mengembalikan 503 `DATABASE_REQUIRED`.
+- **`POST /api/system/database`:**
+  - 409 jika sudah ada config, app sudah jalan, atau ada percobaan lain yang sedang berjalan.
+  - 400 `INVALID_DATABASE_CONFIG` jika input salah (validasi di `parseDatabaseConfig`, `db.ts`).
+  - Urutan: `testConnection` → `connect` → `init()` (dengan `ensureSchema`) → **baru** `saveDatabaseConfig` (0600) → 201.
+  - Jika gagal: `end()` lalu 400 `DATABASE_CONNECTION_FAILED` dengan pesan pg. Password tidak pernah ikut di pesan maupun log.
+
+**Setup (`server.ts`):**
+- `public-status` mengembalikan `needsDatabase:false`.
+- `POST /api/system/setup` menerima `storage`. `checkCosInput` (`googleCredentials.ts`: parse + probe) dijalankan **sebelum** tx, lalu `saveCos` dijalankan di dalam tx setup setelah advisory lock. Jika tx di-rollback, `googleCredentials.init()` memuat ulang cache.
+- `storage` wajib di luar `APP_TEST_MODE`.
+- `init()` dimulai dengan `resetSyncCache`, jadi aman diulang.
+
+**UI (`SignInForm.tsx`, dipakai app dan /sys):**
+- Kartu "Hubungkan PostgreSQL": Host, Port 5432, Username, Password, Database, SSL. Error ditampilkan di Alert dengan `role="alert"`.
+- Mode setup mendapat fieldset "File storage (Tencent COS)": SecretId, SecretKey, Bucket, Region, Prefix.
+- i18n `db_setup.*` untuk en/id/zh. `login.setup_subtitle` diubah agar menyebut file storage.
+- `AuthContext` sudah otomatis jatuh ke SignInForm saat menerima 503. Sudah dicek di Chromium untuk `/app` dan `/sys`.
+
+**Lain-lain:** `.gitignore` mendapat `database.json` dan `drive-backup.json`.
+
+**Tes `onboarding.test.ts` (4 tes):**
+- input tidak valid (8 jenis)
+- password salah: tanpa file dan tanpa password di respons maupun log
+- input valid: 201, mode 0600, kemudian 409
+- `storage` setup tidak valid
+- `DATABASE_URL` menang atas file
+- config tidak bisa dihubungi: exit 1
+- produksi tanpa secret: exit 1
+
+**Gate:** lint ✅, build ✅, unit 78/78 ✅, e2e postgres 32 ✅, data-entry 41 ✅, promise ✅ (`startServer()` hilang dari baseline), smoke test pada `dist/server.cjs` ✅.
+
+**Belum dites:** rollback tx setup yang memulihkan cache COS, karena butuh probe COS asli yang berhasil.
+
 > **Perilaku baru di dev:** di luar `APP_TEST_MODE`, upload mengembalikan 503 sampai superuser menyimpan COS di /sys (tab Google credentials) atau, setelah fase F, di onboarding. File lama di `uploads/` tidak lagi dilayani; ini sesuai keputusan "tanpa impor".
 
 ---
@@ -352,7 +398,17 @@ Hasilnya ada di §3. Spesifikasi asli disimpan di bawah sebagai referensi. Penyi
 ### Fase E: batching baca (performa) ✅ SELESAI (lihat §3)
 `readBusinessRows` dan `childArrays` (`normalizedCoreStore.ts`) menjalankan 1 + 3 + (jumlah requirement DD) query **per partner**. Lewat jaringan, ini berarti ratusan sampai ribuan round trip per `GET /api/partners`. Ganti dengan satu query per tabel anak, `WHERE parent = ANY($1) ORDER BY parent, position`, lalu kelompokkan di JS. `partner_dd_files` memakai key `(partner_id, requirement_position)`. Gate sama dengan fase D.
 
-### Fase F: onboarding (rencana setting di halaman onboard)
+### Fase F: onboarding (rencana setting di halaman onboard) ✅ SELESAI (lihat §3)
+
+Penyimpangan dari rencana di bawah:
+- `POST /api/system/database` dipasang **sebelum** hand-off ke `realApp`, supaya tetap menjawab 409 setelah app berjalan.
+- Saat boot, `testConnection` dijalankan sebelum `connect`.
+- Cache COS dipulihkan dengan reload setelah rollback.
+
+**Catatan untuk fase G:**
+- Dalam mode tanpa DB, `/api/health` mengembalikan 503. Healthcheck Docker akan "unhealthy" sampai langkah DB selesai. Compose mengisi `DATABASE_URL`, jadi jalur normal tidak terdampak.
+- Password DB kosong menghasilkan pesan pg mentah ("SASL: … client password must be a string").
+- Catatan route policy untuk `public-status` di `routePolicies.ts` masih berbunyi "app name + needsSetup only".
 
 **Alur yang dituju:**
 

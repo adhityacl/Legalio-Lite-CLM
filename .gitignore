@@ -44,6 +44,8 @@ kaelyn.db-wal
 kaelyn.db-shm
 SQLITE_STORAGE.md
 data_store.json
+database.json
+drive-backup.json
 backups/
 
 # 4. User Uploads & Documents (SANGAT KRUSIAL: Berisi PDF kontrak, due diligence & lampiran mitra)

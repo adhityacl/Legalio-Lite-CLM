@@ -242,7 +242,7 @@ try{
  await call(`/api/ios/${ios[0].io_id}`,{method:'PUT',org,body:{contract_id:'missing-contract'},status:409});
  assert.equal((await call('/api/ios',{org})).find((io:any)=>io.io_id===ios[0].io_id).contract_id,contract.contract_id);
  checks.push('search update; failed write rollback; API stays available');
- await stop(server);server=run(['--import','tsx','apps/backend/src/server.ts']);await waitFor(backendURL+'/api/health',server); // dev path (tsx, real ESM): the bundle hides initialisation-order bugs
+ await stop(server);server=run(['--import','tsx','apps/backend/src/main.ts']);await waitFor(backendURL+'/api/health',server); // dev path (tsx, real ESM): the bundle hides initialisation-order bugs
  assert.equal((await call('/api/ios',{org})).filter((io:any)=>io.contract_id===contract.contract_id).length,2);
  checks.push('persistence after backend restart');
  frontend=run(['../../node_modules/vite/bin/vite.js','--config','vite.config.ts','--host','127.0.0.1','--port',String(frontendPort)],path.join(repository,'apps/frontend'));await waitFor(frontendURL,frontend);
