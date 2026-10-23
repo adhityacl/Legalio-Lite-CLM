@@ -1,4 +1,5 @@
 import { normalizeSpendingMonths } from './spendingMonths';
+import { createUploadsRouter } from "./routes/uploads";
 import { createIoRouter } from "./routes/io";
 import { createContractsRouter } from "./routes/contracts";
 import { computeEvaluationScore } from './evaluationScoring';
@@ -236,8 +237,6 @@ app.post("/api/rbac/check", async (req: express.Request, res: express.Response) 
     throw err;
   }
 });
-app.use("/uploads", (req: express.Request, res: express.Response, next: express.NextFunction) => { authorizeUpload(req, res, next).catch(next); },
-  (req: express.Request, res: express.Response, next: express.NextFunction) => { serveUpload(req, res, next).catch(next); });
 /*
  * There are no default credentials. The first admin is created on the
  * first-run setup page (POST /api/system/setup). For automated deploys,
@@ -3052,6 +3051,7 @@ app.use(createEvaluationsRouter());
 app.use(createSpendingsRouter());
 app.use(createContractsRouter());
 app.use(createIoRouter());
+app.use(createUploadsRouter());
 app.use("/api/auth-console", authConsoleRouter);
 app.all("/api/*", (req: express.Request, res: express.Response) => {
   sendApiError(req, res, 404, "ROUTE_NOT_FOUND", `API route not found: ${req.method} ${req.path}`);
