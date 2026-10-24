@@ -4,7 +4,10 @@
   "type": "module",
   "name": "@legalio/shared",
   "exports": {
-    "./policy": "./src/policy/index.ts",
+    "./policy": {
+      "browser": "./src/policy/lazy.ts",
+      "default": "./src/policy/index.ts"
+    },
     "./*": "./src/*.ts"
   },
   "scripts": {

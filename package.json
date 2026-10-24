@@ -31,6 +31,7 @@
     "test:e2e:data-entry": "npm run build --workspace @legalio/backend && node --import tsx apps/backend/src/dataEntry.e2e.ts",
     "test:e2e:smoke": "npm run build --workspace @legalio/backend && node --import tsx apps/backend/src/smoke.e2e.ts",
     "test:e2e:postgres": "npm run build --workspace @legalio/backend && node --import tsx apps/backend/src/normalizedCore.e2e.ts",
+    "check:bundle": "node scripts/check-bundle-size.mjs",
     "lint:eslint": "eslint ."
   },
   "devDependencies": {

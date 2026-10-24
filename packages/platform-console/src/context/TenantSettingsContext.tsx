@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore } from 'react';
 import { useIdentity } from './AuthContext';
 import { useTenant } from './TenantContext';
 import { useLanguage } from './LanguageContext';
@@ -7,6 +7,9 @@ import {
   formattingLocaleFor,
   getCountryPack,
   getIndustryPack,
+  getPolicyPacksVersion,
+  loadPolicyPacks,
+  subscribePolicyPacks,
   type CommercialDocumentProfile,
   type CounterpartyType,
   type DueDiligenceRequirement,
@@ -106,6 +109,17 @@ function localPolicyView(settings: TenantSettings = defaultTenantSettings()): Te
 
 const TenantSettingsContext = createContext<TenantSettingsContextValue | undefined>(undefined);
 
+/**
+ * Starts loading the industry packs and pack translations (a separate chunk in the browser build) once someone is signed in, and
+ * returns a counter that changes when they arrive, so everything that reads pack data re-renders with the real texts.
+ */
+function usePolicyPacks(enabled: boolean): number {
+  useEffect(() => {
+    if (enabled) loadPolicyPacks().catch((error) => console.warn('Failed to load the policy packs:', error));
+  }, [enabled]);
+  return useSyncExternalStore(subscribePolicyPacks, getPolicyPacksVersion, getPolicyPacksVersion);
+}
+
 export const TenantSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { identity } = useIdentity();
   const { activeTenantId } = useTenant();
@@ -114,6 +128,7 @@ export const TenantSettingsProvider: React.FC<{ children: React.ReactNode }> = (
   const [policy, setPolicy] = useState<TenantPolicyView>(() => localPolicyView());
   const [countries, setCountries] = useState<CountryOption[]>([]);
   const [industries, setIndustries] = useState<IndustryOption[]>([]);
+  const packsVersion = usePolicyPacks(Boolean(identity));
   const currentOrg = React.useRef(activeTenantId);
   currentOrg.current = activeTenantId;
 
@@ -154,6 +169,11 @@ export const TenantSettingsProvider: React.FC<{ children: React.ReactNode }> = (
     window.addEventListener('organization-updated', onUpdated);
     return () => window.removeEventListener('organization-updated', onUpdated);
   }, [refresh]);
+
+  // Until the server's view arrives, the bundled packs describe the organization; re-read them when the lazy packs are in.
+  useEffect(() => {
+    if (status !== 'ready') setPolicy((current) => (current.tenantId ? current : localPolicyView(current.settings)));
+  }, [packsVersion, status]);
 
   // UI terminology for commercial documents follows the industry pack.
   const profile = policy.industry.commercialDocument;
@@ -213,6 +233,7 @@ export function PolicyCatalogProvider({ children }: { children: React.ReactNode 
   const [countries, setCountries] = useState<CountryOption[]>([]);
   const [industries, setIndustries] = useState<IndustryOption[]>([]);
   const [status, setStatus] = useState<LoadStatus>('loading');
+  usePolicyPacks(Boolean(identity));
   const refresh = useCallback(async () => {
     if (!identity || identity.platformRole !== 'superuser') return;
     try {

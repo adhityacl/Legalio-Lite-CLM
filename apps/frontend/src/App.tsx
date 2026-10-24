@@ -12,8 +12,16 @@ import { NavigationProvider, useNavigation, buildAppUrl } from './context/Naviga
 import { PermissionProvider } from './lib/permissions';
 import { InvitationPrompt } from './components/account/InvitationPrompt';
 import { LoadingState } from './components/StateScreen';
-import { AuthenticatedApp } from './shell/AuthenticatedApp';
 import { rememberReturnTo, takeReturnTo } from './lib/returnTo';
+
+// The signed-in shell (navigation, header, workspace providers, page registry) is its own chunk: the sign-in page does not pay for it.
+// It is fetched as soon as the browser is idle, so it is normally there before the person has finished signing in.
+const loadShell = () => import('./shell/AuthenticatedApp');
+const AuthenticatedApp = lazy(() => loadShell().then((m) => ({ default: m.AuthenticatedApp })));
+if (typeof window !== 'undefined') {
+  const whenIdle = (window as { requestIdleCallback?: (callback: () => void) => void }).requestIdleCallback;
+  if (whenIdle) whenIdle(() => { void loadShell(); }); else setTimeout(() => { void loadShell(); }, 200);
+}
 
 const LazyPrivacyPolicyView = lazy(() => import('./components/PrivacyPolicyView').then((m) => ({ default: m.PrivacyPolicyView })));
 const LazyTermsOfServiceView = lazy(() => import('./components/TermsOfServiceView').then((m) => ({ default: m.TermsOfServiceView })));
@@ -21,7 +29,12 @@ const LazyTermsOfServiceView = lazy(() => import('./components/TermsOfServiceVie
 /** Mounts the signed-in application only while there is a user, so its hooks never run conditionally. */
 const MainApp: React.FC = () => {
   const { user } = useAuth();
-  return user ? <AuthenticatedApp user={user} /> : null;
+  const { t } = useLanguage();
+  return user ? (
+    <Suspense fallback={<LoadingState label={t('app.memuat_halaman', 'Memuat halaman...')} />}>
+      <AuthenticatedApp user={user} />
+    </Suspense>
+  ) : null;
 };
 
 const isPrivacyRoute = (): boolean => {

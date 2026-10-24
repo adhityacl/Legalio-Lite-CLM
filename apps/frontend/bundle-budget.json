@@ -1,0 +1,9 @@
+{
+  "note": "Entry bundle budget in bytes: the measured size at the time plus 10 %. Regenerate with `node scripts/check-bundle-size.mjs --write-budget` after a deliberate change.",
+  "measured": {
+    "raw": 638860,
+    "brotli": 168897
+  },
+  "raw": 702746,
+  "brotli": 185787
+}
