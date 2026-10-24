@@ -90,11 +90,12 @@ const axeSource = readFileSync(createRequire(import.meta.url).resolve('axe-core/
 interface AxeViolation { id: string; impact: string | null; help: string; nodes: Array<{ target: unknown[]; html?: string }> }
 const accessibilityReport: string[] = [];
 const shot = async (page: Page, name: string) => { await page.screenshot({ path: path.join(directory, `${name}.png`), fullPage: false }).catch(() => undefined); };
-async function checkAccessibility(page: Page, name: string) {
+/** `scope` limits the scan to one region (a CSS selector) for pages that carry findings of their own outside the area under test. */
+async function checkAccessibility(page: Page, name: string, scope?: string) {
   await page.evaluate(axeSource);
   // The page function runs in the browser; the backend project has no DOM typings, so it is passed as source text.
   const violations = await page.evaluate(`(async () => {
-    const result = await window.axe.run(document, { resultTypes: ['violations'] });
+    const result = await window.axe.run(${scope ? `document.querySelector(${JSON.stringify(scope)})` : 'document'}, { resultTypes: ['violations'] });
     return result.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.map((n) => ({ target: n.target, html: n.html.slice(0, 200) })) }));
   })()`) as AxeViolation[];
   // Every impact level fails the run: the pages checked here have no known findings left.
@@ -386,6 +387,60 @@ try {
   await termCard.getByRole('button', { name: /reject/i }).click();
   await expect.poll(async () => ((await api('/api/suggestions/summary')).body as { total: number }).total, { timeout: 15_000 }).toBe(0);
   steps.push('AI suggestions are queued without creating records; accepting one (with an edit) created an obligation with source quote, page, confidence and reviewer; rejecting the other created nothing');
+
+  // Clause library: empty state, opt-in starter import, the clause form, then the playbook check on the contract record and in the editor.
+  await page.goto(`${frontendURL}/app?tab=clauses`);
+  await expect(page.getByRole('heading', { name: /clause library & playbook/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('clauses-empty')).toBeVisible({ timeout: 30_000 });
+  await shot(page, 'clauses-empty');
+  await checkAccessibility(page, 'clause library (empty)');
+  await page.getByTestId('clauses-empty').getByRole('button', { name: /import starter clauses/i }).click();
+  const starterDialog = page.getByRole('dialog');
+  await expect(starterDialog.getByText('Payment terms', { exact: true }).last()).toBeVisible({ timeout: 30_000 });
+  await shot(page, 'clauses-starter-import');
+  await checkAccessibility(page, 'starter clause import dialog');
+  await starterDialog.getByTestId('starter-import').click();
+  await expect(page.getByTestId('clause-row').filter({ hasText: 'Payment terms' })).toBeVisible({ timeout: 30_000 });
+  const clauseTotal = ((await api('/api/clauses?limit=500')).body as unknown[]).length;
+  assert.ok(clauseTotal >= 6, `starter clauses imported (${clauseTotal})`);
+  await shot(page, 'clauses-list');
+  await checkAccessibility(page, 'clause library (list)');
+  await page.getByTestId('clause-row').filter({ hasText: 'Payment terms' }).getByRole('button', { name: 'Payment terms', exact: true }).click();
+  await expect(page.getByRole('dialog').getByLabel(/^approved wording$/i)).toHaveValue(/thirty \(30\) days/, { timeout: 15_000 });
+  await shot(page, 'clause-form');
+  await checkAccessibility(page, 'clause form');
+  await page.keyboard.press('Escape');
+  steps.push(`the clause library starts empty, the starter import is an explicit action (${clauseTotal} clauses), and the clause form shows wording, fallbacks and rules`);
+
+  const slowPayment = 'The Customer shall pay each invoice within ninety (90) days of receipt.';
+  await page.goto(`${frontendURL}/app?tab=contracts&id=${encodeURIComponent(storedObligation.contract_id)}`);
+  const playbookRecord = page.getByRole('dialog');
+  await expect(playbookRecord).toBeVisible({ timeout: 30_000 });
+  await playbookRecord.getByRole('tab', { name: /playbook/i }).click();
+  await playbookRecord.getByLabel(/^contract text/i).fill(`SERVICES AGREEMENT.\n\n${slowPayment}\n\nThis agreement is governed by the laws of Singapore.`);
+  await playbookRecord.getByTestId('playbook-run').click();
+  const recordFinding = playbookRecord.getByTestId('playbook-finding').filter({ hasText: /payment terms/i }).filter({ hasText: /says 90/i });
+  await expect(recordFinding).toBeVisible({ timeout: 30_000 });
+  await expect(recordFinding).toContainText('ninety (90) days');
+  await expect(recordFinding).toContainText(/forty-five \(45\) days/);
+  await shot(page, 'playbook-contract-record');
+  await checkAccessibility(page, 'contract record, playbook tab');
+  await page.keyboard.press('Escape');
+  steps.push('playbook check on the contract record: the 90-day payment term is reported with its sentence and the fallback wording');
+
+  const editorDocument = (await api('/api/documents', { method: 'POST', body: JSON.stringify({ name: 'Smoke playbook draft', type: 'contract', content: `<h1>Services agreement</h1><p>${slowPayment}</p><p>Closing words.</p>` }) })).body as { id: string };
+  await page.goto(`${frontendURL}/app?tab=create-contract&document=${encodeURIComponent(editorDocument.id)}`);
+  await page.getByRole('tab', { name: 'Playbook', exact: true }).click({ timeout: 60_000 });
+  await page.getByTestId('playbook-run').click();
+  const editorFinding = page.getByTestId('playbook-finding').filter({ hasText: /says 90/i });
+  await expect(editorFinding).toBeVisible({ timeout: 30_000 });
+  await shot(page, 'playbook-editor');
+  await checkAccessibility(page, 'contract editor, playbook panel', '[data-testid="playbook-panel"]');
+  await editorFinding.getByTestId('playbook-insert').click();
+  await expect(page.locator('.ProseMirror').first()).toContainText(/forty-five \(45\) days/, { timeout: 15_000 });
+  assert.ok(!/ninety \(90\)/.test(await page.locator('.ProseMirror').first().innerText()), 'the quoted sentence was replaced, not duplicated');
+  await expect(page.locator('.ProseMirror').first()).toContainText('Closing words.');
+  steps.push('playbook in the contract editor: "Replace the sentence" swapped the violating sentence for the library fallback');
 
   // 7. A third key page: the dashboard.
   await page.goto(`${frontendURL}/app?tab=dashboard`);

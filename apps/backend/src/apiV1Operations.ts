@@ -7,9 +7,10 @@ import { IO_SORTS } from './repositories/ioRepository';
 import { PARTNER_SORTS } from './repositories/partnerRepository';
 import { SPENDING_SORTS } from './repositories/spendingRepository';
 import { OBLIGATION_SORTS } from './repositories/obligationRepository';
+import { CLAUSE_SORTS } from './repositories/clauseRepository';
 import { OBLIGATION_SOURCES, OBLIGATION_STATUSES, OBLIGATION_TYPES } from '@legalio/shared/obligations';
 
-export type V1Resource = 'contracts' | 'partners' | 'orders' | 'spendings' | 'obligations';
+export type V1Resource = 'contracts' | 'partners' | 'orders' | 'spendings' | 'obligations' | 'clauses';
 export interface V1Filter { name: string; description: string; enum?: readonly string[] }
 export interface V1ResourceSpec {
   resource: V1Resource;
@@ -55,6 +56,12 @@ export const V1_RESOURCES: V1ResourceSpec[] = [
     { name: 'responsible', description: 'Responsible user id.' }, { name: 'department', description: 'Responsible department name.' },
     { name: 'source', description: 'manual or ai_extracted.', enum: OBLIGATION_SOURCES },
     date('due_from', 'Due on or after (YYYY-MM-DD).'), date('due_to', 'Due on or before (YYYY-MM-DD).'),
+  ] },
+  { resource: 'clauses', singular: 'clause', legacy: '/api/clauses', responseKey: 'clause', idField: 'id', sorts: CLAUSE_SORTS, readOnly: true, filters: [
+    { name: 'q', description: 'Words to find in the title, category, wording, guidance or tags.' },
+    { name: 'category', description: 'Exact category.' }, { name: 'risk', description: 'Comma-separated risk levels (low, medium, high).' },
+    { name: 'language', description: 'Clause language (en, id, zh).' }, { name: 'jurisdiction', description: 'Exact jurisdiction.' }, { name: 'tag', description: 'One tag.' },
+    { name: 'status', description: 'active (default), archived or all.' },
   ] },
 ];
 

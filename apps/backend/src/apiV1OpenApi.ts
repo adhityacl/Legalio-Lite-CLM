@@ -6,7 +6,7 @@ import { V1_OPERATIONS, V1_RESOURCES, type V1Operation, type V1Resource } from '
 
 const DENIED = ['fileData', 'fileName', 'accessToken', 'termination_document_file', 'invoice_file', 'billing_file', 'redline_analysis', 'redline_analyzed_at', 'dd_documents'];
 
-const BODIES: Record<Exclude<V1Resource, 'obligations'>, { create: z.ZodType; update: z.ZodType }> = {
+const BODIES: Record<Exclude<V1Resource, 'obligations' | 'clauses'>, { create: z.ZodType; update: z.ZodType }> = {
   contracts: { create: bodySchemas.contractCreateBody, update: bodySchemas.contractUpdateBody },
   partners: { create: bodySchemas.partnerCreateBody, update: bodySchemas.partnerUpdateBody },
   orders: { create: bodySchemas.ioCreateBody, update: bodySchemas.ioUpdateBody },
@@ -90,7 +90,7 @@ export function buildOpenApiDocument(serverBase = 'http://localhost:3000') {
   for (const op of V1_OPERATIONS) (paths[op.openapi] ??= {})[op.method.toLowerCase()] = operationObject(op);
   return {
     openapi: '3.1.0',
-    info: { title: 'Legalio public API', version: '1.0.0', description: 'Organization-scoped access to contracts, partners, orders and spendings (read and write) and obligations (read) with API keys. See docs/API.md.' },
+    info: { title: 'Legalio public API', version: '1.0.0', description: 'Organization-scoped access to contracts, partners, orders and spendings (read and write) and obligations and the clause library (read) with API keys. See docs/API.md.' },
     servers: [{ url: `${serverBase}/api/v1` }],
     security: [{ ApiKey: [] }],
     tags: [{ name: 'session' }, ...V1_RESOURCES.map((spec) => ({ name: spec.resource }))],

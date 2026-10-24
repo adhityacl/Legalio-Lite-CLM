@@ -21,9 +21,9 @@ import { ModalFrame } from '../ui/modal-frame';
 import { orgApi, orgPath } from './orgApi';
 import { DialogHeader, errorText, formatTime } from './dialogParts';
 
-const RESOURCES = ['contracts', 'partners', 'orders', 'spendings', 'obligations'] as const;
+const RESOURCES = ['contracts', 'partners', 'orders', 'spendings', 'obligations', 'clauses'] as const;
 /** Resources a key can only read. */
-const READ_ONLY = new Set<string>(['obligations']);
+const READ_ONLY = new Set<string>(['obligations', 'clauses']);
 interface ApiKeyDto {
   id: string; name: string; prefix: string; scopes: string[]; rateLimitPerMinute: number; createdAt: string; expiresAt: string | null;
   revokedAt: string | null; lastUsedAt: string | null; status: 'active' | 'revoked' | 'expired';

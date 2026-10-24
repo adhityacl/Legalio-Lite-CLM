@@ -40,6 +40,7 @@ import {
   ArrowDown,
   X,
   ListChecks,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -58,6 +59,7 @@ import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
 const ContractObligations = lazy(() => import('../features/obligations/ContractObligations'));
+const PlaybookPanel = lazy(() => import('../features/clauses/PlaybookPanel'));
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
@@ -104,7 +106,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
   const selectedCategory = listState.filters.category ?? 'ALL';
   const selectedStatus = listState.filters.status ?? 'ALL';
   const [detailContract, setDetailContract] = useState<ContractRow | null>(null);
-  const [detailTab, setDetailTab] = useState<'overview' | 'obligations'>('overview');
+  const [detailTab, setDetailTab] = useState<'overview' | 'obligations' | 'playbook'>('overview');
   useEffect(() => { setDetailTab('overview'); }, [detailContract?.contract_id]);
   const opened = useRecordLookup<ContractRow>('contracts', '/contracts', 'contract_id', openDocumentId);
   useEffect(() => {
@@ -600,11 +602,15 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               </Button>
             </DialogHeader>
 
-            <Tabs value={detailTab} onValueChange={(details) => setDetailTab(details.value as 'overview' | 'obligations')} className="flex min-h-0 flex-1 flex-col gap-0">
+            <Tabs value={detailTab} onValueChange={(details) => setDetailTab(details.value as 'overview' | 'obligations' | 'playbook')} className="flex min-h-0 flex-1 flex-col gap-0">
             <TabsList aria-label={t('contracts.record_sections', 'Contract record')} className="mx-g21 mt-g13 w-fit">
               <TabsTrigger value="overview"><FileText aria-hidden="true" />{t('contracts.tab_overview', 'Overview')}</TabsTrigger>
               <TabsTrigger value="obligations"><ListChecks aria-hidden="true" />{t('obligations.contract_tab', 'Obligations')}</TabsTrigger>
+              <TabsTrigger value="playbook"><ClipboardCheck aria-hidden="true" />{t('playbook.tab', 'Playbook')}</TabsTrigger>
             </TabsList>
+            <TabsContent value="playbook" className="mt-0 min-h-0 flex-1 overflow-y-auto p-g21">
+              {detailTab === 'playbook' && <Suspense fallback={<Text size="sm" tone="muted" role="status">{t('common.loading', 'Loading…')}</Text>}><PlaybookPanel contractId={detailContract.contract_id} allowPaste /></Suspense>}
+            </TabsContent>
             <TabsContent value="obligations" className="mt-0 min-h-0 flex-1 overflow-y-auto p-g21">
               {detailTab === 'obligations' && <Suspense fallback={<Text size="sm" tone="muted" role="status">{t('common.loading', 'Loading…')}</Text>}><ContractObligations contractId={detailContract.contract_id} /></Suspense>}
             </TabsContent>

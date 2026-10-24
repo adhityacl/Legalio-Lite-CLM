@@ -56,6 +56,7 @@ import {
   CloudAlert,
   CloudCheck,
   CloudOff,
+  ClipboardCheck,
 } from 'lucide-react';
 import { ContentIcon } from '../../components/icons/ContentIcon';
 import { GridDotsIcon } from '../../components/icons/GridDotsIcon';
@@ -76,6 +77,10 @@ import { NewDocumentDialog, type NewDocumentChoice } from '../../components/docu
 import { DraftHistoryPanel } from '../../components/documents/DraftHistoryPanel';
 import { DocumentInfoPanel } from '../../components/documents/DocumentInfoPanel';
 import { CommentsPanel } from '../../components/documents/CommentsPanel';
+import { applyPlaybookWording } from '../../lib/playbookInsert';
+import type { PlaybookFinding } from '../../api/clauses';
+
+const PlaybookPanel = React.lazy(() => import('../clauses/PlaybookPanel'));
 import { RelativeTime } from '../../components/documents/RelativeTime';
 import {
   buildAgreementHtml,
@@ -412,7 +417,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
   const desktopEditor = useMediaQuery('(min-width: 1024px)');
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
   useEffect(() => { setSidebarOpen(desktopEditor); }, [desktopEditor]);
-  const [sidebarTab, setSidebarTab] = useState<'fields' | 'partners' | 'templates' | 'contents' | 'history' | 'info' | 'comments'>('fields');
+  const [sidebarTab, setSidebarTab] = useState<'fields' | 'partners' | 'templates' | 'contents' | 'history' | 'info' | 'comments' | 'playbook'>('fields');
   const [highlightFillable, setHighlightFillable] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [pageLayout, setPageLayout] = useState<PageLayout>(DEFAULT_PAGE_LAYOUT);
@@ -1285,6 +1290,14 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     updateStats();
   };
 
+  // Playbook check: put the library's wording into the document (over the quoted sentence, else at the cursor).
+  const insertPlaybookWording = (finding: PlaybookFinding) => {
+    if (!editor || editor.isDestroyed || !finding.suggested_text) return;
+    const outcome = applyPlaybookWording(editor, finding.suggested_text, finding.quote);
+    updateStats();
+    showAlert({ title: outcome === 'replaced' ? t('playbook.replaced', 'Sentence replaced with the library wording') : t('playbook.inserted', 'Wording inserted at the cursor'), variant: 'success' });
+  };
+
   // Apply registered partner into fields & editor
   const handleApplyPartner = (partner: Partner) => {
     setSelectedPartnerId(partner.partner_id);
@@ -1469,6 +1482,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     { id: 'history', label: t('documents.tab.history', 'Riwayat'), icon: History },
     { id: 'info', label: t('documents.tab.info', 'Info'), icon: Info },
     { id: 'comments', label: t('documents.tab.comments', 'Komentar'), icon: MessageSquare },
+    { id: 'playbook', label: t('playbook.tab', 'Playbook'), icon: ClipboardCheck },
   ] as const;
   const activeSidebarTab = sidebarTabs.find((tab) => tab.id === sidebarTab) ?? sidebarTabs[0];
 
@@ -1842,6 +1856,12 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                   onContentChanged={(kind) => void saveNow(kind)}
                   onExportRedline={handleExportRedline}
                 />
+              )}
+
+              {sidebarTab === 'playbook' && (
+                <React.Suspense fallback={<Text size="sm" tone="muted" role="status">{t('common.loading', 'Loading…')}</Text>}>
+                  <PlaybookPanel getText={() => editor?.getText() ?? ''} onInsert={canEdit ? insertPlaybookWording : undefined} />
+                </React.Suspense>
               )}
 
               {/* TAB 1: QUICK FILL FORM (Baris yang harus diisi) */}

@@ -11,7 +11,7 @@ import type { OrgContext } from './rbac';
 
 export const API_RESOURCES = ['contracts', 'partners', 'orders', 'spendings'] as const;
 /** Resources a key can only read (no write scope exists for them). */
-export const API_READ_ONLY_RESOURCES = ['obligations'] as const;
+export const API_READ_ONLY_RESOURCES = ['obligations', 'clauses'] as const;
 export const API_SCOPES = [
   ...API_RESOURCES.flatMap((resource) => [`${resource}:read`, `${resource}:write`]),
   ...API_READ_ONLY_RESOURCES.map((resource) => `${resource}:read`),

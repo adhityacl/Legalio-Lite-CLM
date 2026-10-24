@@ -137,6 +137,8 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
 
   ['GET', '/api/v1/obligations', apiKey('obligations:read')],
   ['GET', '/api/v1/obligations/:id', apiKey('obligations:read')],
+  ['GET', '/api/v1/clauses', apiKey('clauses:read')],
+  ['GET', '/api/v1/clauses/:id', apiKey('clauses:read')],
 
   /* ---------------- canonical tenant API ---------------- */
   ['*', '/api/organizations/:organizationId/*', router('path organization + membership/platform context')],
@@ -305,6 +307,15 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/suggestions/summary', tenant('document.edit', 'pending counts of the contracts the caller may see')],
   ['POST', '/api/suggestions/:id/accept', tenant('document.edit', 'a person confirms: creates the obligation / key term with provenance; audited')],
   ['POST', '/api/suggestions/:id/reject', tenant('document.edit', 'audited')],
+  ['GET', '/api/clauses', tenant('document.view', 'clause library of the organization')],
+  ['GET', '/api/clauses/facets', tenant('document.view')],
+  ['GET', '/api/clauses/starter', tenant('document.view', 'starter set with what the organization already imported')],
+  ['POST', '/api/clauses/starter/import', tenant('tenant.settings.update', 'explicit per-organization opt-in; never overwrites existing clauses; audited')],
+  ['GET', '/api/clauses/:id', tenant('document.view')],
+  ['POST', '/api/clauses', tenant('document.edit', 'audited')],
+  ['PUT', '/api/clauses/:id', tenant('document.edit', 'version checked; audited')],
+  ['DELETE', '/api/clauses/:id', tenant('document.delete', 'audited')],
+  ['POST', '/api/playbook/check', tenant('document.view', 'read-only advisory check; the optional AI step uses the organization AI budget')],
   ['GET', '/api/metadata-fields', tenant('document.view')],
   ['POST', '/api/metadata-fields', tenant('tenant.settings.update')],
   ['DELETE', '/api/metadata-fields/:fieldId', tenant('tenant.settings.update')],

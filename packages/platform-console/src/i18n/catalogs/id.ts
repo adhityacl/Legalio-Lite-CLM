@@ -5,6 +5,7 @@ import { TREE_TRANSLATIONS } from '../hierarchyTree';
 import { INTEGRATION_TRANSLATIONS } from '../integrations';
 import { MAILER_TRANSLATIONS } from '../mailer';
 import { OBLIGATION_TRANSLATIONS } from '../obligations';
+import { CLAUSE_TRANSLATIONS } from '../clauses';
 import { SUGGESTION_TRANSLATIONS } from '../suggestions';
 import { TENANT_BOUNDARIES_TRANSLATIONS } from '../tenantBoundaries';
 import { UI_REFINEMENTS } from '../uiRefinements';
@@ -18,5 +19,6 @@ const ID: Record<string, string> = {
   ...INTEGRATION_TRANSLATIONS.ID,
   ...OBLIGATION_TRANSLATIONS.ID,
   ...SUGGESTION_TRANSLATIONS.ID,
+  ...CLAUSE_TRANSLATIONS.ID,
 };
 export default ID;

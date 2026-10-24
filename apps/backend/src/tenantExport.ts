@@ -209,6 +209,13 @@ async function buildArchive(db: Sql, job: ExportJob, zip: ReturnType<typeof crea
     FROM obligations WHERE organization_id = ? AND id > ? ORDER BY id LIMIT ?`, org, (rows) => rows), obligations));
   counts.obligations = obligations.n;
 
+  // Clause library (approved wording, fallbacks and playbook rules).
+  const clauses = { n: 0 };
+  await zip.addEntry('clauses.json', jsonArray(keyset(db, `
+    SELECT id, title, category, risk_level, approved_text, fallback_texts, guidance, language, jurisdiction, tags, rules, status, starter_key, version, created_by, created_at, updated_at
+    FROM clauses WHERE organization_id = ? AND id > ? ORDER BY id LIMIT ?`, org, (rows) => rows), clauses));
+  counts.clauses = clauses.n;
+
   // Activity log (operational history), JSON and CSV.
   const activityQuery = `SELECT * FROM activity_logs WHERE organization_id = ? AND id > ? ORDER BY id LIMIT ?`;
   const activity = { n: 0 };

@@ -106,7 +106,7 @@ test('the set of unauthenticated (public) routes is explicit and reviewed', () =
 test('policies only name known permissions and writes never rest on a view-only permission', () => {
   const viewOnly = new Set(['document.view', 'workspace.view']);
   // Reads that go through POST (AI over records the caller can already see) are the reviewed exceptions.
-  const readViaPost = new Set(['POST /api/chat']);
+  const readViaPost = new Set(['POST /api/chat', 'POST /api/playbook/check']);
   // A member's own e-mail preference: it changes nothing but what is sent to the caller, from data the caller can already see.
   const personalSetting = new Set(['PUT /api/organizations/:organizationId/digest/preferences']);
   for (const [method, pattern, policy] of ROUTE_POLICIES) {

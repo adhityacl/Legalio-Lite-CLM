@@ -18,10 +18,8 @@ import { contractRepository } from '../repositories/contractRepository';
 import { presentSuggestion, suggestionRepository } from '../repositories/suggestionRepository';
 import { organizationToday } from './obligations';
 import { extractFromPages } from '../contractExtraction';
-import { pagesFromBuffer, pagesFromText } from '../contractDocumentText';
+import { pagesFromBuffer, pagesFromText, storedContractPages } from '../contractDocumentText';
 import { acceptSuggestion, rejectSuggestion } from '../suggestionService';
-import { keyFromLink } from '../objectStore';
-import { getStore } from '../uploadStorage';
 import { componentLog } from '../logger';
 
 const log = componentLog('suggestions');
@@ -61,11 +59,7 @@ export function createSuggestionsRouter() {
       pages = pagesFromText(req.body.text);
       sourceName = 'pasted text';
     } else {
-      const key = keyFromLink(String(contract.contract_file_link ?? ''));
-      const stored = key ? await getStore().get(key) : null;
-      if (!stored) throw new PublicError('This contract has no stored document. Upload the file or paste its text.', 422, 'NO_DOCUMENT');
-      ({ pages } = await pagesFromBuffer(stored.body));
-      sourceName = contract.fileName ? String(contract.fileName).slice(0, 200) : 'stored document';
+      ({ pages, sourceName } = await storedContractPages(contract));
     }
     if (!pages.length) throw new PublicError('The document has no readable text to analyse.', 422, 'NO_DOCUMENT_TEXT');
 
