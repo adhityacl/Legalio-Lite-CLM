@@ -2,6 +2,7 @@ import { CONTRACT_TERMINATION_TRANSLATIONS } from '@legalio/shared/i18n/contract
 import { APPROVAL_TRANSLATIONS } from '../approvals';
 import { DOCUMENT_CALENDAR_TRANSLATIONS } from '../documentCalendar';
 import { TREE_TRANSLATIONS } from '../hierarchyTree';
+import { INTEGRATION_TRANSLATIONS } from '../integrations';
 import { MAILER_TRANSLATIONS } from '../mailer';
 import { TENANT_BOUNDARIES_TRANSLATIONS } from '../tenantBoundaries';
 import { UI_REFINEMENTS } from '../uiRefinements';
@@ -12,5 +13,6 @@ import { EXTRA_ID } from './extra.id';
 const ID: Record<string, string> = {
   ...BASE_ID, ...EXTRA_ID, ...UI_REFINEMENTS.ID, ...MAILER_TRANSLATIONS.ID, ...DOCUMENT_CALENDAR_TRANSLATIONS.ID,
   ...CONTRACT_TERMINATION_TRANSLATIONS.ID, ...TENANT_BOUNDARIES_TRANSLATIONS.ID, ...TREE_TRANSLATIONS.ID, ...APPROVAL_TRANSLATIONS.ID,
+  ...INTEGRATION_TRANSLATIONS.ID,
 };
 export default ID;

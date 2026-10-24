@@ -89,6 +89,17 @@ Upgrade notes: schema changes are versioned migrations (see POSTGRES_STORAGE.md)
   that crashes or exceeds two minutes is replaced and that file is processed inline, so an upload never fails because of the worker. Without the file
   (development with `tsx`, tests) everything runs inline as before.
 
+### Phase 3 background jobs and integrations
+
+All Phase 3 passes follow `REMINDER_SCHEDULER_ENABLED` (off under `APP_TEST_MODE`), run under their own PostgreSQL advisory lock (one instance at a time) and are idempotent through ledgers/claims.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `EXPORT_TTL_HOURS` | `24` | How long a finished tenant export can be downloaded; afterwards the job is `expired` and its chunks are deleted. |
+| `EXPORT_MAX_MB` | `1024` | A tenant export larger than this fails (`EXPORT_TOO_LARGE`); retry without files. The ZIP is stored in `export_job_chunks` (PostgreSQL), so size it against your database. |
+
+Tenant export (Settings > Data & API, organization admins): `POST /api/organizations/:id/exports` queues a job, a pass in the same process starts it immediately, a one-minute pass picks up leftovers, fails jobs whose heartbeat stopped (instance died) and expires finished ones. At most one queued/running export per organization. Requesting, and downloading, are written to the audit log (`export.request`, `export.request.with_files`, `export.download`).
+
 ### Health endpoints
 
 - `GET /api/health` is cheap liveness (process answers).

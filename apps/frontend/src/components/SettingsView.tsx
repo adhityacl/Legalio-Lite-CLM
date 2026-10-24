@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Building2, Users, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Building2, DatabaseZap, Users, type LucideIcon } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTenant } from '../context/TenantContext';
 import { useNavigation } from '../context/NavigationContext';
@@ -12,11 +12,12 @@ import { Button } from '@legalio/ui-components/button';
 import { ContextHeader } from '@legalio/ui-components/blocks';
 import { OrganizationTab } from './settings/OrganizationTab';
 import { MembersAccessTab } from './settings/MembersAccessTab';
+import { DataApiTab } from './settings/DataApiTab';
 
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 /**
- * Tenant Settings (PRD §6.1): one screen, at most two tabs —
- * Organization and Members & Access — filtered by the selected
+ * Tenant Settings (PRD §6.1): one screen, at most three tabs —
+ * Organization, Members & Access and Data & API — filtered by the selected
  * organization's capabilities. Hidden tabs are never mounted or fetched.
  */
 export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
@@ -32,6 +33,7 @@ export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
   const tabs: Array<{ id: SettingsTabId; label: string; icon: LucideIcon; visible: boolean }> = [
     { id: 'settings-organization', label: t('tb.tab_organization', 'Organization'), icon: Building2, visible: hasPermission('tenant.settings.read') },
     { id: 'settings-access', label: t('tb.tab_access', 'Members & Access'), icon: Users, visible: hasPermission('tenant.member.read') },
+    { id: 'settings-data', label: t('tb.tab_data', 'Data & API'), icon: DatabaseZap, visible: hasPermission('tenant.data.export') },
   ];
   const visible = tabs.filter((item) => item.visible);
   const orgName = activeTenant?.name || '';
@@ -95,6 +97,9 @@ export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
       </TabsContent>
       <TabsContent value="settings-access">
         {hasPermission('tenant.member.read') && <MembersAccessTab key={activeTenantId} organizationId={activeTenantId} intent={intent} />}
+      </TabsContent>
+      <TabsContent value="settings-data">
+        {hasPermission('tenant.data.export') && <DataApiTab key={activeTenantId} organizationId={activeTenantId} />}
       </TabsContent>
     </Tabs>
   );

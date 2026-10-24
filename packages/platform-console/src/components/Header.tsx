@@ -65,7 +65,7 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
       case 'ios': return t('nav.ios', 'Insertion Order (IO)');
       case 'notifikasi': return t('nav.notifications', 'Notifikasi & Log');
       case 'bulk-import': return t('nav.bulk_import', 'Import Data');
-      case 'settings-organization': case 'settings-access': return t('nav.settings', 'Pengaturan Sistem');
+      case 'settings-organization': case 'settings-access': case 'settings-data': return t('nav.settings', 'Pengaturan Sistem');
       default: return activeTab.startsWith('admin-system-') ? t('nav.system_admin', 'System Admin') : t('nav.dashboard', 'Dashboard');
     }
   })();

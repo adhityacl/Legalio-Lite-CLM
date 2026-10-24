@@ -10,7 +10,7 @@ export const OPERATIONAL_TABS = [
   'partner-evaluation', 'partner-spending', 'notifikasi', 'bulk-import', 'privacy', 'terms',
 ] as const;
 
-export const SETTINGS_TABS = ['settings-organization', 'settings-access'] as const;
+export const SETTINGS_TABS = ['settings-organization', 'settings-access', 'settings-data'] as const;
 export type SettingsTabId = (typeof SETTINGS_TABS)[number];
 
 import { SYSTEM_SUBMENUS, SYSTEM_TABS } from '@legalio/shared/systemConsole';
@@ -36,12 +36,14 @@ export type RouteDecision =
 export function defaultSettingsTab(ctx: RouteContext): SettingsTabId | null {
   if (ctx.can('tenant.settings.read')) return 'settings-organization';
   if (ctx.can('tenant.member.read')) return 'settings-access';
+  if (ctx.can('tenant.data.export')) return 'settings-data';
   return null;
 }
 
 const SETTINGS_PERMISSION: Record<SettingsTabId, string> = {
   'settings-organization': 'tenant.settings.read',
   'settings-access': 'tenant.member.read',
+  'settings-data': 'tenant.data.export',
 };
 
 /**

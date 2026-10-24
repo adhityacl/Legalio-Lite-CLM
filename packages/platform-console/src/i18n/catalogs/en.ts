@@ -2,6 +2,7 @@ import { CONTRACT_TERMINATION_TRANSLATIONS } from '@legalio/shared/i18n/contract
 import { APPROVAL_TRANSLATIONS } from '../approvals';
 import { DOCUMENT_CALENDAR_TRANSLATIONS } from '../documentCalendar';
 import { TREE_TRANSLATIONS } from '../hierarchyTree';
+import { INTEGRATION_TRANSLATIONS } from '../integrations';
 import { MAILER_TRANSLATIONS } from '../mailer';
 import { TENANT_BOUNDARIES_TRANSLATIONS } from '../tenantBoundaries';
 import { UI_REFINEMENTS } from '../uiRefinements';
@@ -12,5 +13,6 @@ import { EXTRA_EN } from './extra.en';
 const EN: Record<string, string> = {
   ...BASE_EN, ...EXTRA_EN, ...UI_REFINEMENTS.EN, ...MAILER_TRANSLATIONS.EN, ...DOCUMENT_CALENDAR_TRANSLATIONS.EN,
   ...CONTRACT_TERMINATION_TRANSLATIONS.EN, ...TENANT_BOUNDARIES_TRANSLATIONS.EN, ...TREE_TRANSLATIONS.EN, ...APPROVAL_TRANSLATIONS.EN,
+  ...INTEGRATION_TRANSLATIONS.EN,
 };
 export default EN;

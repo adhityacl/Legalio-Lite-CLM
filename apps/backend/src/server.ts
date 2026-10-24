@@ -41,6 +41,7 @@ import { createAggregatesRouter } from "./routes/aggregates";
 import { createAiRouter } from "./routes/ai";
 import { createBulkImportRouter } from "./routes/bulkImport";
 import { createContractsRouter } from "./routes/contracts";
+import { createDataExportRouter } from "./routes/dataExport";
 import { createEvaluationsRouter } from "./routes/evaluations";
 import { createGoogleAuthRouter } from "./routes/googleAuth";
 import { createGoogleIntegrationRouter } from "./routes/googleIntegration";
@@ -67,6 +68,7 @@ import { partnerRepository } from "./repositories/partnerRepository";
 import { anyBusinessData } from "./businessData";
 import { insertRepositoryRows } from "./repositories/seed";
 import { ensureSchema } from "./schema";
+import { startBackgroundJobs, stopBackgroundJobs } from "./backgroundJobs";
 import { startSharedStateSync, stopSharedStateSync } from "./sharedState";
 
 const log = componentLog("server");
@@ -130,6 +132,7 @@ export async function init() {
   // then finds nothing left to do (every step is idempotent).
   await withAdvisoryLockWait(STARTUP_LOCK_KEY, prepareData);
   reminderScheduler.start();
+  startBackgroundJobs();
   // Other instances' changes to the configuration, the organizations' policies and the credentials arrive by NOTIFY (with a periodic fallback).
   if (process.env.SHARED_STATE_SYNC !== "false") startSharedStateSync();
 }
@@ -254,6 +257,7 @@ app.use("/api", createOrganizationAdminRouter({
   },
 }));
 
+app.use("/api", createDataExportRouter({ db: sql, deps: () => ({ store: getStore }) }));
 app.use(createPartnersRouter());
 app.use(createEvaluationsRouter());
 app.use(createSpendingsRouter());
@@ -284,6 +288,7 @@ app.use(errorResponder());
 export async function drain() {
   await stopSharedStateSync();
   await stopReminderScheduler();
+  await stopBackgroundJobs();
   await stopPdfWorkers();
   await coreSaver.idle();
 }

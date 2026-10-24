@@ -78,6 +78,12 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/policy-packs', self('pack catalog (non-secret reference data)')],
   ['POST', '/api/user/log-activity', self('login/logout activity of the caller')],
 
+  /* ---------------- organization data, integrations and digests (the organization is the :organizationId path segment) ---------------- */
+  ['POST', '/api/organizations/:organizationId/exports', orgParam('tenant.data.export', 'queues a tenant data export; audited')],
+  ['GET', '/api/organizations/:organizationId/exports', orgParam('tenant.data.export')],
+  ['GET', '/api/organizations/:organizationId/exports/:jobId', orgParam('tenant.data.export')],
+  ['GET', '/api/organizations/:organizationId/exports/:jobId/download', orgParam('tenant.data.export', 'streams the finished ZIP until it expires; audited')],
+
   /* ---------------- canonical tenant API ---------------- */
   ['*', '/api/organizations/:organizationId/*', router('path organization + membership/platform context')],
   ['GET', '/api/platform/configuration', router('platform.configuration.read')],
@@ -298,9 +304,11 @@ export function createAuthorizationMiddleware(db: Sql) {
       }
       let ctx;
       if (policy.kind === 'orgParam') {
+        // `/api/tenants/:id/...` names the organization `id`; `/api/organizations/:organizationId/...` names it `organizationId`.
+        const organizationId = params.id ?? params.organizationId;
         const headers = [req.headers['x-organization-id'], req.headers['x-tenant-id']].map((v) => (typeof v === 'string' ? v.trim() : '')).filter(Boolean);
-        if (headers.some((v) => v !== params.id)) throw new RequestDenied(400, 'ORGANIZATION_SELECTOR_CONFLICT');
-        ctx = await resolveOrganizationContext(db, identity, params.id);
+        if (headers.some((v) => v !== organizationId)) throw new RequestDenied(400, 'ORGANIZATION_SELECTOR_CONFLICT');
+        ctx = await resolveOrganizationContext(db, identity, organizationId);
       } else {
         ctx = await resolveLegacyContext(db, identity, req, { includeBody: policy.includeBody });
       }

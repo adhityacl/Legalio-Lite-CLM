@@ -2,6 +2,7 @@ import { CONTRACT_TERMINATION_TRANSLATIONS } from '@legalio/shared/i18n/contract
 import { APPROVAL_TRANSLATIONS } from '../approvals';
 import { DOCUMENT_CALENDAR_TRANSLATIONS } from '../documentCalendar';
 import { TREE_TRANSLATIONS } from '../hierarchyTree';
+import { INTEGRATION_TRANSLATIONS } from '../integrations';
 import { MAILER_TRANSLATIONS } from '../mailer';
 import { TENANT_BOUNDARIES_TRANSLATIONS } from '../tenantBoundaries';
 import { UI_REFINEMENTS } from '../uiRefinements';
@@ -11,5 +12,6 @@ import { ZH_TRANSLATIONS } from '../zh';
 const ZH: Record<string, string> = {
   ...ZH_TRANSLATIONS, ...UI_REFINEMENTS.ZH, ...MAILER_TRANSLATIONS.ZH, ...DOCUMENT_CALENDAR_TRANSLATIONS.ZH,
   ...CONTRACT_TERMINATION_TRANSLATIONS.ZH, ...TENANT_BOUNDARIES_TRANSLATIONS.ZH, ...TREE_TRANSLATIONS.ZH, ...APPROVAL_TRANSLATIONS.ZH,
+  ...INTEGRATION_TRANSLATIONS.ZH,
 };
 export default ZH;
