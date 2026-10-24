@@ -20,6 +20,7 @@ import { documentsApi } from '../../lib/documentsApi';
 import { approvalsApi } from './approvalsApi';
 import type { ApprovalDraft } from './ApprovalForm';
 import { LOCALE, PersonAvatar, StatusBadge, categoryLabel, formatDateTime } from './approvalUi';
+import { voidHandler } from '@legalio/shared/voidHandler';
 
 interface Props {
   id: string;
@@ -146,7 +147,7 @@ export const ApprovalDetail: React.FC<Props> = ({ id, onBack, onRevise }) => {
                   {detail.source === 'document' ? t('approval.detail.from_my_documents', 'My Documents') : detail.file_name.split('.').pop()?.toUpperCase()} • {formatBytes(detail.file_size)}
                 </Text>
               </div>
-              <Button variant="outline" size="sm" type="button" onClick={openFile}><ExternalLink className="size-g13" aria-hidden />{t('approval.detail.open', 'Open')}</Button>
+              <Button variant="outline" size="sm" type="button" onClick={voidHandler(openFile)}><ExternalLink className="size-g13" aria-hidden />{t('approval.detail.open', 'Open')}</Button>
             </div>
           </Card>
 
@@ -194,10 +195,10 @@ export const ApprovalDetail: React.FC<Props> = ({ id, onBack, onRevise }) => {
                 placeholder={t('approval.detail.comment_placeholder', 'Add a note for the requester…')} />
             </Field>
             <div className="mt-auto space-y-g8 pt-g13">
-              <Button variant="destructive-outline" className="w-full" type="button" loading={deciding === 'reject'} disabled={Boolean(deciding)} onClick={() => decide('reject')}>
+              <Button variant="destructive-outline" className="w-full" type="button" loading={deciding === 'reject'} disabled={Boolean(deciding)} onClick={() => void decide('reject')}>
                 <X className="size-g16" aria-hidden />{t('approval.detail.reject', 'Reject approval')}
               </Button>
-              <Button className="w-full" type="button" loading={deciding === 'approve'} disabled={Boolean(deciding)} onClick={() => decide('approve')}>
+              <Button className="w-full" type="button" loading={deciding === 'approve'} disabled={Boolean(deciding)} onClick={() => void decide('approve')}>
                 <Check className="size-g16" aria-hidden />{t('approval.detail.approve', 'Approve')}
               </Button>
             </div>

@@ -126,7 +126,7 @@ export const ApprovalInbox: React.FC<Props> = ({ onOpen, onCreate }) => {
         <div className="flex flex-wrap items-center justify-between gap-g13">
           <Heading as="h2" size="md" weight="semibold" id="approval-inbox-heading">{t('nav.document_approval', 'My Approval')}</Heading>
           <div className="flex items-center gap-g8">
-            <Button variant="outline" size="icon-md" type="button" onClick={() => refetch()} loading={isFetching} aria-label={t('approval.refresh', 'Refresh')}>
+            <Button variant="outline" size="icon-md" type="button" onClick={() => void refetch()} loading={isFetching} aria-label={t('approval.refresh', 'Refresh')}>
               <RefreshCw className="size-g16" aria-hidden />
             </Button>
             <Button type="button" onClick={onCreate}>
@@ -191,7 +191,7 @@ export const ApprovalInbox: React.FC<Props> = ({ onOpen, onCreate }) => {
             <div role="alert" className="space-y-g13 p-g34 text-center">
               <Text size="sm" weight="semibold" tone="destructive">{t('approval.load_failed', 'Could not load approvals.')}</Text>
               <Text size="xs" tone="muted">{(error as Error).message}</Text>
-              <Button variant="ghost" type="button" onClick={() => refetch()}>
+              <Button variant="ghost" type="button" onClick={() => void refetch()}>
                 <RefreshCw className="h-g13 w-g13" aria-hidden />
                 {t('common.retry', 'Coba lagi')}
               </Button>

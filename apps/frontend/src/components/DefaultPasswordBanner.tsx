@@ -10,6 +10,7 @@ import {
   Dialog, DialogBackdrop, DialogBody, DialogCloseIcon, DialogCloseTrigger, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPositioner, DialogTitle, DialogTrigger,
 } from '@legalio/ui-components/dialog';
 import { GoogleCredentialsDialog } from './settings/GoogleCredentialsDialog';
+import { voidHandler } from '@legalio/shared/voidHandler';
 interface DefaultPasswordBannerProps {
   /** Opens the user administration screen, for changing other accounts. */
   onOpenSecurity: () => void;
@@ -128,7 +129,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
                   <DialogCloseIcon aria-label={t('common.close', 'Close')} />
                   <DialogDescription>{t('security.change_password_desc', 'Other sessions will be signed out after the change.')}</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={submit} noValidate aria-busy={state.kind === 'saving'}>
+                <form onSubmit={voidHandler(submit)} noValidate aria-busy={state.kind === 'saving'}>
                   <DialogBody className="grid gap-g13">
                     {[
                       { id: currentId, label: t('security.current_password', 'Current password'), value: current, set: setCurrent, auto: 'current-password' as const },
@@ -165,7 +166,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
         )}
         {passwordActive && <Button size="sm" variant="outline" onClick={onOpenSecurity}>{t('security.manage_users', 'Manage users')}</Button>}
         {googleIncomplete && showGoogleSetup && (
-          <GoogleCredentialsDialog onClose={refresh} trigger={<Button size="sm">{t('google_setup.button', 'Hubungkan Google')}</Button>} />
+          <GoogleCredentialsDialog onClose={voidHandler(refresh)} trigger={<Button size="sm">{t('google_setup.button', 'Hubungkan Google')}</Button>} />
         )}
       </AlertActions>
     </Alert>

@@ -29,6 +29,7 @@ import { FileUpload, FileUploadDropzone, FileUploadDropzoneIcon, FileUploadHidde
 import { TagsInput, TagsInputClearTrigger, TagsInputControl, TagsInputHiddenInput, TagsInputInput, TagsInputItems, TagsInputLabel } from '@legalio/ui-components/tags-input';
 import { Spinner } from '@legalio/ui-components/spinner';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { voidHandler } from '@legalio/shared/voidHandler';
 export const ENTERPRISE_DEPARTMENTS = [
   'Executive Office',
   'Commercial & Marketing',
@@ -285,7 +286,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
     identifiers, dd_documents: partnerToEdit?.dd_documents }, partners, new Date().toISOString().slice(0, 10));
 
   return (
-    <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-g21" aria-labelledby="partner-form-heading">
+    <form onSubmit={voidHandler(handleSubmit)} className="w-full min-w-0 space-y-g21" aria-labelledby="partner-form-heading">
       <div className="flex flex-wrap items-center justify-between gap-g13">
         <Heading as="h2" size="md" weight="semibold" id="partner-form-heading">
           {partnerToEdit?.partner_id ? t('form.partner.title_edit', 'Edit Data Partner') : t('form.partner.page_title_new', 'Add a new partner')}
@@ -414,7 +415,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                     />
                     <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm"
                       type="button"
-                      onClick={handleGenerateNotes}
+                      onClick={voidHandler(handleGenerateNotes)}
                       disabled={isGeneratingNotes || !namaPartner.trim()}
                       className="absolute bottom-g8 end-g8"
                     >
@@ -436,7 +437,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
                 </FileUploadDropzone>
                 <FileUploadHiddenInput />
               </FileUpload>
-              {fileData && <Button variant="secondary" onClick={handleParsePartner} loading={isParsing} className="self-start">{isParsing ? t('partners.parsing', 'Parsing...') : t('partners.parse_file', 'Parse File')}</Button>}
+              {fileData && <Button variant="secondary" onClick={voidHandler(handleParsePartner)} loading={isParsing} className="self-start">{isParsing ? t('partners.parsing', 'Parsing...') : t('partners.parse_file', 'Parse File')}</Button>}
             </FormSection>
             {error && (
               <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>

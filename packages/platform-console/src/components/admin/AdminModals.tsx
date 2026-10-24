@@ -47,6 +47,7 @@ import { Checkbox, CheckboxControl, CheckboxGroup, CheckboxHiddenInput, Checkbox
 import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
 import { Text } from '@legalio/ui-components/text';
 import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
+import { voidHandler } from '@legalio/shared/voidHandler';
 // Add user modal
 
 interface AddUserModalProps {
@@ -178,7 +179,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
+        <form onSubmit={voidHandler(handleSubmit)} className="p-g21 space-y-g13">
           {error && (
             <Alert status="error" role="alert"><AlertIndicator />
               <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
@@ -425,7 +426,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
+        <form onSubmit={voidHandler(handleSubmit)} className="p-g21 space-y-g13">
           {error && (
             <Alert status="error" role="alert"><AlertIndicator />
               <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
@@ -612,7 +613,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
+        <form onSubmit={voidHandler(handleSubmit)} className="p-g21 space-y-g13">
           {error && (
             <Alert status="error" role="alert"><AlertIndicator />
               <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
@@ -732,7 +733,7 @@ export const CreateOrganizationModal: React.FC<CreateOrgModalProps> = ({
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
+        <form onSubmit={voidHandler(handleSubmit)} className="p-g21 space-y-g13">
           {error && (
             <Alert status="error" role="alert"><AlertIndicator />
               <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
@@ -925,7 +926,7 @@ export const EditOrganizationModal: React.FC<EditOrganizationModalProps> = ({
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
+        <form onSubmit={voidHandler(handleSubmit)} className="p-g21 space-y-g13">
           {error && (
             <Alert status="error" role="alert"><AlertIndicator />
               <AlertContent><AlertDescription>{error}</AlertDescription></AlertContent>
@@ -1095,7 +1096,7 @@ export const ResetOrganizationModal: React.FC<ResetOrganizationModalProps> = ({ 
 
         <div className="pt-g8 flex items-center justify-end gap-g8">
           <Button variant="ghost" type="button" onClick={onClose}>{t('admin.btn_cancel', 'Batal')}</Button>
-          <Button variant="destructive" type="button" onClick={handleReset} disabled={!matches || isResetting}>
+          <Button variant="destructive" type="button" onClick={voidHandler(handleReset)} disabled={!matches || isResetting}>
             <RotateCcw className="w-g13 h-g13" />
             <span>{isResetting ? t('admin.resetting', 'Mereset...') : t('admin.btn_confirm_reset', 'Reset Permanen')}</span>
           </Button>
@@ -1203,7 +1204,7 @@ export const DeleteOrganizationModal: React.FC<DeleteOrganizationModalProps> = (
             {!isDefault && !isActive && (
               <Button variant="destructive"
                 type="button"
-                onClick={handleDelete}
+                onClick={voidHandler(handleDelete)}
                 disabled={isDeleting}
               >
                 <Trash2 className="w-g13 h-g13" />
@@ -1269,7 +1270,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
           </Button>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
+        <form onSubmit={voidHandler(handleSubmit)} className="p-g21 space-y-g13">
           {errorMsg && (
             <Alert status="error" role="alert"><AlertIndicator />
               <AlertContent><AlertDescription>{errorMsg}</AlertDescription></AlertContent>
@@ -1385,7 +1386,7 @@ export const EditDepartmentModal: React.FC<EditDepartmentModalProps> = ({
           </Button>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
+        <form onSubmit={voidHandler(handleSubmit)} className="p-g21 space-y-g13">
           {errorMsg && (
             <Alert status="error" role="alert"><AlertIndicator />
               <AlertContent><AlertDescription>{errorMsg}</AlertDescription></AlertContent>
@@ -1544,7 +1545,7 @@ export const DeleteDepartmentModal: React.FC<DeleteDepartmentModalProps> = ({
             </Button>
             <Button variant="destructive"
               type="button"
-              onClick={handleDelete}
+              onClick={voidHandler(handleDelete)}
               disabled={isDeleting}
             >
               <Trash2 className="w-g13 h-g13" />
@@ -1609,7 +1610,7 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
+        <form onSubmit={voidHandler(handleSubmit)} className="p-g21 space-y-g13">
           <div>
             <div className="text-xs text-muted-foreground">{t('admin.target_team', 'Tim Tujuan')}:</div>
             <div className="font-semibold text-sm text-foreground">{team.name}</div>
@@ -1710,7 +1711,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
           <DialogCloseIcon aria-label={t('redline.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
+        <form onSubmit={voidHandler(handleSubmit)} className="p-g21 space-y-g13">
           <Card className="p-g13 text-xs text-muted-foreground space-y-g3">
             <Text size="sm" weight="semibold" className="flex items-center gap-g5">
               <Mail className="w-g13 h-g13 text-accent-foreground" />
@@ -1898,7 +1899,7 @@ export const GenerateApiKeyModal: React.FC<GenerateApiKeyModalProps> = ({
                 />
                 <Button variant="ghost"
                   type="button"
-                  onClick={handleCopy}
+                  onClick={voidHandler(handleCopy)}
                   className="shrink-0"
                 >
                   {copied ? <Check className="w-g13 h-g13" /> : <Copy className="w-g13 h-g13" />}
@@ -1917,7 +1918,7 @@ export const GenerateApiKeyModal: React.FC<GenerateApiKeyModalProps> = ({
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-g21 space-y-g13">
+          <form onSubmit={voidHandler(handleSubmit)} className="p-g21 space-y-g13">
             <Field>
               <FieldLabel htmlFor="adminmodals-field-26">
                 {t('admin.api_name_label', 'Nama Kunci / Sistem Pengguna')}

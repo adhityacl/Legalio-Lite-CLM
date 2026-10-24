@@ -18,6 +18,7 @@ import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/
 import { FileUpload, FileUploadHiddenInput, FileUploadTrigger } from '@legalio/ui-components/file-upload';
 import { Editable, EditableArea, EditableContext, EditableControl, EditableEditTrigger, EditableInput, EditablePreview, EditableSubmitTrigger } from '@legalio/ui-components/editable';
 import { Text } from '@legalio/ui-components/text';
+import { voidHandler } from '@legalio/shared/voidHandler';
 interface UITextManagerModalProps {
   isOpen?: boolean;
   onClose: () => void;
@@ -175,7 +176,7 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
           <div className="flex flex-wrap items-center gap-g8">
             <Button variant="outline"
               type="button"
-              onClick={exportToCSV}
+              onClick={voidHandler(exportToCSV)}
               disabled={translationsBusy}
             >
               <Download className="w-g16 h-g16 text-accent-foreground" aria-hidden />
@@ -193,7 +194,7 @@ export const UITextManagerModal: React.FC<UITextManagerModalProps> = ({ isOpen =
             {totalCustomCount > 0 && (
               <Button variant="destructive"
                 type="button"
-                onClick={handleReset}
+                onClick={voidHandler(handleReset)}
                 disabled={translationsBusy}
               >
                 <RotateCcw className="size-g16" aria-hidden="true" />

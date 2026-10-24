@@ -23,6 +23,7 @@ import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { Spinner } from '@legalio/ui-components/spinner';
 import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
+import { voidHandler } from '@legalio/shared/voidHandler';
 interface UploadDDModalProps {
   partner: Partner;
   docName: string;
@@ -173,7 +174,7 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="p-g13 sm:p-g21 space-y-g13 overflow-y-auto flex-1">
+        <form onSubmit={voidHandler(handleSubmit)} className="p-g13 sm:p-g21 space-y-g13 overflow-y-auto flex-1">
           {/* List of previously uploaded annual/versioned files */}
           {existingFiles.length > 0 && (
             <div className="space-y-g8">
@@ -215,7 +216,7 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
                       )}
                       <Tooltip><TooltipTrigger asChild><Button variant="secondary"
                         type="button"
-                        onClick={() => handleDeleteExistingFile(f.id)}
+                        onClick={() => void handleDeleteExistingFile(f.id)}
                         disabled={isDeletingFileId === f.id}
                       >
                         {isDeletingFileId === f.id ? (

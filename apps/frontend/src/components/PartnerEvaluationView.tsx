@@ -59,6 +59,7 @@ import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { Text } from '@legalio/ui-components/text';
 import { FormSection } from '@legalio/ui-components/blocks';
+import { voidHandler } from '@legalio/shared/voidHandler';
 interface PartnerEvaluationViewProps {
   partners: Partner[];
   contracts?: Contract[];
@@ -702,7 +703,7 @@ export const PartnerEvaluationView: React.FC<PartnerEvaluationViewProps> = ({
 
   if (showFormModal) {
     return (
-    <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-g21" aria-labelledby="evaluation-form-heading">
+    <form onSubmit={voidHandler(handleSubmit)} className="w-full min-w-0 space-y-g21" aria-labelledby="evaluation-form-heading">
       <div className="flex flex-wrap items-center justify-between gap-g13">
         <Heading as="h2" size="md" weight="semibold" id="evaluation-form-heading">
           {isSavedEvaluation ? t('eval.modal_title_edit', 'Edit Evaluasi Partner') : t('eval.modal_title_add', 'Form Evaluasi Partner')}

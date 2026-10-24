@@ -8,6 +8,7 @@ import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { Text } from '@legalio/ui-components/text';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { voidHandler } from '@legalio/shared/voidHandler';
 
 interface ContractRedliningPanelProps {
   /** AI review endpoint and the current (possibly unsaved) form values it receives. */
@@ -75,7 +76,7 @@ export const ContractRedliningPanel: React.FC<ContractRedliningPanelProps> = ({ 
         </div>
       )}
 
-      <Button type="button" onClick={analyze} loading={loading} disabled={!canAnalyze || loading} className="w-full">
+      <Button type="button" onClick={voidHandler(analyze)} loading={loading} disabled={!canAnalyze || loading} className="w-full">
         <Send aria-hidden />
         {analysis ? t('redline.reanalyze', 'Analisis Ulang') : t('redline.analyze', 'Analyze')}
       </Button>

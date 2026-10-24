@@ -9,6 +9,7 @@ import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/
 import { Heading } from '@legalio/ui-components/heading';
 import { Text } from '@legalio/ui-components/text';
 import { Card } from '@legalio/ui-components/card';
+import { voidHandler } from '@legalio/shared/voidHandler';
 export function ContractEndingSummary({ contract }: { contract: Contract }) {
   const { t } = useLanguage();
   const [error, setError] = useState(false);
@@ -17,9 +18,9 @@ export function ContractEndingSummary({ contract }: { contract: Contract }) {
     <Heading as="h3" size="xs" weight="bold">{t(contract.termination_date ? 'termination.details' : 'termination.expired_details')}</Heading>
     <Text size="sm"><Text as="strong" size="sm">{t(contract.termination_date ? 'termination.date' : 'termination.end_date')}: </Text>{formatBusinessDate(contract.termination_date || contract.end_date)}</Text>
     {contract.termination_reason && <Text size="sm" className="whitespace-pre-wrap break-words"><Text as="strong" size="sm">{t('termination.reason')}: </Text>{contract.termination_reason}</Text>}
-    {contract.termination_document && <Button type="button" variant="outline" className="max-w-full" onClick={async () => {
+    {contract.termination_document && <Button type="button" variant="outline" className="max-w-full" onClick={voidHandler(async () => {
       try { await openTerminationDocument(contract.termination_document!); setError(false); } catch { setError(true); }
-    }}>{t('termination.document')}: {contract.termination_document.fileName}</Button>}
+    })}>{t('termination.document')}: {contract.termination_document.fileName}</Button>}
     {error && <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{t('termination.file_open_error')}</AlertDescription></AlertContent></Alert>}
   </section></Card>;
 }

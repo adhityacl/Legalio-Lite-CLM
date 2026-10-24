@@ -31,6 +31,7 @@ import { Separator } from '@legalio/ui-components/separator';
 import { Card } from '@legalio/ui-components/card';
 import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
+import { voidHandler } from '@legalio/shared/voidHandler';
 interface DocumentInfoPanelProps {
   document: DocumentDetail | null;
   organizationName: string;
@@ -212,7 +213,7 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
         ) : !document ? (
           <Text size="sm" tone="muted">{t('documents.metadata.unsaved', 'Simpan dokumen terlebih dahulu untuk mengisi metadata.')}</Text>
         ) : (
-          <form onSubmit={saveMetadata} className="flex flex-col gap-g13" aria-busy={saveState.status === 'saving'}>
+          <form onSubmit={voidHandler(saveMetadata)} className="flex flex-col gap-g13" aria-busy={saveState.status === 'saving'}>
             {fields.map(renderInput)}
             {saveState.status === 'error' && (
               <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{saveState.message}</AlertDescription></AlertContent></Alert>
@@ -237,7 +238,7 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
                 {fields.map(field => (
                   <ListItem key={field.id} className="flex items-center justify-between gap-g8 rounded-md border border-border p-g5 ps-g13 text-sm">
                     <span className="min-w-0"><span className="font-semibold">{field.name}</span><Text as="span" size="xs" tone="muted"> · {fieldTypeLabel(field.field_type)}</Text></span>
-                    <Button variant="ghost" size="icon-sm" onClick={() => removeField(field)} className="text-destructive" aria-label={`${t('documents.action.delete', 'Hapus')}: ${field.name}`}>
+                    <Button variant="ghost" size="icon-sm" onClick={() => void removeField(field)} className="text-destructive" aria-label={`${t('documents.action.delete', 'Hapus')}: ${field.name}`}>
                       <Trash2 aria-hidden="true" />
                     </Button>
                   </ListItem>
@@ -245,7 +246,7 @@ export const DocumentInfoPanel: React.FC<DocumentInfoPanelProps> = ({ document, 
               </List>
             )}
             <Card size="sm" className="p-g13">
-              <form onSubmit={addField} className="flex flex-col gap-g13">
+              <form onSubmit={voidHandler(addField)} className="flex flex-col gap-g13">
                 <Field required>
                   <FieldLabel className="font-semibold">{t('documents.metadata.field_name', 'Nama kolom')}</FieldLabel>
                   <Input value={newField.name} onChange={(e) => setNewField({ ...newField, name: e.target.value })} placeholder={t('documents.metadata.field_name_placeholder', 'mis. Kode Matter')} />

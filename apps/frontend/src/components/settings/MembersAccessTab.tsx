@@ -30,6 +30,7 @@ import { Clipboard, ClipboardControl, ClipboardInput, ClipboardLabel, ClipboardT
 import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
 import { Spinner } from '@legalio/ui-components/spinner';
 import { List, ListItem } from '@legalio/ui-components/list';
+import { voidHandler } from '@legalio/shared/voidHandler';
 const LazyActivityLogsView = lazy(() => import('../ActivityLogsView').then((m) => ({ default: m.ActivityLogsView })));
 
 interface Member { id: string; userId: string; name: string; email: string; tenantRole: TenantRole; status: 'active' | 'suspended'; departmentIds: string[]; createdAt: string }
@@ -191,7 +192,7 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
       <Card className="overflow-hidden">
         {failed ? (
           <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{t('tb.members_load_error', 'Members could not be loaded.')}</AlertDescription></AlertContent>
-            <AlertActions><Button type="button" variant="outline" size="sm" onClick={() => refresh()}><RefreshCw aria-hidden="true" />{t('tb.retry', 'Retry')}</Button></AlertActions></Alert>
+            <AlertActions><Button type="button" variant="outline" size="sm" onClick={() => void refresh()}><RefreshCw aria-hidden="true" />{t('tb.retry', 'Retry')}</Button></AlertActions></Alert>
         ) : loading ? (
           <div className="space-y-g8 p-g13" aria-busy="true"><Skeleton className="h-g42 w-full" /><Skeleton className="h-g42 w-full" /><Skeleton className="h-g42 w-full" /></div>
         ) : filter === 'pending' ? (
@@ -211,8 +212,8 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
                     <TableCell>{new Date(inv.expiresAt).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-g3">
-                        {can('tenant.invitation.resend') && <Button type="button" variant="ghost" size="sm" onClick={() => resend(inv)}><RefreshCw className="h-g16 w-g16" aria-hidden="true" />{t('tb.resend', 'Resend')}</Button>}
-                        {can('tenant.invitation.cancel') && <Button type="button" variant="ghost" size="sm" onClick={() => cancel(inv)}><X className="h-g16 w-g16" aria-hidden="true" />{t('tb.cancel_invitation', 'Cancel invitation')}</Button>}
+                        {can('tenant.invitation.resend') && <Button type="button" variant="ghost" size="sm" onClick={() => void resend(inv)}><RefreshCw className="h-g16 w-g16" aria-hidden="true" />{t('tb.resend', 'Resend')}</Button>}
+                        {can('tenant.invitation.cancel') && <Button type="button" variant="ghost" size="sm" onClick={() => void cancel(inv)}><X className="h-g16 w-g16" aria-hidden="true" />{t('tb.cancel_invitation', 'Cancel invitation')}</Button>}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -248,9 +249,9 @@ export const MembersAccessTab: React.FC<{ organizationId: string; intent?: strin
                               <Button type="button" variant="ghost" size="icon-sm" onClick={() => setDialog({ kind: 'edit', member: m })} aria-label={t('tb.edit_access_for', 'Edit access for {name}', { name: m.name || m.email })}><Pencil className="h-g13 w-g13" aria-hidden="true" /></Button>
                             )}
                             {can('tenant.member.status.update') && (m.status === 'active'
-                              ? <Button type="button" variant="ghost" size="icon-sm" onClick={() => setStatus(m, 'suspended')} aria-label={t('tb.suspend_for', 'Suspend membership of {name}', { name: m.name || m.email })}><UserX className="h-g13 w-g13" aria-hidden="true" /></Button>
-                              : <Button type="button" variant="ghost" size="icon-sm" onClick={() => setStatus(m, 'active')} aria-label={t('tb.reactivate_for', 'Reactivate membership of {name}', { name: m.name || m.email })}><UserCheck className="h-g13 w-g13" aria-hidden="true" /></Button>)}
-                            {can('tenant.member.remove') && <Button type="button" variant="ghost" size="icon-sm" onClick={() => remove(m)} aria-label={t('tb.remove_for', 'Remove membership of {name}', { name: m.name || m.email })}><UserMinus className="h-g13 w-g13" aria-hidden="true" /></Button>}
+                              ? <Button type="button" variant="ghost" size="icon-sm" onClick={() => void setStatus(m, 'suspended')} aria-label={t('tb.suspend_for', 'Suspend membership of {name}', { name: m.name || m.email })}><UserX className="h-g13 w-g13" aria-hidden="true" /></Button>
+                              : <Button type="button" variant="ghost" size="icon-sm" onClick={() => void setStatus(m, 'active')} aria-label={t('tb.reactivate_for', 'Reactivate membership of {name}', { name: m.name || m.email })}><UserCheck className="h-g13 w-g13" aria-hidden="true" /></Button>)}
+                            {can('tenant.member.remove') && <Button type="button" variant="ghost" size="icon-sm" onClick={() => void remove(m)} aria-label={t('tb.remove_for', 'Remove membership of {name}', { name: m.name || m.email })}><UserMinus className="h-g13 w-g13" aria-hidden="true" /></Button>}
                           </div>
                         ) : <MoreHorizontal className="ml-auto h-g16 w-g16 text-primary-foreground" aria-hidden="true" />}
                       </TableCell>
@@ -327,7 +328,7 @@ const InviteDialog: React.FC<{
   return (
     <ModalFrame size="md" onClose={onClose} >
       <DialogHeader title={codeOnly ? t('onboarding.generate_code', 'Generate invite code') : t('tb.invite_member', 'Invite member')} onClose={onClose} />
-      <form onSubmit={submit} noValidate className="flex flex-col gap-g13 overflow-y-auto p-g21">
+      <form onSubmit={voidHandler(submit)} noValidate className="flex flex-col gap-g13 overflow-y-auto p-g21">
         {!codeOnly && <Field>
           <FieldLabel htmlFor={ids.email}>{t('tb.col_email', 'Email')}</FieldLabel>
           <Input id={ids.email} type="email" autoComplete="off" value={email} aria-invalid={email.length > 0 && !emailValid} aria-describedby={email.length > 0 && !emailValid ? `${ids.email}-error` : undefined} onChange={(e) => setEmail(e.target.value)} />
@@ -422,7 +423,7 @@ const EditMemberDialog: React.FC<{
   return (
     <ModalFrame size="md" onClose={onClose} >
       <DialogHeader title={t('tb.edit_access_for', 'Edit access for {name}', { name: member.name || member.email })} onClose={onClose} />
-      <form onSubmit={submit} noValidate className="flex flex-col gap-g13 overflow-y-auto p-g21">
+      <form onSubmit={voidHandler(submit)} noValidate className="flex flex-col gap-g13 overflow-y-auto p-g21">
         <Field>
           <FieldLabel htmlFor={roleId}>{t('tb.col_role', 'Role')}</FieldLabel>
           <NativeSelect id={roleId} value={role} disabled={!canRole} onChange={(e) => setRole(e.target.value as TenantRole)}>
@@ -477,7 +478,7 @@ const DepartmentsDialog: React.FC<{ organizationId: string; departments: Departm
       <div className="flex flex-col gap-g13 overflow-y-auto p-g21">
         {!hasPermission('department.create') && <Text size="sm" tone="muted">{t('tb.departments_readonly', 'You can see your assigned departments. Only administrators can change them.')}</Text>}
         {hasPermission('department.create') && (
-          <form className="flex items-end gap-g8" onSubmit={async (e) => { e.preventDefault(); if (name.trim() && (await act(() => orgApi(orgPath(organizationId, '/departments'), { method: 'POST', body: { name: name.trim() } })))) setName(''); }}>
+          <form className="flex items-end gap-g8" onSubmit={voidHandler(async (e) => { e.preventDefault(); if (name.trim() && (await act(() => orgApi(orgPath(organizationId, '/departments'), { method: 'POST', body: { name: name.trim() } })))) setName(''); })}>
             <Field className="min-w-0 flex-1">
               <FieldLabel htmlFor={newId}>{t('tb.new_department', 'New department')}</FieldLabel>
               <Input id={newId} maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
@@ -491,7 +492,7 @@ const DepartmentsDialog: React.FC<{ organizationId: string; departments: Departm
             {departments.map((d) => (
               <ListItem key={d.id} className="flex min-h-g42 items-center justify-between gap-g8 px-g13 py-g5">
                 {editing?.id === d.id ? (
-                  <form className="flex flex-1 items-center gap-g8" onSubmit={async (e) => { e.preventDefault(); if (await act(() => orgApi(orgPath(organizationId, `/departments/${d.id}`), { method: 'PATCH', body: { name: editing.name.trim() } }))) setEditing(null); }}>
+                  <form className="flex flex-1 items-center gap-g8" onSubmit={voidHandler(async (e) => { e.preventDefault(); if (await act(() => orgApi(orgPath(organizationId, `/departments/${d.id}`), { method: 'PATCH', body: { name: editing.name.trim() } }))) setEditing(null); })}>
                     <Input aria-label={t('tb.department_name', 'Department name')} id={`rename-${d.id}`} autoFocus maxLength={100} value={editing.name} onChange={(e) => setEditing({ id: d.id, name: e.target.value })} />
                     <Button type="submit" size="sm" disabled={busy || !editing.name.trim()}>{t('tb.save', 'Save')}</Button>
                     <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(null)}>{t('tb.cancel', 'Cancel')}</Button>
@@ -503,7 +504,7 @@ const DepartmentsDialog: React.FC<{ organizationId: string; departments: Departm
                       {hasPermission('department.edit') && <Button type="button" variant="ghost" size="sm" onClick={() => setEditing({ id: d.id, name: d.name })} aria-label={t('tb.rename_department', 'Rename {name}', { name: d.name })}><Pencil className="h-g16 w-g16" aria-hidden="true" /></Button>}
                       {hasPermission('department.delete') && (
                         <Button type="button" variant="ghost" size="sm" aria-label={t('tb.delete_department', 'Delete {name}', { name: d.name })}
-                          onClick={async () => { if (await confirm({ description: t('tb.delete_department_confirm', 'Delete the department {name}?', { name: d.name }), tone: 'danger', confirmLabel: t('tb.delete', 'Delete') })) await act(() => orgApi(orgPath(organizationId, `/departments/${d.id}`), { method: 'DELETE' })); }}>
+                          onClick={voidHandler(async () => { if (await confirm({ description: t('tb.delete_department_confirm', 'Delete the department {name}?', { name: d.name }), tone: 'danger', confirmLabel: t('tb.delete', 'Delete') })) await act(() => orgApi(orgPath(organizationId, `/departments/${d.id}`), { method: 'DELETE' })); })}>
                           <Trash2 className="h-g16 w-g16" aria-hidden="true" />
                         </Button>
                       )}

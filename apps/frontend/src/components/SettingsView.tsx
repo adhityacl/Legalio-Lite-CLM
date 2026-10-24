@@ -15,6 +15,7 @@ import { MembersAccessTab } from './settings/MembersAccessTab';
 import { DataApiTab } from './settings/DataApiTab';
 
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { voidHandler } from '@legalio/shared/voidHandler';
 /**
  * Tenant Settings (PRD §6.1): one screen, at most three tabs —
  * Organization, Members & Access and Data & API — filtered by the selected
@@ -71,7 +72,7 @@ export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
         title={t('tb.settings_title', 'Settings / {org}', { org: orgName })}
         description={accessMode !== 'platform' ? t('tb.role_in_org', 'Role in this organization: {role}', { role: roleLabel }) : undefined}
         actions={accessMode === 'platform' && (
-          <Tooltip><TooltipTrigger asChild><Button size="sm" variant="ghost" onClick={async () => { if (await leaveOrganization()) setActiveTab('admin-system-organizations'); }}
+          <Tooltip><TooltipTrigger asChild><Button size="sm" variant="ghost" onClick={voidHandler(async () => { if (await leaveOrganization()) setActiveTab('admin-system-organizations'); })}
             aria-label={t('tb.back_to_system_admin', 'Back to System Admin')}>
             <ArrowLeft aria-hidden="true" />
             <span className="hidden sm:inline">{t('tb.back_to_system_admin', 'Back to System Admin')}</span>

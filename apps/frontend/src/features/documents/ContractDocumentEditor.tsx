@@ -78,6 +78,7 @@ import { DraftHistoryPanel } from '../../components/documents/DraftHistoryPanel'
 import { DocumentInfoPanel } from '../../components/documents/DocumentInfoPanel';
 import { CommentsPanel } from '../../components/documents/CommentsPanel';
 import { applyPlaybookWording } from '../../lib/playbookInsert';
+import { voidHandler } from '@legalio/shared/voidHandler';
 import type { PlaybookFinding } from '../../api/clauses';
 
 const PlaybookPanel = React.lazy(() => import('../clauses/PlaybookPanel'));
@@ -750,6 +751,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     content: '',
     // The ribbon follows the caret in the header or footer.
     shouldRerenderOnTransaction: true,
+    editorProps: { attributes: { 'aria-label': kind === 'header' ? t('editor.header_label', 'Page header content') : t('editor.footer_label', 'Page footer content') } },
     onUpdate: ({ editor: instance }) => setPageLayout((layout) => ({ ...layout, [kind]: instance.getHTML() })),
   });
   const headerEditor = useHeaderFooterEditor('header');
@@ -782,6 +784,8 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
       }, 300);
     },
     editorProps: {
+      // The editing surface is a textbox; it needs an accessible name for screen readers (and axe).
+      attributes: { 'aria-label': t('editor.document_label', 'Document content'), 'aria-multiline': 'true' },
       handleClick: (_view, _pos, event) => {
         if ((event.target as HTMLElement | null)?.closest?.('[data-comment-id]')) {
           setSidebarOpen(true);
@@ -1523,7 +1527,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
       className={`flex flex-col overflow-hidden text-foreground select-text ${screen === 'explorer' ? 'w-full' : isFullscreen ? 'fixed inset-0 z-50 h-screen bg-background' : 'h-screen max-h-screen bg-muted'}`}
     >
       {screen === 'explorer' && (
-        <DocumentExplorer canEdit={canEdit} canDelete={canEdit} onOpen={openDocument} onCreate={() => setShowNewDocumentDialog(true)} />
+        <DocumentExplorer canEdit={canEdit} canDelete={canEdit} onOpen={voidHandler(openDocument)} onCreate={() => setShowNewDocumentDialog(true)} />
       )}
       {showNewDocumentDialog && (
         <NewDocumentDialog onSelect={startNewDocument} onClose={() => setShowNewDocumentDialog(false)} />
@@ -1540,7 +1544,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
         <div className="flex items-center gap-g8 min-w-0 max-w-full">
           <Tooltip><TooltipTrigger asChild><Button variant="secondary" size="icon-sm"
             type="button"
-            onClick={backToExplorer}
+            onClick={voidHandler(backToExplorer)}
             className="shrink-0"
             aria-label={t('documents.action.back', 'Kembali ke daftar dokumen')}
           >
@@ -1594,7 +1598,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
           <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon-md"
             type="button"
             aria-label={t('contract_creator.download_title', 'Download file Word (.docx)')}
-            onClick={handleDownloadIndonesianDocx}
+            onClick={voidHandler(handleDownloadIndonesianDocx)}
             disabled={isDownloadingDocx}
           >
             {isDownloadingDocx ? <Spinner size="sm" decorative /> : <FileDown className="size-g16" aria-hidden="true" />}
@@ -1645,7 +1649,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
           editor={headerFooterEditor ?? editor}
           editingHeaderFooter={Boolean(headerFooterEditor)}
           layout={pageLayout}
-          onLayoutChange={changePageLayout}
+          onLayoutChange={voidHandler(changePageLayout)}
           onOpenPageSetup={() => setPageSetupOpen(true)}
           onEditHeaderFooter={(kind) => setHeaderFooterEditing({ kind, page: Math.min(activePage, pageCount - 1) })}
           showRuler={showRuler}
@@ -1662,11 +1666,11 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
           zoom={zoomLevel}
           indent={caretIndent}
           onPreview={setPageLayout}
-          onCommit={changePageLayout}
+          onCommit={voidHandler(changePageLayout)}
           onIndentChange={(indent) => editor?.chain().focus().setParagraphIndent({ left: indent.left || null, right: indent.right || null, first: indent.first || null }).run()}
         />
       )}
-      <PageSetupDialog isOpen={pageSetupOpen} layout={pageLayout} onClose={() => setPageSetupOpen(false)} onApply={changePageLayout} />
+      <PageSetupDialog isOpen={pageSetupOpen} layout={pageLayout} onClose={() => setPageSetupOpen(false)} onApply={voidHandler(changePageLayout)} />
 
       {/* 3. MAIN WORKSPACE CONTAINER */}
       <div className="flex-1 flex overflow-hidden relative">
@@ -1734,7 +1738,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                 </AlertContent>
                 <AlertActions>
                   {canEdit && previewOverride.version !== currentDoc?.current_version && (
-                    <Button variant="ghost" size="sm" onClick={() => restoreVersion(previewOverride.version)}>{t('documents.preview.restore', 'Pulihkan versi ini')}</Button>
+                    <Button variant="ghost" size="sm" onClick={() => void restoreVersion(previewOverride.version)}>{t('documents.preview.restore', 'Pulihkan versi ini')}</Button>
                   )}
                   <Button variant="outline" size="sm" onClick={() => switchViewMode('editor')}>{t('documents.preview.close', 'Tutup pratinjau')}</Button>
                 </AlertActions>
@@ -1831,9 +1835,9 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                   refreshKey={historyRefreshKey}
                   canEdit={canEdit}
                   viewingVersion={previewOverride?.version ?? null}
-                  onView={(version) => showVersion(version, 'version')}
-                  onCompare={(version) => showVersion(version, 'diff')}
-                  onRestore={restoreVersion}
+                  onView={(version) => void showVersion(version, 'version')}
+                  onCompare={(version) => void showVersion(version, 'diff')}
+                  onRestore={voidHandler(restoreVersion)}
                 />
               )}
 
@@ -1843,7 +1847,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                   organizationName={activeTenant?.name ?? '—'}
                   canEdit={canEdit}
                   canManageFields={canManageFields}
-                  onUpdate={updateDocumentInfo}
+                  onUpdate={voidHandler(updateDocumentInfo)}
                 />
               )}
 
@@ -1854,7 +1858,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                   canEdit={canEdit}
                   ensureSaved={() => saveNow('manual')}
                   onContentChanged={(kind) => void saveNow(kind)}
-                  onExportRedline={handleExportRedline}
+                  onExportRedline={voidHandler(handleExportRedline)}
                 />
               )}
 
@@ -2332,7 +2336,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                         </Field>
                         <Button variant="outline"
                           type="button"
-                          onClick={handleGenerateAiTemplate}
+                          onClick={voidHandler(handleGenerateAiTemplate)}
                           disabled={isGeneratingAiTemplate}
                           className="w-full"
                         >
@@ -2374,7 +2378,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                       </Field>
                       <Button variant="outline"
                         type="button"
-                        onClick={handleSaveTemplate}
+                        onClick={voidHandler(handleSaveTemplate)}
                         disabled={isSavingTemplate}
                         className="w-full"
                       >
@@ -2422,13 +2426,13 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
                             <div className="flex items-center gap-g5">
                               <Button variant="ghost" size="sm"
                                 type="button"
-                                onClick={() => handleLoadTemplate(tpl)}
+                                onClick={() => void handleLoadTemplate(tpl)}
                               >
                                 {t('contract_creator.templates.use_button', 'Gunakan')}
                               </Button>
                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm"
                                 type="button"
-                                onClick={() => handleDeleteTemplate(tpl.id)}
+                                onClick={() => void handleDeleteTemplate(tpl.id)}
                                 className="text-destructive"
                                 aria-label={t('contract_creator.templates.delete_title', 'Hapus Template')}
                               >

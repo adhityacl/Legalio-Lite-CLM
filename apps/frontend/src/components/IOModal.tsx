@@ -24,6 +24,7 @@ import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/
 import { Text } from '@legalio/ui-components/text';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { NumberInput, NumberInputControl, NumberInputDecrementTrigger, NumberInputIncrementTrigger, NumberInputInput } from '@legalio/ui-components/number-input';
+import { voidHandler } from '@legalio/shared/voidHandler';
 interface IOModalProps {
   ioToEdit?: InsertionOrder | null;
   contracts: Contract[];
@@ -387,7 +388,7 @@ export const IOModal: React.FC<IOModalProps> = ({
   const issues = checks.filter((check) => check.status !== 'ok');
 
   return (
-    <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-g21" aria-labelledby="io-form-heading">
+    <form onSubmit={voidHandler(handleSubmit)} className="w-full min-w-0 space-y-g21" aria-labelledby="io-form-heading">
       <div className="flex flex-wrap items-center justify-between gap-g13">
         <Heading as="h2" size="md" weight="semibold" id="io-form-heading">
           {ioToEdit?.io_id ? t('form.io.title_edit', 'Edit Insertion Order') : t('so.form.page_title_new', 'Submit a new service order')}
@@ -632,7 +633,7 @@ export const IOModal: React.FC<IOModalProps> = ({
               </FileUploadDropzone>
               <FileUploadHiddenInput />
             </FileUpload>
-            {fileData && <Button variant="secondary" onClick={handleParseIO} loading={isParsing} className="self-start">{isParsing ? t('io.parsing', 'Parsing...') : t('io.parse_file', 'Parse File')}</Button>}
+            {fileData && <Button variant="secondary" onClick={voidHandler(handleParseIO)} loading={isParsing} className="self-start">{isParsing ? t('io.parsing', 'Parsing...') : t('io.parse_file', 'Parse File')}</Button>}
             </FormSection>
 
             {parseSuccessMsg && (

@@ -30,7 +30,11 @@ Object.assign(process.env, {
   GEMINI_API_KEY: '', GOOGLE_CLIENT_ID: '', GOOGLE_CLIENT_SECRET: '', GOOGLE_APPLICATION_CREDENTIALS: '', RATE_LIMIT_DISABLED: 'true',
   // The built-in deterministic test model (APP_TEST_MODE only) stands in for Gemini: AI extraction runs without a key or network.
   AI_FAKE_PROVIDER: 'true',
+  // The mock OIDC provider below runs on loopback over http, which the outbound guard refuses unless these development switches are on.
+  WEBHOOK_ALLOW_HTTP: 'true', WEBHOOK_ALLOW_PRIVATE_NETWORKS: 'true',
 });
+const { startMockOidc } = await import('./mockOidcProvider');
+const oidc = await startMockOidc();
 const { createTestDatabase } = await import('./testDatabase');
 const database = await createTestDatabase();
 process.env.DATABASE_URL = database.url;
@@ -436,6 +440,8 @@ try {
   await expect(editorFinding).toBeVisible({ timeout: 30_000 });
   await shot(page, 'playbook-editor');
   await checkAccessibility(page, 'contract editor, playbook panel', '[data-testid="playbook-panel"]');
+  // The whole editor page, not only the panel: ribbon, document surface, side panels. Any violation fails the run.
+  await checkAccessibility(page, 'contract editor (whole page)');
   await editorFinding.getByTestId('playbook-insert').click();
   await expect(page.locator('.ProseMirror').first()).toContainText(/forty-five \(45\) days/, { timeout: 15_000 });
   assert.ok(!/ninety \(90\)/.test(await page.locator('.ProseMirror').first().innerText()), 'the quoted sentence was replaced, not duplicated');
@@ -463,6 +469,122 @@ try {
   steps.push('AI chat answered from retrieved records: the answer cites them and the chip opens the contract record through its deep link');
   await page.keyboard.press('Escape');
 
+  // E-signature, manual path: request on the contract record, send, mark as signed with an uploaded PDF; the contract is updated.
+  await page.goto(`${frontendURL}/app?tab=contracts&id=${encodeURIComponent(created.contract_id)}`);
+  const signRecord = page.getByRole('dialog');
+  await expect(signRecord).toBeVisible({ timeout: 30_000 });
+  await signRecord.getByRole('tab', { name: 'Signatures', exact: true }).click();
+  const signatures = signRecord.getByTestId('contract-signatures');
+  await expect(signatures).toContainText(/No signature requests/i, { timeout: 30_000 });
+  await checkAccessibility(page, 'contract record, signatures tab (empty)');
+  await signatures.getByRole('button', { name: 'Request signature' }).click();
+  const requestForm = page.getByRole('dialog').last();
+  await requestForm.getByLabel(/^Name/).nth(0).fill('Ada Counterparty');
+  await requestForm.getByLabel('E-mail').nth(0).fill('ada@counterparty.test');
+  await requestForm.getByLabel(/^Name/).nth(1).fill('Bo Counterparty');
+  await requestForm.getByLabel('E-mail').nth(1).fill('bo@counterparty.test');
+  await shot(page, 'signature-request-form');
+  await checkAccessibility(page, 'signature request form');
+  await requestForm.getByRole('button', { name: 'Create request' }).click();
+  await expect(signatures).toContainText('Draft', { timeout: 30_000 });
+  await signatures.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(signatures.getByText('Sent', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+  await signatures.getByRole('button', { name: 'Mark Ada Counterparty as signed' }).click();
+  await expect(signatures).toContainText('Partly signed', { timeout: 30_000 });
+  await signatures.getByRole('button', { name: /Mark as signed \/ upload signed copy/ }).click();
+  const completeForm = page.getByRole('dialog').last();
+  await completeForm.getByLabel('Signed copy (PDF)').setInputFiles({ name: 'signed.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 smoke signed copy') });
+  await shot(page, 'signature-complete-form');
+  await checkAccessibility(page, 'mark as signed dialog');
+  await completeForm.getByRole('button', { name: 'Mark as signed', exact: true }).click();
+  await expect(signatures).toContainText('Completed', { timeout: 30_000 });
+  await expect(signatures.getByRole('list', { name: /timeline/i }).or(signatures.getByRole('region', { name: 'Timeline' }))).toBeVisible();
+  await shot(page, 'signature-completed');
+  await checkAccessibility(page, 'contract record, signatures tab (completed)');
+  const signedContract = ((await api('/api/contracts?q=' + encodeURIComponent(created.contract_id) + '&limit=5')).body as Array<{ contract_id: string; status_approval: string; signed_file_link?: string }>).find((c) => c.contract_id === created.contract_id)!;
+  assert.ok(['Signed', 'Active'].includes(signedContract.status_approval), `the contract moved to a signed status (${signedContract.status_approval})`);
+  assert.match(signedContract.signed_file_link ?? '', /^\/uploads\//);
+  const servedCopy = await fetch(backendURL + signedContract.signed_file_link, { headers: { authorization: `Bearer ${token}`, origin: frontendURL } });
+  assert.equal(servedCopy.status, 200);
+  assert.equal(await servedCopy.text(), '%PDF-1.4 smoke signed copy');
+  steps.push(`e-signature by hand: request, send, one signer marked, signed PDF uploaded -> completed; the contract is ${signedContract.status_approval} and links the stored signed copy`);
+  await page.keyboard.press('Escape');
+
+  // Administrator panels: the signing webhook and single sign-on live in Settings > Data & automation.
+  await page.goto(`${frontendURL}/app?tab=settings-data`);
+  const signingPanel = page.getByRole('region', { name: 'Signing webhook' });
+  await expect(signingPanel).toBeVisible({ timeout: 30_000 });
+  const ssoPanel = page.getByRole('region', { name: /Single sign-on/ });
+  await expect(ssoPanel).toBeVisible();
+  await shot(page, 'settings-data-signing-sso');
+  await checkAccessibility(page, 'settings, data & automation (signing webhook and SSO panels)');
+  await signingPanel.getByRole('button', { name: 'Add endpoint' }).click();
+  const endpointForm = page.getByRole('dialog').last();
+  await endpointForm.getByLabel('Name').fill('Smoke bridge');
+  await checkAccessibility(page, 'signing webhook endpoint form');
+  await endpointForm.getByRole('button', { name: 'Add endpoint' }).click();
+  const secretDialog = page.getByRole('dialog').last();
+  await expect(secretDialog).toContainText(/shown only once/i, { timeout: 30_000 });
+  const signingSecret = await secretDialog.locator('input[readonly]').inputValue();
+  assert.match(signingSecret, /^sigsec_/);
+  await checkAccessibility(page, 'signing webhook secret dialog');
+  await secretDialog.getByRole('button', { name: 'Done' }).click();
+  await expect(signingPanel).toContainText('Smoke bridge');
+  steps.push('signing webhook endpoint created in Settings; its secret was shown once');
+
+  // Single sign-on: configure the mock provider through the form, then sign in through it in a fresh browser context.
+  await ssoPanel.getByRole('button', { name: 'Configure' }).click();
+  const ssoForm = page.getByRole('dialog').last();
+  await ssoForm.getByLabel('Issuer URL').fill(oidc.issuer);
+  await ssoForm.getByLabel('Client ID').fill(oidc.state.clientId);
+  await ssoForm.getByLabel('Client secret').fill(oidc.state.clientSecret);
+  await ssoForm.getByLabel('Allowed e-mail domains').fill('example.com');
+  await shot(page, 'sso-settings-form');
+  await checkAccessibility(page, 'SSO settings form');
+  await ssoForm.getByRole('button', { name: 'Save settings' }).click();
+  await expect(ssoPanel).toContainText('Enabled', { timeout: 30_000 });
+  const ssoConfig = (await api(`/api/organizations/${org}/sso`)).body as { sso: { enabled: boolean; clientSecretSet: boolean }; slug: string; redirectUri: string };
+  assert.equal(ssoConfig.sso.enabled, true);
+  assert.equal(ssoConfig.sso.clientSecretSet, true);
+  assert.ok(!JSON.stringify(ssoConfig).includes(oidc.state.clientSecret), 'the secret is not returned');
+  assert.equal(ssoConfig.redirectUri, `${frontendURL}/api/sso/callback`);
+  steps.push('SSO configured in Settings (secret sealed, never returned)');
+
+  const ssoContext = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+  const ssoPage = await ssoContext.newPage();
+  try {
+    // A disallowed domain is refused with a readable message on the sign-in page.
+    oidc.reset();
+    oidc.state.claims = { sub: 'smoke-evil', email: 'intruder@evil.test', email_verified: true };
+    await ssoPage.goto(`${frontendURL}/sso/${ssoConfig.slug}`);
+    await expect(ssoPage.getByRole('heading', { name: /Sign in to/ })).toBeVisible({ timeout: 30_000 });
+    await shot(ssoPage, 'sso-sign-in');
+    await checkAccessibility(ssoPage, 'SSO sign-in page');
+    await ssoPage.getByRole('button', { name: 'Continue with SSO' }).click();
+    await expect(ssoPage.getByRole('alert')).toContainText(/domain is not allowed/i, { timeout: 30_000 });
+    await shot(ssoPage, 'sso-sign-in-refused');
+    await checkAccessibility(ssoPage, 'SSO sign-in page with a refusal');
+    // An allowed, verified member signs in and lands in the application.
+    oidc.reset();
+    oidc.state.claims = { sub: 'smoke-admin-sub', email: 'admin@example.com', email_verified: true, name: 'Smoke Admin' };
+    await ssoPage.goto(`${frontendURL}/sso/${ssoConfig.slug}`);
+    await ssoPage.getByRole('button', { name: 'Continue with SSO' }).click();
+    await expect(ssoPage.locator('#signin-email')).toHaveCount(0, { timeout: 30_000 });
+    await expect(ssoPage.getByRole('navigation').first()).toBeVisible({ timeout: 30_000 });
+    // The e-mail domain lookup offers the button on the normal sign-in page too.
+    const emailContext = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+    const emailPage = await emailContext.newPage();
+    try {
+      await emailPage.goto(`${frontendURL}/app`);
+      await emailPage.locator('#signin-email').fill('someone@example.com');
+      await expect(emailPage.getByRole('button', { name: /Continue with SSO/ })).toBeVisible({ timeout: 15_000 });
+      await checkAccessibility(emailPage, 'sign-in page offering SSO for the typed e-mail domain');
+      await emailPage.locator('#signin-email').fill('someone@unrelated.test');
+      await expect(emailPage.getByRole('button', { name: /Continue with SSO/ })).toHaveCount(0, { timeout: 15_000 });
+    } finally { await emailContext.close(); }
+  } finally { await ssoContext.close(); }
+  steps.push('SSO through the mock OIDC provider: /sso/<slug> offers the button, a disallowed domain is refused, a verified member signs in with a real session');
+
   // 7. A third key page: the dashboard.
   await page.goto(`${frontendURL}/app?tab=dashboard`);
   await expect(page.getByRole('region', { name: /expiring documents/i })).toBeVisible({ timeout: 30_000 });
@@ -487,6 +609,7 @@ try {
   process.exitCode = 1;
 } finally {
   await browser?.close().catch(() => undefined);
+  await oidc.close().catch(() => undefined);
   await stop(frontend);
   await stop(server);
   await database.drop().catch(() => undefined);

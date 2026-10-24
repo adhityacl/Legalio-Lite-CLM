@@ -33,6 +33,7 @@ import { Heading } from '@legalio/ui-components/heading';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { Spinner } from '@legalio/ui-components/spinner';
+import { voidHandler } from '@legalio/shared/voidHandler';
 interface NotificationsViewProps {
   notifications: NotificationLog[];
   onTriggerCheck: () => Promise<void>;
@@ -233,7 +234,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
         <div className="flex flex-wrap items-center gap-g8 shrink-0">
           {unreadCount > 0 && onMarkRead && (
             <Button variant="outline"
-              onClick={handleMarkAllRead}
+              onClick={voidHandler(handleMarkAllRead)}
               className="shrink-0"
             >
               <CheckCheck className="w-g16 h-g16 text-muted-foreground" />
@@ -242,7 +243,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           )}
 
           <Button
-            onClick={handleManualTrigger}
+            onClick={voidHandler(handleManualTrigger)}
             disabled={runningCron}
             className="shrink-0"
           >
@@ -342,7 +343,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
             {onMarkRead && (
               <Button variant="outline" size="sm"
                 type="button"
-                onClick={handleMarkSelectedRead}
+                onClick={voidHandler(handleMarkSelectedRead)}
               >
                 <CheckCircle2 className="w-g13 h-g13 text-accent-foreground" />
                 <span>{t('notifications.mark_read_btn', 'Tandai Dibaca')}</span>
@@ -352,7 +353,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
             {onDeleteNotif && (
               <Button variant="destructive-outline" size="sm"
                 type="button"
-                onClick={handleDeleteSelected}
+                onClick={voidHandler(handleDeleteSelected)}
               >
                 <Trash2 className="w-g13 h-g13" />
                 <span>{t('notifications.delete_selected', 'Hapus Terpilih')}</span>
@@ -503,7 +504,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                           {isUnread && onMarkRead && (
                             <Tooltip><TooltipTrigger asChild><Button variant="secondary" size="icon-sm"
                               type="button"
-                              onClick={(e) => handleMarkSingleRead(notif.notif_id, e)} aria-label={t('notifications.mark_read', 'Tandai Dibaca')}
+                              onClick={(e) => void handleMarkSingleRead(notif.notif_id, e)} aria-label={t('notifications.mark_read', 'Tandai Dibaca')}
                             >
                               <CheckCircle2 className="w-g16 h-g16" />
                             </Button></TooltipTrigger><TooltipBody>{t('notifications.mark_read', 'Tandai Dibaca')}</TooltipBody></Tooltip>
@@ -513,7 +514,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                           {onDeleteNotif && (
                             <Tooltip><TooltipTrigger asChild><Button variant="secondary" size="icon-sm"
                               type="button"
-                              onClick={(e) => handleDeleteSingle(notif.notif_id, e)} aria-label={t('notifications.delete_notif', 'Hapus Notifikasi')}
+                              onClick={(e) => void handleDeleteSingle(notif.notif_id, e)} aria-label={t('notifications.delete_notif', 'Hapus Notifikasi')}
                             >
                               <Trash2 className="w-g16 h-g16" />
                             </Button></TooltipTrigger><TooltipBody>{t('notifications.delete_notif', 'Hapus Notifikasi')}</TooltipBody></Tooltip>

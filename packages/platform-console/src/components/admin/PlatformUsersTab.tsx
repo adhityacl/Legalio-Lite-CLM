@@ -15,6 +15,7 @@ import { DialogHeader, DialogTitle, DialogCloseIcon } from '@legalio/ui-componen
 import { Field, FieldLabel, FieldHelperText } from '@legalio/ui-components/field';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 import { Text } from '@legalio/ui-components/text';
+import { voidHandler } from '@legalio/shared/voidHandler';
 /** Platform identity DTO from `GET /api/auth-console/users` (no tenant roles or memberships). */
 export interface PlatformUser {
   id: string;
@@ -103,10 +104,10 @@ export const PlatformUsersTab: React.FC<{
                       <div className="flex items-center justify-end gap-g3">
                         <Button type="button" variant="ghost" size="icon-sm" onClick={() => setDialog({ kind: 'edit', user: u })} aria-label={t('tb.edit_account_for', 'Edit account of {name}', { name: u.name })}><Pencil className="h-g13 w-g13" aria-hidden="true" /></Button>
                         <Button type="button" variant="ghost" size="icon-sm" onClick={() => setDialog({ kind: 'password', user: u })} aria-label={t('tb.set_password_for', 'Set password for {name}', { name: u.name })}><KeyRound className="h-g13 w-g13" aria-hidden="true" /></Button>
-                        <Button type="button" variant="ghost" size="icon-sm" onClick={() => onToggleBan(u)} aria-label={u.banned && u.banReason === 'PENDING_APPROVAL' ? t('onboarding.approve_account_for', 'Approve account of {name}', { name: u.name }) : u.banned ? t('tb.enable_account_for', 'Enable account of {name}', { name: u.name }) : t('tb.disable_account_for', 'Disable account of {name}', { name: u.name })}>
+                        <Button type="button" variant="ghost" size="icon-sm" onClick={() => void onToggleBan(u)} aria-label={u.banned && u.banReason === 'PENDING_APPROVAL' ? t('onboarding.approve_account_for', 'Approve account of {name}', { name: u.name }) : u.banned ? t('tb.enable_account_for', 'Enable account of {name}', { name: u.name }) : t('tb.disable_account_for', 'Disable account of {name}', { name: u.name })}>
                           {u.banned ? <UserCheck className="h-g13 w-g13" aria-hidden="true" /> : <Ban className="h-g13 w-g13" aria-hidden="true" />}
                         </Button>
-                        <Button type="button" variant="ghost" size="icon-sm" onClick={() => onDelete(u)} aria-label={t('tb.delete_account_for', 'Delete account of {name}', { name: u.name })}><Trash2 className="h-g13 w-g13" aria-hidden="true" /></Button>
+                        <Button type="button" variant="ghost" size="icon-sm" onClick={() => void onDelete(u)} aria-label={t('tb.delete_account_for', 'Delete account of {name}', { name: u.name })}><Trash2 className="h-g13 w-g13" aria-hidden="true" /></Button>
                       </div>
                     )}
                   </TableCell>
@@ -155,13 +156,13 @@ const AccountDialog: React.FC<{
   const valid = name.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && (!password || password.length >= 8);
   return (
     <DialogShell title={title} onClose={onClose}>
-      <form noValidate className="flex flex-col gap-g13 p-g21" onSubmit={async (e) => {
+      <form noValidate className="flex flex-col gap-g13 p-g21" onSubmit={voidHandler(async (e) => {
         e.preventDefault();
         if (!valid) return;
         setBusy(true);
         setError(null);
         try { await onSubmit({ name: name.trim(), email: email.trim(), platformRole, ...(withPassword && password ? { password } : {}) }); } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
-      }}>
+      })}>
         <Field><FieldLabel htmlFor={ids.name}>{t('tb.col_name', 'Name')}</FieldLabel><Input id={ids.name} value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field><FieldLabel htmlFor={ids.email}>{t('tb.col_email', 'Email')}</FieldLabel><Input id={ids.email} type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <Field>
@@ -195,11 +196,11 @@ const PasswordDialog: React.FC<{ user: PlatformUser; onClose: () => void; onSubm
   const id = useId();
   return (
     <DialogShell title={t('tb.set_password_for', 'Set password for {name}', { name: user.name })} onClose={onClose}>
-      <form noValidate className="flex flex-col gap-g13 p-g21" onSubmit={async (e) => {
+      <form noValidate className="flex flex-col gap-g13 p-g21" onSubmit={voidHandler(async (e) => {
         e.preventDefault();
         if (password.length < 8) return;
         try { await onSubmit(password); } catch (err) { setError((err as Error).message); }
-      }}>
+      })}>
         <Field>
           <FieldLabel htmlFor={id}>{t('tb.new_password', 'New password')}</FieldLabel>
           <Input id={id} type="password" autoComplete="new-password" value={password} aria-invalid={password.length > 0 && password.length < 8} aria-describedby={`${id}-hint`} onChange={(e) => setPassword(e.target.value)} />

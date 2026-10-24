@@ -287,7 +287,7 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
                       </ReactMarkdown>
                     </Typeset>
                     {msg.sources && <SourceChips sources={msg.sources} />}
-                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" className="self-start max-sm:size-11 [&>svg]:size-g13" onClick={() => handleCopy(msg)}
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" className="self-start max-sm:size-11 [&>svg]:size-g13" onClick={() => void handleCopy(msg)}
                       aria-label={copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}>
                       {copiedId === msg.id ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
                       <span className="sr-only" aria-live="polite">{copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin')}</span>
@@ -302,7 +302,7 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
               <div className="mt-g8 flex w-full flex-col gap-g8 border-t border-border pt-g13">
                 <Text size="xs" weight="semibold" tone="muted">{t('ai_chat.saran_pertanyaan', 'Saran Pertanyaan:')}</Text>
                 {SUGGESTED_PROMPTS.map(([key, fallback]) => t(key, fallback)).map((prompt) => (
-                  <Button key={prompt} variant="outline" size="sm" onClick={() => handleSend(prompt)} className="h-auto justify-start py-g8 text-start whitespace-normal">
+                  <Button key={prompt} variant="outline" size="sm" onClick={() => void handleSend(prompt)} className="h-auto justify-start py-g8 text-start whitespace-normal">
                     {prompt}
                   </Button>
                 ))}
@@ -321,7 +321,7 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
           </PopoverBody>
 
           <PopoverFooter className="mt-0 border-t border-border p-g13">
-            <form onSubmit={(e) => handleSend(undefined, e)} className="flex w-full items-center gap-g8">
+            <form onSubmit={(e) => void handleSend(undefined, e)} className="flex w-full items-center gap-g8">
               <Input aria-label={t('ai_chat.tanya_seputar_data_atau_lanjutkan_konteks', 'Tanya seputar data atau lanjutkan konteks...')}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

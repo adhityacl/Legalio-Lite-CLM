@@ -18,6 +18,7 @@ import { AlphabeticalSelect } from '../../components/ui/alphabetical-select';
 import { useDocumentList } from '../documents/useDocumentList';
 import { approvalsApi, type NewApproval } from './approvalsApi';
 import { PersonAvatar, categoryLabel } from './approvalUi';
+import { voidHandler } from '@legalio/shared/voidHandler';
 
 export type ApprovalDraft = Pick<NewApproval, 'title' | 'category' | 'note' | 'approverIds' | 'documentId'>;
 
@@ -96,7 +97,7 @@ export const ApprovalForm: React.FC<Props> = ({ initial, onSubmitted, onCancel }
   );
 
   return (
-    <form onSubmit={submit} className="w-full min-w-0 space-y-g21" aria-labelledby="approval-form-heading">
+    <form onSubmit={voidHandler(submit)} className="w-full min-w-0 space-y-g21" aria-labelledby="approval-form-heading">
       <div className="flex flex-wrap items-center justify-between gap-g13">
         <Heading as="h2" size="md" weight="semibold" id="approval-form-heading">{t('approval.form.title', 'Submit a new approval')}</Heading>
         <Button variant="link" size="sm" type="button" onClick={onCancel} className="no-underline hover:underline"><ArrowLeft className="size-g13" aria-hidden />{t('approval.back', 'Back to approvals')}</Button>

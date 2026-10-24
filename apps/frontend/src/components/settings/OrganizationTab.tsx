@@ -32,6 +32,7 @@ import { DialogCloseIcon, DialogDescription, DialogTitle } from '@legalio/ui-com
 import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
 import { Heading } from '@legalio/ui-components/heading';
 import { NumberInput, NumberInputControl, NumberInputDecrementTrigger, NumberInputIncrementTrigger, NumberInputInput } from '@legalio/ui-components/number-input';
+import { voidHandler } from '@legalio/shared/voidHandler';
 export type { OrganizationSettingsDto } from '@legalio/types/organizationSettings';
 
 type SectionId = 'profile' | 'region' | 'contracts' | 'notifications';
@@ -129,7 +130,7 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
       <Alert status="error" role="alert">
         <AlertIndicator />
         <AlertContent><AlertDescription>{t('tb.settings_load_error', 'Organization settings could not be loaded.')}</AlertDescription></AlertContent>
-        <AlertActions><Button variant="outline" size="sm" onClick={() => settingsQuery.refetch()}><RefreshCw aria-hidden="true" />{t('tb.retry', 'Retry')}</Button></AlertActions>
+        <AlertActions><Button variant="outline" size="sm" onClick={() => void settingsQuery.refetch()}><RefreshCw aria-hidden="true" />{t('tb.retry', 'Retry')}</Button></AlertActions>
       </Alert>
     );
   }
@@ -202,7 +203,7 @@ export const OrganizationTab: React.FC<{ organizationId: string }> = ({ organiza
                   <Alert status="error" role="alert" className="flex-1">
                     <AlertIndicator />
                     <AlertContent><AlertDescription>{state.message}</AlertDescription></AlertContent>
-                    {state.conflict && <AlertActions><Button variant="outline" size="sm" onClick={reload}><RefreshCw aria-hidden="true" />{t('tb.reload', 'Reload')}</Button></AlertActions>}
+                    {state.conflict && <AlertActions><Button variant="outline" size="sm" onClick={voidHandler(reload)}><RefreshCw aria-hidden="true" />{t('tb.reload', 'Reload')}</Button></AlertActions>}
                   </Alert>
                 )}
               </div>

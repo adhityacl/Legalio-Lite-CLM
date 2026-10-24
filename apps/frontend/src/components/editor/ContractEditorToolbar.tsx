@@ -824,7 +824,7 @@ export const ContractEditorToolbar: React.FC<ContractEditorToolbarProps> = ({
             onClick={() => setTab(item.id)}
             onKeyDown={(event) => moveTab(event, index)}
             className={`-mb-px border-b-2 px-g8 pb-g5 pt-g8 text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${
-              tab === item.id ? 'border-primary font-semibold text-primary' : 'border-transparent text-foreground hover:text-primary'
+              tab === item.id ? 'border-primary font-semibold text-foreground' : 'border-transparent text-foreground hover:text-primary'
             }`}
           >
             {item.label}

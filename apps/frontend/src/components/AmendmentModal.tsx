@@ -20,6 +20,7 @@ import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/
 import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
 import { ToggleGroup, ToggleGroupItem } from '@legalio/ui-components/toggle-group';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { voidHandler } from '@legalio/shared/voidHandler';
 interface AmendmentModalProps {
   initialParent?: Contract | InsertionOrder;
   contracts: Contract[];
@@ -205,7 +206,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
           <DialogCloseIcon aria-label={t('common.close', 'Tutup')} />
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
+        <form onSubmit={voidHandler(handleSubmit)} className="flex flex-col flex-1 overflow-hidden min-h-0">
           <DialogBody className="mt-0 flex flex-1 flex-col gap-g13 overflow-y-auto px-g21 py-g21 text-foreground">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-g13">
               <Field>
@@ -300,7 +301,7 @@ export const AmendmentModal: React.FC<AmendmentModalProps> = ({
               </FileUploadDropzone>
               <FileUploadHiddenInput />
             </FileUpload>
-            {fileData && <Button variant="secondary" onClick={handleParseAmendment} loading={isParsing} className="self-start">{isParsing ? t('amendments.parsing', 'Parsing...') : t('amendments.parse_file', 'Parse File')}</Button>}
+            {fileData && <Button variant="secondary" onClick={voidHandler(handleParseAmendment)} loading={isParsing} className="self-start">{isParsing ? t('amendments.parsing', 'Parsing...') : t('amendments.parse_file', 'Parse File')}</Button>}
 
             {parseSuccessMsg && (
               <Alert status="success" role="status"><AlertIndicator /><AlertContent><AlertDescription>{parseSuccessMsg}</AlertDescription></AlertContent></Alert>

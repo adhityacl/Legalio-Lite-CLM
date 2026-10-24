@@ -30,6 +30,7 @@ import { Empty, EmptyContent, EmptyDescription } from '@legalio/ui-components/em
 import { Text } from '@legalio/ui-components/text';
 import { List, ListItem } from '@legalio/ui-components/list';
 import { Skeleton } from '@legalio/ui-components/skeleton';
+import { voidHandler } from '@legalio/shared/voidHandler';
 interface CommentsPanelProps {
   editor: Editor | null;
   documentId: string | null;
@@ -309,7 +310,7 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
         )}
 
         {replyTo?.id === comment.id ? (
-          <form onSubmit={submitReply} className="space-y-g3">
+          <form onSubmit={voidHandler(submitReply)} className="space-y-g3">
             <Textarea aria-label={t('documents.comments.reply', 'Balas')}
               id={`${idPrefix}-reply-${comment.id}`}
               autoFocus
@@ -332,21 +333,21 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
             <div className="flex flex-wrap gap-g3">
               {comment.status === 'open' && isSuggestion && (
                 <>
-                  <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'accept')} size="sm">
+                  <Button variant="ghost" type="button" disabled={isBusy} onClick={() => void act(comment, 'accept')} size="sm">
                     <Check className="w-g13 h-g13 text-status-success" aria-hidden /> {t('documents.comments.accept', 'Terima')}
                   </Button>
-                  <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'reject')} size="sm">
+                  <Button variant="ghost" type="button" disabled={isBusy} onClick={() => void act(comment, 'reject')} size="sm">
                     <X className="w-g13 h-g13 text-status-danger" aria-hidden /> {t('documents.comments.reject', 'Tolak')}
                   </Button>
                 </>
               )}
               {comment.status === 'open' && !isSuggestion && (
-                <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'resolve')} size="sm">
+                <Button variant="ghost" type="button" disabled={isBusy} onClick={() => void act(comment, 'resolve')} size="sm">
                   <CheckCheck className="w-g13 h-g13" aria-hidden /> {t('documents.comments.resolve', 'Selesaikan')}
                 </Button>
               )}
               {comment.status === 'resolved' && (
-                <Button variant="ghost" type="button" disabled={isBusy} onClick={() => act(comment, 'reopen')} size="sm">
+                <Button variant="ghost" type="button" disabled={isBusy} onClick={() => void act(comment, 'reopen')} size="sm">
                   <RotateCcw className="w-g13 h-g13" aria-hidden /> {t('documents.comments.reopen', 'Buka lagi')}
                 </Button>
               )}
@@ -374,7 +375,7 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
             type="button"
             disabled={busy === 'ai-redline'}
             aria-busy={busy === 'ai-redline'}
-            onClick={runAiRedlining}
+            onClick={voidHandler(runAiRedlining)}
             className="col-span-2"
           >
             <AiIcon className={`size-g16 ${busy === 'ai-redline' ? 'animate-pulse' : ''}`} />
@@ -384,7 +385,7 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
       )}
 
       {composer && (
-        <Card asChild><form onSubmit={submitComposer} className="space-y-g8 p-g13" aria-busy={busy === 'composer'}>
+        <Card asChild><form onSubmit={voidHandler(submitComposer)} className="space-y-g8 p-g13" aria-busy={busy === 'composer'}>
           <Text size="xs" weight="bold">
             {composer.mode === 'suggestion' ? t('documents.comments.add_suggestion', 'Usulkan Perubahan') : t('documents.comments.add_comment', 'Komentar')}
           </Text>
@@ -460,10 +461,10 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
             </dl>
             {canEdit && openSuggestions.length > 1 && (
               <div className="grid grid-cols-2 gap-g8">
-                <Button variant="outline" type="button" disabled={busy === 'bulk'} onClick={() => bulk('accept')}>
+                <Button variant="outline" type="button" disabled={busy === 'bulk'} onClick={() => void bulk('accept')}>
                   <Check className="w-g13 h-g13 text-status-success" aria-hidden /> {t('documents.comments.accept_all', 'Terima Semua')}
                 </Button>
-                <Button variant="outline" type="button" disabled={busy === 'bulk'} onClick={() => bulk('reject')}>
+                <Button variant="outline" type="button" disabled={busy === 'bulk'} onClick={() => void bulk('reject')}>
                   <X className="w-g13 h-g13 text-status-danger" aria-hidden /> {t('documents.comments.reject_all', 'Tolak Semua')}
                 </Button>
               </div>

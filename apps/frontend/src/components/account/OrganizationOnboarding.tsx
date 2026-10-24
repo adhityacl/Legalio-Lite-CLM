@@ -21,6 +21,7 @@ import { Spinner } from '@legalio/ui-components/spinner';
 import { Card } from '@legalio/ui-components/card';
 import { Text } from '@legalio/ui-components/text';
 import { List, ListItem } from '@legalio/ui-components/list';
+import { voidHandler } from '@legalio/shared/voidHandler';
 export function OrganizationOnboarding() {
   const { t, language } = useLanguage();
   const { logout, refreshUser } = useIdentity();
@@ -99,7 +100,7 @@ export function OrganizationOnboarding() {
             ))}
           </div>
         ) : (
-          <form onSubmit={submit} className="mt-g21 space-y-g13" aria-busy={busy}>
+          <form onSubmit={voidHandler(submit)} className="mt-g21 space-y-g13" aria-busy={busy}>
             <Fieldset disabled={busy} className="space-y-g13">
               <FieldsetLegend className="sr-only">{title}</FieldsetLegend>
               {stage === 'join' ? (

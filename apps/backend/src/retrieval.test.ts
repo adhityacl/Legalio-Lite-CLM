@@ -45,9 +45,14 @@ const lastPrompt = () => prompts[prompts.length - 1] ?? '';
 
 test('pure: terms, the tsquery and citations', async () => {
   const { searchTerms, toTsQuery, citedRefs } = await import('./retrieval');
-  assert.deepEqual(searchTerms('What is the Orchard agreement with Acme?').words, ['orchard', 'agreement', 'acme']);
+  assert.deepEqual(searchTerms('What is the Orchard agreement with Acme?').words, ['orchard', 'acme'], '"agreement" matches every record, so it is dropped');
+  assert.deepEqual(searchTerms('Show me the contract and the agreement').words, ['contract', 'agreement'], 'but a question made only of common words keeps them');
+  assert.deepEqual(searchTerms('the contract').words, ['contract']);
+  assert.deepEqual(searchTerms('Perjanjian kontrak dengan Orchard').words, ['orchard']);
+  assert.deepEqual(searchTerms('合同 contract').words, [], 'a CJK term counts as something specific');
+  assert.deepEqual(searchTerms('the of and').words, [], 'stop words alone give nothing');
   assert.deepEqual(searchTerms('Q3 report of s1').words, ['q3', 'report', 's1']);
-  assert.deepEqual(searchTerms('and its notes?', ['Tell me about the zebrafish contract']).words, ['notes', 'zebrafish', 'contract']);
+  assert.deepEqual(searchTerms('and its notes?', ['Tell me about the zebrafish contract']).words, ['notes', 'zebrafish']);
   assert.deepEqual(searchTerms('合同到期').cjk, ['合同', '同到', '到期']);
   assert.equal(toTsQuery(['a1', 'b2']), 'a1:* | b2:*');
   assert.deepEqual(searchTerms("x'); DROP TABLE users; --").words, ['drop', 'table', 'users'], 'only letters and digits survive: nothing can reach the tsquery syntax');

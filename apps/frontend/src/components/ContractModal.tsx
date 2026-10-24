@@ -36,6 +36,7 @@ import { ToggleGroup, ToggleGroupItem } from '@legalio/ui-components/toggle-grou
 import { Text } from '@legalio/ui-components/text';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { NumberInput, NumberInputControl, NumberInputDecrementTrigger, NumberInputIncrementTrigger, NumberInputInput } from '@legalio/ui-components/number-input';
+import { voidHandler } from '@legalio/shared/voidHandler';
 interface ContractModalProps {
   contractToEdit?: Contract | null;
   partners: Partner[];
@@ -471,7 +472,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="contract-form w-full min-w-0 space-y-g21" aria-labelledby="contract-form-heading">
+    <form onSubmit={voidHandler(handleSubmit)} className="contract-form w-full min-w-0 space-y-g21" aria-labelledby="contract-form-heading">
       <div className="flex flex-wrap items-center justify-between gap-g13">
         <Heading as="h2" size="md" weight="semibold" id="contract-form-heading">
           {contractToEdit?.contract_id
@@ -694,7 +695,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
             {showEndingFields && <ContractEndingFields step={4} terminated={lifecycleMode === 'terminated'} date={terminationDate} endDate={tanggalBerakhir}
               reason={terminationReason} document={contractToEdit?.termination_document} fileName={terminationFile?.fileName} reading={readingTerminationFile}
-              onDate={setTerminationDate} onReason={setTerminationReason} onFile={handleTerminationFile} />}
+              onDate={setTerminationDate} onReason={setTerminationReason} onFile={voidHandler(handleTerminationFile)} />}
 
             <FormSection step={showEndingFields ? 5 : 4} title={t('contract.form.section_document', 'Contract Document')}>
               <FileUpload className="w-full" accept=".pdf,.doc,.docx" maxFiles={1} maxFileSize={20 * 1024 * 1024}
@@ -711,7 +712,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 <FileUploadHiddenInput />
               </FileUpload>
               {fileData && (
-                <Button variant="secondary" onClick={handleParseContract} loading={isParsing} className="self-start">
+                <Button variant="secondary" onClick={voidHandler(handleParseContract)} loading={isParsing} className="self-start">
                   {isParsing ? t('contracts.parsing', 'Parsing...') : t('contracts.parse_file', 'Parse File')}
                 </Button>
               )}

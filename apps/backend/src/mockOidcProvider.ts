@@ -125,5 +125,5 @@ export async function startMockOidc(options: { port?: number; clientId?: string;
 
 if (process.argv[1] && /mockOidcProvider\.[cm]?[jt]s$/.test(process.argv[1])) {
   const port = Number(process.env.MOCK_OIDC_PORT) || 4555;
-  startMockOidc({ port }).then((p) => console.log(`mock OIDC provider at ${p.issuer} (client legalio-client / client-secret-value)`));
+  void startMockOidc({ port }).then((p) => console.log(`mock OIDC provider at ${p.issuer} (client legalio-client / client-secret-value)`));
 }

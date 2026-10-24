@@ -12,6 +12,7 @@ import { FormSection } from '@legalio/ui-components/blocks';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 import { FileUpload, FileUploadDropzone, FileUploadDropzoneIcon, FileUploadHiddenInput, FileUploadLabel, FileUploadTrigger } from '@legalio/ui-components/file-upload';
 import { Text } from '@legalio/ui-components/text';
+import { voidHandler } from '@legalio/shared/voidHandler';
 export function ContractEndingFields({ step, terminated, date, endDate, reason, document, fileName, reading,
   onDate, onReason, onFile }: {
   step: number; terminated: boolean; date: string; endDate: string; reason: string;
@@ -48,10 +49,10 @@ export function ContractEndingFields({ step, terminated, date, endDate, reason, 
         </FileUploadDropzone>
         <FileUploadHiddenInput aria-label={t('termination.document')} />
       </FileUpload>
-      {document && <Button type="button" variant="link" className="justify-self-start" onClick={async () => {
+      {document && <Button type="button" variant="link" className="justify-self-start" onClick={voidHandler(async () => {
           try { await openTerminationDocument(document); setDownloadError(false); }
           catch { setDownloadError(true); }
-        }}>{t('termination.saved_document')}: {document.fileName}</Button>}
+        })}>{t('termination.saved_document')}: {document.fileName}</Button>}
         {downloadError && <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{t('termination.file_open_error')}</AlertDescription></AlertContent></Alert>}
     </div>
   </FormSection></section>;

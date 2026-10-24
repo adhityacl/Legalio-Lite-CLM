@@ -8,6 +8,7 @@ import { OBLIGATION_TRANSLATIONS } from '../obligations';
 import { CHAT_SOURCE_TRANSLATIONS } from '../chatSources';
 import { CLAUSE_TRANSLATIONS } from '../clauses';
 import { SSO_TRANSLATIONS } from '../sso';
+import { ACCESSIBILITY_TRANSLATIONS } from '../accessibility';
 import { SIGNATURE_TRANSLATIONS } from '../signatures';
 import { SUGGESTION_TRANSLATIONS } from '../suggestions';
 import { TENANT_BOUNDARIES_TRANSLATIONS } from '../tenantBoundaries';
@@ -24,6 +25,7 @@ const EN: Record<string, string> = {
   ...SUGGESTION_TRANSLATIONS.EN,
   ...CLAUSE_TRANSLATIONS.EN,
   ...SSO_TRANSLATIONS.EN,
+  ...ACCESSIBILITY_TRANSLATIONS.EN,
   ...SIGNATURE_TRANSLATIONS.EN,
   ...CHAT_SOURCE_TRANSLATIONS.EN,
 };

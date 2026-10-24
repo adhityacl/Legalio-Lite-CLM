@@ -62,6 +62,12 @@ would will shall may might any all some many much more most about into over unde
 yang dan untuk dengan dari pada apa siapa berapa bagaimana mana adalah ini itu atau ada saja semua para kami kita saya anda tolong bisa dapat akan sudah telah
 的 是 和 在 了 请 吗 什么 我们 你们`.split(/\s+/));
 const CJK = /[㐀-鿿豈-﫿]/u;
+/**
+ * Words that occur in almost every record of this application ("agreement", "contract", ...). They match everything and drown the name or
+ * subject the person actually asked about, so they are dropped from the query when anything more specific remains; a question made of
+ * nothing else ("show the contracts") keeps them so it still finds something.
+ */
+const COMMON_WORDS = new Set('agreement agreements contract contracts document documents file files record records perjanjian kontrak dokumen berkas'.split(' '));
 export const MAX_TERMS = 12;
 
 export interface SearchTerms { words: string[]; cjk: string[] }
@@ -86,7 +92,10 @@ export function searchTerms(question: string, recentTexts: string[] = []): Searc
   };
   add(question);
   for (const text of recentTexts.slice(-2)) add(text);
-  return { words: words.slice(0, MAX_TERMS), cjk: cjk.slice(0, MAX_TERMS) };
+  const specific = words.filter((word) => !COMMON_WORDS.has(word));
+  // Only the question's own common words count when nothing specific remains anywhere (also not in the follow-up context or the CJK terms).
+  const kept = specific.length || cjk.length ? specific : words;
+  return { words: kept.slice(0, MAX_TERMS), cjk: cjk.slice(0, MAX_TERMS) };
 }
 
 /** `a:* | b:*` (prefix match, any word). The words contain letters and digits only, so nothing can inject tsquery syntax. */
