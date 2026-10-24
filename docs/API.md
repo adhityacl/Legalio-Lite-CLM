@@ -1,6 +1,6 @@
 # Public API (v1)
 
-Organization-scoped access to **contracts, partners, orders and spendings** (read and write) and **obligations** and the **clause library** (read only) with API keys. The machine-readable description is
+Organization-scoped access to **contracts, partners, orders and spendings** (read and write) and **obligations**, the **clause library** and **signature requests** (read only) with API keys. The machine-readable description is
 served at `GET /api/v1/openapi.json` (OpenAPI 3.1, public, generated from the same operation table as the routes and from the
 request schemas the application itself validates with; a test fails when routes, route policies and the document disagree).
 
@@ -9,7 +9,7 @@ request schemas the application itself validates with; a test fails when routes,
 Organization administrators create keys in **Settings > Data & automation > API keys** (or `POST /api/organizations/:id/api-keys`).
 
 * The key (`lgk_<8 hex>_<43 characters>`) is **shown once**. Only its SHA-256 and a short prefix (`lgk_1a2b3c4d`) are stored; the list never returns the key.
-* **Scopes** are `<resource>:read` and `<resource>:write` for `contracts`, `partners`, `orders`, `spendings`, plus `obligations:read` and `clauses:read` (these have no write scope: they are maintained in the application). They are independent: `write` does not include `read`.
+* **Scopes** are `<resource>:read` and `<resource>:write` for `contracts`, `partners`, `orders`, `spendings`, plus `obligations:read`, `clauses:read` and `signatures:read` (these have no write scope: they are maintained in the application). They are independent: `write` does not include `read`.
 * Optional **expiry** (at most five years) and a **rate limit** per key (default `API_RATE_LIMIT_PER_MINUTE`, 600; 1 to 6000). `last_used_at` is recorded (at most one write per minute per key).
 * A key belongs to one organization and always acts inside it. It is organization-wide (not tied to a department), so give it only the scopes it needs. At most 50 active keys per organization.
 * Creating and revoking keys is written to the organization audit log; changes made through a key appear in the activity history as user `lgk_xxxxxxxx@api-key.invalid`, role "API key".
@@ -25,12 +25,14 @@ curl -H "Authorization: Bearer $LEGALIO_KEY" "https://your-host/api/v1/contracts
 | Method and path | Scope | Notes |
 | --- | --- | --- |
 | `GET /api/v1/whoami` | any valid key | organization id, key name, prefix, scopes |
-| `GET /api/v1/{contracts,partners,orders,spendings,obligations,clauses}` | `<resource>:read` | `limit` (default 50, max 200), `offset`, `q`, `sort`, `dir` and the resource's filters (see the document). Answer: `{ data, total, limit, offset }` |
+| `GET /api/v1/{contracts,partners,orders,spendings,obligations,clauses,signatures}` | `<resource>:read` | `limit` (default 50, max 200), `offset`, `q`, `sort`, `dir` and the resource's filters (see the document). Answer: `{ data, total, limit, offset }` |
 | `GET /api/v1/<resource>/{id}` | `<resource>:read` | `{ data }`; 404 for ids of other organizations |
 | `POST /api/v1/<resource>` | `<resource>:write` | body as the interactive application validates it (see the schemas); 201 `{ data }` |
 | `PATCH /api/v1/<resource>/{id}` | `<resource>:write` | partial update; the record's current `version` is **required** (body `version` or `If-Match`) |
 
 Obligations (`/api/v1/obligations`, `/api/v1/obligations/{id}`) are read-only; filters: `status` (`open`, `in_progress`, `done`, `waived`, and the derived `overdue`), `type`, `contract_id`, `io_id`, `partner_id`, `responsible`, `department`, `source`, `due_from`, `due_to`; sorts `due_date`, `title`, `type`, `status`, `created_at`, `updated_at`. `status` in an answer is derived (an open obligation past its due date reads `overdue`; `stored_status` is the stored value).
+
+Signature requests (`/api/v1/signatures`, `/api/v1/signatures/{id}`) are read-only; filters: `contract_id`, `status` (`draft`, `sent`, `partially_signed`, `completed`, `declined`, `expired`, `cancelled`). A request carries its signers (name, e-mail, order, status), the signed-copy metadata (name, size, SHA-256; the file itself is not served to API keys) and, on the single-record endpoint, the event timeline. Requests are created and progressed in the application or through the signed inbound webhook (see `docs/SIGNATURES.md`).
 
 Clauses (`/api/v1/clauses`, `/api/v1/clauses/{id}`) are read-only; filters: `q`, `category`, `risk` (`low`, `medium`, `high`), `language`, `jurisdiction`, `tag`, `status` (`active` by default, `archived`, `all`); sorts `title`, `category`, `risk_level`, `created_at`, `updated_at`. A clause carries its approved wording, fallback texts, guidance and the playbook `rules`.
 

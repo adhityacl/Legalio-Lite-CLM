@@ -5,6 +5,7 @@ import { DataExportPanel } from './DataExportPanel';
 import { ApiKeysPanel } from './ApiKeysPanel';
 import { WebhooksPanel } from './WebhooksPanel';
 import { SsoPanel } from './SsoPanel';
+import { SignatureEndpointsPanel } from './SignatureEndpointsPanel';
 import { ApprovalSettingsPanel } from './ApprovalSettingsPanel';
 import { DigestDefaultsPanel } from './DigestDefaultsPanel';
 
@@ -21,6 +22,7 @@ export const DataApiTab: React.FC<{ organizationId: string }> = ({ organizationI
       {hasPermission('tenant.settings.read') && <DigestDefaultsPanel organizationId={organizationId} />}
       {hasPermission('tenant.sso.manage') && <SsoPanel organizationId={organizationId} />}
       {hasPermission('tenant.apikey.manage') && <ApiKeysPanel organizationId={organizationId} />}
+      {hasPermission('tenant.signature.manage') && <SignatureEndpointsPanel organizationId={organizationId} />}
       {hasPermission('tenant.webhook.manage') && <WebhooksPanel organizationId={organizationId} />}
       {hasPermission('tenant.data.export') && <DataExportPanel organizationId={organizationId} />}
     </div>

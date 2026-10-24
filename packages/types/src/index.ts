@@ -127,6 +127,11 @@ export interface Contract extends ContractLifecycleFields {
   status_approval: ApprovalStatus;
   internal_pic: string;
   contract_file_link?: string;
+  /** Set by a completed signature request (server-written, read-only for clients). */
+  signed_file_link?: string;
+  signed_file_name?: string;
+  signed_at?: string;
+  signature_request_id?: string;
   fileName?: string;
   internal_notes?: string;
   changed_fields?: string[];

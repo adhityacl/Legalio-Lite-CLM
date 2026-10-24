@@ -20,7 +20,10 @@ same key as the other stored credentials; rotate it to get a new one).
 | `obligation.due_soon` | an open obligation came within its reminder lead time (once per due date) |
 | `obligation.overdue` | an open obligation passed its due date (once per due date) |
 | `obligation.completed` | an obligation was marked done (`data.nextDueDate` is the new date of a recurring one, `data.completedDueDate` the occurrence that was completed) |
-| `signature.completed` | reserved for the e-signature work; nothing emits it yet |
+| `signature.sent` | a signature request was sent out (`data.signers`, `data.providerRef`) |
+| `signature.completed` | every signer signed (`data.signedFile` has the name, size and SHA-256 of the signed copy, or `null` while it is still to come; `data.signers[].signedAt`) |
+| `signature.declined` | a signer declined (`data.declinedBy`, `data.reason`) |
+| `signature.expired` | an open request passed its expiry (`data.expiresAt`) |
 
 Contract events are queued in the same database transaction as the change. `webhook.test` is sent only by the Send test button.
 
