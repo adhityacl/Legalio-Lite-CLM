@@ -21,6 +21,8 @@ import { Type } from '@google/genai';
 import { normalizeParsedDate, computeContractEndDateFromDuration } from '../documentParsing';
 import { runContractRedlineAnalysis } from '../redlineAnalysis';
 import { sql } from '../db';
+import { emitContractEvents } from '../webhookEvents';
+import { emitWebhookEvent } from '../webhooks';
 import { TerminationFile, parseTerminationFile } from '../contractTermination';
 import { randomUUID } from 'node:crypto';
 import { saveUpload } from '../uploadStorage';
@@ -89,6 +91,7 @@ app.post("/api/contracts/export-google-docs", async (req: express.Request, res: 
     );
 
     await addActivityLog("", "", "", "DOCUMENT_EXPORT", "DOCUMENTS", `Exported '${title}' to Google Docs`, req, undefined, { documentId: docResult.id }).catch((err) => log.warn("Could not record export activity:", err));
+    await emitWebhookEvent(sql, targetOrgId, "document.exported", { kind: "google_doc", title: String(title).slice(0, 300), documentId: docResult.id, documentUrl: docResult.documentUrl });
     res.json({
       success: true,
       documentId: docResult.id,
@@ -730,7 +733,11 @@ app.post("/api/contracts", validateBody(bodySchemas.contractCreateBody, { requir
   };
   const writeDenial = assertRecordWritable(req, "contract", newContract);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
-  const stored = await contractRepository.insert(newContract);
+  const stored = await sql.tx(async () => {
+    const row = await contractRepository.insert(newContract);
+    await emitContractEvents(sql, null, row);
+    return row;
+  });
   await logActivity(req, "CREATE", "CONTRACT", `Membuat Kontrak Baru '${contract_number}' (${contract_title}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`);
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
   res.json({ success: true, contract: stored });
@@ -856,7 +863,11 @@ app.put("/api/contracts/:id", validateBody(bodySchemas.contractUpdateBody), asyn
   updated.organizationId = existing.organizationId;
   const writeDenial = assertRecordWritable(req, "contract", updated);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
-  const stored = await contractRepository.update(updated, expectedVersion);
+  const stored = await sql.tx(async () => {
+    const row = await contractRepository.update(updated, expectedVersion);
+    await emitContractEvents(sql, existing, row);
+    return row;
+  });
   await logActivity(req, "UPDATE", "CONTRACT", `Memperbarui data Kontrak '${updated.contract_number}'`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, contract: stored });

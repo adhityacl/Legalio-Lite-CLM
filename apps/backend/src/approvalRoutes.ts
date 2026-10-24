@@ -11,6 +11,7 @@ import {
 import type { OrgContext } from "./rbac";
 import { requestIdOf } from "./identity";
 import { appendAudit } from "./organizationSettingsStore";
+import { emitWebhookEvent } from "./webhooks";
 
 // shortcut: one fixed SLA for every request, make it a per-organization setting when someone asks.
 const SLA_MS = 48 * 60 * 60 * 1000;
@@ -212,6 +213,9 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
       await db.run(`INSERT INTO approval_events (id, request_id, actor_id, kind, message, created_at) VALUES (?, ?, ?, 'submitted', ?, ?)`, newId("ape"), id, ctx.userId, note, at);
       if (documentId) await db.run(`UPDATE contract_documents SET status = 'pending_review' WHERE id = ?`, documentId);
       await audit(req, ctx, "approval.submit", id);
+      await emitWebhookEvent(db, org, "approval.requested", {
+        approvalId: id, code, title, category, requesterId: ctx.userId, approverIds, currentStep: 1, dueAt: new Date(now.getTime() + SLA_MS).toISOString(), documentId: documentId || null,
+      });
       return null;
     });
     if (refused === "DOCUMENT_NOT_FOUND") return bad(res, "Document not found.");
@@ -272,6 +276,12 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
         await db.run(`UPDATE contract_documents SET status = ? WHERE id = ?`, decision === "approve" ? "approved" : "draft", row.document_id);
       }
       await audit(req, ctx, `approval.${decision}`, row.id);
+      const summary = await db.get(`SELECT code, title FROM approval_requests WHERE id = ?`, row.id) as { code: string; title: string };
+      const next = finished ? null : await db.get(`SELECT approver_id FROM approval_steps WHERE request_id = ? AND step_no = ?`, row.id, row.current_step + 1) as { approver_id: string } | undefined;
+      await emitWebhookEvent(db, row.organization_id, "approval.decided", {
+        approvalId: row.id, code: summary.code, title: summary.title, decision: stepStatus, stepNo: row.current_step, approverId: ctx.userId, comment: comment.slice(0, 500),
+        requestStatus: finished ? stepStatus : "pending", finished, nextApproverId: next?.approver_id ?? null, documentId: row.document_id,
+      });
       return true;
     });
     if (!decided) return res.status(409).json({ error: "NOT_CURRENT_APPROVER", message: "This approval is no longer waiting for you." });

@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import { onDbSaved, db } from './memoryDb';
 import { seedLedgerFromLegacy, planReminders, existingKeys as existingReminderKeys, enqueue as enqueueReminder, ReminderSender, deliverDue as deliverDueReminders, createReminderScheduler, schedulerOptionsFromEnv } from './reminders';
 import { sql } from './db';
+import { emitContractEvents } from './webhookEvents';
+import { emitWebhookEvent } from './webhooks';
 import { contractLifecycleMode, contractLifecycle } from '@legalio/shared/contractLifecycle';
 import { contractRepository } from './repositories/contractRepository';
 import { ioRepository } from './repositories/ioRepository';
@@ -108,11 +110,15 @@ async function refreshStoredContractLifecycles(): Promise<number> {
     for (const stale of batch) {
       if (!apply({ ...stale }).changed) continue;
       let endMoved = false;
-      await contractRepository.mutate(stale.organizationId, stale.contract_id, (row) => {
+      const before: any = { ...stale };
+      const refreshed = await contractRepository.mutate(stale.organizationId, stale.contract_id, (row) => {
+        Object.assign(before, row);
         const outcome = apply(row);
         endMoved = outcome.endMoved;
         return outcome.changed ? undefined : false;
       }, { bumpVersion: () => endMoved });
+      // The status moves with the calendar (Active -> Expiring -> Expired): integrations hear about it like any other change.
+      if (refreshed && before.status !== refreshed.status) await emitContractEvents(sql, before, refreshed, "lifecycle");
       updated++;
     }
   }
@@ -252,6 +258,10 @@ export async function deliverReminders() {
   const result = await deliverDueReminders(sql, sendLedgerReminder, {
     onSent: async (row) => {
       if (row.notification_id) await notificationRepository.markSent(row.organization_id, row.notification_id);
+      await emitWebhookEvent(sql, row.organization_id, "reminder.sent", {
+        kind: row.kind, recordId: row.record_id, trigger: row.trigger, offsetDays: row.offset_days, cycleEndDate: row.cycle_end_date,
+        recipientCount: String(row.recipients || "").split(",").filter((entry) => entry.includes("@")).length, notificationId: row.notification_id,
+      });
     },
   });
   if (result.attempted) reminderLog.info(`Reminder delivery: ${result.sent} sent, ${result.failed} failed (will retry), ${result.dead} abandoned, ${result.skipped} skipped.`);

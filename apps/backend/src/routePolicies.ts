@@ -92,6 +92,16 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['POST', '/api/organizations/:organizationId/api-keys', orgParam('tenant.apikey.manage', 'the secret is returned once, hashed at rest; audited')],
   ['POST', '/api/organizations/:organizationId/api-keys/:keyId/revoke', orgParam('tenant.apikey.manage', 'audited')],
 
+  ['GET', '/api/organizations/:organizationId/webhooks', orgParam('tenant.webhook.manage', 'never returns secrets')],
+  ['POST', '/api/organizations/:organizationId/webhooks', orgParam('tenant.webhook.manage', 'URL checked against SSRF rules; the signing secret is returned once; audited')],
+  ['PATCH', '/api/organizations/:organizationId/webhooks/:id', orgParam('tenant.webhook.manage', 'audited')],
+  ['DELETE', '/api/organizations/:organizationId/webhooks/:id', orgParam('tenant.webhook.manage', 'audited')],
+  ['POST', '/api/organizations/:organizationId/webhooks/:id/rotate-secret', orgParam('tenant.webhook.manage', 'new secret returned once; audited')],
+  ['POST', '/api/organizations/:organizationId/webhooks/:id/test', orgParam('tenant.webhook.manage', 'sends one signed test event now; audited')],
+  ['GET', '/api/organizations/:organizationId/webhooks/:id/deliveries', orgParam('tenant.webhook.manage')],
+  ['GET', '/api/organizations/:organizationId/webhooks/:id/deliveries/:deliveryId', orgParam('tenant.webhook.manage')],
+  ['POST', '/api/organizations/:organizationId/webhooks/:id/deliveries/:deliveryId/retry', orgParam('tenant.webhook.manage', 'audited')],
+
   /* ---------------- public API v1 (organization API keys) ---------------- */
   ['GET', '/api/v1/openapi.json', pub('API description; no data')],
   ['GET', '/api/v1/whoami', apiKey(null, 'any valid key; returns its own organization and scopes')],
@@ -346,8 +356,8 @@ export function createAuthorizationMiddleware(db: Sql) {
       }
       let ctx;
       if (policy.kind === 'orgParam') {
-        // `/api/tenants/:id/...` names the organization `id`; `/api/organizations/:organizationId/...` names it `organizationId`.
-        const organizationId = params.id ?? params.organizationId;
+        // `/api/organizations/:organizationId/...` names the organization `organizationId` (other path ids belong to the resource); the older `/api/tenants/:id/...` routes use `id`.
+        const organizationId = params.organizationId ?? params.id;
         const headers = [req.headers['x-organization-id'], req.headers['x-tenant-id']].map((v) => (typeof v === 'string' ? v.trim() : '')).filter(Boolean);
         if (headers.some((v) => v !== organizationId)) throw new RequestDenied(400, 'ORGANIZATION_SELECTOR_CONFLICT');
         ctx = await resolveOrganizationContext(db, identity, organizationId);

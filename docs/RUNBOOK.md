@@ -97,9 +97,13 @@ All Phase 3 passes follow `REMINDER_SCHEDULER_ENABLED` (off under `APP_TEST_MODE
 | --- | --- | --- |
 | `EXPORT_TTL_HOURS` | `24` | How long a finished tenant export can be downloaded; afterwards the job is `expired` and its chunks are deleted. |
 | `EXPORT_MAX_MB` | `1024` | A tenant export larger than this fails (`EXPORT_TOO_LARGE`); retry without files. The ZIP is stored in `export_job_chunks` (PostgreSQL), so size it against your database. |
+| `WEBHOOK_ALLOW_HTTP`, `WEBHOOK_ALLOW_PRIVATE_NETWORKS` | unset | **Development only.** Allow plain-http webhook URLs / private and loopback destinations (the SSRF guard is otherwise always on). A warning is logged when set in production. |
+| `WEBHOOK_TIMEOUT_MS`, `WEBHOOK_MAX_ATTEMPTS` | `10000`, `8` | Per-request timeout and attempts before a delivery is dead-lettered (backoff 30 s doubling to 6 h). |
 | `API_RATE_LIMIT_PER_MINUTE` | `600` | Default per-key limit of the public API when a key does not set its own (in memory per process). |
 
 Public API: see [API.md](API.md). Keys are organization-scoped and stored hashed; revoking a key takes effect on the next request. The in-memory limiters are per process.
+
+Webhooks: see [WEBHOOKS.md](WEBHOOKS.md). The delivery pass runs every 15 s (and right after an event is queued) under its own advisory lock; the delivery log is `webhook_deliveries`.
 
 Tenant export (Settings > Data & API, organization admins): `POST /api/organizations/:id/exports` queues a job, a pass in the same process starts it immediately, a one-minute pass picks up leftovers, fails jobs whose heartbeat stopped (instance died) and expires finished ones. At most one queued/running export per organization. Requesting, and downloading, are written to the audit log (`export.request`, `export.request.with_files`, `export.download`).
 

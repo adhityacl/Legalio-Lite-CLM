@@ -16,6 +16,7 @@ import { createEntityRepository } from './repositories/entityRepository';
 import { readIntegration, readOrganizationSettings } from './organizationSettingsStore';
 import type { ObjectStore } from './objectStore';
 import { createZipWriter, ZipLimitError } from './zipWriter';
+import { emitWebhookEvent } from './webhooks';
 
 const log = componentLog('tenantExport');
 
@@ -272,6 +273,7 @@ export async function runExportJob(db: Sql, id: string, deps: ExportDeps = {}): 
     await db.run(`UPDATE export_jobs SET status = 'succeeded', finished_at = ?, expires_at = ?, size_bytes = ?, entry_count = ?, summary = ?, error = NULL WHERE id = ?`,
       finished.toISOString(), new Date(finished.getTime() + exportTtlMs()).toISOString(), result.bytes, result.entries, JSON.stringify(result.counts), id);
     log.info(`Export ${id} for ${job.organizationId} finished: ${result.entries} entries, ${result.bytes} bytes.`);
+    await emitWebhookEvent(db, job.organizationId, 'document.exported', { kind: 'tenant_export', exportId: id, sizeBytes: result.bytes, includesFiles: job.includeFiles, expiresAt: new Date(finished.getTime() + exportTtlMs()).toISOString() });
   } catch (err) {
     const message = err instanceof ExportError || err instanceof ZipLimitError ? err.message : 'The export failed unexpectedly.';
     if (!(err instanceof ExportError)) log.error(`Export ${id} failed:`, err);
