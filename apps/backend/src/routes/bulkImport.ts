@@ -1,5 +1,6 @@
 import { nextEntityId } from '../ids';
 import { contractRepository } from '../repositories/contractRepository';
+import { partnerRepository } from '../repositories/partnerRepository';
 import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
 import { getRequestTenantId, isMatchingOrg, scopeOf, addActivityLog } from '../recordAccess';
 import { tenantDefaultCurrency, normalizePartnerDocuments, computeDueDiligenceStatus } from '../tenantPolicy';
@@ -96,9 +97,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         });
         continue;
       }
-      const exists = db.partners.find(
-        (p) => inTenant(p) && inTenant(p) && p.partner_name?.toLowerCase() === name.toLowerCase(),
-      );
+      const exists = await partnerRepository.findByName(tenantId, name);
       if (exists) {
         skipped.push({
           rowIndex,
@@ -166,7 +165,8 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         };
         newPartner.dd_documents = normalizePartnerDocuments(newPartner);
         newPartner.status_dd = computeDueDiligenceStatus(newPartner.dd_documents);
-        db.partners.push(newPartner);
+        // Row by row: each partner is committed on its own, so a later row's failure never discards the earlier ones. Imports append.
+        await partnerRepository.insert(newPartner, { position: "last" });
         succeeded.push({
           rowIndex,
           identifier: name,
@@ -207,9 +207,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         continue;
       }
       const partnerNama = (row.partner_name || "").trim();
-      const partner = db.partners.find(
-        (p) => inTenant(p) && p.partner_name?.toLowerCase() === partnerNama.toLowerCase(),
-      );
+      const partner = await partnerRepository.findByName(tenantId, partnerNama);
       if (!partner) {
         failed.push({ rowIndex, identifier: nomor, message: `Partner "${partnerNama}" tidak ditemukan. Impor partner lebih dulu atau samakan nama persis dengan data Partner.` });
         continue;
@@ -312,9 +310,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         continue;
       }
       const partnerNama = (row.partner_name || "").trim();
-      const partner = db.partners.find(
-        (p) => inTenant(p) && p.partner_name?.toLowerCase() === partnerNama.toLowerCase(),
-      );
+      const partner = await partnerRepository.findByName(tenantId, partnerNama);
       if (!partner) {
         failed.push({ rowIndex, identifier: nomor, message: `Partner "${partnerNama}" tidak ditemukan. Impor partner lebih dulu atau samakan nama persis dengan data Partner.` });
         continue;
@@ -404,9 +400,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         });
         continue;
       }
-      const partner = db.partners.find(
-        (p) => inTenant(p) && p.partner_name?.toLowerCase() === supplierName.toLowerCase(),
-      );
+      const partner = await partnerRepository.findByName(tenantId, supplierName);
       const picks = {
         obligation_target: pickEnum(row.obligation_target, BULK_ENUMS.obligation_target),
         incident_frequency: pickEnum(row.incident_frequency, BULK_ENUMS.incident_frequency),
@@ -488,9 +482,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         });
         continue;
       }
-      const partner = db.partners.find(
-        (p) => inTenant(p) && p.partner_name?.toLowerCase() === vendorName.toLowerCase(),
-      );
+      const partner = await partnerRepository.findByName(tenantId, vendorName);
       try {
         const invoiceMonth = normalizeSpendingMonths(row.invoice_month);
         const totalAmount = bulkNumber(row.total_amount);

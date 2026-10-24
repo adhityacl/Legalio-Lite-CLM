@@ -3,6 +3,7 @@ import * as bodySchemas from '../schemas';
 import { resolveActiveGoogleToken, getOrgFolderId, getPartnerCategoryFolderId } from '../googleDrive';
 import { db, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { contractRepository, CONTRACT_SORTS, type ContractQuery } from '../repositories/contractRepository';
+import { partnerRepository } from '../repositories/partnerRepository';
 import { recordVisible } from '../recordScope';
 import { hasOrganizationScope } from '../rbac';
 import { getRequestTenantId, scopedRecords, addActivityLog, assertRecordAccess, assertRecordWritable, isMatchingOrg, logActivity, orgContextOf, scopeOf } from '../recordAccess';
@@ -23,6 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { saveUpload } from '../uploadStorage';
 import { CONTRACT_TERMINATION_TRANSLATIONS } from '@legalio/shared/i18n/contractTermination';
 import { validateBody } from '../validation';
+import { requestedVersion } from '../requestVersion';
 import { contractLifecycleMode, validateContractTermination, contractLifecycle } from '@legalio/shared/contractLifecycle';
 import { getHistoricalExchangeRate } from '@legalio/shared/currencyRates';
 import { formatContractFileName } from '@legalio/shared/fileNaming';
@@ -58,7 +60,7 @@ app.post("/api/contracts/export-google-docs", async (req: express.Request, res: 
     let targetFolderId = (await getOrgFolderId(targetOrgId, token)).id;
     if (partnerName) {
       try {
-        const partner = (await scopedRecords(req, "partner", db.partners)).find(
+        const partner = (await scopedRecords(req, "partner")).find(
           (p: any) => p.partner_name?.toLowerCase() === String(partnerName).toLowerCase() || p.partner_id === partnerName
         );
         if (partner) {
@@ -151,7 +153,7 @@ app.get("/api/contracts", async (req: express.Request, res: express.Response) =>
   await refreshContractLifecycles();
   const query = contractListQuery(req.query);
   if (!query.paged && !query.q && !query.status?.length && !query.statusApproval?.length && !query.documentType && !query.partnerId && !query.internalPic && !query.endFrom && !query.endTo) {
-    return res.json((await scopedRecords(req, "contract", undefined)).map(presentContract));
+    return res.json((await scopedRecords(req, "contract")).map(presentContract));
   }
   const ctx = orgContextOf(req);
   const organizationId = getRequestTenantId(req);
@@ -354,7 +356,7 @@ app.post("/api/contracts/redline-analysis", async (req: express.Request, res: ex
   const draft = req.body?.contract;
   if (!draft || typeof draft !== "object") return res.status(400).json({ error: "Contract data is required." });
   const organizationId = getRequestTenantId(req);
-  const partner = db.partners.find((p) => p.partner_id === draft.partner_id && p.organizationId === organizationId);
+  const partner = await partnerRepository.get(organizationId, String(draft.partner_id ?? ""));
   if (!partner || assertRecordAccess(req, "partner", partner)) return res.status(400).json({ error: "Partner tidak ditemukan." });
   // Editing an existing contract: the result is stored on it right away so it survives leaving without saving.
   const saved = draft.contract_id ? await contractRepository.get(organizationId, String(draft.contract_id)) : undefined;
@@ -414,7 +416,7 @@ app.post("/api/contracts/:id/redline-analysis", async (req: express.Request, res
     });
   }
   if (!(await ensureAiAvailable(req, res))) return;
-  const partner = db.partners.find((p) => p.partner_id === contract.partner_id && p.organizationId === contract.organizationId);
+  const partner = await partnerRepository.get(contract.organizationId, String(contract.partner_id ?? ""));
   try {
     const parsed = await runContractRedlineAnalysis(req, contract, partner);
     const nowIso = parsed.analyzed_at;
@@ -534,7 +536,7 @@ ${plainText}
 });
 
 async function persistContractTerminationFile(req: express.Request, record: { organizationId?: string; partner_id?: string }, file: TerminationFile) {
-  const partner = db.partners.find(p => p.partner_id === record.partner_id);
+  const partner = await partnerRepository.get(String(record.organizationId ?? ""), String(record.partner_id ?? ""));
   const tenant = findTenant(record.organizationId);
   const storedName = `termination-${randomUUID()}.${file.extension}`;
   const url = await saveUpload(partner?.partner_name, 'Folder Termination', storedName, file.fileData, record.organizationId);
@@ -607,7 +609,7 @@ app.post("/api/contracts", validateBody(bodySchemas.contractCreateBody, { requir
   }
   const targetOrgId = getRequestTenantId(req);
   const targetTenant = findTenant(targetOrgId);
-  const partner = db.partners.find((p) => p.partner_id === partner_id && p.organizationId === targetOrgId);
+  const partner = await partnerRepository.get(targetOrgId, String(partner_id ?? ""));
   if (!partner) return res.status(400).json({ error: "Partner tidak ditemukan." });
   const token = await resolveActiveGoogleToken(
     req.headers["x-google-access-token"] || req.body.accessToken,
@@ -721,12 +723,6 @@ app.post("/api/contracts", validateBody(bodySchemas.contractCreateBody, { requir
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
   res.json({ success: true, contract: stored });
 });
-/** `version` from the body or an `If-Match` header (`"3"`, `W/"3"` or `3`); undefined when the client sent none. */
-function requestedVersion(req: express.Request, bodyVersion: unknown): number | undefined {
-  const raw = bodyVersion ?? String(req.headers["if-match"] ?? "").replace(/^W\//, "").replace(/"/g, "");
-  const version = Number(raw);
-  return raw !== "" && raw != null && Number.isInteger(version) && version > 0 ? version : undefined;
-}
 app.put("/api/contracts/:id", validateBody(bodySchemas.contractUpdateBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   // The schema is the whitelist: ids, organization, timestamps, creator and derived fields never come from the client.
@@ -812,9 +808,7 @@ app.put("/api/contracts/:id", validateBody(bodySchemas.contractUpdateBody), asyn
     typeof fileData === "string" &&
     fileData.includes("base64,")
   ) {
-    const partner = db.partners.find(
-      (p) => p.partner_id === updated.partner_id,
-    );
+    const partner = await partnerRepository.get(existing.organizationId, String(updated.partner_id ?? ""));
     const targetFileName = formatContractFileName({
       partnerName: partner?.partner_name,
       documentType: updated.document_type || "Master Agreement",

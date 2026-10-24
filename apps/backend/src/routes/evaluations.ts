@@ -1,3 +1,4 @@
+import { partnerRepository } from '../repositories/partnerRepository';
 import { nextEntityId } from '../ids';
 import { computeEvaluationScore } from '../evaluationScoring';
 import * as bodySchemas from '../schemas';
@@ -19,7 +20,7 @@ export function createEvaluationsRouter() {
   forwardAsyncRouteErrors(app);
 
 app.get("/api/partner-evaluations", async (req: express.Request, res: express.Response) => {
-  const list = await scopedRecords(req, "evaluation", db.evaluations);
+  const list = await scopedRecords(req, "evaluation");
   res.json(list);
 });
 /** AI annual review for the partner evaluation form: summarises the year's snapshot and suggests ratings; an existing evaluation stores the result right away. */
@@ -33,7 +34,7 @@ app.post("/api/partner-evaluations/review-analysis", async (req: express.Request
   if (draft.id && (!saved || assertRecordAccess(req, "evaluation", saved) || assertRecordWritable(req, "evaluation", saved))) {
     return res.status(404).json({ error: "Evaluasi tidak ditemukan." });
   }
-  const partner = db.partners.find((p) => p.partner_id === draft.partner_id && p.organizationId === organizationId);
+  const partner = await partnerRepository.get(organizationId, String(draft.partner_id ?? ""));
   const visiblePartner = partner && !assertRecordAccess(req, "partner", partner) ? partner : undefined;
   if (!(await ensureAiAvailable(req, res))) return;
   const text = (v: unknown, max = 2000) => (v == null || v === "" ? "-" : String(v).slice(0, max));

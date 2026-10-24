@@ -6,6 +6,7 @@
  */
 import { sql } from './db';
 import { db } from './memoryDb';
+import { entityFor } from './normalizedSchema';
 
 export type IdKind = 'partner' | 'contract' | 'io' | 'spending' | 'evaluation';
 
@@ -31,7 +32,7 @@ const SPECS: Record<IdKind, Spec> = {
 
 /** Repository-backed collections are not in memory: ask the table. */
 async function idTaken(spec: Spec, id: string): Promise<boolean> {
-  if (spec.collection === 'contracts') return Boolean(await sql.get('SELECT 1 FROM contracts WHERE contract_id = ?', id));
+  if (entityFor(spec.table).repository) return Boolean(await sql.get(`SELECT 1 FROM "${spec.table}" WHERE "${spec.column}" = ?`, id));
   return (db[spec.collection] || []).some((record: any) => record?.[spec.key] === id);
 }
 /** The next free id of `kind`. `year` only matters for evaluations (defaults to the current year). */

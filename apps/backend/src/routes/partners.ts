@@ -1,9 +1,11 @@
 import { nextEntityId } from '../ids';
-import { pageRows, type ListSpec } from '../listQuery';
 import { contractRepository } from '../repositories/contractRepository';
+import { partnerRepository, PARTNER_SORTS, type PartnerQuery } from '../repositories/partnerRepository';
+import { recordVisible } from '../recordScope';
+import { hasOrganizationScope } from '../rbac';
 import { generateRedlineAnalysis } from '../redlineAnalysis';
 import * as bodySchemas from '../schemas';
-import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity } from '../recordAccess';
+import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity, orgContextOf, scopeOf } from '../recordAccess';
 import { db, sanitizePartnerTags, sanitizeCountryCode, countryNameForPrompt, sanitizeIdentifiers, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { upload } from '../uploadMiddleware';
 import { ensureAiAvailable, getValidAiModel, generateContentWithRetryAndFallback, withDocumentTranscriptField, extractAndCacheDocumentTranscript } from '../aiClient';
@@ -12,6 +14,7 @@ import { aiPolicyContext, normalizePartnerDocuments, computeDueDiligenceStatus }
 import { Type } from '@google/genai';
 import { sendRouteError } from '../apiErrors';
 import { validateBody } from '../validation';
+import { requestedVersion } from '../requestVersion';
 import { resolveActiveGoogleToken, getOrgFolderId } from '../googleDrive';
 import { hasServiceAccountCredentials } from '../lib/googleServiceAccountAuth';
 import { getOrCreateDriveFolder } from '../lib/googleDriveSync';
@@ -27,19 +30,46 @@ export function createPartnersRouter() {
   const app = express.Router();
   forwardAsyncRouteErrors(app);
 
-const PARTNER_LIST: ListSpec<any> = {
-  search: ["partner_name", "codename", "partner_type", "internal_pic", "country", "notes", "partner_id", "pic_name"],
-  sorts: { partner_name: (p) => fold(p.partner_name), created_at: (p) => String(p.created_at ?? ""), updated_at: (p) => String(p.updated_at ?? ""), internal_pic: (p) => fold(p.internal_pic), status_dd: (p) => String(p.status_dd ?? "") },
-  filters: ["internal_pic", "partner_type", "status_dd", "country"],
-};
-const fold = (value: unknown) => String(value ?? "").toLowerCase();
+const queryText = (value: unknown, max = 200) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+const queryList = (value: unknown) => queryText(value, 500).split(",").map((v) => v.trim()).filter(Boolean).slice(0, 20);
+/** Paged-list parameters of GET /api/partners; `paged` is false when the request asks for the classic full list. */
+function partnerListQuery(query: express.Request["query"]): PartnerQuery & { paged: boolean; filtered: boolean } {
+  const requested = queryText(query.sort, 40);
+  const limit = query.limit === undefined ? undefined : Math.min(500, Math.max(1, Math.trunc(Number(query.limit)) || 50));
+  const paged = limit !== undefined || query.offset !== undefined;
+  const filters = { internalPic: queryList(query.internal_pic), partnerType: queryList(query.partner_type), statusDd: queryList(query.status_dd), country: queryList(query.country) };
+  const q = queryText(query.q, 200) || undefined;
+  const sort = (PARTNER_SORTS as readonly string[]).includes(requested) && requested !== "default" ? requested as PartnerQuery["sort"] : (paged || requested ? "partner_name" : "default");
+  return {
+    paged, filtered: Boolean(q) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
+    q, ...filters, sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",
+    limit: limit ?? (query.offset !== undefined ? 50 : undefined), offset: Math.max(0, Math.trunc(Number(query.offset)) || 0),
+  };
+}
+const presentPartner = (p: any) => ({ ...p, tags: sanitizePartnerTags(p.tags) });
+/**
+ * Without list parameters: every visible partner as a bare array (unchanged). With limit/offset/q/sort or a filter (internal_pic,
+ * partner_type, status_dd, country; comma lists): the matching visible partners, one page at a time, the total in `X-Total-Count`.
+ */
 app.get("/api/partners", async (req: express.Request, res: express.Response) => {
-  const partnerList = await scopedRecords(req, "partner", db.partners);
-  const normalizedPartners = partnerList.map((p) => ({
-    ...p,
-    tags: sanitizePartnerTags(p.tags),
-  }));
-  res.json(pageRows(req, res, normalizedPartners, PARTNER_LIST) ?? normalizedPartners);
+  const query = partnerListQuery(req.query);
+  if (!query.paged && !query.filtered) return res.json((await scopedRecords(req, "partner")).map(presentPartner));
+  const ctx = orgContextOf(req);
+  const organizationId = getRequestTenantId(req);
+  let rows: any[];
+  let total: number;
+  if (hasOrganizationScope(ctx)) {
+    ({ rows, total } = await partnerRepository.list(organizationId, query));
+  } else {
+    // Department roles see a subset decided by partner ownership: filter the matches, then page.
+    const matched = (await partnerRepository.list(organizationId, { ...query, limit: undefined, offset: 0 })).rows
+      .filter((row) => recordVisible(ctx, scopeOf(req), "partner", row));
+    total = matched.length;
+    rows = query.limit === undefined ? matched : matched.slice(query.offset, (query.offset ?? 0) + query.limit);
+  }
+  res.setHeader("X-Total-Count", String(total));
+  res.setHeader("Access-Control-Expose-Headers", "X-Total-Count");
+  res.json(rows.map(presentPartner));
 });
 app.post("/api/partners/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
   if (!(await ensureAiAvailable(req, res))) return;
@@ -167,7 +197,7 @@ app.post("/api/partners/review-analysis", async (req: express.Request, res: expr
   if (!draft || typeof draft !== "object" || !String(draft.partner_name || "").trim()) {
     return res.status(400).json({ error: "Partner name is required." });
   }
-  const saved = draft.partner_id ? db.partners.find((p) => p.partner_id === String(draft.partner_id)) : undefined;
+  const saved = draft.partner_id ? await partnerRepository.get(getRequestTenantId(req), String(draft.partner_id)) : undefined;
   if (draft.partner_id && (!saved || assertRecordAccess(req, "partner", saved) || assertRecordWritable(req, "partner", saved))) {
     return res.status(404).json({ error: "Partner tidak ditemukan." });
   }
@@ -208,13 +238,13 @@ Return JSON with exactly:
 `;
   try {
     const analysis = await generateRedlineAnalysis(req, prompt);
-    if (saved) {
-      saved.redline_analysis = analysis;
-      saved.redline_analyzed_at = analysis.analyzed_at;
-      saved.updated_at = analysis.analyzed_at;
-      await saveDb();
-    }
-    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
+    // Row-locked server-side edit: the stored result never overwrites (or fails on) a user's concurrent edit of other fields.
+    const stored = saved ? await partnerRepository.mutate(saved.organizationId, saved.partner_id, (row) => {
+      row.redline_analysis = analysis;
+      row.redline_analyzed_at = analysis.analyzed_at;
+      row.updated_at = analysis.analyzed_at;
+    }) : undefined;
+    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(stored) });
   } catch (error) {
     log.error("Error during partner review:", error);
     sendRouteError(req, res, error, "request failed", "Gagal melakukan analisis AI. Silakan coba kembali.", { status: 500 });
@@ -309,11 +339,10 @@ app.post("/api/partners", validateBody(bodySchemas.partnerCreateBody, { required
   };
   const writeDenial = assertRecordWritable(req, "partner", newPartner);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
-  db.partners.unshift(newPartner);
-  await saveDb();
+  const stored = await partnerRepository.insert(newPartner);
   await logActivity(req, "CREATE", "PARTNER", `Menambahkan Partner baru: ${partner_name}${partnerCountry ? ` (${partnerCountry})` : ""}`);
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
-  res.json({ success: true, partner: newPartner });
+  res.json({ success: true, partner: stored });
 });
 app.put("/api/partners/:id", validateBody(bodySchemas.partnerUpdateBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
@@ -333,12 +362,15 @@ app.put("/api/partners/:id", validateBody(bodySchemas.partnerUpdateBody), async 
     notes,
     tags,
     dd_documents,
+    version: clientVersion,
   } = req.body;
-  const partnerIndex = db.partners.findIndex((p) => p.partner_id === id);
-  if (partnerIndex === -1) {
+  const existing = await partnerRepository.get(getRequestTenantId(req), id);
+  if (!existing) {
     return res.status(404).json({ error: "Partner tidak ditemukan." });
   }
-  const existing = db.partners[partnerIndex];
+  // The version the client last saw (body `version` or If-Match) guards against overwriting someone else's edit; clients that
+  // send none are still protected for the duration of this request (the version read above).
+  const expectedVersion = requestedVersion(req, clientVersion) ?? existing.version;
   const tenantDenial = assertRecordAccess(req, "partner", existing);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
   const nextCountry = country !== void 0 ? sanitizeCountryCode(country) : existing.country || "";
@@ -348,7 +380,7 @@ app.put("/api/partners/:id", validateBody(bodySchemas.partnerUpdateBody), async 
     dd_documents: Array.isArray(dd_documents) ? dd_documents : existing.dd_documents,
   });
   const status_dd = computeDueDiligenceStatus(nextDocuments);
-  const updatedPartner = {
+  const updatedPartner: any = {
     ...existing,
     partner_name: partner_name || existing.partner_name,
     codename: codename !== void 0 ? codename : existing.codename,
@@ -379,19 +411,17 @@ app.put("/api/partners/:id", validateBody(bodySchemas.partnerUpdateBody), async 
   updatedPartner.organizationId = existing.organizationId;
   const writeDenial = assertRecordWritable(req, "partner", updatedPartner);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
-  db.partners[partnerIndex] = updatedPartner;
-  await saveDb();
+  const stored = await partnerRepository.update(updatedPartner, expectedVersion);
   await logActivity(req, "DD_UPDATE", "PARTNER", `Memperbarui profil & status DD Partner ${updatedPartner.partner_name} menjadi '${status_dd}'`);
   await triggerAutoPushToGoogleSheet(req);
-  res.json({ success: true, partner: updatedPartner });
+  res.json({ success: true, partner: stored });
 });
 app.delete("/api/partners/:id", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const partnerIndex = db.partners.findIndex((p) => p.partner_id === id);
-  if (partnerIndex === -1) {
+  const partner = await partnerRepository.get(getRequestTenantId(req), id);
+  if (!partner) {
     return res.status(404).json({ error: "Partner tidak ditemukan." });
   }
-  const partner = db.partners[partnerIndex];
   const tenantDenial = assertRecordAccess(req, "partner", partner);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
   const sameOrg = (row: any) => row?.organizationId === partner.organizationId;
@@ -406,9 +436,11 @@ app.delete("/api/partners/:id", async (req: express.Request, res: express.Respon
   db.ios = db.ios.filter((io) => !partnerIOs.includes(io));
   for (const spending of db.spendings) if (sameOrg(spending) && spending.vendor_id === id) spending.vendor_id = null;
   for (const evaluation of db.evaluations) if (sameOrg(evaluation) && evaluation.partner_id === id) evaluation.partner_id = null;
-  db.partners.splice(partnerIndex, 1);
-  // The partner's contracts are rows of their own repository: removed in the same transaction as the partner and its orders.
-  await saveDb(() => contractRepository.removeByPartner(partner.organizationId, id));
+  // The partner and its contracts are rows of their own repositories: removed in the same transaction as the orders and notifications.
+  await saveDb(async () => {
+    await contractRepository.removeByPartner(partner.organizationId, id);
+    await partnerRepository.remove(partner.organizationId, id);
+  });
   await logActivity(req, "DELETE", "PARTNER", `Menghapus Partner '${partner.partner_name}' beserta ${contractIds.length} Kontrak dan ${partnerIOs.length} Insertion Order pendukung.`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({
@@ -426,7 +458,7 @@ app.post("/api/partners/:id/upload-dd", validateBody(bodySchemas.partnerUploadDd
     documentNumber,
     expiryDate,
   } = req.body;
-  const partner = db.partners.find((p) => p.partner_id === id);
+  const partner = await partnerRepository.get(getRequestTenantId(req), id);
   if (!partner) {
     return res.status(404).json({ error: "Partner tidak ditemukan." });
   }
@@ -435,7 +467,7 @@ app.post("/api/partners/:id/upload-dd", validateBody(bodySchemas.partnerUploadDd
   const token = await resolveActiveGoogleToken(
     req.headers["x-google-access-token"] || req.body.accessToken,
   );
-  const docObj = partner.dd_documents.find((d) => d.name === docName);
+  const docObj = (partner.dd_documents || []).find((d) => d.name === docName);
   const currentFilesCount = (docObj?.files || []).length;
   const finalFileName =
     fileName ||
@@ -461,7 +493,9 @@ app.post("/api/partners/:id/upload-dd", validateBody(bodySchemas.partnerUploadDd
     );
     await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `Dokumen DD '${finalFileName}' untuk vendor '${partner.partner_name}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
   }
-  partner.dd_documents = partner.dd_documents.map((doc) => {
+  // Row-locked edit of the partner as it is now: concurrent uploads to different documents (or a form save) all land.
+  const stored = await partnerRepository.mutate(partner.organizationId, id, (partner) => {
+  partner.dd_documents = (partner.dd_documents || []).map((doc) => {
     if (doc.name === docName) {
       const nowIso = new Date().toISOString();
       const newFileItem = driveLink
@@ -521,21 +555,22 @@ app.post("/api/partners/:id/upload-dd", validateBody(bodySchemas.partnerUploadDd
     partner.dd_verified_date = new Date().toISOString().split("T")[0];
   }
   partner.updated_at = new Date().toISOString();
-  await saveDb();
+  });
   await logActivity(req, "DD_UPDATE", "PARTNER", `Mengunggah dokumen DD '${docName}' untuk partner ${partner.partner_name}`);
   void triggerAutoPushToGoogleSheet(req);
-  res.json({ success: true, partner });
+  res.json({ success: true, partner: stored ?? partner });
 });
 app.delete("/api/partners/:id/dd-file", validateBody(bodySchemas.partnerDdFileDeleteBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const { docName, fileId } = req.body;
-  const partner = db.partners.find((p) => p.partner_id === id);
+  const partner = await partnerRepository.get(getRequestTenantId(req), id);
   if (!partner) {
     return res.status(404).json({ error: "Partner tidak ditemukan." });
   }
   const deleteDenial = assertRecordAccess(req, "partner", partner);
   if (deleteDenial) return res.status(deleteDenial.status).json(deleteDenial.body);
-  partner.dd_documents = partner.dd_documents.map((doc) => {
+  const stored = await partnerRepository.mutate(partner.organizationId, id, (partner) => {
+  partner.dd_documents = (partner.dd_documents || []).map((doc) => {
     if (doc.name === docName) {
       const remainingFiles = (doc.files || []).filter((f) => f.id !== fileId);
       const hasFiles = remainingFiles.length > 0;
@@ -555,9 +590,9 @@ app.delete("/api/partners/:id/dd-file", validateBody(bodySchemas.partnerDdFileDe
     partner.dd_verified_date = new Date().toISOString().split("T")[0];
   }
   partner.updated_at = new Date().toISOString();
-  await saveDb();
+  });
   await logActivity(req, "DELETE", "PARTNER", `Menghapus file dari dokumen DD '${docName}' partner ${partner.partner_name}`);
-  res.json({ success: true, partner });
+  res.json({ success: true, partner: stored ?? partner });
 });
   return app;
 }

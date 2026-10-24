@@ -19,6 +19,8 @@ const numeric = z.union([z.number().finite(), s(64)]);
 const stringList = (item = 200, count = 200) => z.array(s(item)).max(count);
 const openRecord = z.record(z.string(), z.unknown());
 const accessToken = optional(s(4096));
+/** The version the client last read; a stale one is answered with 409 VERSION_CONFLICT. */
+const versionField = optional(z.union([z.number().int().positive(), z.string().regex(/^[1-9]\d{0,9}$/)]));
 const analysis = { redline_analysis: optional(openRecord), redline_analyzed_at: optional(s(64)) };
 const base64File = { fileName: optional(s(300)), fileData: optional(z.string()) };
 const attachedFile = optional(z.object({ fileName: optional(s(300)), fileData: optional(z.string()) }));
@@ -46,6 +48,7 @@ export const partnerUpdateBody = z.object({
   partner_name: optional(s(300)),
   ...partnerFields,
   dd_documents: optional(z.array(openRecord).max(500)),
+  version: versionField,
 });
 
 export const partnerUploadDdBody = z.object({
@@ -102,8 +105,7 @@ export const contractUpdateBody = z.object({
   start_date: optional(date),
   end_date: optional(date),
   status: optional(s(40)),
-  /** The version the client last read; a stale one is answered with 409 VERSION_CONFLICT. */
-  version: optional(z.union([z.number().int().positive(), z.string().regex(/^[1-9]\d{0,9}$/)])),
+  version: versionField,
   ...contractFields,
 });
 

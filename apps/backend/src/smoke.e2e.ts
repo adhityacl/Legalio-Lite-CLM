@@ -35,7 +35,7 @@ process.env.DATABASE_URL = database.url;
 const { sql } = await import('./db');
 const { seedOrganizationsFromDataset } = await import('./organizationProvisioning');
 const { synchronizeCoreData } = await import('./coreDataStore');
-const { contractRepository } = await import('./repositories/contractRepository');
+const { insertRepositoryRows } = await import('./repositories/seed');
 await (await import('./schema')).ensureSchema();
 
 // Fixture: the demo workspace and one organization administrator.
@@ -43,7 +43,7 @@ const dataset = buildDemoDataset();
 await seedOrganizationsFromDataset(sql, dataset);
 await sql.tx(async () => {
   await synchronizeCoreData(sql, dataset);
-  for (const row of [...dataset.contracts].reverse()) await contractRepository.insert(row);
+  await insertRepositoryRows(sql, dataset);
 });
 const now = new Date().toISOString();
 const password = 'Smoke-local-password-1234';

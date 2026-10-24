@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { migratePartnerContact } from './partnerContact';
-import { synchronizeCoreData } from './coreDataStore';
+import { partnerRepository } from './repositories/partnerRepository';
 import { sql } from './db';
 import { readBusinessRows } from './normalizedCoreStore';
 import { ensureSchema } from './schema';
@@ -20,13 +20,13 @@ test('migrates legacy contacts, preserves explicit fields, and is idempotent', (
 
 test('persistence removes the legacy field while retaining contacts and unrelated data', async () => {
   await sql.run(`INSERT INTO organization (id, name, slug, "createdAt") VALUES ('org1', 'Org', 'org1', now())`);
-  const data = { partners: [{ partner_id: 'p1', organizationId: 'org1', pic_partner: 'Jane (jane@example.com | +6512345678)', notes: 'Keep this' }] };
-  await synchronizeCoreData(sql, data);
+  const row = { partner_id: 'p1', organizationId: 'org1', pic_partner: 'Jane (jane@example.com | +6512345678)', notes: 'Keep this' };
+  await partnerRepository.insert(row);
   const [partner] = await readBusinessRows(sql, 'partners');
   assert.equal('pic_partner' in partner, false);
   assert.equal(partner.pic_email, 'jane@example.com');
   assert.equal(partner.notes, 'Keep this');
   assert.equal(partner.organizationId, 'org1');
-  await synchronizeCoreData(sql, data);
+  await partnerRepository.update(row, 1);
   assert.equal((await sql.get('SELECT COUNT(*) AS n FROM partners')).n, 1);
 });

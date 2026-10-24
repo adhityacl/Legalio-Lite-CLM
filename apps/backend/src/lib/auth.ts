@@ -1,5 +1,4 @@
 import { readBusinessRows } from '../normalizedCoreStore';
-import { migratePartnerContact } from '../partnerContact';
 import { synchronizeCoreData } from '../coreDataStore';
 import { openProviderSecrets } from '../providerSecrets';
 import { betterAuth, type BetterAuthOptions, type BetterAuthPlugin } from "better-auth";
@@ -111,7 +110,7 @@ export async function loadCoreData() {
   const single = async (text: string) => { const row = await sql.get(text); return row ? JSON.parse(row.payload) : null; };
   const rows = {
     allowedUsers: await payloads('allowed_users'),
-    partners: (await business('partners')).map(migratePartnerContact),
+    // Repository-backed (repositories/partnerRepository.ts): never loaded into the snapshot.
     // Repository-backed (repositories/contractRepository.ts): never loaded into the snapshot.
     ios: await business('insertion_orders'),
     notifications: await business('notifications'),

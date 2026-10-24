@@ -1,3 +1,4 @@
+import { partnerRepository } from './repositories/partnerRepository';
 import { readIntegration, writeIntegrationRow } from './organizationSettingsStore';
 import { sql } from './db';
 import { refreshTenantProjection, db, saveDb } from './memoryDb';
@@ -5,7 +6,6 @@ import { sanitizeParentFolderId, getOrCreateDriveFolder, createNewDriveFolderInP
 import { findTenant } from './tenantPolicy';
 import { IS_TEST_MODE } from './runtimePaths';
 import { hasServiceAccountCredentials } from './lib/googleServiceAccountAuth';
-import { isMatchingOrg } from './recordAccess';
 import { backupLocalFilesToGoogleDrive } from './driveBackup';
 import { googleCredentials } from './googleCredentialStore';
 import { OAuth2Client } from 'google-auth-library';
@@ -118,7 +118,10 @@ export async function getPartnerFolderId(partner, token, orgId) {
         activeToken,
       );
       partner.dd_folder_link = folderRes.webViewLink;
-      await saveDb();
+      // A link nobody edits by hand: stored without a new version, under the row lock, so open editors are not invalidated.
+      if (partner.partner_id && targetOrgId) {
+        await partnerRepository.mutate(targetOrgId, partner.partner_id, (row) => { row.dd_folder_link = folderRes.webViewLink; }, { bumpVersion: false });
+      }
       return folderRes.id;
     } catch (err) {
       log.warn(
@@ -149,12 +152,8 @@ export async function getPartnerCategoryFolderId(partner: any, category: string,
 export async function ensureAllPartnersFolders(token?: string, targetTenantId?: string) {
   let driveFoldersCreated = 0;
   const activeToken = await resolveActiveGoogleToken(token);
-  const partnersToProcess = targetTenantId
-    ? (db.partners || []).filter((p) =>
-        isMatchingOrg(p.organizationId, targetTenantId),
-      )
-    : db.partners || [];
-  for (const partner of partnersToProcess) {
+  for await (const batch of partnerRepository.batches(500, targetTenantId ? "organization_id = ?" : "TRUE", targetTenantId ? [targetTenantId] : []))
+  for (const partner of batch) {
     if (!partner.partner_name) continue;
     const orgId = partner.organizationId;
     const tenant = findTenant(orgId);

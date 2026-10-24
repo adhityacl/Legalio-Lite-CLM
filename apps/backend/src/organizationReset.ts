@@ -1,9 +1,10 @@
 import type { Sql } from './db';
 import { keyFromLink, type ObjectStore } from './objectStore';
 import { contractRepository } from './repositories/contractRepository';
+import { partnerRepository } from './repositories/partnerRepository';
 
 /** Collections of the in-memory projection that belong to an organization. */
-const COLLECTIONS = ['partners', 'ios', 'spendings', 'evaluations', 'notifications', 'templates', 'activityLogs'] as const;
+const COLLECTIONS = ['ios', 'spendings', 'evaluations', 'notifications', 'templates', 'activityLogs'] as const;
 
 /** Editor documents and approvals live in their own tables; each entry deletes one organization's rows. */
 const SQL_STEPS: Array<{ table: string; sql: string }> = [
@@ -59,8 +60,14 @@ export async function resetOrganizationData(options: OrganizationResetOptions) {
   for await (const batch of contractRepository.batches(500, 'organization_id = ?', [organizationId])) {
     batch.forEach(row => collectUploadLinks(row, links));
   }
-  // The contracts go in the same transaction as the snapshot change: partners that contracts still point at are deleted there too.
-  await save(async () => { removed.contracts = await contractRepository.removeOrganization(organizationId); });
+  for await (const batch of partnerRepository.batches(500, 'organization_id = ?', [organizationId])) {
+    batch.forEach(row => collectUploadLinks(row, links));
+  }
+  // Contracts and partners go in the same transaction as the snapshot change: the orders and notifications that point at them are deleted there too.
+  await save(async () => {
+    removed.contracts = await contractRepository.removeOrganization(organizationId);
+    removed.partners = await partnerRepository.removeOrganization(organizationId);
+  });
 
   await db.tx(async () => {
     for (const step of SQL_STEPS) {

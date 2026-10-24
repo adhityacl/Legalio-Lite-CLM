@@ -5,7 +5,8 @@ import { googleCredentials } from './googleCredentialStore';
 import { IS_TEST_MODE } from './runtimePaths';
 import { ApiError } from './organizationSettingsStore';
 import { RecordKind, createOrganizationScope, teamsOf, recordVisible } from './recordScope';
-import { contractRepository } from './repositories/contractRepository';
+import { createEntityRepository } from './repositories/entityRepository';
+import { entityFor } from './normalizedSchema';
 import { scopeCollections } from './recordAccess';
 import { onDbSaved, db } from './memoryDb';
 import { resolveIdentity, RequestDenied, sendError, resolveOrganizationContext } from './identity';
@@ -38,10 +39,23 @@ export function getStore(): ObjectStore {
  * Folder names are never proof of ownership (two organizations can sanitize
  * to the same name), and unowned root files are denied, not deleted.
  */
-/** Collections of the in-memory projection that can own an upload (contracts are looked up in their repository on demand). */
-export const UPLOAD_KINDS: Array<[RecordKind, string]> = [
-  ["partner", "partners"], ["io", "ios"], ["spending", "spendings"], ["evaluation", "evaluations"],
+/**
+ * Kinds of record that can own an upload, and where their links are stored. Repository-backed kinds are looked up in PostgreSQL on demand
+ * (the file name is a cheap pre-filter on these columns and child tables, the exact link is confirmed on the hydrated record); the
+ * rest are scanned in the in-memory projection.
+ */
+interface UploadKind { kind: RecordKind; table: string; collection: string; columns: string[]; children?: Array<{ table: string; parent: string; columns: string[] }> }
+export const UPLOAD_KINDS: UploadKind[] = [
+  { kind: "partner", table: "partners", collection: "partners", columns: ["dd_folder_link", "extra_json"], children: [
+    { table: "partner_dd_requirements", parent: "partner_id", columns: ["link_drive", "extra_json"] },
+    { table: "partner_dd_files", parent: "partner_id", columns: ["link_drive", "extra_json"] },
+  ] },
+  { kind: "io", table: "insertion_orders", collection: "ios", columns: ["io_file_link", "extra_json"] },
+  { kind: "spending", table: "spendings", collection: "spendings", columns: ["invoice_file_url", "billing_file_url", "folder_link", "extra_json"] },
+  { kind: "evaluation", table: "evaluations", collection: "evaluations", columns: ["extra_json"] },
+  { kind: "contract", table: "contracts", collection: "contracts", columns: ["contract_file_link", "termination_document", "extra_json"] },
 ];
+const isRepositoryBacked = (spec: UploadKind) => Boolean(entityFor(spec.table).repository);
 let uploadIndex: Map<string, Array<{ kind: RecordKind; record: any }>> | null = null;
 onDbSaved(() => { uploadIndex = null; });
 export function normalizeUploadPath(value: string): string | null {
@@ -57,34 +71,51 @@ export function normalizeUploadPath(value: string): string | null {
   }
 }
 const likeEscape = (value: string) => value.replace(/[\\%_]/g, (c) => "\\" + c);
-/** Contracts whose stored JSON links this upload; found by the file name first (cheap filter), then confirmed exactly. */
-async function contractOwners(urlPath: string) {
+/** Records of a repository-backed kind whose stored JSON links this upload; found by the file name first (cheap filter), then confirmed exactly. */
+async function repositoryOwners(spec: UploadKind, urlPath: string) {
   const name = urlPath.split("/").pop() || "";
   if (!name) return [];
   const variants = [...new Set([name, encodeURI(name), encodeURIComponent(name)])].map((v) => `%${likeEscape(v)}%`);
-  const records = await contractRepository.hydrate(await sql.all(
-    `SELECT * FROM contracts WHERE contract_file_link LIKE ANY(?) OR termination_document LIKE ANY(?) OR extra_json LIKE ANY(?)`, variants, variants, variants));
+  const entity = entityFor(spec.table);
+  const own = spec.columns.map((column) => `${column} LIKE ANY(?)`);
+  const viaChildren = (spec.children ?? []).map((child) => `${entity.key} IN (SELECT ${child.parent} FROM ${child.table} WHERE ${child.columns.map((column) => `${column} LIKE ANY(?)`).join(" OR ")})`);
+  const records = await createEntityRepository(sql, spec.table).hydrate(await sql.all(
+    `SELECT * FROM ${spec.table} WHERE ${[...own, ...viaChildren].join(" OR ")}`,
+    ...own.map(() => variants), ...(spec.children ?? []).flatMap((child) => child.columns.map(() => variants))));
   return records
     .filter((record: any) => (JSON.stringify(record).match(/\/uploads\/[^"\\]+/g) || []).some((url) => normalizeUploadPath(url) === urlPath))
-    .map((record: any) => ({ kind: "contract" as RecordKind, record }));
+    .map((record: any) => ({ kind: spec.kind, record }));
 }
 export async function uploadOwners(urlPath: string) {
   if (!uploadIndex) {
     uploadIndex = new Map();
-    for (const [kind, collection] of UPLOAD_KINDS) {
-      for (const record of db[collection] || []) {
+    for (const spec of UPLOAD_KINDS) {
+      if (isRepositoryBacked(spec)) continue;
+      for (const record of db[spec.collection] || []) {
         const urls = JSON.stringify(record).match(/\/uploads\/[^"\\]+/g) || [];
         for (const url of urls) {
           const key = normalizeUploadPath(url);
           if (!key) continue;
           const owners = uploadIndex.get(key) || [];
-          owners.push({ kind, record });
+          owners.push({ kind: spec.kind, record });
           uploadIndex.set(key, owners);
         }
       }
     }
   }
-  return [...(uploadIndex.get(urlPath) || []), ...(await contractOwners(urlPath))];
+  const found = [...(uploadIndex.get(urlPath) || [])];
+  for (const spec of UPLOAD_KINDS) if (isRepositoryBacked(spec)) found.push(...await repositoryOwners(spec, urlPath));
+  return found;
+}
+/** Every record that may link an upload (organization + record), for the one-time ownership backfill. */
+export async function* uploadBackfillRecords(): AsyncGenerator<{ organizationId: string; record: any }> {
+  for (const spec of UPLOAD_KINDS) {
+    if (isRepositoryBacked(spec)) {
+      for await (const batch of createEntityRepository(sql, spec.table).batches()) for (const record of batch) yield { organizationId: record.organizationId, record };
+    } else {
+      for (const record of db[spec.collection] || []) yield { organizationId: record.organizationId, record };
+    }
+  }
 }
 export async function authorizeUpload(req: express.Request, res: express.Response, next: express.NextFunction) {
   let identity;

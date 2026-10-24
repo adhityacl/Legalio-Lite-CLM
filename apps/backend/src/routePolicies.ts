@@ -16,7 +16,7 @@
 import type express from 'express';
 import type { Sql } from './db';
 import { teamsOf } from './recordScope';
-import { contractDirectoryFor } from './repositories/contractRepository';
+import { scopeCollectionsFor } from './repositories/scopeDirectory';
 import {
   RequestDenied, isSameOriginRequest, legacyActorOf, resolveIdentity, resolveLegacyContext,
   resolveOrganizationContext, sendError,
@@ -302,7 +302,7 @@ export function createAuthorizationMiddleware(db: Sql) {
       }
       if (!policy.permissions.every((p) => can(ctx, p))) return sendError(req, res, 403, 'INSUFFICIENT_PERMISSION');
       (req as any).teams = await teamsOf(db, ctx.organizationId);
-      (req as any).contractDirectory = await contractDirectoryFor(db, ctx);
+      (req as any).scopeCollections = await scopeCollectionsFor(db, ctx);
       (req as any).orgContext = ctx;
       (req as any).actor = legacyActorOf(ctx);
       return next();

@@ -26,7 +26,7 @@ import { hasServiceAccountCredentials } from "./lib/googleServiceAccountAuth";
 import { componentLog, errorResponder, requestLogging } from "./logger";
 import { mailTemplates, sendPlatformMail } from "./mailHelpers";
 import { syncIdSequences } from "./ids";
-import { coreSaver, db, demoData, migrateLegacyRecords, normalizeContractRecord, normalizeStoredContracts, refreshTenantProjection, saveDb, sanitizePartnerTags, seedContracts, syncAdderNames } from "./memoryDb";
+import { coreSaver, db, demoData, migrateLegacyRecords, normalizeContractRecord, normalizePartnerRecord, normalizeStoredContracts, normalizeStoredPartners, refreshTenantProjection, saveDb, seedContracts, seedPartners, syncAdderNames } from "./memoryDb";
 import { resetSyncCache } from "./normalizedCoreStore";
 import { createOrganizationAdminRouter } from "./organizationAdminRoutes";
 import { seedOrganizationsFromDataset } from "./organizationProvisioning";
@@ -59,9 +59,11 @@ import { BETTER_AUTH_ALLOWED, createAuthorizationMiddleware, isBetterAuthPathAll
 import { IS_TEST_MODE } from "./runtimePaths";
 import { localizeApiMessages } from "./serverMessages";
 import { tenantSettingsPayload } from "./tenantSettingsView";
-import { getStore, UPLOAD_KINDS } from "./uploadStorage";
+import { getStore, uploadBackfillRecords } from "./uploadStorage";
 import { backfillUploadOwners, uploadBackfillPending } from "./uploadOwnership";
 import { contractRepository } from "./repositories/contractRepository";
+import { partnerRepository } from "./repositories/partnerRepository";
+import { insertRepositoryRows } from "./repositories/seed";
 import { ensureSchema } from "./schema";
 
 const log = componentLog("server");
@@ -138,8 +140,9 @@ export async function init() {
     log.info(`Seeded bootstrap superuser: ${demoAdminEmail}`);
   }
   const initialData = await loadCoreData();
-  const hasCoreData = ["partners", "ios", "spendings", "evaluations", "notifications", "templates", "activityLogs"]
-    .some((key) => Array.isArray((initialData as any)[key]) && (initialData as any)[key].length > 0) || await contractRepository.anyAtAll();
+  const hasCoreData = ["ios", "spendings", "evaluations", "notifications", "templates", "activityLogs"]
+    .some((key) => Array.isArray((initialData as any)[key]) && (initialData as any)[key].length > 0)
+    || await contractRepository.anyAtAll() || await partnerRepository.anyAtAll();
   const seedDemoContracts = !(hasCoreData || !freshInstall);
 
   // An initialized workspace may intentionally contain no business records after a reset.
@@ -165,6 +168,7 @@ export async function init() {
   delete db.activeTenantId;
   await refreshTenantProjection();
   migrateLegacyRecords();
+  await normalizeStoredPartners();
   await normalizeStoredContracts();
   // Demo-dataset logins share DEMO_ADMIN_PASSWORD, so a production server never keeps them —
   // including servers that created them before this rule existed.
@@ -173,16 +177,16 @@ export async function init() {
     db.allowedUsers = allowedUsers;
     if (removed) log.info(`Production: removed ${removed} demo login account(s).`);
   }
-  // Demo contracts are repository-backed: they commit together with the partners and orders that reference each other.
+  // Demo partners and contracts are repository-backed: they commit together with the orders that reference each other.
   // Reverse order keeps the dataset's order (each insert goes to the front).
   await saveDb(seedDemoContracts ? async () => {
-    for (const contract of [...seedContracts].reverse()) await contractRepository.insert(normalizeContractRecord(contract));
+    await insertRepositoryRows(sql, { partners: seedPartners, contracts: seedContracts }, { partners: (row) => normalizePartnerRecord(structuredClone(row)), contracts: normalizeContractRecord });
   } : undefined);
-  const uploadRecords = UPLOAD_KINDS.flatMap(([, collection]) => (db[collection] || []).map((record: any) => ({ organizationId: record.organizationId, record })));
   if (await uploadBackfillPending(sql)) {
-    for await (const batch of contractRepository.batches()) for (const record of batch) uploadRecords.push({ organizationId: record.organizationId, record });
+    const uploadRecords: Array<{ organizationId: string; record: any }> = [];
+    for await (const item of uploadBackfillRecords()) uploadRecords.push(item);
+    await backfillUploadOwners(sql, uploadRecords);
   }
-  await backfillUploadOwners(sql, uploadRecords);
   // The auth console reads platform configuration (SMTP) from `db`; it no longer
   // hydrates identities, memberships or organizations from this projection.
   setConsoleDbReference(db, saveDb, getStore, async (organizationId?: string) => {
@@ -208,13 +212,6 @@ export async function init() {
     if (changed) {
       await saveDb();
     }
-  }
-  if (db.partners && Array.isArray(db.partners)) {
-    db.partners = db.partners.map((p) => ({
-      ...p,
-      tags: sanitizePartnerTags(p.tags),
-    }));
-    await saveDb();
   }
   syncAdderNames();
   await saveDb();
@@ -243,7 +240,7 @@ app.use("/api", createOrganizationAdminRouter({
   onOrganizationChanged,
   departmentReferenced: async (organizationId: string, department: { id: string; name: string }) => {
     const key = normalizeDepartmentName(department.name);
-    return (db.partners || []).some((row: any) => row?.organizationId === organizationId && normalizeDepartmentName(row.internal_pic) === key)
+    return await partnerRepository.departmentReferenced(organizationId, key)
       || await contractRepository.departmentReferenced(organizationId, key);
   },
   inviteUrl: (req: express.Request, token: string) => {

@@ -421,6 +421,81 @@ test('saving other entities does not touch contract rows', async () => {
   assert.deepEqual(after, before);
 });
 
+/* ------------------------------ repository-backed entities: versions, races, snapshot isolation ------------------------------ */
+
+interface Persisted { name: string; route: string; key: string; field: string; create: (tag: string) => Promise<any>; table: string; idColumn: string; responseKey: string }
+const PERSISTED_ENTITIES: Persisted[] = [
+  {
+    name: 'partners', route: '/api/partners', key: 'partner_id', field: 'notes', table: 'partners', idColumn: 'partner_id', responseKey: 'partner',
+    create: async (tag) => ok(await api('adminA', 'POST', '/api/partners', { org: A, body: { partner_name: `Race Partner ${tag}`, internal_pic: 'Sales' } })).partner,
+  },
+];
+for (const entity of PERSISTED_ENTITIES) {
+  test(`${entity.name}: rows carry a version; concurrent edits of one row never lose an update (409 VERSION_CONFLICT)`, async () => {
+    const created = await entity.create(`race-${entity.name}`);
+    assert.equal(created.version, 1);
+    const url = `${entity.route}/${created[entity.key]}`;
+    const race = await Promise.all([
+      api('adminA', 'PUT', url, { org: A, body: { [entity.field]: 'Writer one', version: created.version } }),
+      api('adminA', 'PUT', url, { org: A, body: { [entity.field]: 'Writer two', version: created.version } }),
+    ]);
+    assert.deepEqual(race.map((reply) => reply.status).sort(), [200, 409], race.map((r) => r.raw.slice(0, 120)).join(' | '));
+    const loser = race.find((reply) => reply.status === 409)!;
+    assert.equal(loser.body.code, 'VERSION_CONFLICT');
+    for (const key of ['error', 'code', 'message', 'status', 'requestId']) assert.ok(key in loser.body, key);
+    const winner = race.find((reply) => reply.status === 200)!.body[entity.responseKey];
+    assert.equal(winner.version, 2);
+    const stored = ok(await api('adminA', 'GET', entity.route, { org: A })).find((row: any) => row[entity.key] === created[entity.key]);
+    assert.equal(stored[entity.field], winner[entity.field]);
+    assert.equal(stored.version, 2);
+    assert.equal((await api('adminA', 'PUT', url, { org: A, body: { [entity.field]: 'Old copy', version: 1 } })).status, 409, 'a stale copy is told so later too');
+    assert.equal((await api('adminA', 'PUT', url, { org: A, body: { [entity.field]: 'No version' } })).status, 200, 'a client without a version simply overwrites the current row');
+  });
+
+  test(`${entity.name}: concurrent edits of different rows all succeed`, async () => {
+    const made = [];
+    for (const n of [1, 2, 3, 4]) made.push(await entity.create(`par-${entity.name}-${n}`));
+    const replies = await Promise.all(made.map((row) => api('adminA', 'PUT', `${entity.route}/${row[entity.key]}`, { org: A, body: { [entity.field]: `Edited ${row[entity.key]}`, version: row.version } })));
+    assert.deepEqual(replies.map((r) => r.status), [200, 200, 200, 200]);
+  });
+
+  test(`${entity.name}: saving other entities does not touch these rows`, async () => {
+    const stamp = () => sql.all(`SELECT ${entity.idColumn} AS id, xmin::text AS xmin, version FROM ${entity.table} ORDER BY ${entity.idColumn}`);
+    const before = await stamp();
+    // Writes of entities that still travel with the snapshot, and of contracts, must leave this table alone.
+    ok(await api('adminA', 'PUT', `/api/contracts/${fixtureA.contract.contract_id}`, { org: A, body: { internal_notes: `nudge ${entity.table.length}` } }));
+    if (entity.name !== 'ios') ok(await api('adminA', 'PUT', `/api/ios/${fixtureA.io.io_id}`, { org: A, body: { io_title: `nudge ${entity.table.length}` } }));
+    if (entity.name !== 'spendings') ok(await api('adminA', 'PUT', `/api/partner-spendings/${fixtureA.spending.id}`, { org: A, body: { invoice_title: `nudge ${entity.table.length}` } }));
+    assert.deepEqual(await stamp(), before);
+  });
+}
+
+test('partners: two document uploads to different due-diligence documents on one partner both land', async () => {
+  const partner = ok(await api('adminA', 'POST', '/api/partners', { org: A, body: { partner_name: 'DD Race Partner', internal_pic: 'Sales', country: 'ID' } })).partner;
+  const docs = (partner.dd_documents as any[]).slice(0, 2).map((d) => d.name);
+  assert.equal(docs.length, 2);
+  const replies = await Promise.all(docs.map((docName, i) => api('adminA', 'POST', `/api/partners/${partner.partner_id}/upload-dd`, { org: A, body: { docName, fileName: `dd-${i}.pdf`, fileData: pdf(), documentNumber: `N${i}` } })));
+  assert.deepEqual(replies.map((r) => r.status), [200, 200], replies.map((r) => r.raw.slice(0, 160)).join(' | '));
+  const stored = ok(await api('adminA', 'GET', '/api/partners', { org: A })).find((p: any) => p.partner_id === partner.partner_id);
+  for (const docName of docs) {
+    const doc = stored.dd_documents.find((d: any) => d.name === docName);
+    assert.equal(doc.files.length, 1, `${docName} kept its uploaded file`);
+  }
+  assert.equal(stored.version, 3, 'each upload is its own versioned write');
+});
+
+test('partners: deleting one removes its contracts, orders, notifications and children, and nulls the links of spendings and evaluations', async () => {
+  const f = await seed(A, 'adminA', 'DEL1', 'Sales');
+  ok(await api('adminA', 'DELETE', `/api/partners/${f.partner.partner_id}`, { org: A }));
+  assert.equal((await sql.get(`SELECT COUNT(*) AS n FROM partners WHERE partner_id = ?`, f.partner.partner_id)).n, 0);
+  assert.equal((await sql.get(`SELECT COUNT(*) AS n FROM contracts WHERE contract_id = ?`, f.contract.contract_id)).n, 0);
+  assert.equal((await sql.get(`SELECT COUNT(*) AS n FROM insertion_orders WHERE io_id = ?`, f.io.io_id)).n, 0);
+  assert.equal((await sql.get(`SELECT COUNT(*) AS n FROM partner_dd_requirements WHERE partner_id = ?`, f.partner.partner_id)).n, 0);
+  const spending = (await sql.get(`SELECT vendor_id FROM spendings WHERE id = ?`, f.spending.id));
+  assert.equal(spending.vendor_id, null);
+  denied(await api('adminB', 'DELETE', `/api/partners/${fixtureA.partner.partner_id}`, { org: B }), [404]);
+});
+
 /* ------------------------------ server-side paging and search ------------------------------ */
 
 test('GET /api/contracts pages, filters and sorts on the server and reports the total', async () => {

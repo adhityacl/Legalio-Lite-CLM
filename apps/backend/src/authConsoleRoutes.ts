@@ -1,4 +1,4 @@
-import { contractRepository } from './repositories/contractRepository';
+import { organizationOwnsBusinessData } from './businessData';
 /**
  * System Admin console API — platform operations only (tenant-boundaries PRD §6.6, §10.1).
  *
@@ -552,8 +552,7 @@ authConsoleRouter.post('/organizations/:id/reset', platformHandler(async (req, r
 authConsoleRouter.delete('/organizations/:id', platformHandler(async (req, res, identity) => {
   const id = req.params.id;
   await readOrganizationSettings(sql, id); // 404 for unknown IDs
-  const owned = ['partners', 'ios', 'spendings', 'evaluations', 'notifications', 'templates']
-    .some((key) => (globalDbRef?.[key] || []).some((row: any) => row?.organizationId === id)) || await contractRepository.anyIn(id);
+  const owned = await organizationOwnsBusinessData(globalDbRef, id);
   if (owned) throw new ApiError(409, 'ORGANIZATION_IN_USE', "Move or remove this organization's records first.");
   await sql.tx(async () => {
     await sql.run('DELETE FROM "teamMember" WHERE "teamId" IN (SELECT id FROM team WHERE "organizationId" = ?)', id);

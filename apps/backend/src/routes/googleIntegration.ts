@@ -1,3 +1,4 @@
+import { partnerRepository } from '../repositories/partnerRepository';
 import { checkIsAdmin } from '../adminCheck';
 import { backupLocalFilesToGoogleDrive } from '../driveBackup';
 import { getRequestTenantId, orgContextOf } from '../recordAccess';
@@ -149,7 +150,7 @@ const provisionFoldersHandler = __name(async (req: express.Request, res: express
     await saveDb();
     return res.json({
       success: true,
-      message: `4 Subfolder Kategori (Folder Contract, Folder Invoice & Billing, Folder IO, Folder DD) berhasil dibuat/diperbarui untuk ${db.partners.length} partner.`,
+      message: `4 Subfolder Kategori (Folder Contract, Folder Invoice & Billing, Folder IO, Folder DD) berhasil dibuat/diperbarui untuk ${await partnerRepository.count()} partner.`,
       stats,
     });
   } catch (err) {

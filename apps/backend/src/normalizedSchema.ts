@@ -15,7 +15,7 @@ const fields = (names: string, kind: FieldKind = 'text'): Field[] => names.split
 const dates = fields('created_at updated_at');
 const lifecycle = [...fields('lifecycle_mode termination_date termination_reason'), ...fields('termination_document', 'json')];
 export const ENTITIES: EntitySchema[] = [
-  { table: 'partners', key: 'partner_id', collection: 'partners', search: ['partner_name', 'codename', 'partner_type', 'notes'], fields: [
+  { table: 'partners', key: 'partner_id', collection: 'partners', repository: true, search: ['partner_name', 'codename', 'partner_type', 'notes'], fields: [
     ...fields('partner_name country entity_type partner_type pic_name pic_email pic_phone pic_address internal_pic codename status_dd dd_folder_link dd_verified_date notes'), ...dates,
   ] },
   { table: 'contracts', key: 'contract_id', collection: 'contracts', repository: true, search: ['contract_number', 'contract_title', 'internal_notes', 'change_summary'], fields: [

@@ -16,6 +16,8 @@ export type Row = Record<string, any>;
 export const quote = (name: string) => `"${name.replaceAll('"', '""')}"`;
 
 export interface WriteOptions {
+  /** `'last'` appends after the organization's existing rows (bulk imports); default `'first'` (newest first, like the old `unshift`). */
+  position?: 'first' | 'last';
   /** Runs inside the write transaction before the statement: take locks and check cross-row rules here. */
   beforeWrite?: (row: Row) => Promise<void>;
 }
@@ -63,7 +65,8 @@ export function createEntityRepository(db: Sql, table: string) {
     try {
       return await db.tx(async () => {
         await options.beforeWrite?.(row);
-        const first = await db.get<{ position: number }>(`SELECT COALESCE(MIN(record_position), 1) - 1 AS position FROM ${t} WHERE organization_id = ?`, organizationId);
+        const edge = options.position === 'last' ? 'COALESCE(MAX(record_position), -1) + 1' : 'COALESCE(MIN(record_position), 1) - 1';
+        const first = await db.get<{ position: number }>(`SELECT ${edge} AS position FROM ${t} WHERE organization_id = ?`, organizationId);
         const values: Row = { [entity.key]: id, organization_id: organizationId, record_position: Number(first?.position ?? 0), ...columns(row) };
         const names = Object.keys(values);
         await db.run(`INSERT INTO ${t} (${names.map(quote).join(',')}) VALUES (${names.map((name) => '@' + name).join(',')})`, values);
@@ -100,6 +103,27 @@ export function createEntityRepository(db: Sql, table: string) {
         return (await get(organizationId, id))!;
       });
     } catch (error) { return translate(error); }
+  }
+
+  /**
+   * Atomic server-side change of one row: it is locked, `change` edits the content as it is *now*, and the result is written with the
+   * version just read, so it neither fails on nor overwrites a concurrent edit of other fields. For derived values and read-modify-write
+   * actions; user edits of a form go through `update` with the version the user saw. `change` returning `false` writes nothing.
+   */
+  async function mutate(
+    organizationId: string, id: string,
+    change: (row: Row) => void | false | Promise<void | false>,
+    options: Omit<UpdateOptions, 'bumpVersion'> & { bumpVersion?: boolean | (() => boolean) } = {},
+  ): Promise<Row | undefined> {
+    return db.tx(async () => {
+      const record = await db.get<Row>(`SELECT * FROM ${t} WHERE organization_id = ? AND ${key} = ? FOR UPDATE`, organizationId, id);
+      if (!record) return undefined;
+      const [row] = await hydrateRecords(db, entity, [record]);
+      const version = row.version;
+      if (await change(row) === false) return row;
+      const bumpVersion = typeof options.bumpVersion === 'function' ? options.bumpVersion() : options.bumpVersion;
+      return update(row, version, { ...options, bumpVersion });
+    });
   }
 
   /** Deletes one row (children cascade). False when it did not exist. */
@@ -139,7 +163,7 @@ export function createEntityRepository(db: Sql, table: string) {
     }
   }
 
-  return { entity, table, get, getMany, insert, update, remove, removeOrganization, removeAll, batches, hydrate: (records: Row[]) => hydrateRecords(db, entity, records) };
+  return { entity, table, get, getMany, insert, update, mutate, remove, removeOrganization, removeAll, batches, hydrate: (records: Row[]) => hydrateRecords(db, entity, records) };
 }
 
 export type EntityRepository = ReturnType<typeof createEntityRepository>;

@@ -18,12 +18,12 @@ app.get("/api/init-data", async (req: express.Request, res: express.Response) =>
   res.setHeader("Cache-Control", "no-store");
   res.json({
     organizationId,
-    contracts: await scopedRecords(req, "contract", undefined),
-    ios: await scopedRecords(req, "io", db.ios),
-    partners: await scopedRecords(req, "partner", db.partners),
-    notifications: await scopedRecords(req, "notification", db.notifications),
-    evaluations: await scopedRecords(req, "evaluation", db.evaluations),
-    spendings: await scopedRecords(req, "spending", db.spendings),
+    contracts: await scopedRecords(req, "contract"),
+    ios: await scopedRecords(req, "io"),
+    partners: await scopedRecords(req, "partner"),
+    notifications: await scopedRecords(req, "notification"),
+    evaluations: await scopedRecords(req, "evaluation"),
+    spendings: await scopedRecords(req, "spending"),
     services: {
       aiAvailable: Boolean(getEffectiveGeminiApiKey()) && settings.modules.aiAssistant,
       googleUploadsAvailable: Boolean(sanitizeParentFolderId(db.googleConfig?.driveFolderId)) &&

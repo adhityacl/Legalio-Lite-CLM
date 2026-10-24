@@ -1,8 +1,8 @@
 import crypto from 'crypto';
 import { buildDemoDataset } from '@legalio/shared/data/demoDataset';
 import { resolveTenantSettings } from '@legalio/shared/policy';
-import { DEFAULT_BRANDING, coreSaver, db, migrateLegacyRecords, normalizeContractRecord, saveDb } from '../memoryDb';
-import { contractRepository } from '../repositories/contractRepository';
+import { DEFAULT_BRANDING, coreSaver, db, migrateLegacyRecords, normalizeContractRecord, normalizePartnerRecord, saveDb } from '../memoryDb';
+import { clearRepositoryRows, insertRepositoryRows } from '../repositories/seed';
 import { identityOf } from '../identity';
 import { sql } from '../db';
 import { removeDemoAccounts } from '../demoAccounts';
@@ -121,7 +121,6 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       Object.assign(db, {
         tenants,
         allowedUsers: [],
-        partners: dataset.partners,
         ios: dataset.ios,
         spendings: dataset.spendings,
         evaluations: dataset.evaluations,
@@ -155,6 +154,7 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       try {
         migrateLegacyRecords();
         dataset.contracts.forEach(normalizeContractRecord);
+        dataset.partners.forEach(normalizePartnerRecord);
         snapshot = coreSaver.snapshot();
         nextState = { ...db };
       } finally {
@@ -165,8 +165,8 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       await saveCoreData(snapshot);
       // Contracts are repository-backed: the snapshot sync neither removes the old ones nor writes the dataset's. Reverse order
       // keeps the dataset's order (each insert goes to the front).
-      await contractRepository.removeAll();
-      for (const contract of [...dataset.contracts].reverse()) await contractRepository.insert(contract);
+      await clearRepositoryRows(sql);
+      await insertRepositoryRows(sql, dataset);
       await appendAudit(sql, auditActorFor(req, identity), {
         organizationId: null, action: "platform.application.reset", targetType: "installation", targetId: "installation",
         outcome: "success", changedFields: [`mode:${mode}`],

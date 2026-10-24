@@ -10,7 +10,7 @@ export function createNotificationsRouter() {
   forwardAsyncRouteErrors(app);
 
 app.get("/api/notification-logs", async (req: express.Request, res: express.Response) => {
-  res.json(await scopedRecords(req, "notification", db.notifications));
+  res.json(await scopedRecords(req, "notification"));
 });
 /**
  * Matches in-memory notifications the caller may touch. scopedRecords re-reads rows from the database,
@@ -18,7 +18,7 @@ app.get("/api/notification-logs", async (req: express.Request, res: express.Resp
  */
 async function visibleNotificationFilter(req: express.Request) {
   const org = orgContextOf(req).organizationId;
-  const ids = new Set((await scopedRecords(req, "notification", db.notifications)).map((n: any) => n.notif_id));
+  const ids = new Set((await scopedRecords(req, "notification")).map((n: any) => n.notif_id));
   return { has: (n: any) => n.organizationId === org && ids.has(n.notif_id) };
 }
 /** Only notifications attached to records the caller can see are touched (PRD §4.5.2). */
@@ -29,7 +29,7 @@ app.post("/api/notification-logs/mark-read", async (req: express.Request, res: e
     visible.has(n) && (markAll || (notif_id && n.notif_id === notif_id)) ? { ...n, is_read: true } : n,
   );
   await saveDb();
-  res.json({ success: true, notifications: await scopedRecords(req, "notification", db.notifications) });
+  res.json({ success: true, notifications: await scopedRecords(req, "notification") });
 });
 app.post("/api/notification-logs/delete", async (req: express.Request, res: express.Response) => {
   const { notif_id, notif_ids, deleteAll } = req.body || {};
@@ -37,7 +37,7 @@ app.post("/api/notification-logs/delete", async (req: express.Request, res: expr
   const chosen = new Set<string>(Array.isArray(notif_ids) ? notif_ids : notif_id ? [notif_id] : []);
   db.notifications = (db.notifications || []).filter((n) => !(visible.has(n) && (deleteAll || chosen.has(n.notif_id))));
   await saveDb();
-  res.json({ success: true, notifications: await scopedRecords(req, "notification", db.notifications) });
+  res.json({ success: true, notifications: await scopedRecords(req, "notification") });
 });
 app.post("/api/cron/trigger-check", async (req: express.Request, res: express.Response) => {
   // Same pass as the scheduler, under the same lock: a concurrent run on another instance makes this one a no-op.

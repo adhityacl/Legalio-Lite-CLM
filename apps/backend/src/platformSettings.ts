@@ -1,12 +1,11 @@
 import { ApiError, appendAudit } from './organizationSettingsStore';
-import { db, DEFAULT_BRANDING, coreSaver, refreshTenantProjection, saveDb } from './memoryDb';
+import { db, DEFAULT_BRANDING, coreSaver, normalizeStoredPartners, refreshTenantProjection, saveDb } from './memoryDb';
 import { withCurrentUiTextKeys } from './uiTextKeys';
 import { UITextOverrides } from '@legalio/types/uiTexts';
 import { hasServiceAccountCredentials } from './lib/googleServiceAccountAuth';
 import { getEffectiveGeminiApiKey, getValidAiModel } from './aiClient';
 import { auditActorFor } from './organizationAdminRoutes';
 import { sql } from './db';
-import { normalizePartnerDocuments, computeDueDiligenceStatus } from './tenantPolicy';
 import { recalculateStatuses } from './reminderJobs';
 /** Platform configuration (SMTP, AI, Google) read/written through strict sections, provider-secret masking, and organization-change projections. */
 
@@ -184,11 +183,8 @@ export async function applyPlatformConfiguration(section: unknown, values: unkno
 /** Committed organization change: rebuild projections and re-derive policy-dependent state. */
 export async function onOrganizationChanged(organizationId: string) {
   await refreshTenantProjection();
-  (db.partners || []).forEach((p: any) => {
-    if (p.organizationId !== organizationId) return;
-    p.dd_documents = normalizePartnerDocuments(p);
-    p.status_dd = computeDueDiligenceStatus(p.dd_documents);
-  });
+  // The due-diligence checklist follows the organization's policy packs.
+  await normalizeStoredPartners(organizationId);
   await recalculateStatuses();
   await saveDb();
 }

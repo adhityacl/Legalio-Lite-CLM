@@ -4,7 +4,9 @@ import { RequestDenied } from './identity';
 import { createOrganizationScope, RecordKind, filterRecords, recordVisible } from './recordScope';
 import { db } from './memoryDb';
 import { readBusinessRows } from './normalizedCoreStore';
-import { contractRepository, contractDirectoryFor, type ContractDirectoryEntry } from './repositories/contractRepository';
+import { contractRepository } from './repositories/contractRepository';
+import { partnerRepository } from './repositories/partnerRepository';
+import { EMPTY_SCOPE_COLLECTIONS, scopeCollectionsFor, type ScopeCollections } from './repositories/scopeDirectory';
 import { sql } from './db';
 import { appendActivity } from './activityLog';
 /** Request-scoped record access: verified organization context, department scope, and attribution of activity to the session. */
@@ -20,13 +22,13 @@ export function orgContextOf(req: express.Request): OrgContext {
 export function isMatchingOrg(entityOrgId, targetTenantId) {
   return Boolean(entityOrgId) && Boolean(targetTenantId) && entityOrgId === targetTenantId;
 }
-/** Record collections the scope resolver reads: partners and insertion orders from memory, contracts from the request's directory. */
-export function scopeCollectionsOf(req: express.Request) {
-  return { partners: db.partners, ios: db.ios, contracts: ((req as any).contractDirectory || []) as ContractDirectoryEntry[] };
+/** Record collections the scope resolver reads: the request's directory of partners, contracts and insertion orders (department roles only). */
+export function scopeCollectionsOf(req: express.Request): ScopeCollections {
+  return { ...(((req as any).scopeCollections as ScopeCollections | undefined) ?? EMPTY_SCOPE_COLLECTIONS), ios: db.ios };
 }
 /** Same for callers outside a request (upload authorization). */
-export async function scopeCollections(ctx: OrgContext) {
-  return { partners: db.partners, ios: db.ios, contracts: await contractDirectoryFor(sql, ctx) };
+export async function scopeCollections(ctx: OrgContext): Promise<ScopeCollections> {
+  return { ...(await scopeCollectionsFor(sql, ctx)), ios: db.ios };
 }
 /** Request-local department resolver for the verified organization. */
 export function scopeOf(req: express.Request) {
@@ -35,10 +37,12 @@ export function scopeOf(req: express.Request) {
   return r.recordScope as ReturnType<typeof createOrganizationScope>;
 }
 /** Records of `kind` the caller may see: own organization, department scope, before any aggregation. */
-export async function scopedRecords<T = any>(req: express.Request, kind: RecordKind, rows: T[] | undefined): Promise<T[]> {
+export async function scopedRecords<T = any>(req: express.Request, kind: RecordKind): Promise<T[]> {
   const tables: Record<RecordKind, string> = { partner: 'partners', contract: 'contracts', io: 'insertion_orders', spending: 'spendings', evaluation: 'evaluations', notification: 'notifications' };
   const organizationId = orgContextOf(req).organizationId;
-  const records = (kind === 'contract' ? (await contractRepository.list(organizationId)).rows : await readBusinessRows(sql, tables[kind], organizationId)) as T[];
+  const records = (kind === 'contract' ? (await contractRepository.list(organizationId)).rows
+    : kind === 'partner' ? (await partnerRepository.list(organizationId)).rows
+    : await readBusinessRows(sql, tables[kind], organizationId)) as T[];
   return filterRecords(orgContextOf(req), scopeOf(req), kind, records);
 }
 /**

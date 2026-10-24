@@ -1,3 +1,4 @@
+import { partnerRepository } from '../repositories/partnerRepository';
 import { nextEntityId } from '../ids';
 import { pageRows, type ListSpec } from '../listQuery';
 import { contractRepository } from '../repositories/contractRepository';
@@ -35,7 +36,7 @@ const IO_LIST: ListSpec<any> = {
   filters: ["status", "partner_id", "contract_id"],
 };
 app.get("/api/ios", async (req: express.Request, res: express.Response) => {
-  const iosList = await scopedRecords(req, "io", db.ios);
+  const iosList = await scopedRecords(req, "io");
   const labels = await contractRepository.labels(getRequestTenantId(req), iosList.map((io) => io.contract_id));
   const result = iosList.map((io) => {
     const c = labels.get(io.contract_id);
@@ -193,7 +194,7 @@ app.post("/api/ios/review-analysis", async (req: express.Request, res: express.R
   const draft = req.body?.io;
   if (!draft || typeof draft !== "object") return res.status(400).json({ error: "Service order data is required." });
   const organizationId = getRequestTenantId(req);
-  const partner = db.partners.find((p) => p.partner_id === draft.partner_id && p.organizationId === organizationId);
+  const partner = await partnerRepository.get(organizationId, String(draft.partner_id ?? ""));
   if (!partner || assertRecordAccess(req, "partner", partner)) return res.status(400).json({ error: "Partner tidak ditemukan." });
   const saved = draft.io_id ? db.ios.find((i) => i.io_id === String(draft.io_id)) : undefined;
   if (draft.io_id && (!saved || assertRecordAccess(req, "io", saved) || assertRecordWritable(req, "io", saved))) {
@@ -306,7 +307,7 @@ app.post("/api/ios", validateBody(bodySchemas.ioCreateBody, { requiredMessage: "
   }
   const targetOrgId = getRequestTenantId(req);
   const targetTenant = findTenant(targetOrgId);
-  const partner = db.partners.find((p) => p.partner_id === partner_id && p.organizationId === targetOrgId);
+  const partner = await partnerRepository.get(targetOrgId, String(partner_id ?? ""));
   if (!partner) return res.status(400).json({ error: "Partner tidak ditemukan." });
   const contract = contract_id ? await contractRepository.get(targetOrgId, contract_id) : undefined;
   const token = await resolveActiveGoogleToken(
@@ -453,9 +454,7 @@ app.put("/api/ios/:id", validateBody(bodySchemas.ioUpdateBody), async (req: expr
     uploadedData.includes("base64,")
   ) {
     const fileData = uploadedData;
-    const partner = db.partners.find(
-      (p) => p.partner_id === updated.partner_id && p.organizationId === existing.organizationId,
-    );
+    const partner = await partnerRepository.get(existing.organizationId, String(updated.partner_id ?? ""));
     const targetFileName = formatIOFileName({
       partnerName: partner?.partner_name,
       mediaChannel: updated.media_channel || "Digital Channel",

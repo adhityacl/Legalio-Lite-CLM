@@ -1,3 +1,4 @@
+import { partnerRepository } from '../repositories/partnerRepository';
 import { nextEntityId } from '../ids';
 import { pageRows, type ListSpec } from '../listQuery';
 import { contractRepository } from '../repositories/contractRepository';
@@ -37,7 +38,7 @@ const SPENDING_LIST: ListSpec<any> = {
   filters: ["payment_status", "vendor_id", "currency"],
 };
 app.get("/api/partner-spendings", async (req: express.Request, res: express.Response) => {
-  const spendingsList = await scopedRecords(req, "spending", db.spendings);
+  const spendingsList = await scopedRecords(req, "spending");
   const list = spendingsList.map((s) => {
     if (s.total_amount_usd === void 0 || s.total_amount_usd === null) {
       const amt = Number(s.total_amount) || 0;
@@ -150,7 +151,7 @@ app.post("/api/spendings/review-analysis", async (req: express.Request, res: exp
   if (draft.id && (!saved || assertRecordAccess(req, "spending", saved) || assertRecordWritable(req, "spending", saved))) {
     return res.status(404).json({ error: "Data spending tidak ditemukan." });
   }
-  const partner = db.partners.find((p) => p.partner_id === draft.vendor_id && p.organizationId === organizationId);
+  const partner = await partnerRepository.get(organizationId, String(draft.vendor_id ?? ""));
   const visiblePartner = partner && !assertRecordAccess(req, "partner", partner) ? partner : undefined;
   const so = draft.io_id ? db.ios.find((io) => io.io_id === String(draft.io_id)) : undefined;
   const visibleSo = so && !assertRecordAccess(req, "io", so) ? so : undefined;
@@ -287,12 +288,7 @@ app.post("/api/partner-spendings", validateBody(bodySchemas.spendingCreateBody, 
     total_amount_usd = Number(total_amount_usd);
   }
   // Only this organization's partners: another tenant's partner of the same name must never be linked or described.
-  const partner = db.partners.find(
-    (p) =>
-      p.organizationId === targetOrgId &&
-      (p.partner_id === vendor_id ||
-        String(p.partner_name || "").toLowerCase() === vendor_name.toLowerCase()),
-  );
+  const partner = await partnerRepository.findByIdOrName(targetOrgId, vendor_id, vendor_name);
   if (invoice_file && invoice_file.fileData) {
     const targetInvoiceName = formatInvoiceFileName({
       partnerName: partner?.partner_name || vendor_name,
@@ -435,12 +431,7 @@ app.put("/api/partner-spendings/:id", validateBody(bodySchemas.spendingUpdateBod
     ...updates,
     updated_at: new Date().toISOString(),
   };
-  const partner = db.partners.find(
-    (p) =>
-      p.organizationId === existing.organizationId &&
-      (p.partner_id === updated.vendor_id ||
-        String(p.partner_name || "").toLowerCase() === String(updated.vendor_name || "").toLowerCase()),
-  );
+  const partner = await partnerRepository.findByIdOrName(existing.organizationId, updated.vendor_id, updated.vendor_name);
   const token = await resolveActiveGoogleToken(
     req.headers["x-google-access-token"] || req.body.accessToken,
   );

@@ -1,3 +1,4 @@
+import { partnerRepository } from '../repositories/partnerRepository';
 import { getTenantSettings, aiPolicyContext, computeLifecycle } from '../tenantPolicy';
 import { getIndustryPack } from '@legalio/shared/policy';
 import { generateContentWithRetryAndFallback, getEffectiveGeminiApiKey, getValidAiModel, formatGeminiError, ensureAiAvailable, aiLimits } from '../aiClient';
@@ -181,7 +182,8 @@ app.post("/api/chat", async (req: express.Request, res: express.Response) => {
     const chatScope = scopeOf(req);
     const ctxForChat = orgContextOf(req);
     const visibleTo = (kind: RecordKind) => (row: any) => recordVisible(ctxForChat, chatScope, kind, row);
-    const partnerNameOf = (id: string) => db.partners.find((p) => p.partner_id === id && p.organizationId === tenantId)?.partner_name || "";
+    const partnerNames = new Map((await partnerRepository.directory(tenantId)).map((p) => [p.partner_id, p.partner_name || ""]));
+    const partnerNameOf = (id: string) => partnerNames.get(id) || "";
     /*
      * Privacy by design (PRD §3.4.1, §5.1): only the active tenant's records
      * are sent, and direct identifiers — phone numbers, e-mail addresses,

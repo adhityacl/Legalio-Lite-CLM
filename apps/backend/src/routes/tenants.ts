@@ -1,4 +1,4 @@
-import { contractRepository } from '../repositories/contractRepository';
+import { organizationOwnsBusinessData } from '../businessData';
 import { identityOf, accessibleOrganizations, RequestDenied, sendError } from '../identity';
 import { sql, isUniqueViolation } from '../db';
 import { db, refreshTenantProjection } from '../memoryDb';
@@ -109,8 +109,7 @@ app.delete("/api/tenants/:id", async (req: express.Request, res: express.Respons
   const id = req.params.id;
   if (!findTenant(id)) return sendError(req, res, 404, "RESOURCE_NOT_FOUND");
   // Deleting an organization never cascades into business data (PRD §9.4).
-  const owned = ["partners", "ios", "spendings", "evaluations", "notifications", "templates"]
-    .some((key) => (db[key] || []).some((row: any) => row?.organizationId === id)) || await contractRepository.anyIn(id);
+  const owned = await organizationOwnsBusinessData(db, id);
   if (owned) return sendError(req, res, 409, "ORGANIZATION_IN_USE", "Move or remove this organization's records first.");
   await sql.tx(async () => {
     await sql.run('DELETE FROM "teamMember" WHERE "teamId" IN (SELECT id FROM team WHERE "organizationId" = ?)', id);

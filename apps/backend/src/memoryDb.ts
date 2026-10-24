@@ -7,6 +7,8 @@ import { normalizeContractStatus, normalizeApprovalStatus } from '@legalio/types
 import { normalizeCurrencyCode } from '@legalio/shared/currencyUtils';
 import { createCoreSaver } from './coreDataStore';
 import { contractRepository } from './repositories/contractRepository';
+import { partnerRepository } from './repositories/partnerRepository';
+import { migratePartnerContact } from './partnerContact';
 import { loadCoreData } from './lib/auth';
 import { componentLog } from './logger';
 const log = componentLog('memoryDb');
@@ -30,9 +32,10 @@ export const seedData = IS_TEST_MODE
   : demoData;
 /** Demo contracts to insert (through the repository) when a first run seeds the demo workspace; empty in test mode. */
 export const seedContracts: any[] = seedData.contracts;
+/** Demo partners to insert (through the repository) when a first run seeds the demo workspace; empty in test mode. */
+export const seedPartners: any[] = seedData.partners;
 export const db: any = {
   allowedUsers: [],
-  partners: seedData.partners,
   ios: seedData.ios,
   notifications: seedData.notifications,
   activityLogs: seedData.activityLogs,
@@ -65,6 +68,7 @@ const repositoryBacked = (collection: string, repository: string) => Object.defi
   set() { throw new Error(`db.${collection} is not in memory: write through ${repository}.`); },
 });
 repositoryBacked('contracts', 'repositories/contractRepository');
+repositoryBacked('partners', 'repositories/partnerRepository');
 bindTenantStore(() => db);
 
 /** Rebuilds the read-only `db.tenants` projection from canonical organization rows (PRD §7.3). */
@@ -82,14 +86,6 @@ export function migrateLegacyRecords() {
   // Organization ownership is never guessed here: records without a canonical
   // organization stay quarantined until the 002 migration maps them (PRD §14.3).
   if (!db.templates) db.templates = [];
-  (db.partners || []).forEach((p: any) => {
-    if (p.country === undefined && p.legal_status_flag) {
-      // BHI = "Badan Hukum Indonesia"; BHA = foreign entity of unknown country.
-      p.country = p.legal_status_flag === "BHI" ? "ID" : "";
-    }
-    p.dd_documents = normalizePartnerDocuments(p);
-    p.status_dd = computeDueDiligenceStatus(p.dd_documents);
-  });
   (db.ios || []).forEach((io: any) => {
     io.status = normalizeContractStatus(io.status);
     io.currency = normalizeCurrencyCode(io.currency, tenantDefaultCurrency(io.organizationId));
@@ -97,6 +93,39 @@ export function migrateLegacyRecords() {
   (db.spendings || []).forEach((sp: any) => {
     sp.currency = normalizeCurrencyCode(sp.currency, tenantDefaultCurrency(sp.organizationId));
   });
+}
+/** JSON with object keys sorted at every level, to compare records regardless of key order. */
+export function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v);
+}
+/** Partner written by an earlier release brought in line with the model (contact fields, country, tags, due-diligence checklist). */
+export function normalizePartnerRecord(p: any) {
+  migratePartnerContact(p);
+  if (p.country === undefined && p.legal_status_flag) {
+    // BHI = "Badan Hukum Indonesia"; BHA = foreign entity of unknown country.
+    p.country = p.legal_status_flag === "BHI" ? "ID" : "";
+  }
+  p.tags = sanitizePartnerTags(p.tags);
+  p.dd_documents = normalizePartnerDocuments(p);
+  p.status_dd = computeDueDiligenceStatus(p.dd_documents);
+  return p;
+}
+/**
+ * Brings stored partners to the current model (see normalizePartnerRecord). Rows that are already normal are left alone; a changed row is
+ * rewritten under its row lock without a new version (nobody's open editor becomes outdated). `organizationId` limits it to one tenant
+ * (after a policy change); returns the number of rows rewritten.
+ */
+export async function normalizeStoredPartners(organizationId?: string): Promise<number> {
+  const signature = (p: any) => stableJson(p);
+  let changed = 0;
+  for await (const batch of partnerRepository.batches(500, organizationId ? 'organization_id = ?' : 'TRUE', organizationId ? [organizationId] : [])) {
+    for (const partner of batch) {
+      if (signature(normalizePartnerRecord(structuredClone(partner))) === signature(partner)) continue;
+      await partnerRepository.mutate(partner.organizationId, partner.partner_id, (row) => { normalizePartnerRecord(row); }, { bumpVersion: false });
+      changed++;
+    }
+  }
+  return changed;
 }
 /** Stable status codes and a valid currency on a contract written by an earlier release (contracts are repository-backed, so this is applied row by row). */
 export function normalizeContractRecord(c: any) {
