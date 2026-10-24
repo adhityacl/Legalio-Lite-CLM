@@ -5,6 +5,7 @@ import { TREE_TRANSLATIONS } from '../hierarchyTree';
 import { INTEGRATION_TRANSLATIONS } from '../integrations';
 import { MAILER_TRANSLATIONS } from '../mailer';
 import { OBLIGATION_TRANSLATIONS } from '../obligations';
+import { SUGGESTION_TRANSLATIONS } from '../suggestions';
 import { TENANT_BOUNDARIES_TRANSLATIONS } from '../tenantBoundaries';
 import { UI_REFINEMENTS } from '../uiRefinements';
 import { ZH_TRANSLATIONS } from '../zh';
@@ -15,5 +16,6 @@ const ZH: Record<string, string> = {
   ...CONTRACT_TERMINATION_TRANSLATIONS.ZH, ...TENANT_BOUNDARIES_TRANSLATIONS.ZH, ...TREE_TRANSLATIONS.ZH, ...APPROVAL_TRANSLATIONS.ZH,
   ...INTEGRATION_TRANSLATIONS.ZH,
   ...OBLIGATION_TRANSLATIONS.ZH,
+  ...SUGGESTION_TRANSLATIONS.ZH,
 };
 export default ZH;

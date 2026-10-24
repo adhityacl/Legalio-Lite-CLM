@@ -31,6 +31,8 @@ export interface OptimizedPdfResult {
   inspectionReport: PdfInspectionReport;
   pageScores?: Array<{ page: number; score: number; categories: string[] }>;
   fileHash?: string;
+  /** Text of every page of the ORIGINAL document (digital-text PDFs only); lets callers tie a quote to its page. */
+  pagesText?: Array<{ num: number; text: string }>;
 }
 
 
@@ -321,6 +323,7 @@ export async function optimizePdfForCheapOcr(pdfInput: string | Buffer): Promise
         extractedText,
         hasDigitalText: report.hasDigitalText,
         inspectionReport: report,
+        pagesText,
         fileHash,
       };
     }
@@ -400,6 +403,7 @@ export async function optimizePdfForCheapOcr(pdfInput: string | Buffer): Promise
       extractedText,
       hasDigitalText: report.hasDigitalText,
       inspectionReport: report,
+      pagesText,
       pageScores,
       fileHash,
     };
@@ -415,6 +419,7 @@ export async function optimizePdfForCheapOcr(pdfInput: string | Buffer): Promise
       extractedText,
       hasDigitalText: report.hasDigitalText,
       inspectionReport: report,
+      pagesText,
       fileHash,
     };
   }

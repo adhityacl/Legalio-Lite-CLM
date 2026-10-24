@@ -8,6 +8,8 @@ import { getTenantSettings } from './tenantPolicy';
 import { getRequestTenantId } from './recordAccess';
 import { setCachedTranscript } from './lib/cheapOcrPipeline';
 import { componentLog } from './logger';
+import { IS_TEST_MODE } from './runtimePaths';
+import { fakeAiGenerator, fakeProviderEnabled } from './aiFake';
 const log = componentLog('aiClient');
 
 /** The Gemini client wrapper: key and model selection, retry/fallback chain with curated errors, per-organization budgets. */
@@ -92,16 +94,33 @@ export function formatGeminiError(err: any): string {
   const short = apiMessage.split("\n")[0].slice(0, 160);
   return `Google Gemini API mengembalikan error: ${short}. Periksa koneksi internet dan status API Key di Settings > Model AI & Parser, lalu coba lagi.`;
 }
+/**
+ * The model behind every AI feature can be replaced by a function (tests inject a fake model; no Gemini call is made). Only allowed under
+ * APP_TEST_MODE: production code paths cannot swap the provider. `AI_FAKE_PROVIDER=true` (also test mode only) installs the deterministic
+ * built-in fake (aiFake.ts), which the end-to-end suites use.
+ */
+export interface AiGeneratorCall { model: string; params: any; signal: AbortSignal }
+export interface AiGeneratorResult { text?: string; usageMetadata?: { totalTokenCount?: number } }
+export type AiGenerator = (call: AiGeneratorCall) => Promise<AiGeneratorResult>;
+let generatorOverride: AiGenerator | null = null;
+export function setAiGenerator(generator: AiGenerator | null) {
+  if (generator && !IS_TEST_MODE) throw new Error('The AI model can only be replaced under APP_TEST_MODE.');
+  generatorOverride = generator;
+}
+const activeGenerator = (): AiGenerator | null => generatorOverride ?? (fakeProviderEnabled(IS_TEST_MODE) ? fakeAiGenerator : null);
+/** True when a provider key is configured or a (test) generator stands in for it. */
+export const aiProviderAvailable = () => Boolean(activeGenerator()) || Boolean(getEffectiveGeminiApiKey());
 export async function generateContentWithRetryAndFallback(params: any) {
+  const generator = activeGenerator();
   const apiKey = getEffectiveGeminiApiKey();
-  if (!apiKey) {
+  if (!generator && !apiKey) {
     throw new PublicError(
       "Missing GEMINI_API_KEY. Silakan masukkan Gemini API Key di menu Pengaturan (Settings) > Model AI & Parser.",
       500,
       "AI_NOT_CONFIGURED",
     );
   }
-  const aiClient = getGenAIClient(apiKey);
+  const aiClient = generator ? null : getGenAIClient(apiKey);
   const primaryModel = getValidAiModel(params.model);
   const candidateFallbacks = [
     "gemini-3.1-flash-lite",
@@ -119,7 +138,8 @@ export async function generateContentWithRetryAndFallback(params: any) {
       call: (model, signal) => {
         log.info(`[Gemini API] Processing request with model=${model}...`);
         // abortSignal cancels the HTTP request itself when the attempt times out.
-        return aiClient.models.generateContent({ ...params, model, config: { ...(params.config || {}), abortSignal: signal } });
+        if (generator) return generator({ model, params, signal });
+        return aiClient!.models.generateContent({ ...params, model, config: { ...(params.config || {}), abortSignal: signal } });
       },
       onAttemptFailed: (model, err, attempt) =>
         log.warn(`[Gemini API] Model ${model} failed on attempt ${attempt}/${Math.min(aiLimits.maxAttempts, models.length)} (${String((err as any)?.message || err).toLowerCase().slice(0, 120)})`),
@@ -145,7 +165,7 @@ export async function ensureAiAvailable(req: express.Request, res: express.Respo
     res.status(403).json({ error: "AI_DISABLED", message: "AI features are disabled for this organization." });
     return false;
   }
-  if (!getEffectiveGeminiApiKey()) {
+  if (!aiProviderAvailable()) {
     res.status(400).json({ error: "AI_NOT_CONFIGURED", message: "The AI assistant is not available. Ask your platform administrator to configure a provider." });
     return false;
   }

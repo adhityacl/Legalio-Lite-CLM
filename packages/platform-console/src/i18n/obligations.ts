@@ -1,6 +1,7 @@
 /** Obligations and key dates (Phase 3B). Every key exists in EN, ID and ZH. */
 export const OBLIGATION_TRANSLATIONS = {
   "EN": {
+    "obligations.list_label": "Obligation list",
     "data.keys.resource.obligations": "Obligations",
     "nav.obligations": "Obligations",
     "calendar.obligation": "Obligations",
@@ -97,6 +98,7 @@ export const OBLIGATION_TRANSLATIONS = {
     "obligations.recurrence.every_days": "Every {n} days"
   },
   "ID": {
+    "obligations.list_label": "Daftar kewajiban",
     "data.keys.resource.obligations": "Kewajiban",
     "nav.obligations": "Kewajiban",
     "calendar.obligation": "Kewajiban",
@@ -193,6 +195,7 @@ export const OBLIGATION_TRANSLATIONS = {
     "obligations.recurrence.every_days": "Setiap {n} hari"
   },
   "ZH": {
+    "obligations.list_label": "义务列表",
     "data.keys.resource.obligations": "合同义务",
     "nav.obligations": "合同义务",
     "calendar.obligation": "合同义务",

@@ -28,6 +28,8 @@ Object.assign(process.env, {
   APP_TEST_MODE: '1', APP_DATA_DIR: directory, BETTER_AUTH_URL: frontendURL, TRUSTED_ORIGINS: `${backendURL},${frontendURL}`, BETTER_AUTH_ENABLE_INFRA: 'false',
   API_ONLY: 'true', SEED_DEMO_ADMIN: 'false', PORT: String(backendPort), DISABLE_HMR: 'true', BETTER_AUTH_SECRET: 'test-only-secret-for-isolated-smoke-e2e-123456789',
   GEMINI_API_KEY: '', GOOGLE_CLIENT_ID: '', GOOGLE_CLIENT_SECRET: '', GOOGLE_APPLICATION_CREDENTIALS: '', RATE_LIMIT_DISABLED: 'true',
+  // The built-in deterministic test model (APP_TEST_MODE only) stands in for Gemini: AI extraction runs without a key or network.
+  AI_FAKE_PROVIDER: 'true',
 });
 const { createTestDatabase } = await import('./testDatabase');
 const database = await createTestDatabase();
@@ -87,6 +89,7 @@ const stop = async (child?: ChildProcess) => {
 const axeSource = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 interface AxeViolation { id: string; impact: string | null; help: string; nodes: Array<{ target: unknown[]; html?: string }> }
 const accessibilityReport: string[] = [];
+const shot = async (page: Page, name: string) => { await page.screenshot({ path: path.join(directory, `${name}.png`), fullPage: false }).catch(() => undefined); };
 async function checkAccessibility(page: Page, name: string) {
   await page.evaluate(axeSource);
   // The page function runs in the browser; the backend project has no DOM typings, so it is passed as source text.
@@ -97,7 +100,7 @@ async function checkAccessibility(page: Page, name: string) {
   // Every impact level fails the run: the pages checked here have no known findings left.
   const blocking = violations;
   for (const v of violations) accessibilityReport.push(`${name}: [${v.impact}] ${v.id} - ${v.help} (${v.nodes.length} element${v.nodes.length === 1 ? '' : 's'}; first: ${JSON.stringify(v.nodes[0]?.target)} ${v.nodes[0]?.html ?? ''})`);
-  assert.equal(blocking.length, 0, `${name}: accessibility violations:\n${blocking.map((v) => `  [${v.impact}] ${v.id}: ${v.help} -> ${JSON.stringify(v.nodes.slice(0, 3).map((n) => n.target))}`).join('\n')}`);
+  assert.equal(blocking.length, 0, `${name}: accessibility violations:\n${blocking.map((v) => `  [${v.impact}] ${v.id}: ${v.help} -> ${JSON.stringify(v.nodes.slice(0, 3).map((n) => [n.target, (n.html ?? '').slice(0, 160)]))}`).join('\n')}`);
   steps.push(`axe-core on ${name}: no violations`);
 }
 
@@ -293,6 +296,96 @@ try {
   await expect(page.getByRole('dialog')).toContainText(number, { timeout: 30_000 });
   assert.equal(new URL(page.url()).searchParams.get('tab'), 'contracts');
   steps.push('workspace search finds the new contract and opens it');
+
+  // 6b. Obligations: create one through the form, see it in the list, the dashboard widget and the contract record; accept an AI suggestion.
+  await page.goto(`${frontendURL}/app?tab=obligations`);
+  await expect(page.getByRole('heading', { name: /obligations & key dates/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: /add obligation/i }).first()).toBeVisible();
+  await checkAccessibility(page, 'obligations page (empty list)');
+  await page.getByRole('button', { name: /add obligation/i }).first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  const obligationTitle = `Smoke obligation ${Date.now()}`;
+  await dialog.getByLabel(/^title$/i).fill(obligationTitle);
+  await dialog.getByLabel(/^type$/i).selectOption('payment');
+  const soon = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+  // The date field takes dd/mm/yyyy.
+  await dialog.getByLabel(/due date/i).fill(soon.split('-').reverse().join('/'));
+  await dialog.getByLabel(/due date/i).press('Tab');
+  await dialog.getByLabel(/^contract/i).selectOption({ index: 1 });
+  await shot(page, 'obligation-form');
+  await checkAccessibility(page, 'obligation form');
+  await dialog.getByRole('button', { name: /^save$/i }).click();
+  await expect(dialog).toHaveCount(0, { timeout: 30_000 });
+  const obligationRow = page.getByRole('row', { name: new RegExp(obligationTitle) });
+  await expect(obligationRow).toBeVisible({ timeout: 30_000 });
+  const storedObligation = ((await api(`/api/obligations?q=${encodeURIComponent(obligationTitle)}`)).body as Array<{ id: string; version: number; type: string; due_date: string; contract_id: string; source: string }>)[0];
+  assert.deepEqual([storedObligation.type, storedObligation.due_date, storedObligation.version, storedObligation.source], ['payment', soon, 1, 'manual']);
+  assert.ok(storedObligation.contract_id, 'linked to the chosen contract');
+  await shot(page, 'obligations-list');
+  await checkAccessibility(page, 'obligations page (list)');
+  steps.push(`created obligation "${obligationTitle}" through the form (${storedObligation.id}, due ${soon})`);
+
+  await obligationRow.getByRole('button', { name: /action/i }).click();
+  await page.getByRole('menuitem', { name: /mark done/i }).click();
+  await expect.poll(async () => ((await api(`/api/obligations/${storedObligation.id}`)).body as { status: string }).status, { timeout: 15_000 }).toBe('done');
+  steps.push('marked the obligation done from the row menu');
+  await api(`/api/obligations/${storedObligation.id}`, { method: 'PUT', body: JSON.stringify({ status: 'open', version: 2 }) });
+
+  await page.goto(`${frontendURL}/app?tab=dashboard`);
+  const widget = page.getByTestId('obligations-widget');
+  await expect(widget).toBeVisible({ timeout: 30_000 });
+  const summary = (await api('/api/obligations/summary')).body as { overdue: number; dueThisWeek: number; open: number };
+  assert.ok(summary.dueThisWeek >= 1 && summary.open >= 1);
+  await shot(page, 'dashboard-widget');
+  await expect(widget.getByTestId('obligations-widget-value').nth(1)).toHaveText(String(summary.dueThisWeek));
+  steps.push(`dashboard widget shows the SQL aggregate (${summary.dueThisWeek} due this week, ${summary.open} open)`);
+
+  await page.goto(`${frontendURL}/app?tab=obligations`);
+  await page.getByRole('tab', { name: /calendar/i }).click();
+  await expect(page.getByRole('region', { name: /document calendar/i })).toBeVisible({ timeout: 30_000 });
+  await shot(page, 'obligations-calendar');
+  await checkAccessibility(page, 'obligations calendar view');
+
+  await page.goto(`${frontendURL}/app?tab=contracts&id=${encodeURIComponent(storedObligation.contract_id)}`);
+  const recordDialog = page.getByRole('dialog');
+  await expect(recordDialog).toBeVisible({ timeout: 30_000 });
+  await recordDialog.getByRole('tab', { name: /obligations/i }).click();
+  await expect(recordDialog.getByTestId('contract-obligations')).toContainText(obligationTitle, { timeout: 30_000 });
+  await shot(page, 'contract-obligations-tab');
+  await checkAccessibility(page, 'contract record, obligations tab');
+  steps.push('the contract record has an Obligations tab listing the obligation');
+  await page.keyboard.press('Escape');
+
+  // AI extraction (the built-in test model) queues suggestions; accepting one in the review queue creates the obligation with provenance.
+  const extraction = await api(`/api/contracts/${storedObligation.contract_id}/extract`, { method: 'POST', body: JSON.stringify({ text: 'MASTER AGREEMENT.\nThe Supplier shall pay the setup fee on 2031-02-03.\n\f\nThis agreement is governed by the laws of Singapore.' }) });
+  assert.equal(extraction.status, 200, JSON.stringify(extraction.body).slice(0, 300));
+  assert.equal((extraction.body as { created: number }).created, 2);
+  const beforeAccept = ((await api('/api/obligations?source=ai_extracted')).body as unknown[]).length;
+  assert.equal(beforeAccept, 0, 'nothing exists before a person accepts');
+  await page.goto(`${frontendURL}/app?tab=obligations`);
+  const reviewTab = page.getByRole('tab', { name: /ai review/i });
+  await expect(reviewTab).toContainText('2', { timeout: 30_000 });
+  await reviewTab.click();
+  const card = page.getByTestId('suggestion-card').filter({ hasText: /setup fee/i });
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  await expect(card).toContainText(/shall pay the setup fee/i);
+  await expect(card).toContainText(/page 1/i);
+  await expect(card).toContainText(/confidence 82%/i);
+  await shot(page, 'review-queue');
+  await checkAccessibility(page, 'AI review queue');
+  await card.getByLabel(/^title$/i).fill('Pay the setup fee (reviewed)');
+  await card.getByRole('button', { name: /accept and create obligation/i }).click();
+  await expect.poll(async () => ((await api('/api/obligations?source=ai_extracted')).body as unknown[]).length, { timeout: 15_000 }).toBe(1);
+  const aiObligation = ((await api('/api/obligations?source=ai_extracted')).body as Array<{ title: string; due_date: string; source_quote: string; source_page: number; confirmed_by: string; source_confidence: number }>)[0];
+  assert.equal(aiObligation.title, 'Pay the setup fee (reviewed)');
+  assert.equal(aiObligation.due_date, '2031-02-03');
+  assert.match(aiObligation.source_quote, /shall pay the setup fee/);
+  assert.deepEqual([aiObligation.source_page, aiObligation.source_confidence, aiObligation.confirmed_by], [1, 0.82, 'smoke-admin']);
+  const termCard = page.getByRole('article', { name: /governing law/i });
+  await termCard.getByRole('button', { name: /reject/i }).click();
+  await expect.poll(async () => ((await api('/api/suggestions/summary')).body as { total: number }).total, { timeout: 15_000 }).toBe(0);
+  steps.push('AI suggestions are queued without creating records; accepting one (with an edit) created an obligation with source quote, page, confidence and reviewer; rejecting the other created nothing');
 
   // 7. A third key page: the dashboard.
   await page.goto(`${frontendURL}/app?tab=dashboard`);

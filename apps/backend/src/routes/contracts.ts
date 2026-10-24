@@ -16,7 +16,9 @@ import { normalizeCurrencyCode, convertToUsdWithFallback, getDefaultUsdRate } fr
 import { tenantDefaultCurrency, aiPolicyContext, findTenant, getTenantSettings } from '../tenantPolicy';
 import { upload } from '../uploadMiddleware';
 import { ensureAiAvailable, getValidAiModel, generateContentWithRetryAndFallback, withDocumentTranscriptField, extractAndCacheDocumentTranscript } from '../aiClient';
-import { computeInputSha256, globalOcrCache, buildCheapOcrContents } from '../lib/cheapOcrPipeline';
+import { computeInputSha256, globalOcrCache, buildCheapOcrContents, getCachedTranscript } from '../lib/cheapOcrPipeline';
+import { buildFieldProvenance } from '../lib/provenance';
+import { pagesFromText } from '../contractDocumentText';
 import { Type } from '@google/genai';
 import { normalizeParsedDate, computeContractEndDateFromDuration } from '../documentParsing';
 import { runContractRedlineAnalysis } from '../redlineAnalysis';
@@ -38,6 +40,8 @@ import express from 'express';
 import { forwardAsyncRouteErrors } from '../asyncRoutes';
 import { componentLog } from '../logger';
 const log = componentLog('contracts');
+/** Fields of the contract parser's answer that carry a source quote. */
+const PARSE_PROVENANCE_FIELDS = ["contract_title", "partner_name", "contract_number", "parent_contract_number", "start_date", "end_date", "contract_value", "currency", "auto_renewal", "notice_period_days"] as const;
 
 export function createContractsRouter() {
   const app = express.Router();
@@ -232,7 +236,8 @@ app.post("/api/contracts/parse", upload.single("file") as any, async (req: expre
 13. "notice_period_days": the notice period in days for termination or non-renewal (default 30 when not specified).
 14. "change_summary": for an addendum, a clear summary of which clauses changed and how; otherwise "".
 15. "changed_fields": for an addendum, an array containing any of exactly these codes: "Nilai Kontrak / IO", "Jangka Waktu Periode", "Ruang Lingkup / Deliverables", "Syarat Pembayaran", "Pihak Berwenang". Otherwise [].
-16. "internal_notes": a structured Markdown summary written in ${ctx.responseLanguage}, acting as a senior legal analyst.
+16. "provenance": for each of these fields whose value you took from the text — contract_title, partner_name, contract_number, parent_contract_number, start_date, end_date, contract_value, currency, auto_renewal, notice_period_days — one entry {"field", "source_quote", "confidence"}: source_quote is copied exactly from the contract (one sentence or clause, at most 300 characters; for a computed date, the sentence the computation rests on) and confidence is 0 to 1. Leave a field out when you did not find a supporting passage.
+17. "internal_notes": a structured Markdown summary written in ${ctx.responseLanguage}, acting as a senior legal analyst.
    STRICT RULE: do not use the comma character (,) anywhere in internal_notes — use "and", "or", parentheses or hyphens instead — so the text can be exported to CSV safely.
    Use exactly these sections (translate the headings into ${ctx.responseLanguage}):
    # AGREEMENT SUMMARY — [counterparty or product name]
@@ -280,6 +285,14 @@ Return strictly one valid JSON object matching the schema. Use "" for any text f
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
               },
+              provenance: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: { field: { type: Type.STRING }, source_quote: { type: Type.STRING }, confidence: { type: Type.NUMBER } },
+                  required: ["field", "source_quote"],
+                },
+              },
               internal_notes: { type: Type.STRING },
             },
             required: ["internal_notes"],
@@ -290,6 +303,11 @@ Return strictly one valid JSON object matching the schema. Use "" for any text f
     });
     const parsedData = JSON.parse((response as any).text);
     await extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
+    // Where each value came from: the model's quotes, checked against the document text when it is available (a fresh digital PDF has
+    // its pages; a document read before has a transcript without page boundaries; a scan being read now has neither).
+    const provenanceSource = ocrStats.pages?.length ? ocrStats.pages.map((p: any) => ({ page: p.num, text: p.text }))
+      : ocrStats.classification === "cached_transcript" ? pagesFromText((await getCachedTranscript(ocrStats.fileHash)) ?? "") : null;
+    parsedData.provenance = buildFieldProvenance(parsedData.provenance, provenanceSource?.length ? provenanceSource : null, PARSE_PROVENANCE_FIELDS, { pagesKnown: Boolean(ocrStats.pages?.length) });
     if (parsedData.start_date) {
       parsedData.start_date = normalizeParsedDate(parsedData.start_date);
     }

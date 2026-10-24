@@ -49,10 +49,13 @@ export function errorResponder(): express.ErrorRequestHandler {
     if (res.headersSent) return next(err);
     if (!req.path.startsWith('/api/')) return next(err);
     // Errors that carry curated text (repositories: version conflicts, duplicates) keep their own code and message.
-    const curated = err?.expose === true && typeof err.apiCode === 'string' && status < 500;
+    // PublicError carries its stable identifier as `code`, repository errors as `apiCode`. Server-side statuses stay generic except 502/503
+    // (a provider answer that could not be used, a dependency that is unavailable), whose messages are written for the user.
+    const apiCode: string | null = typeof err?.apiCode === 'string' ? err.apiCode : err?.expose === true && typeof err.code === 'string' && /^[A-Z][A-Z0-9_]+$/.test(err.code) ? err.code : null;
+    const curated = err?.expose === true && apiCode !== null && (status < 500 || status === 502 || status === 503);
     const message = curated ? String(err.message) : TEXT[status] || (status >= 500 ? 'An internal error occurred.' : 'The request could not be processed.');
     // `error` stays human-readable because existing clients display it; `code` is the stable identifier.
-    res.status(status).json({ error: message, code: curated ? err.apiCode : status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_FAILED', message, status, requestId, ...(curated && err.details ? { details: err.details } : {}) });
+    res.status(status).json({ error: message, code: curated ? apiCode : status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_FAILED', message, status, requestId, ...(curated && err.details ? { details: err.details } : {}) });
   };
 }
 

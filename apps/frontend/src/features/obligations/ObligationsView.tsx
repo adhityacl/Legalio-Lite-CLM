@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CalendarClock, CalendarDays, CheckCircle2, Clock, ListChecks, Pencil, Plus, RefreshCw, Search, Settings2, Sparkles, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CalendarClock, CalendarDays, CheckCircle2, ClipboardCheck, Clock, ListChecks, Pencil, Plus, RefreshCw, Search, Settings2, Sparkles, Trash2 } from 'lucide-react';
 import { PAGE_SIZES } from '@legalio/types/documents';
 import { Badge } from '@legalio/ui-components/badge';
 import { Button } from '@legalio/ui-components/button';
@@ -31,7 +31,10 @@ import { WorkspaceDocumentCalendar } from '../calendar/WorkspaceDocumentCalendar
 import { ApprovalNotifications } from '../approvals/ApprovalNotifications';
 import { ObligationDialog } from './ObligationDialog';
 import { ObligationSettingsDialog } from './ObligationSettingsDialog';
-import { invalidateObligations } from './obligationQueries';
+import { ExtractDialog } from './ExtractDialog';
+import { ReviewQueue } from './ReviewQueue';
+import { suggestionsApi } from '../../api/suggestions';
+import { invalidateObligations, obligationsViewRequest } from './obligationQueries';
 import { DueCell, STATUS_KEYS, StatusBadge, TYPE_KEYS, TYPE_OPTIONS, attachedTo, recurrenceLabel, typeLabel } from './obligationUi';
 
 const FILTER_KEYS = ['status', 'type', 'responsible'] as const;
@@ -52,7 +55,8 @@ export const ObligationsView: React.FC = () => {
   const confirmDialog = useConfirm();
   const showAlert = useAlertToast();
   const queryClient = useQueryClient();
-  const [view, setView] = useState<'list' | 'calendar'>('list');
+  const [view, setView] = useState<'list' | 'calendar' | 'review'>(() => { const requested = obligationsViewRequest.view; obligationsViewRequest.view = null; return requested ?? 'list'; });
+  const [extractOpen, setExtractOpen] = useState(false);
   const [rows, setRows] = useState(PAGE_SIZES[1] as number);
   const [dialog, setDialog] = useState<{ obligation: Obligation | null } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -62,13 +66,14 @@ export const ObligationsView: React.FC = () => {
   }), []);
   const toApiSort = useMemo(() => (field: string) => ((SORTABLE as readonly string[]).includes(field) ? field : null), []);
   const list = useServerList<Obligation>({ entity: 'obligations', path: '/obligations', pageSize: rows, filterKeys: FILTER_KEYS, mapFilters, toApiSort });
+  const pendingReview = useQuery({ queryKey: ['obligations', activeTenantId, 'suggestions-summary'], queryFn: ({ signal }) => suggestionsApi.summary({ signal }), enabled: Boolean(activeTenantId) && canEdit, staleTime: 15_000 });
   const summary = useQuery({ queryKey: ['obligations', activeTenantId, 'summary'], queryFn: ({ signal }) => obligationsApi.summary({ signal }), enabled: Boolean(activeTenantId), staleTime: 15_000 });
 
   // The calendar cross-references contracts and orders; the picker lists contracts to link to (up to the API's page maximum).
   useSnapshotDemand(view === 'calendar');
   const { contracts, ios, partners, workspaceLoading, workspaceError, loadAllData } = useWorkspace();
   const contractChoices = useQuery({
-    queryKey: ['obligations', activeTenantId, 'contract-choices'], enabled: Boolean(activeTenantId) && dialog !== null,
+    queryKey: ['obligations', activeTenantId, 'contract-choices'], enabled: Boolean(activeTenantId) && (dialog !== null || extractOpen),
     queryFn: async () => (await contractsApi.page({ limit: 500, sort: 'contract_number', dir: 'asc' })).items.map((c) => ({ id: c.contract_id, label: `${c.contract_number} · ${c.contract_title}` })),
     staleTime: 60_000,
   });
@@ -133,6 +138,7 @@ export const ObligationsView: React.FC = () => {
         <div className="flex items-center gap-g8">
           <Button variant="outline" size="icon-md" type="button" onClick={() => void refreshAll()} loading={list.isFetching} aria-label={t('approval.refresh', 'Refresh')}><RefreshCw className="size-g16" aria-hidden /></Button>
           {canConfigure && <Button variant="outline" type="button" onClick={() => setSettingsOpen(true)}><Settings2 className="size-g16" aria-hidden /><span>{t('obligations.reminder_settings', 'Reminders')}</span></Button>}
+          {canEdit && <Button variant="outline" type="button" onClick={() => setExtractOpen(true)}><Sparkles className="size-g16" aria-hidden /><span>{t('suggestions.extract.title', 'Extract obligations with AI')}</span></Button>}
           {canEdit && <Button type="button" onClick={() => setDialog({ obligation: null })}><Plus className="size-g16" aria-hidden /><span>{t('obligations.add', 'Add obligation')}</span></Button>}
         </div>
       </div>
@@ -151,10 +157,11 @@ export const ObligationsView: React.FC = () => {
         ))}
       </div>
 
-      <Tabs value={view} onValueChange={(details) => setView(details.value as 'list' | 'calendar')} className="flex flex-col gap-g13">
+      <Tabs value={view} onValueChange={(details) => setView(details.value as 'list' | 'calendar' | 'review')} className="flex flex-col gap-g13">
         <TabsList aria-label={t('obligations.title', 'Obligations & key dates')} className="w-full sm:w-auto">
           <TabsTrigger value="list"><ListChecks aria-hidden="true" />{t('obligations.view.list', 'List')}</TabsTrigger>
           <TabsTrigger value="calendar"><CalendarDays aria-hidden="true" />{t('obligations.view.calendar', 'Calendar')}</TabsTrigger>
+          {canEdit && <TabsTrigger value="review"><ClipboardCheck aria-hidden="true" />{t('obligations.view.review', 'AI review')}{pendingReview.data?.total ? <Badge tone="warning" className="ms-g5" data-testid="review-count">{pendingReview.data.total}</Badge> : null}</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="list" className="mt-0 space-y-g13">
@@ -179,7 +186,7 @@ export const ObligationsView: React.FC = () => {
             </div>
           </Card>
 
-          <Card asChild><section className="overflow-hidden" aria-busy={list.isFetching} aria-live="polite" aria-label={t('obligations.title', 'Obligations & key dates')}>
+          <Card asChild><section className="overflow-hidden" aria-busy={list.isFetching} aria-live="polite" aria-label={t('obligations.list_label', 'Obligation list')}>
             {list.isLoading && (
               <div className="divide-y divide-border" role="status">
                 <span className="sr-only">{t('common.loading', 'Loading…')}</span>
@@ -237,6 +244,8 @@ export const ObligationsView: React.FC = () => {
           </section></Card>
         </TabsContent>
 
+        {canEdit && <TabsContent value="review" className="mt-0">{view === 'review' && <ReviewQueue onExtract={() => setExtractOpen(true)} />}</TabsContent>}
+
         <TabsContent value="calendar" className="mt-0">
           {view === 'calendar' && <WorkspaceDocumentCalendar contracts={contracts} ios={ios} partners={partners} loading={workspaceLoading} error={workspaceError} onRetry={() => void loadAllData()}
             onOpenDocument={(kind, id) => setActiveTab(kind === 'contract' ? 'contracts' : 'ios', undefined, { recordId: id })}
@@ -247,6 +256,13 @@ export const ObligationsView: React.FC = () => {
       {dialog && <ObligationDialog obligation={dialog.obligation} contracts={contractChoices.data ?? []} readOnly={!canEdit} onClose={() => setDialog(null)}
         onSaved={() => { setDialog(null); showAlert({ title: t('obligations.saved', 'Obligation saved'), variant: 'success' }); void refreshAll(); }} />}
       {settingsOpen && <ObligationSettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {extractOpen && <ExtractDialog contracts={contractChoices.data ?? []} onClose={() => setExtractOpen(false)}
+        onDone={(result) => {
+          setExtractOpen(false);
+          setView('review');
+          showAlert({ title: t('suggestions.extract.done', '{n} suggestion(s) queued for review', { n: result.created }), description: result.duplicates ? t('suggestions.extract.duplicates', '{n} were already known.', { n: result.duplicates }) : undefined, variant: 'success' });
+          void refreshAll();
+        }} />}
     </section>
   );
 };

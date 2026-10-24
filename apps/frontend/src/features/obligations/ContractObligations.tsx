@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, ListChecks, Pencil, Plus } from 'lucide-react';
+import { BookMarked, CheckCircle2, ListChecks, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { Badge } from '@legalio/ui-components/badge';
 import { Button } from '@legalio/ui-components/button';
 import { Card } from '@legalio/ui-components/card';
@@ -13,9 +13,13 @@ import { useAlertToast } from '../../context/AlertToastContext';
 import { usePermissions } from '../../lib/permissions';
 import { errorMessage } from '../../api/client';
 import { obligationsApi, type Obligation } from '../../api/obligations';
+import { suggestionsApi } from '../../api/suggestions';
+import { useNavigation } from '../../context/NavigationContext';
+import { ExtractDialog } from './ExtractDialog';
+import { ProvenanceQuote } from './ProvenanceQuote';
 import { ObligationDialog } from './ObligationDialog';
 import { DueCell, StatusBadge, recurrenceLabel, typeLabel } from './obligationUi';
-import { invalidateObligations } from './obligationQueries';
+import { invalidateObligations, obligationsViewRequest } from './obligationQueries';
 
 /** The "Obligations" tab of a contract record: its deadlines and duties, with quick add and mark-done. */
 export const ContractObligations: React.FC<{ contractId: string }> = ({ contractId }) => {
@@ -26,6 +30,9 @@ export const ContractObligations: React.FC<{ contractId: string }> = ({ contract
   const showAlert = useAlertToast();
   const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<{ obligation: Obligation | null } | null>(null);
+  const [extractOpen, setExtractOpen] = useState(false);
+  const { setActiveTab } = useNavigation();
+  const keyTerms = useQuery({ queryKey: ['obligations', activeTenantId, 'key-terms', contractId], queryFn: ({ signal }) => suggestionsApi.keyTerms(contractId, { signal }), enabled: Boolean(activeTenantId) });
   const query = useQuery({
     queryKey: ['obligations', activeTenantId, 'contract', contractId],
     queryFn: ({ signal }) => obligationsApi.page({ contractId, limit: 100, sort: 'due_date' }, { signal, organizationId: activeTenantId }),
@@ -41,7 +48,12 @@ export const ContractObligations: React.FC<{ contractId: string }> = ({ contract
     <div className="space-y-g13" data-testid="contract-obligations">
       <div className="flex flex-wrap items-center justify-between gap-g8">
         <Heading as="h3" size="xs" weight="bold" className="flex items-center gap-g5 uppercase tracking-wider text-muted-foreground"><ListChecks className="size-g16" aria-hidden />{t('obligations.contract_tab', 'Obligations')}</Heading>
-        {canEdit && <Button type="button" size="sm" onClick={() => setDialog({ obligation: null })}><Plus aria-hidden />{t('obligations.add', 'Add obligation')}</Button>}
+        {canEdit && (
+          <div className="flex flex-wrap gap-g8">
+            <Button type="button" size="sm" variant="outline" onClick={() => setExtractOpen(true)}><Sparkles aria-hidden />{t('suggestions.extract.title', 'Extract obligations with AI')}</Button>
+            <Button type="button" size="sm" onClick={() => setDialog({ obligation: null })}><Plus aria-hidden />{t('obligations.add', 'Add obligation')}</Button>
+          </div>
+        )}
       </div>
       {query.isLoading && <div role="status"><span className="sr-only">{t('common.loading', 'Loading…')}</span><Skeleton className="h-g42 w-full" /></div>}
       {query.isError && <Card role="alert" className="p-g13 text-center"><Text size="sm" tone="destructive">{t('obligations.load_failed', 'Could not load obligations.')}</Text></Card>}
@@ -70,6 +82,29 @@ export const ContractObligations: React.FC<{ contractId: string }> = ({ contract
           </li>
         ))}
       </ul>
+      <div className="space-y-g8 pt-g13">
+        <Heading as="h3" size="xs" weight="bold" className="flex items-center gap-g5 uppercase tracking-wider text-muted-foreground"><BookMarked className="size-g16" aria-hidden />{t('suggestions.key_terms', 'Key clauses')}</Heading>
+        {(keyTerms.data ?? []).length === 0 && <Card className="p-g13 text-center"><Text size="sm" tone="muted">{t('suggestions.key_terms_empty', 'No key clauses have been confirmed for this contract yet.')}</Text></Card>}
+        <ul className="space-y-g8">
+          {(keyTerms.data ?? []).map((term) => (
+            <li key={term.id}><Card className="space-y-g8 p-g13">
+              <div className="flex flex-wrap items-start justify-between gap-g8">
+                <div className="min-w-0"><Text size="sm" weight="semibold">{term.label}: {term.value}</Text>{term.summary && <Text size="xs" tone="muted">{term.summary}</Text>}</div>
+                {canEdit && <Button type="button" variant="ghost" size="icon-sm" aria-label={`${t('documents.action.delete', 'Delete')}: ${term.label}`}
+                  onClick={() => void suggestionsApi.removeKeyTerm(contractId, term.term_key).then(() => queryClient.invalidateQueries({ queryKey: ['obligations'] }))}><Trash2 aria-hidden /></Button>}
+              </div>
+              <ProvenanceQuote quote={term.source_quote} page={term.source_page} confidence={term.source_confidence} verified={null} />
+            </Card></li>
+          ))}
+        </ul>
+      </div>
+      {extractOpen && <ExtractDialog contractId={contractId} onClose={() => setExtractOpen(false)}
+        onDone={(result) => {
+          setExtractOpen(false);
+          showAlert({ title: t('suggestions.extract.done', '{n} suggestion(s) queued for review', { n: result.created }), variant: 'success' });
+          void invalidateObligations(queryClient);
+          if (result.created > 0) { obligationsViewRequest.view = 'review'; setActiveTab('obligations'); }
+        }} />}
       {dialog && <ObligationDialog obligation={dialog.obligation} initial={{ contract_id: contractId }} lockContract readOnly={!canEdit} onClose={() => setDialog(null)}
         onSaved={() => { setDialog(null); showAlert({ title: t('obligations.saved', 'Obligation saved'), variant: 'success' }); void invalidateObligations(queryClient); }} />}
     </div>

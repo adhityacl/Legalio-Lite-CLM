@@ -5,6 +5,7 @@ import { TREE_TRANSLATIONS } from '../hierarchyTree';
 import { INTEGRATION_TRANSLATIONS } from '../integrations';
 import { MAILER_TRANSLATIONS } from '../mailer';
 import { OBLIGATION_TRANSLATIONS } from '../obligations';
+import { SUGGESTION_TRANSLATIONS } from '../suggestions';
 import { TENANT_BOUNDARIES_TRANSLATIONS } from '../tenantBoundaries';
 import { UI_REFINEMENTS } from '../uiRefinements';
 import { BASE_EN } from './base.en';
@@ -16,5 +17,6 @@ const EN: Record<string, string> = {
   ...CONTRACT_TERMINATION_TRANSLATIONS.EN, ...TENANT_BOUNDARIES_TRANSLATIONS.EN, ...TREE_TRANSLATIONS.EN, ...APPROVAL_TRANSLATIONS.EN,
   ...INTEGRATION_TRANSLATIONS.EN,
   ...OBLIGATION_TRANSLATIONS.EN,
+  ...SUGGESTION_TRANSLATIONS.EN,
 };
 export default EN;

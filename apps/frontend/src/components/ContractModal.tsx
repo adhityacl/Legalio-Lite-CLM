@@ -227,6 +227,8 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
   const [isParsing, setIsParsing] = useState(false);
   const [parseSuccessMsg, setParseSuccessMsg] = useState<string | null>(null);
+  /** Where each auto-filled value came from (quote, page, confidence), when the parser could tell. */
+  const [parseSources, setParseSources] = useState<Record<string, { quote: string; page: number | null; confidence: number | null; verified: boolean | null }>>({});
 
   const handleParseContract = async () => {
     if (!fileData && !rawFileObj) {
@@ -236,6 +238,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     setIsParsing(true);
     setError(null);
     setParseSuccessMsg(null);
+    setParseSources({});
     try {
       const result = await contractsApi.parse(rawFileObj ?? { pdfBase64: fileData }, { timeoutMs: 90_000 });
       if (result.success && result.data) {
@@ -244,6 +247,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
           const docType = parsed.document_type.toLowerCase().includes('addendum') ? 'Agreement Addendum' : 'Master Agreement';
           setJenisDokumen(docType as any);
         }
+        if (parsed.provenance && typeof parsed.provenance === 'object') setParseSources(parsed.provenance);
         if (parsed.contract_number) setNomorKontrak(parsed.contract_number);
         if (parsed.start_date) setTanggalMulai(parsed.start_date);
         if (parsed.end_date) setTanggalBerakhir(parsed.end_date);
@@ -715,6 +719,25 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
             {parseSuccessMsg && (
               <Alert status="success" role="status"><AlertIndicator /><AlertContent><AlertDescription>{parseSuccessMsg}</AlertDescription></AlertContent></Alert>
+            )}
+
+            {Object.keys(parseSources).length > 0 && (
+              <details className="rounded-md border border-border bg-muted/40 p-g13 text-sm" data-testid="parse-sources">
+                <summary className="cursor-pointer font-semibold">{t('contracts.parse_sources', 'Where the auto-filled values came from')}</summary>
+                <ul className="mt-g8 space-y-g8">
+                  {Object.entries(parseSources).map(([field, source]) => (
+                    <li key={field}>
+                      <span className="font-mono text-xs">{t(`contracts.parse_field.${field}`, field)}</span>
+                      <blockquote className="italic">“{source.quote}”</blockquote>
+                      <span className="text-xs text-muted-foreground">
+                        {source.page ? t('obligations.source_page', 'Page {page}', { page: source.page }) : t('suggestions.page_unknown', 'Page unknown')}
+                        {source.confidence != null ? ` · ${t('obligations.confidence', 'Confidence {pct}%', { pct: Math.round(source.confidence * 100) })}` : ''}
+                        {source.verified === false ? ` · ${t('suggestions.quote_missing', 'Quote not found in the document: check it')}` : ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
 
             {error && (

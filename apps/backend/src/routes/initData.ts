@@ -2,7 +2,7 @@ import { refreshContractLifecycles } from '../reminderJobs';
 import { getRequestTenantId, scopedRecords } from '../recordAccess';
 import { getTenantSettings } from '../tenantPolicy';
 import { db } from '../memoryDb';
-import { getEffectiveGeminiApiKey } from '../aiClient';
+import { aiProviderAvailable } from '../aiClient';
 import { sanitizeParentFolderId } from '../lib/googleDriveSync';
 import { hasServiceAccountCredentials } from '../lib/googleServiceAccountAuth';
 import express from 'express';
@@ -25,7 +25,7 @@ app.get("/api/init-data", async (req: express.Request, res: express.Response) =>
     evaluations: await scopedRecords(req, "evaluation"),
     spendings: await scopedRecords(req, "spending"),
     services: {
-      aiAvailable: Boolean(getEffectiveGeminiApiKey()) && settings.modules.aiAssistant,
+      aiAvailable: aiProviderAvailable() && settings.modules.aiAssistant,
       googleUploadsAvailable: Boolean(sanitizeParentFolderId(db.googleConfig?.driveFolderId)) &&
         Boolean(db.googleConfig?.accessToken || db.googleConfig?.refreshToken || hasServiceAccountCredentials()),
     },

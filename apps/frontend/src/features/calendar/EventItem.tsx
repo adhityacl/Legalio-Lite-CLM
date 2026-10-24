@@ -23,12 +23,16 @@ export function EventItem({ event, chip = false, onEventClick }: {
  const date = parseCalendarDate(event.date)!;
  const locale = getActiveFormattingLocale();
  const done = event.type === 'task' && event.status === 'done';
- const label = [t(EVENT_TYPE_CONFIG[event.type].labelKey), new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(date),
- event.title, done ? t('calendar.done') : '', event.projected ? t('calendar.projected') : ''].filter(Boolean).join(' · ');
+ // The accessible name starts with the visible text (the day number and the title in a list, the title in a chip), so it contains it.
+ const visibleText = chip ? event.title : `${date.getDate()} ${event.title}`;
+ const label = [visibleText, t(EVENT_TYPE_CONFIG[event.type].labelKey), new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(date),
+ done ? t('calendar.done') : '', event.projected ? t('calendar.projected') : ''].filter(Boolean).join(' · ');
  const className = cn('w-full min-w-0 justify-start gap-g8 rounded-md px-g3 py-g2 text-xs font-medium text-foreground',
  chip ? EVENT_TYPE_CONFIG[event.type].chip : 'hover:bg-muted');
  const content = <>
  {!chip && <time dateTime={calendarDateKey(date)} className="inline-flex size-g21 shrink-0 items-center justify-center rounded-sm bg-muted text-xs font-semibold tabular-nums text-muted-foreground">{date.getDate()}</time>}
+ {/* A real space between the parts, so the visible text reads "1 Title" and the accessible name can contain it. */}
+ {!chip && ' '}
  <EventIndicator type={event.type} done={done} />
     <span className={cn('truncate', done && 'line-through', chip && 'hidden sm:inline')}>{event.title}</span>
  {chip && <span className="truncate sm:hidden" aria-hidden="true">{date.getDate()}</span>}

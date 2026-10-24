@@ -161,6 +161,8 @@ export async function buildCheapOcrContents(
     inspectionMs: number;
     classification: string;
     fileHash: string;
+    /** Text of each page of the original PDF (fresh digital-text extractions only; absent for cached transcripts and scans). */
+    pages?: Array<{ num: number; text: string }>;
   };
 }> {
   // Task-agnostic transcript cache: if some earlier call (any feature) already
@@ -222,6 +224,7 @@ export async function buildCheapOcrContents(
           inspectionMs: report.inspectionTimeMs,
           classification: report.classification,
           fileHash,
+          ...(opt.pagesText?.length ? { pages: opt.pagesText } : {}),
         },
       };
     }
