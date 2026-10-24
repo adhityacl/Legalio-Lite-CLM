@@ -1,9 +1,12 @@
 import { partnerRepository } from '../repositories/partnerRepository';
 import { nextEntityId } from '../ids';
-import { pageRows, type ListSpec } from '../listQuery';
+import { ioRepository, IO_SORTS, type IoQuery } from '../repositories/ioRepository';
+import { requestedVersion } from '../requestVersion';
+import { recordVisible } from '../recordScope';
+import { hasOrganizationScope } from '../rbac';
 import { contractRepository } from '../repositories/contractRepository';
 import * as bodySchemas from '../schemas';
-import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, isMatchingOrg, logActivity } from '../recordAccess';
+import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity, orgContextOf, scopeOf } from '../recordAccess';
 import { db, countryNameForPrompt, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { normalizeCurrencyCode, convertToUsdWithFallback, getDefaultUsdRate } from '@legalio/shared/currencyUtils';
 import { tenantDefaultCurrency, aiPolicyContext, getTenantSettings, findTenant, computeLifecycle } from '../tenantPolicy';
@@ -30,15 +33,25 @@ export function createIoRouter() {
   const app = express.Router();
   forwardAsyncRouteErrors(app);
 
-const IO_LIST: ListSpec<any> = {
-  search: ["io_number", "io_title", "media_channel", "deliverables", "contract_number", "internal_notes", "io_id"],
-  sorts: { end_date: (i) => String(i.end_date ?? ""), io_number: (i) => String(i.io_number ?? "").toLowerCase(), start_date: (i) => String(i.start_date ?? ""), created_at: (i) => String(i.created_at ?? "") },
-  filters: ["status", "partner_id", "contract_id"],
-};
-app.get("/api/ios", async (req: express.Request, res: express.Response) => {
-  const iosList = await scopedRecords(req, "io");
-  const labels = await contractRepository.labels(getRequestTenantId(req), iosList.map((io) => io.contract_id));
-  const result = iosList.map((io) => {
+const queryText = (value: unknown, max = 200) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+const queryList = (value: unknown) => queryText(value, 500).split(",").map((v) => v.trim()).filter(Boolean).slice(0, 20);
+/** Paged-list parameters of GET /api/ios; `paged` is false when the request asks for the classic full list. */
+function ioListQuery(query: express.Request["query"]): IoQuery & { paged: boolean; filtered: boolean } {
+  const requested = queryText(query.sort, 40);
+  const limit = query.limit === undefined ? undefined : Math.min(500, Math.max(1, Math.trunc(Number(query.limit)) || 50));
+  const paged = limit !== undefined || query.offset !== undefined;
+  const filters = { status: queryList(query.status), partnerId: queryList(query.partner_id), contractId: queryList(query.contract_id) };
+  const q = queryText(query.q, 200) || undefined;
+  const sort = (IO_SORTS as readonly string[]).includes(requested) && requested !== "default" ? requested as IoQuery["sort"] : (paged || requested ? "end_date" : "default");
+  return {
+    paged, filtered: Boolean(q) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
+    q, ...filters, sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",
+    limit: limit ?? (query.offset !== undefined ? 50 : undefined), offset: Math.max(0, Math.trunc(Number(query.offset)) || 0),
+  };
+}
+/** The order as the API presents it: normalized currency, a USD value and the number of the contract it belongs to. */
+function presentIos(rows: any[], labels: Map<string, { contract_number: string | null }>) {
+  return rows.map((io) => {
     const c = labels.get(io.contract_id);
     const cur = normalizeCurrencyCode(io.currency, tenantDefaultCurrency(io.organizationId));
     const amt = Number(io.io_value) || 0;
@@ -55,7 +68,34 @@ app.get("/api/ios", async (req: express.Request, res: express.Response) => {
       contract_number: c ? c.contract_number : io.contract_number || "-",
     };
   });
-  res.json(pageRows(req, res, result, IO_LIST) ?? result);
+}
+/**
+ * Without list parameters: every visible order as a bare array (unchanged). With limit/offset/q/sort or a filter (status, partner_id,
+ * contract_id; comma lists): the matching visible orders, one page at a time, the total in `X-Total-Count`.
+ */
+app.get("/api/ios", async (req: express.Request, res: express.Response) => {
+  const query = ioListQuery(req.query);
+  const ctx = orgContextOf(req);
+  const organizationId = getRequestTenantId(req);
+  let rows: any[];
+  if (!query.paged && !query.filtered) {
+    rows = await scopedRecords(req, "io");
+  } else {
+    let total: number;
+    if (hasOrganizationScope(ctx)) {
+      ({ rows, total } = await ioRepository.list(organizationId, query));
+    } else {
+      // Department roles see a subset decided by partner/contract ownership: filter the matches, then page.
+      const matched = (await ioRepository.list(organizationId, { ...query, limit: undefined, offset: 0 })).rows
+        .filter((row) => recordVisible(ctx, scopeOf(req), "io", row));
+      total = matched.length;
+      rows = query.limit === undefined ? matched : matched.slice(query.offset, (query.offset ?? 0) + query.limit);
+    }
+    res.setHeader("X-Total-Count", String(total));
+    res.setHeader("Access-Control-Expose-Headers", "X-Total-Count");
+  }
+  const labels = await contractRepository.labels(organizationId, rows.map((io) => io.contract_id));
+  res.json(presentIos(rows, labels));
 });
 app.post("/api/ios/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
   if (!(await ensureAiAvailable(req, res))) return;
@@ -196,7 +236,7 @@ app.post("/api/ios/review-analysis", async (req: express.Request, res: express.R
   const organizationId = getRequestTenantId(req);
   const partner = await partnerRepository.get(organizationId, String(draft.partner_id ?? ""));
   if (!partner || assertRecordAccess(req, "partner", partner)) return res.status(400).json({ error: "Partner tidak ditemukan." });
-  const saved = draft.io_id ? db.ios.find((i) => i.io_id === String(draft.io_id)) : undefined;
+  const saved = draft.io_id ? await ioRepository.get(organizationId, String(draft.io_id)) : undefined;
   if (draft.io_id && (!saved || assertRecordAccess(req, "io", saved) || assertRecordWritable(req, "io", saved))) {
     return res.status(404).json({ error: "Service order not found." });
   }
@@ -242,13 +282,13 @@ Return JSON with exactly:
 `;
   try {
     const analysis = await generateRedlineAnalysis(req, prompt);
-    if (saved) {
-      saved.redline_analysis = analysis;
-      saved.redline_analyzed_at = analysis.analyzed_at;
-      saved.updated_at = analysis.analyzed_at;
-      await saveDb();
-    }
-    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
+    // Row-locked server-side edit: the stored result never overwrites (or fails on) a user's concurrent edit of other fields.
+    const stored = saved ? await ioRepository.mutate(saved.organizationId, saved.io_id, (row) => {
+      row.redline_analysis = analysis;
+      row.redline_analyzed_at = analysis.analyzed_at;
+      row.updated_at = analysis.analyzed_at;
+    }) : undefined;
+    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(stored) });
   } catch (error) {
     log.error("Error during service order review:", error);
     sendRouteError(req, res, error, "request failed", "Gagal melakukan analisis AI. Silakan coba kembali.", { status: 500 });
@@ -297,9 +337,7 @@ app.post("/api/ios", validateBody(bodySchemas.ioCreateBody, { requiredMessage: "
       .json({ error: "Tanggal Berakhir harus setelah Tanggal Mulai." });
   }
   const ioTenantId = getRequestTenantId(req);
-  const existingIODup = db.ios.find(
-    (i) => isMatchingOrg(i.organizationId, ioTenantId) && String(i.io_number || "").trim().toLowerCase() === io_number.trim().toLowerCase(),
-  );
+  const existingIODup = await ioRepository.findByNumber(ioTenantId, io_number);
   if (existingIODup) {
     return res
       .status(400)
@@ -396,18 +434,19 @@ app.post("/api/ios", validateBody(bodySchemas.ioCreateBody, { requiredMessage: "
   };
   const writeDenial = assertRecordWritable(req, "io", newIO);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
-  db.ios.unshift(newIO);
-  await saveDb();
+  const stored = await ioRepository.insert(newIO);
   await logActivity(req, "CREATE", "IO", `Membuat dokumen komersial baru '${io_number}' (${io_title}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`);
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
-  res.json({ success: true, io: newIO });
+  res.json({ success: true, io: stored });
 });
 app.put("/api/ios/:id", validateBody(bodySchemas.ioUpdateBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const { fileData: uploadedData, fileName: uploadedName, accessToken: _accessToken, ...updates } = req.body;
-  const idx = db.ios.findIndex((i) => i.io_id === id);
-  if (idx === -1) return res.status(404).json({ error: "IO tidak ditemukan." });
-  const existing = db.ios[idx];
+  const { fileData: uploadedData, fileName: uploadedName, accessToken: _accessToken, version: clientVersion, ...updates } = req.body;
+  const existing = await ioRepository.get(getRequestTenantId(req), id);
+  if (!existing) return res.status(404).json({ error: "IO tidak ditemukan." });
+  // The version the client last saw (body `version` or If-Match) guards against overwriting someone else's edit; clients that
+  // send none are still protected for the duration of this request (the version read above).
+  const expectedVersion = requestedVersion(req, clientVersion) ?? existing.version;
   const tenantDenial = assertRecordAccess(req, "io", existing);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
   const updated = {
@@ -490,12 +529,7 @@ app.put("/api/ios/:id", validateBody(bodySchemas.ioUpdateBody), async (req: expr
       .json({ error: "Tanggal Berakhir harus setelah Tanggal Mulai." });
   }
   if (updated.io_number) {
-    const dup = db.ios.find(
-      (i) =>
-        isMatchingOrg(i.organizationId, updated.organizationId) &&
-        String(i.io_number || "").trim().toLowerCase() ===
-          updated.io_number.trim().toLowerCase() && i.io_id !== id,
-    );
+    const dup = await ioRepository.findByNumber(existing.organizationId, updated.io_number, id);
     if (dup) {
       return res
         .status(400)
@@ -510,20 +544,18 @@ app.put("/api/ios/:id", validateBody(bodySchemas.ioUpdateBody), async (req: expr
   updated.organizationId = existing.organizationId;
   const writeDenial = assertRecordWritable(req, "io", updated);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
-  db.ios[idx] = updated;
-  await saveDb();
+  const stored = await ioRepository.update(updated, expectedVersion);
   await logActivity(req, "UPDATE", "IO", `Memperbarui data Insertion Order '${updated.io_number}'`);
   await triggerAutoPushToGoogleSheet(req);
-  res.json({ success: true, io: updated });
+  res.json({ success: true, io: stored });
 });
 app.delete("/api/ios/:id", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const item = db.ios.find((i) => i.io_id === id);
+  const item = await ioRepository.get(getRequestTenantId(req), id);
   if (!item) return res.status(404).json({ error: "IO tidak ditemukan." });
   const tenantDenial = assertRecordAccess(req, "io", item);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
-  db.ios = db.ios.filter((i) => i !== item);
-  await saveDb();
+  await ioRepository.remove(item.organizationId, id);
   await logActivity(req, "DELETE", "IO", `Menghapus Insertion Order '${item.io_number}' (${item.io_title})`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });

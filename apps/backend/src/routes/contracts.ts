@@ -4,6 +4,7 @@ import { resolveActiveGoogleToken, getOrgFolderId, getPartnerCategoryFolderId } 
 import { db, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { contractRepository, CONTRACT_SORTS, type ContractQuery } from '../repositories/contractRepository';
 import { partnerRepository } from '../repositories/partnerRepository';
+import { ioRepository } from '../repositories/ioRepository';
 import { recordVisible } from '../recordScope';
 import { hasOrganizationScope } from '../rbac';
 import { getRequestTenantId, scopedRecords, addActivityLog, assertRecordAccess, assertRecordWritable, isMatchingOrg, logActivity, orgContextOf, scopeOf } from '../recordAccess';
@@ -855,11 +856,13 @@ app.delete("/api/contracts/:id", async (req: express.Request, res: express.Respo
   if (!ctr) return res.status(404).json({ error: "Kontrak tidak ditemukan." });
   const tenantDenial = assertRecordAccess(req, "contract", ctr);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
-  for (const io of db.ios) if (io.organizationId === ctr.organizationId && io.contract_id === id) io.contract_id = null;
   db.notifications = db.notifications.filter((n) => !(n.organizationId === ctr.organizationId && n.parent_type === 'Contract' && n.parent_id === id));
   // Insertion orders and notifications live in the snapshot, the contract (and its children's parent link) in its repository:
   // one transaction, so the contract is never gone while an order still points at it, or the other way round.
-  await saveDb(() => contractRepository.removeWithChildren(ctr.organizationId, id));
+  await saveDb(async () => {
+    await ioRepository.detachContract(ctr.organizationId, id);
+    await contractRepository.removeWithChildren(ctr.organizationId, id);
+  });
   await logActivity(req, "DELETE", "CONTRACT", `Menghapus Kontrak '${ctr.contract_number}' (${ctr.contract_title})`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });

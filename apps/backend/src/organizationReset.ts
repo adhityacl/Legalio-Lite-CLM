@@ -1,10 +1,10 @@
 import type { Sql } from './db';
 import { keyFromLink, type ObjectStore } from './objectStore';
-import { contractRepository } from './repositories/contractRepository';
-import { partnerRepository } from './repositories/partnerRepository';
+import { ENTITIES } from './normalizedSchema';
+import { createEntityRepository } from './repositories/entityRepository';
 
 /** Collections of the in-memory projection that belong to an organization. */
-const COLLECTIONS = ['ios', 'spendings', 'evaluations', 'notifications', 'templates', 'activityLogs'] as const;
+const COLLECTIONS = ['spendings', 'evaluations', 'notifications', 'templates', 'activityLogs'] as const;
 
 /** Editor documents and approvals live in their own tables; each entry deletes one organization's rows. */
 const SQL_STEPS: Array<{ table: string; sql: string }> = [
@@ -56,17 +56,14 @@ export async function resetOrganizationData(options: OrganizationResetOptions) {
     mine.forEach(row => collectUploadLinks(row, links));
     memory[collection] = rows.filter(row => row?.organizationId !== organizationId);
   }
-  // Contracts are repository-backed: their upload links are read first, their rows removed with the rest of the SQL steps.
-  for await (const batch of contractRepository.batches(500, 'organization_id = ?', [organizationId])) {
-    batch.forEach(row => collectUploadLinks(row, links));
+  // Repository-backed tables: their upload links are read first, their rows removed in the same transaction as the snapshot change
+  // (the records that point at them are removed there too).
+  const repositories = ENTITIES.filter(entity => entity.repository).map(entity => ({ entity, repository: createEntityRepository(db, entity.table) }));
+  for (const { repository } of repositories) {
+    for await (const batch of repository.batches(500, 'organization_id = ?', [organizationId])) batch.forEach(row => collectUploadLinks(row, links));
   }
-  for await (const batch of partnerRepository.batches(500, 'organization_id = ?', [organizationId])) {
-    batch.forEach(row => collectUploadLinks(row, links));
-  }
-  // Contracts and partners go in the same transaction as the snapshot change: the orders and notifications that point at them are deleted there too.
   await save(async () => {
-    removed.contracts = await contractRepository.removeOrganization(organizationId);
-    removed.partners = await partnerRepository.removeOrganization(organizationId);
+    for (const { entity, repository } of repositories) removed[entity.collection] = await repository.removeOrganization(organizationId);
   });
 
   await db.tx(async () => {

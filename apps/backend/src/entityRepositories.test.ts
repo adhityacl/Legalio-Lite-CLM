@@ -17,6 +17,7 @@ const { ensureSchema } = await import('./schema');
 const { VersionConflictError } = await import('./repositories/errors');
 const { synchronizeBusinessRows, resetSyncCache } = await import('./normalizedCoreStore');
 const { partnerRepository } = await import('./repositories/partnerRepository');
+const { ioRepository } = await import('./repositories/ioRepository');
 
 type Row = Record<string, any>;
 interface Spec {
@@ -36,6 +37,11 @@ const SPECS: Spec[] = [
     name: 'partners', table: 'partners', key: 'partner_id', repo: partnerRepository, field: 'partner_name', childTable: 'partner_categories', childKey: 'partner_id',
     make: (id, org = 'org-a') => ({ partner_id: id, organizationId: org, partner_name: `Partner ${id}`, country: 'ID', internal_pic: 'Sales', tags: ['Supplier', 'IT'], identifiers: [{ scheme: 'tax', value: id, country: 'ID' }],
       dd_documents: [{ key: 'reg', name: 'Registration', required: true, expires: false, status: 'Available', files: [{ id: `f-${id}`, fileName: 'a.pdf', linkDrive: `/uploads/${id}.pdf` }] }], notes: 'Orchard notes', custom_extension: { keep: true } }),
+  },
+  {
+    name: 'insertion orders', table: 'insertion_orders', key: 'io_id', repo: ioRepository, field: 'io_title',
+    make: (id, org = 'org-a') => ({ io_id: id, organizationId: org, io_number: `IO-${id}`, io_title: `Order ${id}`, partner_id: null, contract_id: null, io_value: 0.29, currency: 'USD', status: 'Active',
+      start_date: '2026-01-01', end_date: '2030-01-01', media_channel: 'Digital', deliverables: 'Orchard banners', custom_extension: { keep: true } }),
   },
 ];
 

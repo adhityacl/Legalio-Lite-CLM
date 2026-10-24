@@ -21,7 +21,7 @@ before(async () => {
 after(async () => { await database?.drop(); fs.rmSync(dir, { recursive: true, force: true }); });
 
 test('a fresh database hands out the first number of each kind in the familiar shape', async () => {
-  db.ios = []; db.spendings = []; db.evaluations = [];
+  db.spendings = []; db.evaluations = [];
   assert.equal(await nextEntityId('partner'), 'P0001');
   assert.equal(await nextEntityId('contract'), 'C0001');
   assert.equal(await nextEntityId('io'), 'IO0001');

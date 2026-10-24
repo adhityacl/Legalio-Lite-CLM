@@ -112,7 +112,7 @@ export async function loadCoreData() {
     allowedUsers: await payloads('allowed_users'),
     // Repository-backed (repositories/partnerRepository.ts): never loaded into the snapshot.
     // Repository-backed (repositories/contractRepository.ts): never loaded into the snapshot.
-    ios: await business('insertion_orders'),
+    // Repository-backed (repositories/ioRepository.ts): never loaded into the snapshot.
     notifications: await business('notifications'),
     // Append-only table, read per organization through activityLog.ts: never loaded into memory.
     activityLogs: [] as any[],

@@ -8,6 +8,7 @@ import { normalizeCurrencyCode } from '@legalio/shared/currencyUtils';
 import { createCoreSaver } from './coreDataStore';
 import { contractRepository } from './repositories/contractRepository';
 import { partnerRepository } from './repositories/partnerRepository';
+import { ioRepository } from './repositories/ioRepository';
 import { migratePartnerContact } from './partnerContact';
 import { loadCoreData } from './lib/auth';
 import { componentLog } from './logger';
@@ -34,9 +35,10 @@ export const seedData = IS_TEST_MODE
 export const seedContracts: any[] = seedData.contracts;
 /** Demo partners to insert (through the repository) when a first run seeds the demo workspace; empty in test mode. */
 export const seedPartners: any[] = seedData.partners;
+/** Demo insertion orders to insert (through the repository) on a first run; empty in test mode. */
+export const seedIos: any[] = seedData.ios;
 export const db: any = {
   allowedUsers: [],
-  ios: seedData.ios,
   notifications: seedData.notifications,
   activityLogs: seedData.activityLogs,
   evaluations: seedData.evaluations,
@@ -69,6 +71,7 @@ const repositoryBacked = (collection: string, repository: string) => Object.defi
 });
 repositoryBacked('contracts', 'repositories/contractRepository');
 repositoryBacked('partners', 'repositories/partnerRepository');
+repositoryBacked('ios', 'repositories/ioRepository');
 bindTenantStore(() => db);
 
 /** Rebuilds the read-only `db.tenants` projection from canonical organization rows (PRD §7.3). */
@@ -86,10 +89,6 @@ export function migrateLegacyRecords() {
   // Organization ownership is never guessed here: records without a canonical
   // organization stay quarantined until the 002 migration maps them (PRD §14.3).
   if (!db.templates) db.templates = [];
-  (db.ios || []).forEach((io: any) => {
-    io.status = normalizeContractStatus(io.status);
-    io.currency = normalizeCurrencyCode(io.currency, tenantDefaultCurrency(io.organizationId));
-  });
   (db.spendings || []).forEach((sp: any) => {
     sp.currency = normalizeCurrencyCode(sp.currency, tenantDefaultCurrency(sp.organizationId));
   });
@@ -97,6 +96,26 @@ export function migrateLegacyRecords() {
 /** JSON with object keys sorted at every level, to compare records regardless of key order. */
 export function stableJson(value: unknown): string {
   return JSON.stringify(value, (_key, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v);
+}
+/** Stable status code and a valid currency on an insertion order written by an earlier release. */
+export function normalizeIoRecord(io: any) {
+  io.status = normalizeContractStatus(io.status);
+  io.currency = normalizeCurrencyCode(io.currency, tenantDefaultCurrency(io.organizationId));
+  return io;
+}
+/** Brings stored insertion orders to stable status codes and a valid currency. Only rows that need it are read (SQL pre-filter). */
+export async function normalizeStoredIos(): Promise<number> {
+  const stale = `status IS NULL OR status NOT IN ('Active','Expiring','Expired','Terminated') OR currency IS NULL OR currency !~ '^[A-Z]{3}$'`;
+  const signature = (io: any) => JSON.stringify([io.status, io.currency]);
+  let changed = 0;
+  for await (const batch of ioRepository.batches(500, stale)) {
+    for (const io of batch) {
+      if (signature(normalizeIoRecord({ ...io })) === signature(io)) continue;
+      await ioRepository.mutate(io.organizationId, io.io_id, (row) => { normalizeIoRecord(row); }, { bumpVersion: false });
+      changed++;
+    }
+  }
+  return changed;
 }
 /** Partner written by an earlier release brought in line with the model (contact fields, country, tags, due-diligence checklist). */
 export function normalizePartnerRecord(p: any) {

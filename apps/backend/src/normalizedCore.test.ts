@@ -8,6 +8,7 @@ import { createCoreSaver } from './coreDataStore';
 import { sql as s } from './db';
 import { contractRepository } from './repositories/contractRepository';
 import { partnerRepository } from './repositories/partnerRepository';
+import { ioRepository } from './repositories/ioRepository';
 import { ensureSchema } from './schema';
 import { createTestDatabase } from './testDatabase';
 
@@ -36,6 +37,7 @@ async function fixture() {
     await synchronizeBusinessRows(s, rows);
     for (const row of [...rows.partners].reverse()) await partnerRepository.insert(row);
     for (const row of [...rows.contracts].reverse()) await contractRepository.insert(row);
+    for (const row of [...rows.ios].reverse()) await ioRepository.insert(row);
   });
   return { rows };
 }
@@ -52,7 +54,7 @@ const syncWithContract = async (rows: Record<string, any[]>, contract: Record<st
 test('stored rows read back with every field, child array, decimal and independent IO ID', async () => {
   const {rows} = await fixture();
   for (const entity of ENTITIES) {
-    assert.deepEqual(await readBusinessRows(s,entity.table), rows[entity.collection].map(row => entity.table==='partners' ? {...row,version:1,...(row.pic_email ? {pic_contact:'private@example.com / +62123'} : {})} : entity.table==='contracts' ? {...row,version:1} : row));
+    assert.deepEqual(await readBusinessRows(s,entity.table), rows[entity.collection].map(row => entity.table==='partners' ? {...row,version:1,...(row.pic_email ? {pic_contact:'private@example.com / +62123'} : {})} : entity.table==='contracts' || entity.table==='insertion_orders' ? {...row,version:1} : row));
   }
   assert.deepEqual(await s.get('SELECT io_id, contract_id FROM insertion_orders'),{io_id:'i1',contract_id:'c1'});
   assert.deepEqual(await s.get('SELECT io_value_minor,io_value_scale FROM insertion_orders'),{io_value_minor:29,io_value_scale:2});
@@ -61,7 +63,7 @@ test('stored rows read back with every field, child array, decimal and independe
 test('multiple IOs per contract, stable notification IDs, updates, and ordering survive reload', async () => {
   const {rows} = await fixture();
   {
-    rows.ios.unshift({...rows.ios[0],io_id:'i2',io_number:'IO-002',io_value:1.2345678901234567});
+    await ioRepository.insert({...rows.ios[0],io_id:'i2',io_number:'IO-002',io_value:1.2345678901234567});
     rows.partners[0].dd_documents[0].files[0].fileName='Updated.pdf';
     await partnerRepository.update(rows.partners[0],1);
     await synchronizeBusinessRows(s,rows);
@@ -95,8 +97,8 @@ test('cross-organization references and duplicate IDs roll back all business cha
     rows.spendings[0].vendor_name='Must roll back';
     await assert.rejects(() => syncWithContract(rows,{...rows.contracts[0],partner_id:'p2'}),/foreign key/);
     assert.equal((await readBusinessRows(s,'spendings'))[0].vendor_name,'Orchard');
-    rows.ios.push({...rows.ios[0]});
-    await assert.rejects(() => synchronizeBusinessRows(s,rows),/Duplicate io_id/);
+    rows.spendings.push({...rows.spendings[0]});
+    await assert.rejects(() => synchronizeBusinessRows(s,rows),/Duplicate id/);
     assert.equal((await readBusinessRows(s,'spendings'))[0].vendor_name,'Orchard');
   }
 });
@@ -111,9 +113,9 @@ test('unchanged rows are skipped, yet direct writes, deletions and failed saves 
     await synchronizeBusinessRows(s,rows);
     assert.equal((await readBusinessRows(s,'spendings'))[0].vendor_name,'Orchard');
     // Rows removed from memory disappear even though every remaining row is unchanged.
-    rows.ios.pop();
+    rows.notifications.pop();
     await synchronizeBusinessRows(s,rows);
-    assert.equal((await readBusinessRows(s,'insertion_orders')).length,0);
+    assert.equal((await readBusinessRows(s,'notifications')).length,0);
     // A rolled-back save forgets what it believed was written, so the retry persists the change.
     rows.spendings[0].vendor_name='Retry persists';
     await assert.rejects(() => syncWithContract(rows,{...rows.contracts[0],partner_id:'p2'}),/foreign key/);
@@ -159,13 +161,13 @@ test('a failed save reloads memory inside the lock, so the queued save neither r
     const persisted = structuredClone(rows);
     let memory: Record<string, any> = rows;
     const saver = createCoreSaver(s, () => memory, async () => { memory = structuredClone(persisted); });
-    memory.ios.push({...memory.ios[0]});
+    memory.spendings.push({...memory.spendings[0]});
     const failed = saver.save();
     const queued = saver.save(() => s.run(`INSERT INTO audit VALUES ('queued')`));
-    await assert.rejects(failed, /Duplicate io_id/);
+    await assert.rejects(failed, /Duplicate id/);
     await queued;
-    assert.equal(memory.ios.length, 1);
-    assert.equal((await readBusinessRows(s,'insertion_orders')).length, 1);
+    assert.equal(memory.spendings.length, 1);
+    assert.equal((await readBusinessRows(s,'spendings')).length, 1);
     assert.deepEqual(await s.all('SELECT note FROM audit'), [{ note: 'queued' }]);
   }
 });

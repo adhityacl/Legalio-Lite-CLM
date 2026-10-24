@@ -4,6 +4,7 @@ import { seedLedgerFromLegacy, planReminders, existingKeys as existingReminderKe
 import { sql } from './db';
 import { contractLifecycleMode, contractLifecycle } from '@legalio/shared/contractLifecycle';
 import { contractRepository } from './repositories/contractRepository';
+import { ioRepository } from './repositories/ioRepository';
 import { getTenantSettings, findTenant, computeLifecycle } from './tenantPolicy';
 import { todayInTimezone } from '@legalio/shared/policy';
 import { normalizeContractStatus } from '@legalio/types/domainStatus';
@@ -57,16 +58,30 @@ export function reminderRecipients(tenantId: string, kind: "contract" | "commerc
 /** Recomputes lifecycle status (and rolls auto-renewals forward) for contracts and commercial documents. Sends nothing. */
 export async function recalculateStatuses() {
   await refreshStoredContractLifecycles();
-  for (const io of db.ios || []) {
-    if (normalizeContractStatus(io.status) === "Terminated") { io.status = "Terminated"; continue; }
+  await refreshStoredIoLifecycles();
+}
+/**
+ * Refreshes the derived status / days_remaining of stored insertion orders, row by row and without a new version (a display value
+ * is not an edit). Each row is re-read under a row lock, so a concurrent user edit is never overwritten with old data.
+ */
+async function refreshStoredIoLifecycles(): Promise<number> {
+  const apply = (io: any) => {
     const { daysRemaining, status } = computeLifecycle(io.organizationId, io.end_date, io.status, false);
-    Object.assign(io, {
-      status,
-      days_remaining: daysRemaining ?? io.days_remaining,
-      updated_at: io.updated_at || new Date().toISOString(),
-    });
+    const remaining = daysRemaining ?? io.days_remaining;
+    const changed = io.status !== status || io.days_remaining !== remaining;
+    if (changed) { io.status = status; io.days_remaining = remaining; }
+    return changed;
+  };
+  let updated = 0;
+  // A stored Terminated status is final until the order is edited, so those rows are never scanned.
+  for await (const batch of ioRepository.batches(500, "status IS DISTINCT FROM 'Terminated'")) {
+    for (const stale of batch) {
+      if (!apply({ ...stale })) continue;
+      await ioRepository.mutate(stale.organizationId, stale.io_id, (row) => (apply(row) ? undefined : false), { bumpVersion: false });
+      updated++;
+    }
   }
-  await saveDb();
+  return updated;
 }
 /**
  * Rolls auto-renewals forward and refreshes the derived status / days_remaining of stored contracts, row by row. A stale
@@ -122,7 +137,9 @@ export async function reminderRecords(): Promise<ReminderRecord[]> {
   for await (const batch of contractRepository.batches(500, "status IS DISTINCT FROM 'Terminated'")) {
     for (const contract of batch) { const item = contractReminder(contract); if (item) found.push(item); }
   }
-  for (const io of db.ios || []) { const item = commercialReminder(io); if (item) found.push(item); }
+  for await (const batch of ioRepository.batches(500, "status IS DISTINCT FROM 'Terminated'")) {
+    for (const io of batch) { const item = commercialReminder(io); if (item) found.push(item); }
+  }
   return found;
 }
 /** One ledger row's record, looked up directly (a delivery pass must not scan every contract per row). */
@@ -131,7 +148,7 @@ async function reminderRecordFor(row: { organization_id: string; kind: string; r
     const contract = await contractRepository.get(row.organization_id, row.record_id);
     return contract ? contractReminder(contract) : null;
   }
-  const io = (db.ios || []).find((candidate: any) => candidate.io_id === row.record_id && candidate.organizationId === row.organization_id);
+  const io = await ioRepository.get(row.organization_id, row.record_id);
   return io ? commercialReminder(io) : null;
 }
 export function reminderContent(item: ReminderRecord, trigger: "offset" | "notice", offsetDays: number) {

@@ -22,7 +22,7 @@ export const ENTITIES: EntitySchema[] = [
     ...fields('document_type parent_contract_id contract_number contract_title partner_id start_date end_date completion_date currency notice_type_required status status_approval internal_pic contract_file_link fileName internal_notes change_summary redline_analyzed_at'),
     ...fields('contract_value contract_value_usd', 'money'), ...fields('notice_period_days', 'number'), ...fields('auto_renewal', 'boolean'), ...fields('redline_analysis changed_fields', 'json'), ...lifecycle, ...dates,
   ] },
-  { table: 'insertion_orders', key: 'io_id', collection: 'ios', search: ['io_number', 'io_title', 'media_channel', 'deliverables', 'internal_notes'], fields: [
+  { table: 'insertion_orders', key: 'io_id', collection: 'ios', repository: true, search: ['io_number', 'io_title', 'media_channel', 'deliverables', 'internal_notes'], fields: [
     ...fields('contract_id io_number io_title partner_id media_channel start_date end_date completion_date pricing_model charging_type payment_scheme currency deliverables notice_type_required status internal_notes io_file_link fileName'),
     ...fields('io_value io_value_usd', 'money'), ...fields('notice_period_days', 'number'), ...dates,
   ] },

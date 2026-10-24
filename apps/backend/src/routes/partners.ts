@@ -1,5 +1,6 @@
 import { nextEntityId } from '../ids';
 import { contractRepository } from '../repositories/contractRepository';
+import { ioRepository } from '../repositories/ioRepository';
 import { partnerRepository, PARTNER_SORTS, type PartnerQuery } from '../repositories/partnerRepository';
 import { recordVisible } from '../recordScope';
 import { hasOrganizationScope } from '../rbac';
@@ -426,27 +427,24 @@ app.delete("/api/partners/:id", async (req: express.Request, res: express.Respon
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
   const sameOrg = (row: any) => row?.organizationId === partner.organizationId;
   const contractIds = await contractRepository.idsByPartner(partner.organizationId, id);
-  const partnerIOs = db.ios.filter(
-    (io) => sameOrg(io) && (io.partner_id === id || contractIds.includes(io.contract_id)),
-  );
-  const ioIds = partnerIOs.map((io) => io.io_id);
+  const ioIds = await ioRepository.idsByPartnerOrContracts(partner.organizationId, id, contractIds);
   db.notifications = db.notifications.filter(
     (n) => !(sameOrg(n) && (contractIds.includes(n.parent_id) || ioIds.includes(n.parent_id))),
   );
-  db.ios = db.ios.filter((io) => !partnerIOs.includes(io));
   for (const spending of db.spendings) if (sameOrg(spending) && spending.vendor_id === id) spending.vendor_id = null;
   for (const evaluation of db.evaluations) if (sameOrg(evaluation) && evaluation.partner_id === id) evaluation.partner_id = null;
   // The partner and its contracts are rows of their own repositories: removed in the same transaction as the orders and notifications.
   await saveDb(async () => {
+    await ioRepository.removeMany(partner.organizationId, ioIds);
     await contractRepository.removeByPartner(partner.organizationId, id);
     await partnerRepository.remove(partner.organizationId, id);
   });
-  await logActivity(req, "DELETE", "PARTNER", `Menghapus Partner '${partner.partner_name}' beserta ${contractIds.length} Kontrak dan ${partnerIOs.length} Insertion Order pendukung.`);
+  await logActivity(req, "DELETE", "PARTNER", `Menghapus Partner '${partner.partner_name}' beserta ${contractIds.length} Kontrak dan ${ioIds.length} Insertion Order pendukung.`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({
     success: true,
     deletedContractsCount: contractIds.length,
-    deletedIosCount: partnerIOs.length,
+    deletedIosCount: ioIds.length,
   });
 });
 app.post("/api/partners/:id/upload-dd", validateBody(bodySchemas.partnerUploadDdBody), async (req: express.Request, res: express.Response) => {

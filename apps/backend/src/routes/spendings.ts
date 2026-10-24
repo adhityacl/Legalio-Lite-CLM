@@ -1,4 +1,5 @@
 import { partnerRepository } from '../repositories/partnerRepository';
+import { ioRepository } from '../repositories/ioRepository';
 import { nextEntityId } from '../ids';
 import { pageRows, type ListSpec } from '../listQuery';
 import { contractRepository } from '../repositories/contractRepository';
@@ -153,7 +154,7 @@ app.post("/api/spendings/review-analysis", async (req: express.Request, res: exp
   }
   const partner = await partnerRepository.get(organizationId, String(draft.vendor_id ?? ""));
   const visiblePartner = partner && !assertRecordAccess(req, "partner", partner) ? partner : undefined;
-  const so = draft.io_id ? db.ios.find((io) => io.io_id === String(draft.io_id)) : undefined;
+  const so = draft.io_id ? await ioRepository.get(organizationId, String(draft.io_id)) : undefined;
   const visibleSo = so && !assertRecordAccess(req, "io", so) ? so : undefined;
   const parent = visibleSo?.contract_id ? await contractRepository.get(organizationId, visibleSo.contract_id) : undefined;
   if (!(await ensureAiAvailable(req, res))) return;
@@ -351,7 +352,7 @@ app.post("/api/partner-spendings", validateBody(bodySchemas.spendingCreateBody, 
     billing_file_url,
     billing_file_name,
     folder_link: partner ? partner.dd_folder_link : void 0,
-    io_id: req.body.io_id && db.ios.some((io) => io.io_id === String(req.body.io_id) && io.organizationId === targetOrgId) ? String(req.body.io_id) : void 0,
+    io_id: req.body.io_id && await ioRepository.exists(targetOrgId, String(req.body.io_id)) ? String(req.body.io_id) : void 0,
     billed_quantity: Number(req.body.billed_quantity) > 0 ? Number(req.body.billed_quantity) : void 0,
     // Review run on the add page before the spending existed.
     redline_analysis: req.body.redline_analysis && typeof req.body.redline_analysis === "object" ? req.body.redline_analysis : void 0,
@@ -424,7 +425,7 @@ app.put("/api/partner-spendings/:id", validateBody(bodySchemas.spendingUpdateBod
     updates.total_amount_usd = Number(updates.total_amount_usd);
   }
   if (Object.prototype.hasOwnProperty.call(updates, "io_id")) {
-    updates.io_id = updates.io_id && db.ios.some((io) => io.io_id === String(updates.io_id) && io.organizationId === existing.organizationId) ? String(updates.io_id) : void 0;
+    updates.io_id = updates.io_id && await ioRepository.exists(existing.organizationId, String(updates.io_id)) ? String(updates.io_id) : void 0;
   }
   const updated = {
     ...existing,

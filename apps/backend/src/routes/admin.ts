@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { buildDemoDataset } from '@legalio/shared/data/demoDataset';
 import { resolveTenantSettings } from '@legalio/shared/policy';
-import { DEFAULT_BRANDING, coreSaver, db, migrateLegacyRecords, normalizeContractRecord, normalizePartnerRecord, saveDb } from '../memoryDb';
+import { DEFAULT_BRANDING, coreSaver, db, migrateLegacyRecords, normalizeContractRecord, normalizeIoRecord, normalizePartnerRecord, saveDb } from '../memoryDb';
 import { clearRepositoryRows, insertRepositoryRows } from '../repositories/seed';
 import { identityOf } from '../identity';
 import { sql } from '../db';
@@ -121,7 +121,6 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       Object.assign(db, {
         tenants,
         allowedUsers: [],
-        ios: dataset.ios,
         spendings: dataset.spendings,
         evaluations: dataset.evaluations,
         notifications: dataset.notifications,
@@ -155,6 +154,7 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
         migrateLegacyRecords();
         dataset.contracts.forEach(normalizeContractRecord);
         dataset.partners.forEach(normalizePartnerRecord);
+        dataset.ios.forEach(normalizeIoRecord);
         snapshot = coreSaver.snapshot();
         nextState = { ...db };
       } finally {

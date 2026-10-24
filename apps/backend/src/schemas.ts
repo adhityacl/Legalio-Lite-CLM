@@ -146,6 +146,7 @@ export const ioUpdateBody = z.object({
   end_date: optional(date),
   pricing_model: optional(s(200)),
   charging_type: optional(s(200)),
+  version: versionField,
   ...ioFields,
 });
 

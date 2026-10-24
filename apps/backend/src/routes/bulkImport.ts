@@ -1,10 +1,11 @@
 import { nextEntityId } from '../ids';
 import { contractRepository } from '../repositories/contractRepository';
 import { partnerRepository } from '../repositories/partnerRepository';
+import { ioRepository } from '../repositories/ioRepository';
 import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
 import { getRequestTenantId, isMatchingOrg, scopeOf, addActivityLog } from '../recordAccess';
 import { tenantDefaultCurrency, normalizePartnerDocuments, computeDueDiligenceStatus } from '../tenantPolicy';
-import { db, sanitizeCountryCode, sanitizeIdentifiers, sanitizePartnerTags } from '../memoryDb';
+import { db, saveDb, sanitizeCountryCode, sanitizeIdentifiers, sanitizePartnerTags } from '../memoryDb';
 import { normalizeCurrencyCode, convertToUsdWithFallback } from '@legalio/shared/currencyUtils';
 import { computeEvaluationScore } from '../evaluationScoring';
 import { normalizeSpendingMonths } from '../spendingMonths';
@@ -298,9 +299,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         });
         continue;
       }
-      const exists = db.ios.find(
-        (io) => inTenant(io) && io.io_number?.toLowerCase() === nomor.toLowerCase(),
-      );
+      const exists = await ioRepository.findByNumber(tenantId, nomor);
       if (exists) {
         skipped.push({
           rowIndex,
@@ -353,7 +352,8 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           created_at: now,
           updated_at: now,
         };
-        db.ios.push(newIO);
+        // Row by row, appended after the existing orders.
+        await ioRepository.insert(newIO, { position: "last" });
         succeeded.push({
           rowIndex,
           identifier: nomor,
@@ -524,7 +524,8 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
       .status(400)
       .json({ error: `Tipe import tidak dikenal: ${type}` });
   }
-  await recalculateStatuses(); // once per import: it saves the whole database
+  await recalculateStatuses(); // once per import
+  await saveDb(); // evaluations and spendings are still imported into the snapshot
   const totalSucceeded = succeeded.length;
   if (totalSucceeded > 0) {
     await addActivityLog(

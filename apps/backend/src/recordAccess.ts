@@ -2,7 +2,6 @@ import express from 'express';
 import { OrgContext, hasOrganizationScope } from './rbac';
 import { RequestDenied } from './identity';
 import { createOrganizationScope, RecordKind, filterRecords, recordVisible } from './recordScope';
-import { db } from './memoryDb';
 import { readBusinessRows } from './normalizedCoreStore';
 import { contractRepository } from './repositories/contractRepository';
 import { partnerRepository } from './repositories/partnerRepository';
@@ -24,11 +23,11 @@ export function isMatchingOrg(entityOrgId, targetTenantId) {
 }
 /** Record collections the scope resolver reads: the request's directory of partners, contracts and insertion orders (department roles only). */
 export function scopeCollectionsOf(req: express.Request): ScopeCollections {
-  return { ...(((req as any).scopeCollections as ScopeCollections | undefined) ?? EMPTY_SCOPE_COLLECTIONS), ios: db.ios };
+  return ((req as any).scopeCollections as ScopeCollections | undefined) ?? EMPTY_SCOPE_COLLECTIONS;
 }
 /** Same for callers outside a request (upload authorization). */
 export async function scopeCollections(ctx: OrgContext): Promise<ScopeCollections> {
-  return { ...(await scopeCollectionsFor(sql, ctx)), ios: db.ios };
+  return scopeCollectionsFor(sql, ctx);
 }
 /** Request-local department resolver for the verified organization. */
 export function scopeOf(req: express.Request) {

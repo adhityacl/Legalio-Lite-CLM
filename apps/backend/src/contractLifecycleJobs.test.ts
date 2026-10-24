@@ -28,8 +28,6 @@ beforeEach(async () => {
   await sql.exec('TRUNCATE organization, search_records CASCADE');
   await sql.exec(`INSERT INTO organization (id, name, slug, "createdAt") VALUES ('org-a', 'A', 'a', now())`);
   await sql.exec(`INSERT INTO partners (partner_id, organization_id, record_position) VALUES ('p1', 'org-a', 0)`);
-  // recalculateStatuses also saves the snapshot (orders); the partner must be in memory or that save would delete it.
-  db.ios = [];
 });
 
 test('a refresh corrects stale status and days without a new version, and rolls an auto-renewal forward with one', async () => {

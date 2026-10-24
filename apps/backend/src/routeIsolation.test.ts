@@ -429,6 +429,13 @@ const PERSISTED_ENTITIES: Persisted[] = [
     name: 'partners', route: '/api/partners', key: 'partner_id', field: 'notes', table: 'partners', idColumn: 'partner_id', responseKey: 'partner',
     create: async (tag) => ok(await api('adminA', 'POST', '/api/partners', { org: A, body: { partner_name: `Race Partner ${tag}`, internal_pic: 'Sales' } })).partner,
   },
+  {
+    name: 'ios', route: '/api/ios', key: 'io_id', field: 'io_title', table: 'insertion_orders', idColumn: 'io_id', responseKey: 'io',
+    create: async (tag) => ok(await api('adminA', 'POST', '/api/ios', { org: A, body: {
+      partner_id: fixtureA.partner.partner_id, io_number: `IO-${tag}`, io_title: `Order ${tag}`, start_date: '2026-01-01', end_date: '2099-12-31',
+      currency: 'USD', io_value: 10, pricing_model: 'Fixed', charging_type: 'Postpaid', media_channel: 'Digital',
+    } })).io,
+  },
 ];
 for (const entity of PERSISTED_ENTITIES) {
   test(`${entity.name}: rows carry a version; concurrent edits of one row never lose an update (409 VERSION_CONFLICT)`, async () => {
@@ -465,6 +472,7 @@ for (const entity of PERSISTED_ENTITIES) {
     // Writes of entities that still travel with the snapshot, and of contracts, must leave this table alone.
     ok(await api('adminA', 'PUT', `/api/contracts/${fixtureA.contract.contract_id}`, { org: A, body: { internal_notes: `nudge ${entity.table.length}` } }));
     if (entity.name !== 'ios') ok(await api('adminA', 'PUT', `/api/ios/${fixtureA.io.io_id}`, { org: A, body: { io_title: `nudge ${entity.table.length}` } }));
+    if (entity.name !== 'partners') ok(await api('adminA', 'PUT', `/api/partners/${fixtureA.partner.partner_id}`, { org: A, body: { notes: `nudge ${entity.table.length}` } }));
     if (entity.name !== 'spendings') ok(await api('adminA', 'PUT', `/api/partner-spendings/${fixtureA.spending.id}`, { org: A, body: { invoice_title: `nudge ${entity.table.length}` } }));
     assert.deepEqual(await stamp(), before);
   });

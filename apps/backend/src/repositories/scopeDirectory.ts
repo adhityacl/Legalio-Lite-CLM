@@ -6,9 +6,10 @@
 import type { Sql } from '../db';
 import { departmentScope, type OrgContext } from '../rbac';
 import { createContractRepository, type ContractDirectoryEntry } from './contractRepository';
+import { createIoRepository, type IoDirectoryEntry } from './ioRepository';
 import { createPartnerRepository, type PartnerDirectoryEntry } from './partnerRepository';
 
-export interface ScopeCollections { partners: PartnerDirectoryEntry[]; contracts: ContractDirectoryEntry[]; ios: any[] }
+export interface ScopeCollections { partners: PartnerDirectoryEntry[]; contracts: ContractDirectoryEntry[]; ios: IoDirectoryEntry[] }
 export const EMPTY_SCOPE_COLLECTIONS: ScopeCollections = { partners: [], contracts: [], ios: [] };
 
 export async function scopeCollectionsFor(db: Sql, ctx: OrgContext): Promise<ScopeCollections> {
@@ -16,6 +17,6 @@ export async function scopeCollectionsFor(db: Sql, ctx: OrgContext): Promise<Sco
   return {
     partners: await createPartnerRepository(db).directory(ctx.organizationId),
     contracts: await createContractRepository(db).directory(ctx.organizationId),
-    ios: [],
+    ios: await createIoRepository(db).directory(ctx.organizationId),
   };
 }
