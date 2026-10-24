@@ -8,5 +8,5 @@ export default function BulkImportRoute() {
   useSnapshotDemand(true);
   const { partners, contracts, ios, loadAllData, snapshotLoaded } = useWorkspace();
   if (!snapshotLoaded) return <LoadingState label={t('app.memuat_halaman', 'Memuat halaman...')} />;
-  return <BulkImportView partners={partners} contracts={contracts} ios={ios} onRefreshData={loadAllData} />;
+  return <BulkImportView partners={partners} contracts={contracts} ios={ios} onRefreshData={() => void loadAllData()} />;
 }

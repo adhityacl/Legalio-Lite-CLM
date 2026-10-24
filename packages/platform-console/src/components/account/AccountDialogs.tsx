@@ -183,7 +183,7 @@ export const AccountProfileDialog: React.FC<{ onClose: () => void }> = ({ onClos
             <TabsTrigger value="security" className="flex-1">{t('tb.security_tab', 'Security')}</TabsTrigger>
           </TabsList>
           <TabsContent value="profile">
-        <form onSubmit={saveProfile} aria-label={t('tb.profile_details', 'Profile details')} className="flex flex-col gap-g21">
+        <form onSubmit={(event) => void saveProfile(event)} aria-label={t('tb.profile_details', 'Profile details')} className="flex flex-col gap-g21">
           <div className="flex items-center gap-g21">
               <Avatar className="size-g89 text-lg">
                 {image && <AvatarImage src={image} alt={t('tb.profile_photo', 'Profile photo')} />}
@@ -234,7 +234,7 @@ export const AccountProfileDialog: React.FC<{ onClose: () => void }> = ({ onClos
           </TabsContent>
           <TabsContent value="security" className="space-y-g21">
         {hasPassword ? (
-          <form onSubmit={changePassword} aria-label={t('tb.change_password', 'Change password')} className="flex flex-col gap-g34">
+          <form onSubmit={(event) => void changePassword(event)} aria-label={t('tb.change_password', 'Change password')} className="flex flex-col gap-g34">
             <div className="grid gap-g21">
               <Field>
                 <FieldLabel htmlFor={ids.current}>{t('tb.current_password', 'Current password')}</FieldLabel>
@@ -279,7 +279,7 @@ export const AccountProfileDialog: React.FC<{ onClose: () => void }> = ({ onClos
                     <Text as="span" size="xs" tone="muted" className="block">{new Date(s.updatedAt || s.createdAt).toLocaleString()}{s.current ? ` · ${t('tb.this_session', 'This session')}` : ''}</Text>
                   </span>
                 </span>
-                {!s.current && <Button type="button" variant="ghost" size="sm" onClick={() => revoke(s.id)}><LogOut className="h-g16 w-g16" aria-hidden="true" />{t('tb.sign_out_session', 'Sign out')}</Button>}
+                {!s.current && <Button type="button" variant="ghost" size="sm" onClick={() => void revoke(s.id)}><LogOut className="h-g16 w-g16" aria-hidden="true" />{t('tb.sign_out_session', 'Sign out')}</Button>}
               </ListItem>
             ))}
           </List>

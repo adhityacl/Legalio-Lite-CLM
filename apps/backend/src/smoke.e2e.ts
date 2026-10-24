@@ -1,7 +1,7 @@
 /**
  * Browser smoke test on a throwaway PostgreSQL database: sign in, list contracts, open one (also through a deep link),
  * create and edit a contract through the real form, find it with the workspace search, and run an axe-core accessibility
- * check on three key pages. Serious and critical axe violations fail the run; the rest are printed as a report.
+ * check on three key pages. Any axe violation fails the run.
  *
  *   npm run test:e2e:smoke   (needs PLAYWRIGHT_BROWSERS_PATH with Chromium, TEST_DATABASE_URL like the other e2e suites)
  */
@@ -85,20 +85,20 @@ const stop = async (child?: ChildProcess) => {
 
 /* ---------------------------------- accessibility ---------------------------------- */
 const axeSource = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
-interface AxeViolation { id: string; impact: string | null; help: string; nodes: Array<{ target: unknown[] }> }
+interface AxeViolation { id: string; impact: string | null; help: string; nodes: Array<{ target: unknown[]; html?: string }> }
 const accessibilityReport: string[] = [];
 async function checkAccessibility(page: Page, name: string) {
   await page.evaluate(axeSource);
   // The page function runs in the browser; the backend project has no DOM typings, so it is passed as source text.
   const violations = await page.evaluate(`(async () => {
     const result = await window.axe.run(document, { resultTypes: ['violations'] });
-    return result.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.map((n) => ({ target: n.target })) }));
+    return result.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.map((n) => ({ target: n.target, html: n.html.slice(0, 200) })) }));
   })()`) as AxeViolation[];
-  const blocking = violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
-  const minor = violations.filter((v) => !blocking.includes(v));
-  for (const v of violations) accessibilityReport.push(`${name}: [${v.impact}] ${v.id} - ${v.help} (${v.nodes.length} element${v.nodes.length === 1 ? '' : 's'}; first: ${JSON.stringify(v.nodes[0]?.target)})`);
-  assert.equal(blocking.length, 0, `${name}: serious/critical accessibility violations:\n${blocking.map((v) => `  [${v.impact}] ${v.id}: ${v.help} -> ${JSON.stringify(v.nodes.slice(0, 3).map((n) => n.target))}`).join('\n')}`);
-  steps.push(`axe-core on ${name}: no serious/critical violations (${minor.length} moderate/minor reported)`);
+  // Every impact level fails the run: the pages checked here have no known findings left.
+  const blocking = violations;
+  for (const v of violations) accessibilityReport.push(`${name}: [${v.impact}] ${v.id} - ${v.help} (${v.nodes.length} element${v.nodes.length === 1 ? '' : 's'}; first: ${JSON.stringify(v.nodes[0]?.target)} ${v.nodes[0]?.html ?? ''})`);
+  assert.equal(blocking.length, 0, `${name}: accessibility violations:\n${blocking.map((v) => `  [${v.impact}] ${v.id}: ${v.help} -> ${JSON.stringify(v.nodes.slice(0, 3).map((n) => n.target))}`).join('\n')}`);
+  steps.push(`axe-core on ${name}: no violations`);
 }
 
 try {
@@ -158,6 +158,17 @@ try {
   steps.push(`deep link ?tab=contracts&id=${target.contract_id} opens the record and then clears id`);
   await page.keyboard.press('Escape');
   await expect(detail).toHaveCount(0);
+
+  // The navigation panel's resize separator lives inside the navigation landmark and still works from the keyboard.
+  const separator = page.getByRole('separator').first();
+  await expect(separator).toBeVisible();
+  const box = await separator.boundingBox();
+  assert.ok(box && box.height > 300, 'the separator spans the height of the panel');
+  const sizeBefore = Number(await separator.getAttribute('aria-valuenow'));
+  await separator.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => Number(await separator.getAttribute('aria-valuenow'))).toBeGreaterThan(sizeBefore);
+  steps.push(`the sidebar resize separator is keyboard-operable (${sizeBefore} -> ${await separator.getAttribute('aria-valuenow')})`);
 
   // 3b. Server-side lists: paging, sorting and debounced search live in the URL, and none of the list pages loads the whole workspace.
   const totalOf = async (route: string) => Number((await api(route + (route.includes('?') ? '&' : '?') + 'limit=1')).headers.get('x-total-count'));

@@ -99,7 +99,7 @@ export const CosStorageForm: React.FC = () => {
             <div className="space-y-g3"><dt>{t('google_setup.updated_at', 'Terakhir diperbarui')}</dt><dd className="text-foreground"><RelativeTime iso={data.updated_at} /></dd></div>
           </dl>
         )}
-        <form className="grid gap-g8 sm:grid-cols-2" onSubmit={save}>
+        <form className="grid gap-g8 sm:grid-cols-2" onSubmit={(event) => void save(event)}>
           <Field required>
             <FieldLabel htmlFor="cos-secret-id">SecretId</FieldLabel>
             <Input id="cos-secret-id" required autoComplete="off" spellCheck={false} value={form.secretId} onChange={set('secretId')} />

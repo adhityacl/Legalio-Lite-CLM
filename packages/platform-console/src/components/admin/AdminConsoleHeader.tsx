@@ -9,7 +9,7 @@ import { Spinner } from '@legalio/ui-components/spinner';
 
 export const AdminConsoleHeader: React.FC<{
   activeTab: SystemSubmenu;
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
   isRefreshing: boolean;
 }> = ({ activeTab, onRefresh, isRefreshing }) => {
   const { t } = useLanguage();
@@ -25,7 +25,7 @@ export const AdminConsoleHeader: React.FC<{
     <div className="flex items-center justify-between gap-g8">
       <Heading as="h2" size="md" weight="semibold">{titles[activeTab]}</Heading>
       <Tooltip><TooltipTrigger asChild>
-        <Button variant="ghost" size="icon-md" onClick={onRefresh} disabled={isRefreshing} aria-label={t('admin.refresh_btn', 'Refresh Data')}>
+        <Button variant="ghost" size="icon-md" onClick={() => void onRefresh()} disabled={isRefreshing} aria-label={t('admin.refresh_btn', 'Refresh Data')}>
           {isRefreshing ? <Spinner size="sm" decorative /> : <RefreshCw aria-hidden="true" />}
         </Button>
       </TooltipTrigger><TooltipBody>{t('admin.refresh_btn', 'Refresh Data')}</TooltipBody></Tooltip>

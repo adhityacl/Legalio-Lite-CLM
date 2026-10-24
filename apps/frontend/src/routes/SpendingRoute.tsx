@@ -13,7 +13,7 @@ export default function SpendingRoute() {
       spendings={spendings}
       contracts={contracts}
       ios={ios}
-      onRefreshData={loadAllData}
+      onRefreshData={() => void loadAllData()}
     />
   );
 }

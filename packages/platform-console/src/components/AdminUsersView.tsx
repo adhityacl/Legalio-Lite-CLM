@@ -144,7 +144,7 @@ export const AdminUsersView: React.FC<{ initialTab?: SystemSubmenu; onManageOrga
           </Suspense>
         ) : loadError ? (
           <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{t('admin.load_error', 'Data gagal dimuat')}: {loadError}</AlertDescription></AlertContent>
-            <AlertActions><Button variant="outline" size="sm" type="button" onClick={() => loadConsoleData()}>{t('admin.retry', 'Coba lagi')}</Button></AlertActions></Alert>
+            <AlertActions><Button variant="outline" size="sm" type="button" onClick={() => void loadConsoleData()}>{t('admin.retry', 'Coba lagi')}</Button></AlertActions></Alert>
         ) : isLoading ? (
           <div role="status" className="flex min-h-g233 items-center justify-center gap-g8 text-sm text-muted-foreground"><Spinner size="sm" decorative />{t('admin.loading', 'Memuat data akses admin...')}</div>
         ) : (

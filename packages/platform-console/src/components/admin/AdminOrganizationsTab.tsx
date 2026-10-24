@@ -15,7 +15,7 @@ import { Badge } from '@legalio/ui-components/badge';
 interface AdminOrganizationsTabProps {
   organizations: ConsoleOrganization[];
   activeOrg: ConsoleOrganization | null;
-  onSelectOrg?: (org: ConsoleOrganization) => void;
+  onSelectOrg?: (org: ConsoleOrganization) => void | Promise<void>;
   onOpenCreateOrg: () => void;
   onOpenEditOrg: (org: ConsoleOrganization) => void;
   onDeleteOrg: (org: ConsoleOrganization) => void;
@@ -111,7 +111,7 @@ export const AdminOrganizationsTab: React.FC<AdminOrganizationsTabProps> = ({
                           <Button type="button" variant="ghost" size="icon-sm" onClick={() => onDeleteOrg(org)} disabled={deleteDisabled} aria-label={`${deleteLabel}: ${org.name}`}><Trash2 className="size-g13" aria-hidden="true" /></Button>
                         </TooltipTrigger><TooltipBody>{deleteLabel}</TooltipBody></Tooltip>
                         {onSelectOrg && <Tooltip><TooltipTrigger asChild>
-                          <Button type="button" variant="secondary" size="icon-sm" onClick={() => onSelectOrg(org)} aria-label={`${t('tb.manage_organization', 'Manage organization')}: ${org.name}`}><ArrowUpRight className="size-g16" aria-hidden="true" /></Button>
+                          <Button type="button" variant="secondary" size="icon-sm" onClick={() => void onSelectOrg(org)} aria-label={`${t('tb.manage_organization', 'Manage organization')}: ${org.name}`}><ArrowUpRight className="size-g16" aria-hidden="true" /></Button>
                         </TooltipTrigger><TooltipBody>{t('tb.manage_organization', 'Manage organization')}</TooltipBody></Tooltip>}
                       </div>
                     </TableCell>

@@ -387,14 +387,16 @@ export function AppShell({ navigation, header, children, className, searchResult
       <Sidebar className={`h-screen w-full ${className ?? ''}`} defaultSize={savedSize()} onResizeEnd={details => localStorage.setItem(SIZE_KEY, JSON.stringify(details.size))}>
         <SidebarPanel role="navigation" aria-label={t('nav.main_title', 'Menu Utama')} className="hidden bg-muted md:flex">
           {desktop && <>
-            <SidebarHeader className="h-g42 border-b border-border py-0">{switcher}</SidebarHeader>
+            {/* role="group": a header/footer inside the navigation landmark is not the page's banner/contentinfo. */}
+            <SidebarHeader role="group" className="h-g42 border-b border-border py-0">{switcher}</SidebarHeader>
             <SidebarContent>
               <NavigationGroups sections={sections} onNavigate={navigate} rail />
             </SidebarContent>
-            <SidebarFooter><StatusFooter /></SidebarFooter>
+            <SidebarFooter role="group"><StatusFooter /></SidebarFooter>
           </>}
+          {/* Inside the navigation landmark (so the separator is not content outside every landmark); pinned to the panel's inner edge. */}
+          <SidebarResizeTrigger aria-label={t('nav.resize_menu', 'Ubah lebar menu')} className="absolute inset-y-0 right-0 hidden md:flex" />
         </SidebarPanel>
-        <SidebarResizeTrigger aria-label={t('nav.resize_menu', 'Ubah lebar menu')} className="hidden md:flex" />
         <SidebarTrigger aria-label={t('nav.collapse_menu', 'Kecilkan Menu')} className="hidden md:inline-flex" />
         <SidebarInset className="flex min-w-0 flex-col overflow-hidden">
           {header}

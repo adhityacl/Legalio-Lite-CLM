@@ -5,7 +5,7 @@ import { Button } from '@legalio/ui-components/button';
 import { useLanguage } from '../../context/LanguageContext';
 
 /** Appears above a table while rows are selected, like the Notification Center's bulk action bar. */
-export function BulkSelectionBar({ count, noun, onDelete }: { count: number; noun: string; onDelete: () => void }) {
+export function BulkSelectionBar({ count, noun, onDelete }: { count: number; noun: string; onDelete: () => void | Promise<void> }) {
   const { t } = useLanguage();
   if (count === 0) return null;
   return (
@@ -14,7 +14,7 @@ export function BulkSelectionBar({ count, noun, onDelete }: { count: number; nou
         <span className="font-semibold text-accent-foreground">{count}</span>
         <span>{t('bulk.selected', '{noun} dipilih', { noun })}</span>
       </div>
-      <Button variant="destructive-outline" size="sm" type="button" onClick={onDelete}>
+      <Button variant="destructive-outline" size="sm" type="button" onClick={() => void onDelete()}>
         <Trash2 className="w-g13 h-g13" />
         <span>{t('bulk.delete_selected', 'Hapus Terpilih')}</span>
       </Button>

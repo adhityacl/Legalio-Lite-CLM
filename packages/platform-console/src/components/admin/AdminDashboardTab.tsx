@@ -37,7 +37,7 @@ interface AdminDashboardTabProps {
   onOpenCreateOrg: () => void;
   onOpenCreateTeam: () => void;
   onOpenCreateApiKey: () => void;
-  onRevokeSession: (sessionId: string) => void;
+  onRevokeSession: (sessionId: string) => void | Promise<void>;
 }
 
 export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
@@ -267,7 +267,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
                     </Text>
                     <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm"
                       type="button"
-                      onClick={() => onRevokeSession(session.id)}
+                      onClick={() => void onRevokeSession(session.id)}
                       className="text-destructive"
                     >
                       {t('admin.btn_revoke', 'Cabut')}

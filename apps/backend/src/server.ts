@@ -36,6 +36,7 @@ import { normalizeDepartmentName } from "./recordScope";
 import { recalculateStatuses, reminderScheduler, seedReminderLedger, stopReminderScheduler } from "./reminderJobs";
 import { createAdminRouter } from "./routes/admin";
 import { createActivityLogsRouter } from "./routes/activityLogs";
+import { startPdfWorkers, stopPdfWorkers } from "./lib/pdfWorkerPool";
 import { createAggregatesRouter } from "./routes/aggregates";
 import { createAiRouter } from "./routes/ai";
 import { createBulkImportRouter } from "./routes/bulkImport";
@@ -121,6 +122,7 @@ app.use((req: express.Request, _res: express.Response, next: express.NextFunctio
  * Everything that reads or writes the database runs here; main.ts connects first and awaits it before serving this app.
  */
 export async function init() {
+  startPdfWorkers();
   await ensureSchema();
   await reloadAuthConfiguration();
   await googleCredentials.init();
@@ -282,6 +284,7 @@ app.use(errorResponder());
 export async function drain() {
   await stopSharedStateSync();
   await stopReminderScheduler();
+  await stopPdfWorkers();
   await coreSaver.idle();
 }
 export { app, getFreshGoogleAccessToken, isMatchingOrg, resolveActiveGoogleToken };

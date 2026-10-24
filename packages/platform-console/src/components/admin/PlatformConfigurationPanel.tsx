@@ -869,7 +869,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                         <>
                           <Button
                             variant="outline"
-                            onClick={handleGoogleRefresh}
+                            onClick={() => void handleGoogleRefresh()}
                             disabled={connectingAuth}
                           >
                             {connectingAuth ? <Spinner size="sm" decorative /> : <RefreshCw aria-hidden="true" />}
@@ -877,7 +877,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
  </Button>
  <Button
  variant="destructive-outline"
-                            onClick={handleGoogleDisconnect}
+                            onClick={() => void handleGoogleDisconnect()}
                           >
                             <LogOut className="w-g13 h-g13" />
                             <span>{t('settings.disconnect', 'Putuskan')}</span>
@@ -885,7 +885,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                         </>
                       ) : (
                         <Button
-                          onClick={handleGoogleConnect}
+                          onClick={() => void handleGoogleConnect()}
                           disabled={connectingAuth}
                         >
                           <Zap className="w-g13 h-g13" />
@@ -926,7 +926,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           variant="outline"
                           size="sm"
                           disabled={backupState.running}
-                          onClick={handleBackupNow}
+                          onClick={() => void handleBackupNow()}
                           className="shrink-0"
                         >
                           <span>{backupState.running ? 'Mencadangkan...' : backupState.message || 'Backup Sekarang'}</span>
@@ -1009,7 +1009,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                             </TabsList>
 
                             <TabsContent value="picker">
-                              <form onSubmit={handleSaveOption2Picker} className="space-y-g13">
+                              <form onSubmit={(event) => void handleSaveOption2Picker(event)} className="space-y-g13">
                                 <Card className="p-g13 space-y-g8">
                                   <FieldLabel htmlFor="settingsview-field-1">
                                     {t('settings.folder_google_drive_id', 'Folder Google Drive ID')}
@@ -1025,7 +1025,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                                     <Button
                                       type="button"
                                       variant="outline"
-                                      onClick={() => handleOpenDrivePicker('folder')}
+                                      onClick={() => void handleOpenDrivePicker('folder')}
                                       disabled={!isTokenActive}
                                       className="shrink-0"
                                     >
@@ -1057,7 +1057,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                             </TabsContent>
 
                             <TabsContent value="manual">
-                              <form onSubmit={handleSaveOption3Manual} className="space-y-g13">
+                              <form onSubmit={(event) => void handleSaveOption3Manual(event)} className="space-y-g13">
                                 <Field>
                                   <FieldLabel htmlFor="settingsview-field-2">
                                     {t('settings.master_root_id_label', 'Folder ID Google Drive')}
@@ -1143,7 +1143,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                   </div>
                 </CardHeader>
                 <CardBody className="space-y-g13">
-                  <form onSubmit={handleSaveApiKey} className="space-y-g13">
+                  <form onSubmit={(event) => void handleSaveApiKey(event)} className="space-y-g13">
                     <div className="space-y-g5">
                       <FieldLabel htmlFor="settingsview-field-3" className="w-full justify-between">
                         <span>{t('settings.gemini_api_key_label', 'Gemini API Key (AI Studio)')}</span>
@@ -1205,7 +1205,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={handleTestApiKey}
+                        onClick={() => void handleTestApiKey()}
                         disabled={testingApiKey || !geminiApiKey.trim()}
                       >
                         {testingApiKey ? <Spinner size="sm" decorative /> : <AiIcon aria-hidden="true" />}
@@ -1225,7 +1225,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                   </CardTitle>
                 </CardHeader>
                 <CardBody className="space-y-g13">
-                  <RadioGroup aria-label={t('settings.ai_config_title', 'Pilihan Model Google Gemini')} value={aiModel} onValueChange={details => details.value && handleSaveAiModel(details.value)} className="grid w-full grid-cols-1 gap-g13 md:grid-cols-2">
+                  <RadioGroup aria-label={t('settings.ai_config_title', 'Pilihan Model Google Gemini')} value={aiModel} onValueChange={details => { if (details.value) void handleSaveAiModel(details.value); }} className="grid w-full grid-cols-1 gap-g13 md:grid-cols-2">
                     {[
                       {
                         id: 'gemini-3.8-flash',
@@ -1302,7 +1302,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                   </div>
                 </CardHeader>
                 <CardBody className="space-y-g13">
-                  <form onSubmit={handleSaveSmtp} className="space-y-g13">
+                  <form onSubmit={(event) => void handleSaveSmtp(event)} className="space-y-g13">
                     {/* Toggle Enable SMTP */}
                     <Card className="flex flex-row items-center justify-between gap-g13 p-g13">
                       <div className="min-w-0 flex-1 text-start">
@@ -1426,7 +1426,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={handleTestSmtp}
+                          onClick={() => void handleTestSmtp()}
                           disabled={testingSmtp || !smtpHost || !smtpUser}
                           className="shrink-0"
                         >
@@ -1501,7 +1501,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                   <div className="grid w-full grid-cols-2 gap-g8 sm:w-auto">
                     <Button
                       variant="outline"
-                      onClick={exportToCSV}
+                      onClick={() => void exportToCSV()}
                       disabled={translationsBusy}
                       className="w-full"
                     >
@@ -1521,7 +1521,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
                   <Button
                     variant="outline"
-                    onClick={async () => {
+                    onClick={() => { void (async () => {
                       const ok = await confirmDialog({
                         description: t('settings.reset_seluruh_kamus_teks_ke_bahasa', 'Reset seluruh kamus teks ke bahasa bawaan sistem?'),
                         tone: 'danger',
@@ -1535,7 +1535,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
                           setErrorMsg(error instanceof Error ? error.message : t('tb.texts_save_failed'));
                         }
                       }
-                    }}
+                    })(); }}
                     disabled={translationsBusy}
                     className="ml-auto"
                   >

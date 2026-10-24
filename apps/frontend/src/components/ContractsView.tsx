@@ -71,7 +71,7 @@ const CONTRACT_FILTERS = ['document_type', 'category', 'status'] as const;
 
 interface ContractsViewProps {  onAddContract: () => void;
   onEditContract: (contract: Contract) => void;
-  onDeleteContract: (contractId: string) => void;
+  onDeleteContract: (contractId: string) => void | Promise<void>;
   onDeleteContracts: (ids: string[]) => Promise<void>;
   onOpenAddendumModal: (contract: Contract) => void;
   openDocumentId?: string;

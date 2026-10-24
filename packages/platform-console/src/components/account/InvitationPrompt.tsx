@@ -113,7 +113,7 @@ export const InvitationPrompt: React.FC = () => {
           ) : (
             <>
               <Button type="button" variant="outline" onClick={close}>{t('tb.not_now', 'Not now')}</Button>
-              <Button type="button" onClick={accept} disabled={preview.status !== 'pending' || state.kind === 'busy'}>
+              <Button type="button" onClick={() => void accept()} disabled={preview.status !== 'pending' || state.kind === 'busy'}>
                 {state.kind === 'busy' && <Spinner size="sm" decorative />}{t('tb.accept_invitation', 'Accept invitation')}
               </Button>
             </>

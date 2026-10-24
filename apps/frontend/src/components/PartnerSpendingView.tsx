@@ -620,7 +620,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
 
   if (showModal) {
     return (
-    <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-g21" aria-labelledby="spending-form-heading">
+    <form onSubmit={(event) => void handleSubmit(event)} className="w-full min-w-0 space-y-g21" aria-labelledby="spending-form-heading">
       <div className="flex flex-wrap items-center justify-between gap-g13">
         <Heading as="h2" size="md" weight="semibold" id="spending-form-heading">
           {editingSpending ? t('spending.modal_edit_title', 'Edit Data Spending') : t('spending.form_title', 'Input Data Spending')}
@@ -760,7 +760,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                             <FileUploadHiddenInput />
                           </FileUpload>
                           {!fileObj && existingUrl && <Button asChild variant="link" className="break-all"><a href={existingUrl} target="_blank" rel="noopener noreferrer">{existingName}</a></Button>}
-                          {kind === 'invoice' && fileObj && <Button variant="secondary" type="button" disabled={formBusy} onClick={handleParseSpending} className="self-start">
+                          {kind === 'invoice' && fileObj && <Button variant="secondary" type="button" disabled={formBusy} onClick={() => void handleParseSpending()} className="self-start">
                             {isParsing && <Spinner size="sm" decorative />}
                             {isParsing ? t('spending.mengekstrak', 'Mengekstrak...') : t('partners.parse_file', 'Parse File')}
                           </Button>}

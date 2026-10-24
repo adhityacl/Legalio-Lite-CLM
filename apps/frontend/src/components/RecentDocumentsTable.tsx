@@ -44,7 +44,7 @@ export function RecentDocumentsTable({ contracts, ios, onNavigate }: {
   return (
     <Card asChild><section aria-label={t('ui.recent_documents')} className="overflow-hidden">
       <TableCardHeader tone="info" icon={<FilePlus2 />} title={t('ui.recent_documents')} />
-      <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.recent_documents')}>
+      <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
         <Table className="dashboard-data-table dashboard-document-table w-full min-w-g610 text-left">
           <TableHeader><TableRow>
             <TableColumnHeader scope="col" className="w-g42">

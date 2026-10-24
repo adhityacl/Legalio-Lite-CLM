@@ -67,7 +67,7 @@ const IO_FILTERS = ['status', 'pricing_model', 'charging_type'] as const;
 
 interface IOViewProps {  onAddIO: () => void;
   onEditIO: (io: InsertionOrder) => void;
-  onDeleteIO: (ioId: string) => void;
+  onDeleteIO: (ioId: string) => void | Promise<void>;
   onDeleteIOs: (ids: string[]) => Promise<void>;
   openDocumentId?: string;
   onDocumentOpened?: () => void;

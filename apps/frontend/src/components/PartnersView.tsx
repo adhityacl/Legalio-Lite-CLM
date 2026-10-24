@@ -94,9 +94,9 @@ interface PartnersViewProps {
   onEvaluationOpened?: () => void;
   onAddPartner: () => void;
   onEditPartner: (partner: Partner) => void;
-  onDeletePartner: (id: string, name: string) => void;
+  onDeletePartner: (id: string, name: string) => void | Promise<void>;
   onDeletePartners: (ids: string[]) => Promise<void>;
-  onUploadDDDoc?: (partnerId: string, docName: string) => void;
+  onUploadDDDoc?: (partnerId: string, docName: string) => void | Promise<void>;
 }
 
 export const PartnersView: React.FC<PartnersViewProps> = ({
@@ -792,7 +792,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                 {isLegal && (
                                   <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm"
                                     type="button"
-                                    onClick={() => handleDeleteDDFile(selectedPartnerDetail.partner_id, doc.name, f.id, displayName)}
+                                    onClick={() => void handleDeleteDDFile(selectedPartnerDetail.partner_id, doc.name, f.id, displayName)}
                                     className="text-destructive" aria-label={t('partners.hapus_file_ini', 'Hapus file ini')}
                                   >
                                     <Trash2 className="w-g13 h-g13" />

@@ -70,6 +70,23 @@ Upgrade notes: schema changes are versioned migrations (see POSTGRES_STORAGE.md)
   extension cannot be created the migration still succeeds and search uses a sequential scan; ask a database administrator to run
   `CREATE EXTENSION pg_trgm;` and `npm run migrate` again to get the index.
 
+### Aggregates, list parameters added for the screens, and the PDF worker (Phase 2C)
+
+- `GET /api/aggregates/dashboard|badges|facets|partners` are read-only SQL roll-ups for the caller's organization and, for department roles, the
+  records their departments own (`final_only=1` additionally applies the viewer rule: final contracts only). `/aggregates/partners` takes the
+  `/api/partners` list parameters and adds contract/order/spending/evaluation figures per partner of the page.
+- The list endpoints gained filters and sorts (additive): contracts `category`, `parent_contract_id`, `window_from`/`window_to` (records that start, end or fall due inside the window)
+  and the sort keys `partner_name`, `contract_value_usd`, `document_type`, `file`; partners `partner_status=Active|Inactive`, `exclude_country`,
+  `deep=1` (also matches the numbers and titles of the partner's contracts and orders) and the sorts `codename`, `pic_name`, `partner_status`;
+  orders `pricing_model`, `charging_type`, `window_from`/`window_to` and more sorts; spendings `year`, `month`, `vendor_name` and more sorts. Contract
+  and order rows carry `partner_name`, partner rows `active_contract_count`. A caller that sends none of the new parameters gets the earlier answers.
+- Migration `0016_upload_owner_trigram` adds pg_trgm GIN indexes on `contracts(contract_file_link)`, `(termination_document)` and `(extra_json)` for
+  the upload-owner lookup of files that have no ownership row yet. Like `0008` it succeeds without the extension (the lookup then scans).
+- PDF inspection and slimming (`pdf-parse`, `pdf-lib`) run in worker threads when `dist/pdfWorker.cjs` is deployed next to `server.cjs` (it is built by
+  `npm run build`): `PDF_WORKER_THREADS` (default 2, at most 8), `PDF_WORKER=off` to run inline, `PDF_WORKER_FILE` to point at another file. A worker
+  that crashes or exceeds two minutes is replaced and that file is processed inline, so an upload never fails because of the worker. Without the file
+  (development with `tsx`, tests) everything runs inline as before.
+
 ### Health endpoints
 
 - `GET /api/health` is cheap liveness (process answers).

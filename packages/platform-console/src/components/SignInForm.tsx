@@ -214,7 +214,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
           <CardDescription>{t('db_setup.subtitle', 'Enter the database this installation will use. The connection is tested and the tables are created before it is saved.')}</CardDescription>
         </div>
         {errorAlert}
-        <form onSubmit={connectDatabase} className="grid grid-cols-[1fr_6rem] gap-g13" aria-busy={loading}>
+        <form onSubmit={(event) => void connectDatabase(event)} className="grid grid-cols-[1fr_6rem] gap-g13" aria-busy={loading}>
           <Field required>
             <FieldLabel htmlFor="db-host">{t('db_setup.host', 'Host')}</FieldLabel>
             <Input id="db-host" required autoComplete="off" spellCheck={false} placeholder="127.0.0.1" value={database.host} onChange={setDb('host')} />
@@ -312,7 +312,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
         </Alert>
       )}
 
-      <form onSubmit={handleSubmit} className={`flex flex-col ${setupMode ? 'gap-[11px]' : 'gap-g13'}`} aria-busy={loading}>
+      <form onSubmit={(event) => void handleSubmit(event)} className={`flex flex-col ${setupMode ? 'gap-[11px]' : 'gap-g13'}`} aria-busy={loading}>
         {setupMode && (
           <Field required>
             <FieldLabel htmlFor="setup-public-url">{t('login.public_url_label', 'Website URL')}</FieldLabel>

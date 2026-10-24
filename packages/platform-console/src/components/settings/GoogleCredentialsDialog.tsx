@@ -212,8 +212,8 @@ export const GoogleCredentialsForm: React.FC = () => {
 
           <div className="space-y-g5">
             <FileUpload className="gap-g5" key={uploadKey} ids={{ hiddenInput: inputId }} accept=".json,application/json" maxFiles={1} maxFileSize={MAX_FILE_BYTES} disabled={busy !== null}
-              onFileAccept={details => upload(kind, details.files[0])}
-              onFileReject={details => upload(kind, details.files[0]?.file)}>
+              onFileAccept={details => void upload(kind, details.files[0])}
+              onFileReject={details => void upload(kind, details.files[0]?.file)}>
               <FileUploadDropzone aria-label={t('google_setup.drop_hint', 'atau seret file ke kotak ini')} className="min-h-g68 gap-g8 bg-muted/30 p-g8 sm:grid-cols-[auto_minmax(0,1fr)] sm:text-start">
                 <FileUploadTrigger asChild>
                   <Button size="sm" className="min-h-11 max-sm:w-full" loading={busy === kind}>
@@ -234,7 +234,7 @@ export const GoogleCredentialsForm: React.FC = () => {
             </FileUpload>
             {info.source === 'upload' && (
               <div className="flex justify-end">
-                <Button variant="ghost" size="sm" onClick={() => remove(kind)} disabled={busy !== null} className="min-h-11 text-destructive"
+                <Button variant="ghost" size="sm" onClick={() => void remove(kind)} disabled={busy !== null} className="min-h-11 text-destructive"
                   aria-label={t('google_setup.reset', 'Reset file yang diunggah')}>
                   <RotateCcw className="size-g16" aria-hidden="true" />
                   {t('common.reset', 'Reset')}

@@ -72,4 +72,38 @@ export default tseslint.config(
       'no-restricted-globals': ['error', { name: 'fetch', message: 'Use the shared API client: import { api, apiRequest } from "@legalio/shared/apiClient".' }],
     },
   },
+  // Event handlers: a promise-returning function passed to a JSX attribute (onClick={asyncFn}) has its rejection dropped. New code in the
+  // browser packages gets the check (`attributes: true`); the files below still hold such handlers (96 in total when this list was
+  // written) and are exempt until cleaned up. Remove a file from the list when it is fixed; do not add files.
+  {
+    files: ['apps/frontend/src/**/*.{ts,tsx}', 'apps/backend/console/src/**/*.{ts,tsx}', 'packages/platform-console/src/**/*.{ts,tsx}'],
+    ignores: [
+      'apps/frontend/src/components/AIChatWidget.tsx',
+      'apps/frontend/src/components/AmendmentModal.tsx',
+      'apps/frontend/src/components/ContractModal.tsx',
+      'apps/frontend/src/components/ContractRedliningPanel.tsx',
+      'apps/frontend/src/components/DefaultPasswordBanner.tsx',
+      'apps/frontend/src/components/IOModal.tsx',
+      'apps/frontend/src/components/NotificationsView.tsx',
+      'apps/frontend/src/components/PartnerEvaluationView.tsx',
+      'apps/frontend/src/components/PartnerModal.tsx',
+      'apps/frontend/src/components/SettingsView.tsx',
+      'apps/frontend/src/components/UploadDDModal.tsx',
+      'apps/frontend/src/components/account/OrganizationOnboarding.tsx',
+      'apps/frontend/src/components/documents/CommentsPanel.tsx',
+      'apps/frontend/src/components/documents/DocumentInfoPanel.tsx',
+      'apps/frontend/src/components/settings/MembersAccessTab.tsx',
+      'apps/frontend/src/components/settings/OrganizationTab.tsx',
+      'apps/frontend/src/features/approvals/ApprovalDetail.tsx',
+      'apps/frontend/src/features/approvals/ApprovalForm.tsx',
+      'apps/frontend/src/features/approvals/ApprovalInbox.tsx',
+      'apps/frontend/src/features/contracts/ContractEndingFields.tsx',
+      'apps/frontend/src/features/contracts/ContractEndingSummary.tsx',
+      'apps/frontend/src/features/documents/ContractDocumentEditor.tsx',
+      'packages/platform-console/src/components/UITextManagerModal.tsx',
+      'packages/platform-console/src/components/admin/AdminModals.tsx',
+      'packages/platform-console/src/components/admin/PlatformUsersTab.tsx',
+    ],
+    rules: { '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { attributes: true } }] },
+  },
 );

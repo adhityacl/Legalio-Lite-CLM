@@ -34,7 +34,7 @@ export default function PartnersRoute({ evaluation = false }: { evaluation?: boo
       ios={evaluation ? ios : undefined}
       spendings={evaluation ? spendings : undefined}
       evaluations={evaluation ? evaluations : undefined}
-      onRefreshData={loadAllData}
+      onRefreshData={() => void loadAllData()}
       initialSubTab={evaluation ? 'evaluation' : 'list'}
       onAddPartner={() => openEditor({ kind: 'partner', record: null })}
       onEditPartner={(p) => openEditor({ kind: 'partner', record: p })}

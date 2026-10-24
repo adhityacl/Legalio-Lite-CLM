@@ -11,7 +11,7 @@ export default function HierarchyRoute() {
     <HierarchyTreemapView
       loading={workspaceLoading}
       error={workspaceError}
-      onRetry={loadAllData}
+      onRetry={() => void loadAllData()}
       onOpenCalendarDocument={(kind, id) => setActiveTab(kind === 'contract' ? 'contracts' : 'ios', undefined, { recordId: id })}
       partners={partners}
       contracts={contracts}

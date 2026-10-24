@@ -24,8 +24,8 @@ import { Badge } from '@legalio/ui-components/badge';
 interface AdminApiKeysTabProps {
   apiKeys: ConsoleApiKey[];
   onOpenCreateKey: () => void;
-  onRevokeKey: (keyId: string) => void;
-  onDeleteKey: (keyId: string) => void;
+  onRevokeKey: (keyId: string) => void | Promise<void>;
+  onDeleteKey: (keyId: string) => void | Promise<void>;
 }
 
 export const AdminApiKeysTab: React.FC<AdminApiKeysTabProps> = ({
@@ -126,14 +126,14 @@ export const AdminApiKeysTab: React.FC<AdminApiKeysTabProps> = ({
                         {k.status === 'active' && (
                           <Button variant="ghost" size="sm"
                             type="button"
-                            onClick={() => onRevokeKey(k.id)}
+                            onClick={() => void onRevokeKey(k.id)}
                           >
                             {t('admin.btn_revoke', 'Cabut')}
                           </Button>
                         )}
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm"
                           type="button"
-                          onClick={() => onDeleteKey(k.id)}
+                          onClick={() => void onDeleteKey(k.id)}
                           className="text-destructive" aria-label={t('admin.title_delete_key', 'Hapus Kunci')}
                         >
                           <Trash2 className="w-g13 h-g13" />

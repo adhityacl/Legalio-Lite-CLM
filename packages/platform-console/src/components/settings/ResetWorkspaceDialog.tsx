@@ -90,7 +90,7 @@ export const ResetWorkspaceDialog: React.FC<ResetWorkspaceDialogProps> = ({ open
             <DialogDescription className="text-status-danger">{t('settings.reset_modal_warning', 'This action is permanent and cannot be undone.')}</DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={submit} noValidate aria-busy={status.kind === 'running'} className="flex min-h-0 flex-1 flex-col">
+          <form onSubmit={(event) => void submit(event)} noValidate aria-busy={status.kind === 'running'} className="flex min-h-0 flex-1 flex-col">
             <DialogBody className="mt-0 grid gap-g13 overflow-y-auto px-g21 py-g21 text-foreground">
               <RadioGroup className="grid gap-g8 sm:grid-cols-2" value={mode} onValueChange={(details) => details.value && setMode(details.value as ResetMode)}>
                 <RadioGroupLabel className="sm:col-span-2">{t('settings.reset.mode_label', 'After the reset')}</RadioGroupLabel>

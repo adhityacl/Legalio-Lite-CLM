@@ -26,7 +26,7 @@ import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/too
 interface HeaderProps {
   notifications: NotificationLog[];
   googleConfig?: GoogleSheetsConfig;
-  onRefreshData: () => void;
+  onRefreshData: () => void | Promise<void>;
   onNavigateToTab: (tab: string) => void;
   onOpenMobileMenu?: () => void;
 }

@@ -385,7 +385,7 @@ export const BulkImportView: React.FC<BulkImportViewProps> = ({
             <div className="flex w-full items-center gap-g8">
               <Button
                 type="button"
-                onClick={handleImport}
+                onClick={() => void handleImport()}
                 disabled={!parsedRows || parsedRows.length === 0 || isImporting}
                 className="flex-1"
               >

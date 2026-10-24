@@ -10,20 +10,35 @@
 * Endpoint modules (`contracts.ts`, `partners.ts`, `orders.ts`, `spendings.ts`, `evaluations.ts`, `notifications.ts`, `templates.ts`, `account.ts`,
   `assistant.ts`, `workspace.ts`, `bulkImport.ts`) give typed functions, including `page(...)` for the paged list endpoints.
 * `userEmail` / `userName` / `userRole` are never sent: the server takes the actor from the session.
-* Raw `fetch(` calls left: 0 in `apps/frontend/src` besides the client; about 55 (in 20 files) remain in `packages/platform-console` (auth context,
-  sign-in, tenant contexts, platform configuration, Google sign-in) and `packages/shared` (exchange rates). They are shared with the System Console
-  build; moving the client into `packages/platform-console` and re-exporting it from `apps/frontend/src/api` is the next step.
+* The client itself lives in `packages/shared/src/apiClient.ts` (`@legalio/shared/apiClient`); `apps/frontend/src/api/client.ts` re-exports it. The
+  platform console and `packages/shared` use the same client (shared is the lowest layer both depend on, so there is no cycle). Raw `fetch(` is
+  an ESLint error (`no-restricted-globals`) in browser code; the only remaining uses are third parties: the Google Drive/Sheets calls in
+  `platform-console/src/lib/googleAuthService.ts` and the exchange-rate provider in `shared/src/currencyRates.ts` (server side).
+* `api/aggregates.ts` and `api/search.ts` type the SQL aggregate endpoints and `/api/search`.
 
 ## Workspace data and mutations (`features/workspace`)
 
-* `useWorkspaceData` reads `/api/init-data` into the query cache (key `['init-data', identity, organization]`).
+* `useWorkspaceData` reads `/api/init-data` into the query cache (key `['init-data', identity, organization]`), but only **on demand**: the provider
+  enables it while an editor or the amendment dialog is open, or while a view asks for it with `useSnapshotDemand()` (hierarchy, bulk import,
+  contract creator, partner evaluation, the spending form). Contracts, partners, orders, spending, dashboard, notifications, the navigation badges
+  and the search palette do not call it.
 * `workspaceCache.ts` + `useWorkspaceMutations.ts`: contract/order/partner create, edit and delete are `useMutation`s with optimistic cache updates,
   rollback that never undoes a newer value, and invalidation of the snapshot afterwards. A contract edit sends the `version` it was based on; a 409
   `VERSION_CONFLICT` is shown as "changed by someone else" and the refresh loads the current version.
 * `useWorkspaceActions.ts` adds confirmations, toasts and translated messages; `WorkspaceContext.tsx` provides data, actions and the open editor.
-* The list views still receive the whole snapshot (`init-data`) and filter, sort and page on the client: the dashboard, search palette, hierarchy
-  and the cross-references between lists need all records. The paged endpoints and `contractsApi.page(...)` exist for the next step (a views-by-view
-  move to server-side lists), not used by the screens yet.
+* **Server-side lists** (`lib/useServerList.ts`, `lib/listState.ts`): contracts, partners, orders and spending request
+  `GET <collection>?limit&offset&q&sort&dir&<filters>` and read `X-Total-Count`. Page, search, sort and filters live in the URL
+  (`?tab=contracts&l.page=2&l.q=acme&l.sort=end&l.dir=desc&l.f.status=Active`); the navigation drops `l.*` when the page changes. Typing is debounced
+  (300 ms); TanStack Query keeps the previous page on screen (`keepPreviousData`) while the next one loads. `lib/useRecordLookup.ts` resolves a
+  deep-linked record (`&id=`) and a record's related rows (addenda, orders of a contract) through the same endpoints.
+  Mutations invalidate the `lists`, `aggregates` and `notifications` query roots together with the snapshot.
+* **Aggregates** (`features/aggregates`): the dashboard reads `GET /api/aggregates/dashboard` (counts by status, active value per currency, the five
+  nearest expiring and the five newest documents, the monthly spending roll-up with categories); the navigation badges read
+  `/api/aggregates/badges`; filter option lists read `/api/aggregates/facets`; `/api/aggregates/partners` gives per-partner roll-ups (not used by a
+  screen yet). All are scoped to the caller's organization and departments in SQL.
+* **Search palette**: `features/aggregates/useWorkspaceSearch.ts` calls `GET /api/search` (debounced 250 ms); `AppShell` reports the typed text
+  through `onSearchQueryChange`.
+* Not virtualized: the tables render one page (at most 50 rows), so there is no list over 200 rows to virtualize.
 
 ## Pages and routing (`routes`, `shell`)
 
@@ -36,15 +51,20 @@
 * `shell/AuthenticatedApp.tsx` is the signed-in shell; `App.tsx` only composes providers and sign-in routing.
 * To add a page: add the tab to `lib/appRoutes.ts` (permission), a `routes/XRoute.tsx` that reads `useWorkspace()`, and an entry in `ROUTES`.
 
-## Bundle sizes (production build, raw bytes)
+## Bundle sizes (production build)
 
-| Chunk | Before | After |
+Entry chunk = the module script of `index.html` plus the chunks it preloads (measured by `scripts/check-bundle-size.mjs`; brotli at quality 11):
+
+| | Before | After |
 | --- | ---: | ---: |
-| entry `index` | 1,306,682 (brotli 310,819) | 1,314,487 (brotli 313,709) |
-| `ContractDocumentEditor` (Tiptap, lazy) | 1,099,051 | 1,097,969 |
-| Dashboard (recharts, lazy) | 423,477 | 423,730 |
-| Hierarchy / Settings / Partners pages | 87,798 / 77,978 / 66,974 | 88,476 / 77,847 / 66,215 |
+| entry raw | 1,316,880 B | 638,860 B (-51 %) |
+| entry brotli | 314,292 B | 168,897 B (-46 %) |
 
-The editor and dashboard were already lazy and stay out of the entry. The entry is dominated by react-dom (620 KB source), the UI kit and
-`@ark-ui` (about 500 KB), and the policy packs in `packages/shared` (industry packs 113 KB, `zh` 77 KB), which load synchronously with the tenant
-settings: lazy-loading those is the largest remaining entry-size win.
+What moved out: the industry packs and the zh/id pack texts (`@legalio/shared/policy` resolves to `policy/lazy.ts` in browsers through the
+`browser` export condition; `loadPolicyPacks()` fetches the two chunks once someone is signed in and `subscribePolicyPacks` re-renders the tenant
+settings consumers; the server and tests keep the eager `policy/index.ts`), and the whole signed-in shell (`App.tsx` loads `shell/AuthenticatedApp`
+as its own chunk, prefetched when the browser is idle). The sign-in page therefore ships react-dom, the UI kit, the query client and the API client only.
+The editor (Tiptap) and the dashboard (recharts) were already lazy. The remaining entry is dominated by react-dom, the UI kit and `@ark-ui`.
+
+`npm run check:bundle` (run by CI after the build) fails when the entry grows past `apps/frontend/bundle-budget.json` (measured size + 10 %: raw
+702,746 B, brotli 185,787 B). After a deliberate change run `node scripts/check-bundle-size.mjs --write-budget`.

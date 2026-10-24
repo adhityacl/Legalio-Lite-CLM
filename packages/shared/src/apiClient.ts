@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * The one HTTP client of the application. Every call to the backend goes through `apiRequest` / `apiRequestWithMeta`:
  *

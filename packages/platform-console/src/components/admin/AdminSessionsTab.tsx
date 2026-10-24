@@ -23,8 +23,8 @@ import { Text } from '@legalio/ui-components/text';
 import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
 interface AdminSessionsTabProps {
   sessions: ConsoleSession[];
-  onRevokeSession: (sessionId: string) => void;
-  onRevokeAllUserSessions: (userId: string) => void;
+  onRevokeSession: (sessionId: string) => void | Promise<void>;
+  onRevokeAllUserSessions: (userId: string) => void | Promise<void>;
 }
 
 export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
@@ -137,7 +137,7 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
                           <Badge tone="neutral">{s.token ? `${s.token.slice(0, 12)}...` : `${(s.id || '').slice(0, 12)}...`}</Badge>
                           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm"
                             type="button"
-                            onClick={() => handleCopy(s.token || s.id, s.id)}
+                            onClick={() => void handleCopy(s.token || s.id, s.id)}
                             aria-label={t('admin.copy_token', 'Salin token sesi')}
                           >
                             {isCopied ? <Check className="w-g13 h-g13 text-status-success" /> : <Copy className="w-g13 h-g13" />}
@@ -188,7 +188,7 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
                               type="button"
                               variant="ghost"
                               size="icon-sm"
-                              onClick={() => onRevokeAllUserSessions(s.userId)}
+                              onClick={() => void onRevokeAllUserSessions(s.userId)}
                               aria-label={t('admin.revoke_all_user_sessions', 'Cabut Semua Sesi User')}
                             >
                               <RotateCcw className="w-g13 h-g13" />
@@ -198,7 +198,7 @@ export const AdminSessionsTab: React.FC<AdminSessionsTabProps> = ({
                             type="button"
                             variant="ghost"
                             size="icon-sm"
-                            onClick={() => onRevokeSession(s.id)}
+                            onClick={() => void onRevokeSession(s.id)}
                             aria-label={t('admin.revoke_session', 'Cabut Sesi')}
                           >
                             <X className="w-g13 h-g13" />
