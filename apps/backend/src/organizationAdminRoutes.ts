@@ -184,7 +184,7 @@ export async function listMembers(db: DB, ctx: OrgContext, query: any) {
   return { members: await Promise.all(rows.map((r) => memberDto(db, ctx.organizationId, r))), total };
 }
 
-async function replaceAssignments(db: DB, organizationId: string, userId: string, departmentIds: string[]) {
+export async function replaceAssignments(db: DB, organizationId: string, userId: string, departmentIds: string[]) {
   await db.run(`DELETE FROM "teamMember" WHERE "userId" = ? AND "teamId" IN (SELECT id FROM team WHERE "organizationId" = ?)`, userId, organizationId);
   const now = new Date().toISOString();
   for (const teamId of departmentIds) await db.run(`INSERT INTO "teamMember" (id, "teamId", "userId", "createdAt") VALUES (?, ?, ?, ?)`, `tm_${crypto.randomUUID()}`, teamId, userId, now);
@@ -335,7 +335,7 @@ export async function deleteDepartment(db: DB, ctx: OrgContext, actor: AuditActo
 
 export type InvitationStatus = 'pending' | 'accepted' | 'canceled' | 'expired';
 
-function invitationDepartmentIds(row: { departmentIds?: string | null; teamId?: string | null }): string[] {
+export function invitationDepartmentIds(row: { departmentIds?: string | null; teamId?: string | null }): string[] {
   if (row.departmentIds) {
     try {
       const parsed = JSON.parse(row.departmentIds);
@@ -484,7 +484,7 @@ async function inviterStillAuthorized(db: DB, row: any): Promise<boolean> {
 }
 
 /** Approval and acceptance use the same current invitation checks. */
-async function invitationIsUsable(db: DB, row: any): Promise<boolean> {
+export async function invitationIsUsable(db: DB, row: any): Promise<boolean> {
   if (invitationStatus(row) !== 'pending' || !isTenantRole(row.role)) return false;
   if (!await db.get('SELECT 1 FROM organization WHERE id = ?', row.organizationId)) return false;
   const departmentIds = invitationDepartmentIds(row);

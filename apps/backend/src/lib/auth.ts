@@ -3,6 +3,7 @@ import { openProviderSecrets } from '../providerSecrets';
 import { betterAuth, type BetterAuthOptions, type BetterAuthPlugin } from "better-auth";
 import { APIError } from "better-auth/api";
 import { hasApprovalInvitation } from "../organizationAdminRoutes";
+import { SSO_REQUIRED_MESSAGE, ssoBlocksPasswordSignIn } from "../ssoPolicy";
 import { admin, organization } from "better-auth/plugins";
 import { dash, sentinel } from "@better-auth/infra";
 import { createAccessControl } from "better-auth/plugins/access";
@@ -135,6 +136,11 @@ const invitationApprovalPlugin = {
   id: 'invitation-approval',
   init: () => ({ options: { databaseHooks: {
     session: { create: { before: async (session, ctx) => {
+      // Sessions started through Better Auth's own endpoints (password, social) are refused for members of organizations that require SSO.
+      // SSO sessions are created by sso.ts outside an endpoint, so they carry no endpoint context and pass.
+      if (ctx && (await ssoBlocksPasswordSignIn(sql, session.userId)).blocked) {
+        throw APIError.from('FORBIDDEN', { code: 'SSO_REQUIRED', message: SSO_REQUIRED_MESSAGE });
+      }
       const user = await sql.get<{ email: string; banned: boolean | null; banReason: string | null }>('SELECT email, banned, "banReason" FROM "user" WHERE id = ?', session.userId);
       if (user?.banned && user.banReason === 'PENDING_APPROVAL' &&
           await hasApprovalInvitation(sql, user.email, ctx?.headers?.get('x-invitation-token'))) {

@@ -61,6 +61,9 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/google-auth/client-id', pub('OAuth client id for the sign-in button')],
   ['POST', '/api/auth/google/sync-session', pub('Google sign-in: verified Google identity, onboarding rules')],
   ['POST', '/api/google-auth/sync-session', pub('Google sign-in: verified Google identity, onboarding rules')],
+  ['GET', '/api/sso/lookup', pub('sign-in page: organizations with SSO for an e-mail domain or slug; empty for unknown and non-SSO organizations alike')],
+  ['GET', '/api/sso/callback', pub('OIDC redirect URI: single-use state, PKCE, nonce and a browser-binding cookie are all verified')],
+  ['GET', '/api/sso/:slug/start', pub('starts the authorization-code flow for an organization that enabled SSO')],
   ['GET', '/api/invitations/:token/preview', pub('token possession; minimal preview')],
   ['GET', '/api/auth-console/invitations/verify', pub('legacy adapter to invitation preview')],
 
@@ -101,6 +104,11 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/organizations/:organizationId/webhooks/:id/deliveries', orgParam('tenant.webhook.manage')],
   ['GET', '/api/organizations/:organizationId/webhooks/:id/deliveries/:deliveryId', orgParam('tenant.webhook.manage')],
   ['POST', '/api/organizations/:organizationId/webhooks/:id/deliveries/:deliveryId/retry', orgParam('tenant.webhook.manage', 'audited')],
+
+  ['GET', '/api/organizations/:organizationId/sso', orgParam('tenant.sso.manage', 'never returns the client secret')],
+  ['PUT', '/api/organizations/:organizationId/sso', orgParam('tenant.sso.manage', 'issuer checked against SSRF rules and discovered; secret sealed; audited')],
+  ['POST', '/api/organizations/:organizationId/sso/test', orgParam('tenant.sso.manage', 'runs OIDC discovery for the saved issuer')],
+  ['DELETE', '/api/organizations/:organizationId/sso', orgParam('tenant.sso.manage', 'removes the provider and its linked identities; audited')],
 
   ['GET', '/api/organizations/:organizationId/approval-settings', orgParam('tenant.settings.read')],
   ['PUT', '/api/organizations/:organizationId/approval-settings', orgParam('tenant.settings.update', 'SLA hours and escalation target; audited')],

@@ -6,6 +6,7 @@ import { getFreshGoogleAccessToken } from '../googleDrive';
 import { db, saveDb } from '../memoryDb';
 import { verifyGoogleAccessTokenEmail } from '../googleTokenVerifier';
 import { hasApprovalInvitation } from '../organizationAdminRoutes';
+import { SSO_REQUIRED_MESSAGE, ssoBlocksPasswordSignIn } from '../ssoPolicy';
 import { sql, isUniqueViolation } from '../db';
 import { isIdentityBanned, sendError } from '../identity';
 import { checkIsAdmin } from '../adminCheck';
@@ -174,6 +175,9 @@ app.post(
         const pending = existingUser.banReason === 'PENDING_APPROVAL';
         return res.status(403).json({ success: false, error: pending ? "ACCOUNT_PENDING_APPROVAL" : "ACCOUNT_DISABLED",
           message: pending ? "Your account is waiting for manual superuser approval." : "This account is disabled." });
+      }
+      if ((await ssoBlocksPasswordSignIn(sql, existingUser.id)).blocked) {
+        return res.status(403).json({ success: false, error: "SSO_REQUIRED", message: SSO_REQUIRED_MESSAGE });
       }
       // Google verified this address, so the identity's email is verified.
       await sql.run(`UPDATE "user" SET image = COALESCE(?, image), "emailVerified" = true, "updatedAt" = ? WHERE id = ?`, photoURL || null, now, existingUser.id);
