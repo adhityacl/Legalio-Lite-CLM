@@ -436,6 +436,12 @@ const PERSISTED_ENTITIES: Persisted[] = [
       currency: 'USD', io_value: 10, pricing_model: 'Fixed', charging_type: 'Postpaid', media_channel: 'Digital',
     } })).io,
   },
+  {
+    name: 'spendings', route: '/api/partner-spendings', key: 'id', field: 'invoice_title', table: 'spendings', idColumn: 'id', responseKey: 'spending',
+    create: async (tag) => ok(await api('adminA', 'POST', '/api/partner-spendings', { org: A, body: {
+      vendor_id: fixtureA.partner.partner_id, vendor_name: fixtureA.partner.partner_name, invoice_number: `INV-${tag}`, invoice_date: '2026-10-01', invoice_month: ['2026-10-31'], currency: 'USD', total_amount: 5,
+    } })).spending,
+  },
 ];
 for (const entity of PERSISTED_ENTITIES) {
   test(`${entity.name}: rows carry a version; concurrent edits of one row never lose an update (409 VERSION_CONFLICT)`, async () => {

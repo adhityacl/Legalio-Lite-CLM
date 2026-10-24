@@ -182,6 +182,7 @@ export const spendingUpdateBody = z.object({
   vendor_name: optional(s(500)),
   invoice_number: optional(s(200)),
   total_amount: optional(numeric),
+  version: versionField,
   ...spendingFields,
 });
 

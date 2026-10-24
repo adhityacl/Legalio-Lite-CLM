@@ -1,12 +1,15 @@
 import { partnerRepository } from '../repositories/partnerRepository';
 import { ioRepository } from '../repositories/ioRepository';
 import { nextEntityId } from '../ids';
-import { pageRows, type ListSpec } from '../listQuery';
+import { spendingRepository, SPENDING_SORTS, type SpendingQuery } from '../repositories/spendingRepository';
+import { requestedVersion } from '../requestVersion';
+import { recordVisible } from '../recordScope';
+import { hasOrganizationScope } from '../rbac';
 import { contractRepository } from '../repositories/contractRepository';
 import { normalizeSpendingMonths } from '../spendingMonths';
 import * as bodySchemas from '../schemas';
-import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity } from '../recordAccess';
-import { db, countryNameForPrompt, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity, orgContextOf, scopeOf } from '../recordAccess';
+import { db, countryNameForPrompt, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { normalizeCurrencyCode, convertToUsdWithFallback, getDefaultUsdRate } from '@legalio/shared/currencyUtils';
 import { tenantDefaultCurrency, aiPolicyContext, findTenant } from '../tenantPolicy';
 import { upload } from '../uploadMiddleware';
@@ -33,26 +36,54 @@ export function createSpendingsRouter() {
   const app = express.Router();
   forwardAsyncRouteErrors(app);
 
-const SPENDING_LIST: ListSpec<any> = {
-  search: ["vendor_name", "invoice_number", "invoice_title", "invoice_description", "payment_status", "id"],
-  sorts: { invoice_date: (s) => String(s.invoice_date ?? ""), vendor_name: (s) => String(s.vendor_name ?? "").toLowerCase(), total_amount_usd: (s) => Number(s.total_amount_usd) || 0, created_at: (s) => String(s.created_at ?? "") },
-  filters: ["payment_status", "vendor_id", "currency"],
-};
+const queryText = (value: unknown, max = 200) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+const queryList = (value: unknown) => queryText(value, 500).split(",").map((v) => v.trim()).filter(Boolean).slice(0, 20);
+/** Paged-list parameters of GET /api/partner-spendings; `paged` is false when the request asks for the classic full list. */
+function spendingListQuery(query: express.Request["query"]): SpendingQuery & { paged: boolean; filtered: boolean } {
+  const requested = queryText(query.sort, 40);
+  const limit = query.limit === undefined ? undefined : Math.min(500, Math.max(1, Math.trunc(Number(query.limit)) || 50));
+  const paged = limit !== undefined || query.offset !== undefined;
+  const filters = { paymentStatus: queryList(query.payment_status), vendorId: queryList(query.vendor_id), currency: queryList(query.currency) };
+  const q = queryText(query.q, 200) || undefined;
+  const sort = (SPENDING_SORTS as readonly string[]).includes(requested) && requested !== "default" ? requested as SpendingQuery["sort"] : (paged || requested ? "invoice_date" : "default");
+  return {
+    paged, filtered: Boolean(q) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
+    q, ...filters, sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",
+    limit: limit ?? (query.offset !== undefined ? 50 : undefined), offset: Math.max(0, Math.trunc(Number(query.offset)) || 0),
+  };
+}
+/** The spending as the API presents it: always with a USD amount. */
+function presentSpending(s: any) {
+  if (s.total_amount_usd === void 0 || s.total_amount_usd === null) {
+    const amt = Number(s.total_amount) || 0;
+    const cur = normalizeCurrencyCode(s.currency, tenantDefaultCurrency(s.organizationId));
+    return { ...s, total_amount_usd: cur === "USD" ? amt : convertToUsdWithFallback(amt, cur) };
+  }
+  return s;
+}
+/**
+ * Without list parameters: every visible spending as a bare array (unchanged). With limit/offset/q/sort or a filter (payment_status,
+ * vendor_id, currency; comma lists): the matching visible spendings, one page at a time, the total in `X-Total-Count`.
+ */
 app.get("/api/partner-spendings", async (req: express.Request, res: express.Response) => {
-  const spendingsList = await scopedRecords(req, "spending");
-  const list = spendingsList.map((s) => {
-    if (s.total_amount_usd === void 0 || s.total_amount_usd === null) {
-      const amt = Number(s.total_amount) || 0;
-      const cur = normalizeCurrencyCode(s.currency, tenantDefaultCurrency(s.organizationId));
-      const usdVal =
-        cur === "USD"
-          ? amt
-          : convertToUsdWithFallback(amt, cur);
-      return { ...s, total_amount_usd: usdVal };
-    }
-    return s;
-  });
-  res.json(pageRows(req, res, list, SPENDING_LIST) ?? list);
+  const query = spendingListQuery(req.query);
+  if (!query.paged && !query.filtered) return res.json((await scopedRecords(req, "spending")).map(presentSpending));
+  const ctx = orgContextOf(req);
+  const organizationId = getRequestTenantId(req);
+  let rows: any[];
+  let total: number;
+  if (hasOrganizationScope(ctx)) {
+    ({ rows, total } = await spendingRepository.list(organizationId, query));
+  } else {
+    // Department roles see a subset decided by vendor ownership: filter the matches, then page.
+    const matched = (await spendingRepository.list(organizationId, { ...query, limit: undefined, offset: 0 })).rows
+      .filter((row) => recordVisible(ctx, scopeOf(req), "spending", row));
+    total = matched.length;
+    rows = query.limit === undefined ? matched : matched.slice(query.offset, (query.offset ?? 0) + query.limit);
+  }
+  res.setHeader("X-Total-Count", String(total));
+  res.setHeader("Access-Control-Expose-Headers", "X-Total-Count");
+  res.json(rows.map(presentSpending));
 });
 app.post("/api/spendings/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
   if (!(await ensureAiAvailable(req, res))) return;
@@ -148,7 +179,7 @@ app.post("/api/spendings/review-analysis", async (req: express.Request, res: exp
   const draft = req.body?.spending;
   if (!draft || typeof draft !== "object") return res.status(400).json({ error: "Spending data is required." });
   const organizationId = getRequestTenantId(req);
-  const saved = draft.id ? (db.spendings || []).find((s) => s.id === String(draft.id)) : undefined;
+  const saved = draft.id ? await spendingRepository.get(organizationId, String(draft.id)) : undefined;
   if (draft.id && (!saved || assertRecordAccess(req, "spending", saved) || assertRecordWritable(req, "spending", saved))) {
     return res.status(404).json({ error: "Data spending tidak ditemukan." });
   }
@@ -204,13 +235,13 @@ Return JSON with exactly:
 `;
   try {
     const analysis = await generateRedlineAnalysis(req, prompt, pdf);
-    if (saved) {
-      saved.redline_analysis = analysis;
-      saved.redline_analyzed_at = analysis.analyzed_at;
-      saved.updated_at = analysis.analyzed_at;
-      await saveDb();
-    }
-    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
+    // Row-locked server-side edit: the stored result never overwrites (or fails on) a user's concurrent edit of other fields.
+    const stored = saved ? await spendingRepository.mutate(saved.organizationId, saved.id, (row) => {
+      row.redline_analysis = analysis;
+      row.redline_analyzed_at = analysis.analyzed_at;
+      row.updated_at = analysis.analyzed_at;
+    }) : undefined;
+    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(stored) });
   } catch (error) {
     log.error("Error during invoice review:", error);
     sendRouteError(req, res, error, "request failed", "Gagal melakukan analisis AI. Silakan coba kembali.", { status: 500 });
@@ -360,14 +391,12 @@ app.post("/api/partner-spendings", validateBody(bodySchemas.spendingCreateBody, 
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
-  db.spendings = db.spendings || [];
   const writeDenial = assertRecordWritable(req, "spending", newSpending);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
-  db.spendings.unshift(newSpending);
-  await saveDb();
+  const stored = await spendingRepository.insert(newSpending);
   await logActivity(req, "CREATE", "PARTNER", `Menambahkan Catatan Partner Spending untuk '${vendor_name}' (Invoice #${invoice_number}) senilai ${formatAmountForTenant(total_amount, normalizeCurrencyCode(currency, tenantDefaultCurrency(targetOrgId)), targetOrgId)}`);
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
-  res.json({ success: true, spending: newSpending });
+  res.json({ success: true, spending: presentSpending(stored) });
 });
 app.put("/api/partner-spendings/:id", validateBody(bodySchemas.spendingUpdateBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
@@ -375,13 +404,16 @@ app.put("/api/partner-spendings/:id", validateBody(bodySchemas.spendingUpdateBod
     invoice_file,
     billing_file,
     accessToken: _accessToken,
+    version: clientVersion,
     ...updates
   } = req.body;
-  const idx = (db.spendings || []).findIndex((s) => s.id === id);
-  if (idx === -1) {
+  const existing = await spendingRepository.get(getRequestTenantId(req), id);
+  if (!existing) {
     return res.status(404).json({ error: "Data spending tidak ditemukan." });
   }
-  const existing = db.spendings[idx];
+  // The version the client last saw (body `version` or If-Match) guards against overwriting someone else's edit; clients that
+  // send none are still protected for the duration of this request (the version read above).
+  const expectedVersion = requestedVersion(req, clientVersion) ?? existing.version;
   const accessDenial = assertRecordAccess(req, "spending", existing);
   if (accessDenial) return res.status(accessDenial.status).json(accessDenial.body);
   const hasAllocations = Object.prototype.hasOwnProperty.call(updates, "month_allocations") || existing.month_allocations !== undefined;
@@ -489,23 +521,20 @@ app.put("/api/partner-spendings/:id", validateBody(bodySchemas.spendingUpdateBod
   updated.organizationId = existing.organizationId;
   const writeDenial = assertRecordWritable(req, "spending", updated);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
-  db.spendings[idx] = updated;
-  await saveDb();
+  const stored = await spendingRepository.update(updated, expectedVersion);
   await logActivity(req, "UPDATE", "PARTNER", `Memperbarui Catatan Partner Spending untuk '${updated.vendor_name}' (Invoice #${updated.invoice_number})`);
   await triggerAutoPushToGoogleSheet(req);
-  res.json({ success: true, spending: updated });
+  res.json({ success: true, spending: presentSpending(stored) });
 });
 app.delete("/api/partner-spendings/:id", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const idx = (db.spendings || []).findIndex((s) => s.id === id);
-  if (idx === -1) {
+  const removed = await spendingRepository.get(getRequestTenantId(req), id);
+  if (!removed) {
     return res.status(404).json({ error: "Data spending tidak ditemukan." });
   }
-  const removed = db.spendings[idx];
   const accessDenial = assertRecordAccess(req, "spending", removed);
   if (accessDenial) return res.status(accessDenial.status).json(accessDenial.body);
-  db.spendings.splice(idx, 1);
-  await saveDb();
+  await spendingRepository.remove(removed.organizationId, id);
   await logActivity(req, "DELETE", "PARTNER", `Menghapus Catatan Partner Spending '${removed.vendor_name}' (Invoice #${removed.invoice_number})`);
   await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });

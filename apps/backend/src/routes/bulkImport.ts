@@ -2,6 +2,7 @@ import { nextEntityId } from '../ids';
 import { contractRepository } from '../repositories/contractRepository';
 import { partnerRepository } from '../repositories/partnerRepository';
 import { ioRepository } from '../repositories/ioRepository';
+import { spendingRepository } from '../repositories/spendingRepository';
 import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
 import { getRequestTenantId, isMatchingOrg, scopeOf, addActivityLog } from '../recordAccess';
 import { tenantDefaultCurrency, normalizePartnerDocuments, computeDueDiligenceStatus } from '../tenantPolicy';
@@ -469,11 +470,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         continue;
       }
       const identifier = `${vendorName} \u2014 ${invoiceNumber}`;
-      const exists = db.spendings.find(
-        (s) => inTenant(s) &&
-          s.invoice_number?.toLowerCase() === invoiceNumber.toLowerCase() &&
-          s.vendor_name?.toLowerCase() === vendorName.toLowerCase(),
-      );
+      const exists = await spendingRepository.findDuplicate(tenantId, invoiceNumber, vendorName);
       if (exists) {
         skipped.push({
           rowIndex,
@@ -505,7 +502,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           bank_account_number: row.bank_account_number || "",
           bank_account_holder_name: row.bank_account_holder_name || "",
         };
-        db.spendings.push(newSpending);
+        await spendingRepository.insert(newSpending, { position: "last" });
         succeeded.push({
           rowIndex,
           identifier,

@@ -26,7 +26,7 @@ export const ENTITIES: EntitySchema[] = [
     ...fields('contract_id io_number io_title partner_id media_channel start_date end_date completion_date pricing_model charging_type payment_scheme currency deliverables notice_type_required status internal_notes io_file_link fileName'),
     ...fields('io_value io_value_usd', 'money'), ...fields('notice_period_days', 'number'), ...dates,
   ] },
-  { table: 'spendings', key: 'id', collection: 'spendings', search: ['vendor_name', 'invoice_number', 'invoice_title', 'invoice_description'], fields: [
+  { table: 'spendings', key: 'id', collection: 'spendings', repository: true, search: ['vendor_name', 'invoice_number', 'invoice_title', 'invoice_description'], fields: [
     ...fields('vendor_id vendor_name invoice_number invoice_date invoice_title invoice_description currency payment_status bank_name bank_account_number bank_account_holder_name invoice_file_url invoice_file_name billing_file_url billing_file_name folder_link'),
     ...fields('total_amount total_amount_usd', 'money'), ...dates,
   ] },

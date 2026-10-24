@@ -26,7 +26,7 @@ import { hasServiceAccountCredentials } from "./lib/googleServiceAccountAuth";
 import { componentLog, errorResponder, requestLogging } from "./logger";
 import { mailTemplates, sendPlatformMail } from "./mailHelpers";
 import { syncIdSequences } from "./ids";
-import { coreSaver, db, demoData, migrateLegacyRecords, normalizeContractRecord, normalizeIoRecord, normalizePartnerRecord, normalizeStoredContracts, normalizeStoredIos, normalizeStoredPartners, refreshTenantProjection, saveDb, seedContracts, seedIos, seedPartners, syncAdderNames } from "./memoryDb";
+import { coreSaver, db, demoData, migrateLegacyRecords, normalizeContractRecord, normalizeIoRecord, normalizePartnerRecord, normalizeStoredContracts, normalizeSpendingRecord, normalizeStoredIos, normalizeStoredPartners, normalizeStoredSpendings, migrateLegacySpendingIds, refreshTenantProjection, saveDb, seedContracts, seedIos, seedPartners, seedSpendings, syncAdderNames } from "./memoryDb";
 import { resetSyncCache } from "./normalizedCoreStore";
 import { createOrganizationAdminRouter } from "./organizationAdminRoutes";
 import { seedOrganizationsFromDataset } from "./organizationProvisioning";
@@ -64,6 +64,7 @@ import { backfillUploadOwners, uploadBackfillPending } from "./uploadOwnership";
 import { contractRepository } from "./repositories/contractRepository";
 import { partnerRepository } from "./repositories/partnerRepository";
 import { ioRepository } from "./repositories/ioRepository";
+import { spendingRepository } from "./repositories/spendingRepository";
 import { insertRepositoryRows } from "./repositories/seed";
 import { ensureSchema } from "./schema";
 
@@ -141,9 +142,9 @@ export async function init() {
     log.info(`Seeded bootstrap superuser: ${demoAdminEmail}`);
   }
   const initialData = await loadCoreData();
-  const hasCoreData = ["spendings", "evaluations", "notifications", "templates", "activityLogs"]
+  const hasCoreData = ["evaluations", "notifications", "templates", "activityLogs"]
     .some((key) => Array.isArray((initialData as any)[key]) && (initialData as any)[key].length > 0)
-    || await contractRepository.anyAtAll() || await partnerRepository.anyAtAll() || await ioRepository.anyAtAll();
+    || await contractRepository.anyAtAll() || await partnerRepository.anyAtAll() || await ioRepository.anyAtAll() || await spendingRepository.anyAtAll();
   const seedDemoContracts = !(hasCoreData || !freshInstall);
 
   // An initialized workspace may intentionally contain no business records after a reset.
@@ -171,6 +172,8 @@ export async function init() {
   migrateLegacyRecords();
   await normalizeStoredPartners();
   await normalizeStoredIos();
+  await normalizeStoredSpendings();
+  await migrateLegacySpendingIds();
   await normalizeStoredContracts();
   // Demo-dataset logins share DEMO_ADMIN_PASSWORD, so a production server never keeps them —
   // including servers that created them before this rule existed.
@@ -182,7 +185,7 @@ export async function init() {
   // Demo partners and contracts are repository-backed: they commit together with the orders that reference each other.
   // Reverse order keeps the dataset's order (each insert goes to the front).
   await saveDb(seedDemoContracts ? async () => {
-    await insertRepositoryRows(sql, { partners: seedPartners, contracts: seedContracts, ios: seedIos }, { partners: (row) => normalizePartnerRecord(structuredClone(row)), contracts: normalizeContractRecord, insertion_orders: normalizeIoRecord });
+    await insertRepositoryRows(sql, { partners: seedPartners, contracts: seedContracts, ios: seedIos, spendings: seedSpendings }, { partners: (row) => normalizePartnerRecord(structuredClone(row)), contracts: normalizeContractRecord, insertion_orders: normalizeIoRecord, spendings: normalizeSpendingRecord });
   } : undefined);
   if (await uploadBackfillPending(sql)) {
     const uploadRecords: Array<{ organizationId: string; record: any }> = [];
@@ -200,20 +203,6 @@ export async function init() {
     ensureAllPartnersFolders().catch((err) =>
       log.error("Startup category folder provisioning error:", err),
     );
-  }
-  if (db.spendings && db.spendings.length > 0) {
-    let legacyCounter = 1;
-    let changed = false;
-    for (const sp of db.spendings) {
-      if (!sp.id || sp.id.startsWith("spd-")) {
-        sp.id = `SP${String(legacyCounter).padStart(4, "0")}`;
-        legacyCounter++;
-        changed = true;
-      }
-    }
-    if (changed) {
-      await saveDb();
-    }
   }
   syncAdderNames();
   await saveDb();

@@ -21,7 +21,7 @@ before(async () => {
 after(async () => { await database?.drop(); fs.rmSync(dir, { recursive: true, force: true }); });
 
 test('a fresh database hands out the first number of each kind in the familiar shape', async () => {
-  db.spendings = []; db.evaluations = [];
+  db.evaluations = [];
   assert.equal(await nextEntityId('partner'), 'P0001');
   assert.equal(await nextEntityId('contract'), 'C0001');
   assert.equal(await nextEntityId('io'), 'IO0001');
@@ -50,9 +50,8 @@ test('concurrent requests never draw the same id', async () => {
 });
 
 test('numbers of deleted records are not reused', async () => {
-  db.spendings = [];
   const first = await nextEntityId('spending');
-  db.spendings = [{ id: first }];
-  db.spendings = []; // deleted
+  await sql.run(`INSERT INTO spendings (id, organization_id, record_position) VALUES (?, 'o', 1)`, first);
+  await sql.run('DELETE FROM spendings WHERE id = ?', first); // deleted
   assert.notEqual(await nextEntityId('spending'), first);
 });

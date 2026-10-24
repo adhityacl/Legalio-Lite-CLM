@@ -18,6 +18,7 @@ const { VersionConflictError } = await import('./repositories/errors');
 const { synchronizeBusinessRows, resetSyncCache } = await import('./normalizedCoreStore');
 const { partnerRepository } = await import('./repositories/partnerRepository');
 const { ioRepository } = await import('./repositories/ioRepository');
+const { spendingRepository } = await import('./repositories/spendingRepository');
 
 type Row = Record<string, any>;
 interface Spec {
@@ -42,6 +43,11 @@ const SPECS: Spec[] = [
     name: 'insertion orders', table: 'insertion_orders', key: 'io_id', repo: ioRepository, field: 'io_title',
     make: (id, org = 'org-a') => ({ io_id: id, organizationId: org, io_number: `IO-${id}`, io_title: `Order ${id}`, partner_id: null, contract_id: null, io_value: 0.29, currency: 'USD', status: 'Active',
       start_date: '2026-01-01', end_date: '2030-01-01', media_channel: 'Digital', deliverables: 'Orchard banners', custom_extension: { keep: true } }),
+  },
+  {
+    name: 'spendings', table: 'spendings', key: 'id', repo: spendingRepository, field: 'vendor_name', childTable: 'spending_allocations', childKey: 'spending_id',
+    make: (id, org = 'org-a') => ({ id, organizationId: org, vendor_id: null, vendor_name: `Vendor ${id}`, invoice_number: `INV-${id}`, invoice_date: '2026-10-01', total_amount: 10.01, total_amount_usd: 10.01, currency: 'USD',
+      invoice_month: ['2026-10'], month_allocations: [{ month: '2026-10', amount: 10.01, custom: 'allocation extra' }], payment_status: 'Paid', custom_extension: { keep: true } }),
   },
 ];
 

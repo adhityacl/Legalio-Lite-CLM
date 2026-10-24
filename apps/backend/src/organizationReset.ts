@@ -4,7 +4,7 @@ import { ENTITIES } from './normalizedSchema';
 import { createEntityRepository } from './repositories/entityRepository';
 
 /** Collections of the in-memory projection that belong to an organization. */
-const COLLECTIONS = ['spendings', 'evaluations', 'notifications', 'templates', 'activityLogs'] as const;
+const COLLECTIONS = ['evaluations', 'notifications', 'templates', 'activityLogs'] as const;
 
 /** Editor documents and approvals live in their own tables; each entry deletes one organization's rows. */
 const SQL_STEPS: Array<{ table: string; sql: string }> = [

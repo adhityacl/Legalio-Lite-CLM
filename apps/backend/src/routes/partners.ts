@@ -1,6 +1,7 @@
 import { nextEntityId } from '../ids';
 import { contractRepository } from '../repositories/contractRepository';
 import { ioRepository } from '../repositories/ioRepository';
+import { spendingRepository } from '../repositories/spendingRepository';
 import { partnerRepository, PARTNER_SORTS, type PartnerQuery } from '../repositories/partnerRepository';
 import { recordVisible } from '../recordScope';
 import { hasOrganizationScope } from '../rbac';
@@ -431,10 +432,10 @@ app.delete("/api/partners/:id", async (req: express.Request, res: express.Respon
   db.notifications = db.notifications.filter(
     (n) => !(sameOrg(n) && (contractIds.includes(n.parent_id) || ioIds.includes(n.parent_id))),
   );
-  for (const spending of db.spendings) if (sameOrg(spending) && spending.vendor_id === id) spending.vendor_id = null;
   for (const evaluation of db.evaluations) if (sameOrg(evaluation) && evaluation.partner_id === id) evaluation.partner_id = null;
   // The partner and its contracts are rows of their own repositories: removed in the same transaction as the orders and notifications.
   await saveDb(async () => {
+    await spendingRepository.detachVendor(partner.organizationId, id);
     await ioRepository.removeMany(partner.organizationId, ioIds);
     await contractRepository.removeByPartner(partner.organizationId, id);
     await partnerRepository.remove(partner.organizationId, id);

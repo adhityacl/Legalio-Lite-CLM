@@ -9,6 +9,8 @@ import { createCoreSaver } from './coreDataStore';
 import { contractRepository } from './repositories/contractRepository';
 import { partnerRepository } from './repositories/partnerRepository';
 import { ioRepository } from './repositories/ioRepository';
+import { spendingRepository } from './repositories/spendingRepository';
+import { nextEntityId } from './ids';
 import { migratePartnerContact } from './partnerContact';
 import { loadCoreData } from './lib/auth';
 import { componentLog } from './logger';
@@ -37,12 +39,13 @@ export const seedContracts: any[] = seedData.contracts;
 export const seedPartners: any[] = seedData.partners;
 /** Demo insertion orders to insert (through the repository) on a first run; empty in test mode. */
 export const seedIos: any[] = seedData.ios;
+/** Demo spendings to insert (through the repository) on a first run; empty in test mode. */
+export const seedSpendings: any[] = seedData.spendings;
 export const db: any = {
   allowedUsers: [],
   notifications: seedData.notifications,
   activityLogs: seedData.activityLogs,
   evaluations: seedData.evaluations,
-  spendings: seedData.spendings,
   tenants: [],
   templates: [],
   newsTicker: { items: [] as string[], lastGeneratedAt: null as string | null },
@@ -72,6 +75,7 @@ const repositoryBacked = (collection: string, repository: string) => Object.defi
 repositoryBacked('contracts', 'repositories/contractRepository');
 repositoryBacked('partners', 'repositories/partnerRepository');
 repositoryBacked('ios', 'repositories/ioRepository');
+repositoryBacked('spendings', 'repositories/spendingRepository');
 bindTenantStore(() => db);
 
 /** Rebuilds the read-only `db.tenants` projection from canonical organization rows (PRD §7.3). */
@@ -89,13 +93,44 @@ export function migrateLegacyRecords() {
   // Organization ownership is never guessed here: records without a canonical
   // organization stay quarantined until the 002 migration maps them (PRD §14.3).
   if (!db.templates) db.templates = [];
-  (db.spendings || []).forEach((sp: any) => {
-    sp.currency = normalizeCurrencyCode(sp.currency, tenantDefaultCurrency(sp.organizationId));
-  });
 }
 /** JSON with object keys sorted at every level, to compare records regardless of key order. */
 export function stableJson(value: unknown): string {
   return JSON.stringify(value, (_key, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v);
+}
+/** A valid currency on a spending written by an earlier release. */
+export function normalizeSpendingRecord(sp: any) {
+  sp.currency = normalizeCurrencyCode(sp.currency, tenantDefaultCurrency(sp.organizationId));
+  return sp;
+}
+/** Brings stored spendings to a valid currency. Only rows that need it are read (SQL pre-filter). */
+export async function normalizeStoredSpendings(): Promise<number> {
+  let changed = 0;
+  for await (const batch of spendingRepository.batches(500, `currency IS NULL OR currency !~ '^[A-Z]{3}$'`)) {
+    for (const sp of batch) {
+      if (normalizeSpendingRecord({ ...sp }).currency === sp.currency) continue;
+      await spendingRepository.mutate(sp.organizationId, sp.id, (row) => { normalizeSpendingRecord(row); }, { bumpVersion: false });
+      changed++;
+    }
+  }
+  return changed;
+}
+/**
+ * Spendings stored by the earliest releases carry ids like "spd-…" instead of SPnnnn: they get a number from the id sequence
+ * (the row is rewritten under its new id; the old one disappears in the same transaction).
+ */
+export async function migrateLegacySpendingIds(): Promise<number> {
+  let changed = 0;
+  for await (const batch of spendingRepository.batches(500, `id LIKE 'spd-%'`)) {
+    for (const sp of batch) {
+      await sql.tx(async () => {
+        await spendingRepository.remove(sp.organizationId, sp.id);
+        await spendingRepository.insert({ ...sp, id: await nextEntityId("spending") });
+      });
+      changed++;
+    }
+  }
+  return changed;
 }
 /** Stable status code and a valid currency on an insertion order written by an earlier release. */
 export function normalizeIoRecord(io: any) {

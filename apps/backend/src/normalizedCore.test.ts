@@ -9,6 +9,7 @@ import { sql as s } from './db';
 import { contractRepository } from './repositories/contractRepository';
 import { partnerRepository } from './repositories/partnerRepository';
 import { ioRepository } from './repositories/ioRepository';
+import { spendingRepository } from './repositories/spendingRepository';
 import { ensureSchema } from './schema';
 import { createTestDatabase } from './testDatabase';
 
@@ -31,13 +32,14 @@ async function fixture() {
   const contract = { contract_id:'c1', organizationId:'org-a', partner_id:'p1', parent_contract_id:'', contract_number:'CTR-2026-001', contract_title:'Orchard Contract', contract_value:1234.56, currency:'USD', auto_renewal:false, cooperation_categories:['Services'], termination_date:null };
   const io = { io_id:'i1', contract_id:'c1', partner_id:'p1', organizationId:'org-a', io_number:'IO-001', io_title:'Orchard Order', io_value:0.29, currency:'USD' };
   const spending = { id:'s1', organizationId:'org-a', vendor_id:'p1', vendor_name:'Orchard', total_amount:10.01, currency:'USD', invoice_month:['2026-01-31'], month_allocations:[{month:'2026-01',amount:10.01, custom:'allocation extra'}] };
-  const rows: Record<string,any[]> = { partners:[partner,{ partner_id:'p2', organizationId:'org-b', partner_name:'Unique Orchard Secret', tags:[], identifiers:[], dd_documents:[] }],contracts:[contract],ios:[io],spendings:[spending],notifications:[{notif_id:'n1',organizationId:'org-a',parent_type:'IO',parent_id:'i1',message:'Reminder',is_read:false}],activityLogs:[],evaluations:[],templates:[] };
+  const rows: Record<string,any[]> = { partners:[partner,{ partner_id:'p2', organizationId:'org-b', partner_name:'Unique Orchard Secret', tags:[], identifiers:[], dd_documents:[] }],contracts:[contract],ios:[io],spendings:[spending],notifications:[{notif_id:'n1',organizationId:'org-a',parent_type:'IO',parent_id:'i1',message:'Reminder',is_read:false}],activityLogs:[],evaluations:[{ id:'e1', organizationId:'org-a', partner_id:'p1', supplier_name:'Orchard', review_date:'2026-01-01', sla_score:80 }],templates:[] };
   // Partners and contracts are repository-backed: the snapshot sync ignores `rows.partners` and `rows.contracts`, so they are written through their repositories.
   await s.tx(async () => {
     await synchronizeBusinessRows(s, rows);
     for (const row of [...rows.partners].reverse()) await partnerRepository.insert(row);
     for (const row of [...rows.contracts].reverse()) await contractRepository.insert(row);
     for (const row of [...rows.ios].reverse()) await ioRepository.insert(row);
+    for (const row of [...rows.spendings].reverse()) await spendingRepository.insert(row);
   });
   return { rows };
 }
@@ -54,7 +56,7 @@ const syncWithContract = async (rows: Record<string, any[]>, contract: Record<st
 test('stored rows read back with every field, child array, decimal and independent IO ID', async () => {
   const {rows} = await fixture();
   for (const entity of ENTITIES) {
-    assert.deepEqual(await readBusinessRows(s,entity.table), rows[entity.collection].map(row => entity.table==='partners' ? {...row,version:1,...(row.pic_email ? {pic_contact:'private@example.com / +62123'} : {})} : entity.table==='contracts' || entity.table==='insertion_orders' ? {...row,version:1} : row));
+    assert.deepEqual(await readBusinessRows(s,entity.table), rows[entity.collection].map(row => entity.table==='partners' ? {...row,version:1,...(row.pic_email ? {pic_contact:'private@example.com / +62123'} : {})} : entity.table==='contracts' || entity.table==='insertion_orders' || entity.table==='spendings' ? {...row,version:1} : row));
   }
   assert.deepEqual(await s.get('SELECT io_id, contract_id FROM insertion_orders'),{io_id:'i1',contract_id:'c1'});
   assert.deepEqual(await s.get('SELECT io_value_minor,io_value_scale FROM insertion_orders'),{io_value_minor:29,io_value_scale:2});
@@ -94,12 +96,12 @@ test('search follows inserts, updates and deletes, scopes organizations and excl
 test('cross-organization references and duplicate IDs roll back all business changes', async () => {
   const {rows} = await fixture();
   {
-    rows.spendings[0].vendor_name='Must roll back';
+    rows.evaluations[0].supplier_name='Must roll back';
     await assert.rejects(() => syncWithContract(rows,{...rows.contracts[0],partner_id:'p2'}),/foreign key/);
-    assert.equal((await readBusinessRows(s,'spendings'))[0].vendor_name,'Orchard');
-    rows.spendings.push({...rows.spendings[0]});
+    assert.equal((await readBusinessRows(s,'evaluations'))[0].supplier_name,'Orchard');
+    rows.evaluations.push({...rows.evaluations[0]});
     await assert.rejects(() => synchronizeBusinessRows(s,rows),/Duplicate id/);
-    assert.equal((await readBusinessRows(s,'spendings'))[0].vendor_name,'Orchard');
+    assert.equal((await readBusinessRows(s,'evaluations'))[0].supplier_name,'Orchard');
   }
 });
 
@@ -108,19 +110,19 @@ test('unchanged rows are skipped, yet direct writes, deletions and failed saves 
   {
     await synchronizeBusinessRows(s,rows);
     // A direct write to business tables (application reset) must drop the fingerprints so the next save rewrites rows.
-    await s.run("UPDATE spendings SET vendor_name = 'Edited elsewhere' WHERE id = 's1'");
+    await s.run("UPDATE evaluations SET supplier_name = 'Edited elsewhere' WHERE id = 'e1'");
     resetSyncCache(s);
     await synchronizeBusinessRows(s,rows);
-    assert.equal((await readBusinessRows(s,'spendings'))[0].vendor_name,'Orchard');
+    assert.equal((await readBusinessRows(s,'evaluations'))[0].supplier_name,'Orchard');
     // Rows removed from memory disappear even though every remaining row is unchanged.
     rows.notifications.pop();
     await synchronizeBusinessRows(s,rows);
     assert.equal((await readBusinessRows(s,'notifications')).length,0);
     // A rolled-back save forgets what it believed was written, so the retry persists the change.
-    rows.spendings[0].vendor_name='Retry persists';
+    rows.evaluations[0].supplier_name='Retry persists';
     await assert.rejects(() => syncWithContract(rows,{...rows.contracts[0],partner_id:'p2'}),/foreign key/);
     await synchronizeBusinessRows(s,rows);
-    assert.equal((await readBusinessRows(s,'spendings'))[0].vendor_name,'Retry persists');
+    assert.equal((await readBusinessRows(s,'evaluations'))[0].supplier_name,'Retry persists');
   }
 });
 
@@ -131,26 +133,26 @@ test('serialized saves snapshot when their turn comes, so mutations during a wri
     const saver = createCoreSaver(s, () => {
       // Another handler edits memory while the first save is still writing.
       if (++snapshots === 1) queueMicrotask(() => {
-        rows.spendings[0].vendor_name = 'Second edit';
-        rows.spendings.push({ id: 's3', organizationId: 'org-a', vendor_name: 'Late partner' });
+        rows.evaluations[0].supplier_name = 'Second edit';
+        rows.evaluations.push({ id: 'e3', organizationId: 'org-a', supplier_name: 'Late partner' });
       });
       return rows;
     });
-    const names = async () => (await readBusinessRows(s,'spendings')).map(row => `${row.id}:${row.vendor_name}`);
-    rows.spendings[0].vendor_name = 'First edit';
+    const names = async () => (await readBusinessRows(s,'evaluations')).map(row => `${row.id}:${row.supplier_name}`);
+    rows.evaluations[0].supplier_name = 'First edit';
     const first = saver.save();
     const second = saver.save();
     await first;
-    assert.deepEqual(await names(), ['s1:First edit']);
+    assert.deepEqual(await names(), ['e1:First edit']);
     await second;
-    assert.deepEqual(await names(), ['s1:Second edit','s3:Late partner']);
+    assert.deepEqual(await names(), ['e1:Second edit','e3:Late partner']);
     // A save never runs inside a transaction (it would wait on itself), and a rolled-back save is retried in full.
     await assert.rejects(s.tx(() => saver.save()), /inside a transaction/);
-    rows.spendings[0].vendor_name = 'Kept after rollback';
+    rows.evaluations[0].supplier_name = 'Kept after rollback';
     await assert.rejects(saver.save(async () => { throw new Error('audit failed'); }), /audit failed/);
-    assert.equal((await readBusinessRows(s,'spendings'))[0].vendor_name,'Second edit');
+    assert.equal((await readBusinessRows(s,'evaluations'))[0].supplier_name,'Second edit');
     await saver.save();
-    assert.equal((await readBusinessRows(s,'spendings'))[0].vendor_name,'Kept after rollback');
+    assert.equal((await readBusinessRows(s,'evaluations'))[0].supplier_name,'Kept after rollback');
   }
 });
 
@@ -161,13 +163,13 @@ test('a failed save reloads memory inside the lock, so the queued save neither r
     const persisted = structuredClone(rows);
     let memory: Record<string, any> = rows;
     const saver = createCoreSaver(s, () => memory, async () => { memory = structuredClone(persisted); });
-    memory.spendings.push({...memory.spendings[0]});
+    memory.evaluations.push({...memory.evaluations[0]});
     const failed = saver.save();
     const queued = saver.save(() => s.run(`INSERT INTO audit VALUES ('queued')`));
     await assert.rejects(failed, /Duplicate id/);
     await queued;
-    assert.equal(memory.spendings.length, 1);
-    assert.equal((await readBusinessRows(s,'spendings')).length, 1);
+    assert.equal(memory.evaluations.length, 1);
+    assert.equal((await readBusinessRows(s,'evaluations')).length, 1);
     assert.deepEqual(await s.all('SELECT note FROM audit'), [{ note: 'queued' }]);
   }
 });
@@ -216,9 +218,11 @@ test('a list read costs one query per table, not per parent row', async () => {
   const counted = { ...s, all: (text: string, ...params: unknown[]) => { queries++; return s.all(text, ...params); } };
   const readCount = async (k: number) => {
     const ids = Array.from({ length: k }, (_, i) => `p${i}`);
+    resetSyncCache(s);
     const rows = { partners: ids.map(partner), contracts: ids.map(id => ({ contract_id:`c-${id}`, organizationId:'org-a', cooperation_categories:[id,'y'] })), spendings: ids.map(id => spending(`s-${id}`)) };
     await s.run('DELETE FROM insertion_orders');
-    await s.run('DELETE FROM spendings');
+    await s.run('DELETE FROM evaluations');
+    await spendingRepository.removeAll();
     resetSyncCache(s);
     await contractRepository.removeAll();
     await partnerRepository.removeAll();
@@ -226,9 +230,10 @@ test('a list read costs one query per table, not per parent row', async () => {
       await synchronizeBusinessRows(s, rows);
       for (const row of [...rows.partners].reverse()) await partnerRepository.insert(row);
       for (const row of [...rows.contracts].reverse()) await contractRepository.insert(row);
+      for (const row of [...rows.spendings].reverse()) await spendingRepository.insert(row);
     });
     queries = 0;
-    for (const [table, collection] of [['partners','partners'],['contracts','contracts'],['spendings','spendings']]) assert.deepEqual(await readBusinessRows(counted, table), rows[collection as keyof typeof rows].map(row => table === 'contracts' || table === 'partners' ? { ...row, version: 1 } : row));
+    for (const [table, collection] of [['partners','partners'],['contracts','contracts'],['spendings','spendings']]) assert.deepEqual(await readBusinessRows(counted, table), rows[collection as keyof typeof rows].map(row => table === 'contracts' || table === 'partners' || table === 'spendings' ? { ...row, version: 1 } : row));
     return queries;
   };
   assert.equal(await readCount(1), await readCount(6));
