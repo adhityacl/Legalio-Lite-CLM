@@ -25,4 +25,8 @@ export const approvalsApi = {
     request<{ ok: true }>(`/approvals/${id}/decision`, { method: 'POST', body: { decision, comment } }),
   remove: (id: string) => request<{ ok: true }>(`/approvals/${id}`, { method: 'DELETE' }),
   fileUrl: (id: string) => `/api/approvals/${id}/file`,
+  notifications: (organizationId: string) =>
+    request<{ notifications: Array<{ id: string; kind: string; params: Record<string, any>; isRead: boolean; createdAt: string }>; unread: number }>(`/api/organizations/${encodeURIComponent(organizationId)}/my-notifications`),
+  markNotificationsRead: (organizationId: string) =>
+    request<{ updated: number }>(`/api/organizations/${encodeURIComponent(organizationId)}/my-notifications/read`, { method: 'POST', body: { all: true } }),
 };

@@ -13,7 +13,7 @@ after(() => database?.drop());
 test('every outgoing template renders, validates variables and persists versioned edits', async () => {
   {
     const store = createMailTemplateStore(sql);
-    assert.equal((await store.list()).length, 5);
+    assert.equal((await store.list()).length, Object.keys(MAIL_CATALOG).length);
     for (const id of Object.keys(MAIL_CATALOG) as MailTemplateId[]) {
       const entry = MAIL_CATALOG[id];
       validateMailTemplate(id, entry.defaults);

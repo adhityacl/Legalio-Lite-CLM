@@ -4,9 +4,10 @@ import { usePermissions } from '../../lib/permissions';
 import { DataExportPanel } from './DataExportPanel';
 import { ApiKeysPanel } from './ApiKeysPanel';
 import { WebhooksPanel } from './WebhooksPanel';
+import { ApprovalSettingsPanel } from './ApprovalSettingsPanel';
 
 /**
- * Data & API (administrators): tenant data export now; API keys, webhooks and digest defaults are added by their own panels.
+ * Data & automation (administrators): approval SLA, API keys, webhooks and data export. Digest defaults join them.
  * Each panel is shown only with its permission and the server rechecks every call.
  */
 export const DataApiTab: React.FC<{ organizationId: string }> = ({ organizationId }) => {
@@ -14,6 +15,7 @@ export const DataApiTab: React.FC<{ organizationId: string }> = ({ organizationI
   const { hasPermission } = usePermissions();
   return (
     <div className="flex min-w-0 flex-col gap-g21" aria-label={t('tb.data_title', 'Data & API')}>
+      {hasPermission('tenant.settings.read') && <ApprovalSettingsPanel organizationId={organizationId} />}
       {hasPermission('tenant.apikey.manage') && <ApiKeysPanel organizationId={organizationId} />}
       {hasPermission('tenant.webhook.manage') && <WebhooksPanel organizationId={organizationId} />}
       {hasPermission('tenant.data.export') && <DataExportPanel organizationId={organizationId} />}

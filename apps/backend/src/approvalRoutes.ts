@@ -12,9 +12,9 @@ import type { OrgContext } from "./rbac";
 import { requestIdOf } from "./identity";
 import { appendAudit } from "./organizationSettingsStore";
 import { emitWebhookEvent } from "./webhooks";
+import { announceApprovalNotices, enqueueNotice, getApprovalSettings } from "./approvalNotifications";
 
-// shortcut: one fixed SLA for every request, make it a per-organization setting when someone asks.
-const SLA_MS = 48 * 60 * 60 * 1000;
+// The SLA is a per-organization setting (approval_settings, default 48 h); a request keeps the deadline it was created with.
 const NEAR_SLA_MS = 6 * 60 * 60 * 1000;
 const MAX_APPROVERS = 10;
 const MAX_TEXT = 2000;
@@ -205,21 +205,24 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
       // MAX, not COUNT: deleting an earlier request must not make the next code repeat.
       const { n } = await db.get(`SELECT COALESCE(MAX(CAST(substr(code, 9) AS INTEGER)), 0) AS n FROM approval_requests WHERE organization_id = ? AND code LIKE ?`, org, `OA-${year}-%`) as { n: number };
       const code = `OA-${year}-${String(n + 1).padStart(5, "0")}`;
+      const slaMs = (await getApprovalSettings(db, org)).slaHours * 60 * 60 * 1000;
       await db.run(`
         INSERT INTO approval_requests (id, organization_id, code, title, category, note, source, document_id, file_name, file_mime, file_size, file_data, created_by, created_at, due_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, id, org, code, title, category, note, source, documentId || null, fileName, fileMime, fileSize, fileData, ctx.userId, at, new Date(now.getTime() + SLA_MS).toISOString());
+      `, id, org, code, title, category, note, source, documentId || null, fileName, fileMime, fileSize, fileData, ctx.userId, at, new Date(now.getTime() + slaMs).toISOString());
       for (const [i, approverId] of approverIds.entries()) await db.run(`INSERT INTO approval_steps (id, request_id, step_no, approver_id) VALUES (?, ?, ?, ?)`, newId("aps"), id, i + 1, approverId);
       await db.run(`INSERT INTO approval_events (id, request_id, actor_id, kind, message, created_at) VALUES (?, ?, ?, 'submitted', ?, ?)`, newId("ape"), id, ctx.userId, note, at);
       if (documentId) await db.run(`UPDATE contract_documents SET status = 'pending_review' WHERE id = ?`, documentId);
       await audit(req, ctx, "approval.submit", id);
       await emitWebhookEvent(db, org, "approval.requested", {
-        approvalId: id, code, title, category, requesterId: ctx.userId, approverIds, currentStep: 1, dueAt: new Date(now.getTime() + SLA_MS).toISOString(), documentId: documentId || null,
+        approvalId: id, code, title, category, requesterId: ctx.userId, approverIds, currentStep: 1, dueAt: new Date(now.getTime() + slaMs).toISOString(), documentId: documentId || null,
       });
+      await enqueueNotice(db, { organizationId: org, requestId: id, stepNo: 1, kind: "requested", recipientId: approverIds[0], payload: { code, title, category, requesterId: ctx.userId, dueAt: new Date(now.getTime() + slaMs).toISOString(), stepNo: 1, stepCount: approverIds.length } });
       return null;
     });
     if (refused === "DOCUMENT_NOT_FOUND") return bad(res, "Document not found.");
     if (refused) return res.status(409).json({ error: refused, message: "This document is already in an approval flow." });
+    announceApprovalNotices();
     res.status(201).json({ id });
   });
 
@@ -282,9 +285,15 @@ export function createApprovalRouter({ db, tenantOf }: ApprovalRouterOptions) {
         approvalId: row.id, code: summary.code, title: summary.title, decision: stepStatus, stepNo: row.current_step, approverId: ctx.userId, comment: comment.slice(0, 500),
         requestStatus: finished ? stepStatus : "pending", finished, nextApproverId: next?.approver_id ?? null, documentId: row.document_id,
       });
+      const detail = await db.get(`SELECT due_at FROM approval_requests WHERE id = ?`, row.id) as { due_at: string };
+      const notice = { code: summary.code, title: summary.title, requesterId: row.created_by, approverId: ctx.userId, dueAt: detail.due_at, stepNo: row.current_step, stepCount: total };
+      // The requester hears every decision; the next approver is asked when the chain moves on.
+      await enqueueNotice(db, { organizationId: row.organization_id, requestId: row.id, stepNo: row.current_step, kind: "decided", recipientId: row.created_by, payload: { ...notice, decision: stepStatus, comment: comment.slice(0, 500), finished } });
+      if (next) await enqueueNotice(db, { organizationId: row.organization_id, requestId: row.id, stepNo: row.current_step + 1, kind: "requested", recipientId: next.approver_id, payload: { ...notice, stepNo: row.current_step + 1 } });
       return true;
     });
     if (!decided) return res.status(409).json({ error: "NOT_CURRENT_APPROVER", message: "This approval is no longer waiting for you." });
+    announceApprovalNotices();
     res.json({ ok: true });
   }));
 

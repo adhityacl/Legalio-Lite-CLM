@@ -5,6 +5,7 @@ import { EXPORT_LOCK_KEY, processExports } from './tenantExport';
 import { getStore } from './uploadStorage';
 import { IS_TEST_MODE } from './runtimePaths';
 import { componentLog } from './logger';
+import { APPROVAL_SLA_LOCK_KEY, deliverApprovalNotices, onApprovalNoticeQueued, runApprovalSlaPass, type ApprovalNoticeDeps } from './approvalNotifications';
 import { outboundPolicyFromEnv } from './ssrfGuard';
 import { WEBHOOK_LOCK_KEY, deliverDueWebhooks, onWebhookQueued, pruneDeliveries } from './webhooks';
 
@@ -24,7 +25,24 @@ export const webhookJob = createPeriodicJob({
   },
 });
 
-const jobs = [exportJob, webhookJob];
+/** Production wiring of the approval mailer: the platform SMTP relay and the editable mail templates. */
+async function approvalDeps(): Promise<ApprovalNoticeDeps> {
+  const { mailTemplates, sendSmtpEmail } = await import('./mailHelpers');
+  const { db: memory } = await import('./memoryDb');
+  const { getPublicBaseUrl } = await import('./installationSettings');
+  return {
+    smtpAvailable: () => Boolean(memory.googleConfig?.smtpEnabled),
+    send: async (input) => { const result = await sendSmtpEmail(input); return { success: Boolean(result?.success), error: result?.success ? undefined : String((result as { error?: unknown })?.error ?? '') }; },
+    render: (id, values, trusted) => mailTemplates.render(id, values, trusted),
+    publicUrl: () => getPublicBaseUrl() || process.env.PUBLIC_URL || '',
+  };
+}
+export const approvalJob = createPeriodicJob({
+  name: 'Approval notices and SLA', lockKey: APPROVAL_SLA_LOCK_KEY, intervalMs: 5 * 60_000, startupDelayMs: 45_000, enabled,
+  run: async () => { await runApprovalSlaPass(sql); await deliverApprovalNotices(sql, await approvalDeps()); },
+});
+
+const jobs = [exportJob, webhookJob, approvalJob];
 export const startBackgroundJobs = () => {
   const policy = outboundPolicyFromEnv();
   if (process.env.NODE_ENV === 'production' && (policy.allowHttp || policy.allowPrivateNetworks)) {
@@ -32,6 +50,9 @@ export const startBackgroundJobs = () => {
   }
   for (const job of jobs) job.start();
   // A freshly queued event is delivered at once (still under the advisory lock) instead of at the next tick.
-  if (enabled) onWebhookQueued(() => { void webhookJob.runOnce(); });
+  if (enabled) {
+    onWebhookQueued(() => { void webhookJob.runOnce(); });
+    onApprovalNoticeQueued(() => { void approvalJob.runOnce(); });
+  }
 };
-export const stopBackgroundJobs = async () => { onWebhookQueued(null); await Promise.all(jobs.map((job) => job.stop())); };
+export const stopBackgroundJobs = async () => { onWebhookQueued(null); onApprovalNoticeQueued(null); await Promise.all(jobs.map((job) => job.stop())); };

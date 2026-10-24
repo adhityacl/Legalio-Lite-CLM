@@ -102,6 +102,11 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/organizations/:organizationId/webhooks/:id/deliveries/:deliveryId', orgParam('tenant.webhook.manage')],
   ['POST', '/api/organizations/:organizationId/webhooks/:id/deliveries/:deliveryId/retry', orgParam('tenant.webhook.manage', 'audited')],
 
+  ['GET', '/api/organizations/:organizationId/approval-settings', orgParam('tenant.settings.read')],
+  ['PUT', '/api/organizations/:organizationId/approval-settings', orgParam('tenant.settings.update', 'SLA hours and escalation target; audited')],
+  ['GET', '/api/organizations/:organizationId/my-notifications', orgParam('document.create', 'the caller\'s own in-app notifications only')],
+  ['POST', '/api/organizations/:organizationId/my-notifications/read', orgParam('document.create', 'marks only the caller\'s own entries')],
+
   /* ---------------- public API v1 (organization API keys) ---------------- */
   ['GET', '/api/v1/openapi.json', pub('API description; no data')],
   ['GET', '/api/v1/whoami', apiKey(null, 'any valid key; returns its own organization and scopes')],

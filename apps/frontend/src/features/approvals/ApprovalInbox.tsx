@@ -23,6 +23,7 @@ import { TablePagination } from '../../components/ui/TablePagination';
 import { ActionMenu, type ActionMenuItem } from '../../components/ui/action-menu';
 import { RelativeTime } from '../../components/documents/RelativeTime';
 import { approvalsApi } from './approvalsApi';
+import { ApprovalNotifications } from './ApprovalNotifications';
 import { PersonAvatar, StatusBadge, categoryLabel, categoryTone, slaLeft } from './approvalUi';
 
 interface Props {
@@ -134,6 +135,8 @@ export const ApprovalInbox: React.FC<Props> = ({ onOpen, onCreate }) => {
             </Button>
           </div>
         </div>
+
+        <ApprovalNotifications onOpen={onOpen} />
 
         <div className="grid grid-cols-1 gap-g13 sm:grid-cols-3">
           {statCards.map(({ icon: Icon, tone, value, label }) => (
