@@ -1,14 +1,13 @@
 import crypto from 'crypto';
 import { buildDemoDataset } from '@legalio/shared/data/demoDataset';
 import { resolveTenantSettings } from '@legalio/shared/policy';
-import { DEFAULT_BRANDING, coreSaver, db, migrateLegacyRecords, normalizeContractRecord, normalizeIoRecord, normalizePartnerRecord, normalizeSpendingRecord, saveDb } from '../memoryDb';
+import { DEFAULT_BRANDING, coreSaver, db, normalizeContractRecord, normalizeIoRecord, normalizePartnerRecord, normalizeSpendingRecord, saveDb } from '../memoryDb';
 import { clearRepositoryRows, insertRepositoryRows } from '../repositories/seed';
 import { identityOf } from '../identity';
 import { sql } from '../db';
 import { removeDemoAccounts } from '../demoAccounts';
 import { seedOrganizationsFromDataset } from '../organizationProvisioning';
 import { buildTenantProjection, appendAudit } from '../organizationSettingsStore';
-import { resetSyncCache } from '../normalizedCoreStore';
 import { saveCoreData } from '../lib/auth';
 import { auditActorFor } from '../organizationAdminRoutes';
 import { getStore } from '../uploadStorage';
@@ -121,9 +120,6 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       Object.assign(db, {
         tenants,
         allowedUsers: [],
-        notifications: dataset.notifications,
-        activityLogs: dataset.activityLogs,
-        templates: [],
         newsTicker: { byTenant: {} },
         branding: { ...DEFAULT_BRANDING },
         customTranslations: {},
@@ -149,7 +145,6 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
         },
       });
       try {
-        migrateLegacyRecords();
         dataset.contracts.forEach(normalizeContractRecord);
         dataset.partners.forEach(normalizePartnerRecord);
         dataset.ios.forEach(normalizeIoRecord);
@@ -159,11 +154,8 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       } finally {
         Object.assign(db, liveState);
       }
-      // search_records was emptied above, so no fingerprint may skip a row; the replacement and its business records commit together.
-      resetSyncCache(sql);
       await saveCoreData(snapshot);
-      // Contracts are repository-backed: the snapshot sync neither removes the old ones nor writes the dataset's. Reverse order
-      // keeps the dataset's order (each insert goes to the front).
+      // Business records are repository-backed: every table is emptied and the dataset's rows inserted (in its order).
       await clearRepositoryRows(sql);
       await insertRepositoryRows(sql, dataset);
       await appendAudit(sql, auditActorFor(req, identity), {
@@ -172,7 +164,6 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       });
     }));
   } catch (err) {
-    resetSyncCache(sql);
     log.error("Error resetting auth organization tables:", err);
     return res.status(500).json({ error: "Failed to reset organization tables." });
   }

@@ -13,8 +13,8 @@ const { runMigrations } = await import('./migrate');
 const { MIGRATIONS } = await import('./migrations');
 const { contractRepository } = await import('./repositories/contractRepository');
 const { DuplicateValueError, VersionConflictError } = await import('./repositories/errors');
-const { synchronizeBusinessRows, resetSyncCache } = await import('./normalizedCoreStore');
-const { entityFor } = await import('./normalizedSchema');
+const { createCoreSaver } = await import('./coreDataStore');
+const { writeLegacySnapshot } = await import('./legacySnapshot');
 const { ensureSchema } = await import('./schema');
 
 let database: Awaited<ReturnType<typeof createTestDatabase>>;
@@ -133,21 +133,24 @@ test('delete removes the row, its categories and search entry; children lose the
   assert.equal(child.version, 2);
 });
 
-test('the snapshot sync never writes, reads or deletes contracts', async () => {
+test('the in-memory snapshot save never writes, reads or deletes contracts or partners', async () => {
   await contractRepository.insert(contract('C1'));
   await contractRepository.insert(contract('C2'));
   const stamp = async () => (await sql.all(`SELECT contract_id, xmin::text AS xmin, version FROM contracts ORDER BY contract_id`));
-  const before = await stamp();
-  resetSyncCache(sql);
-  // Memory holds neither contracts nor partners, by design: absence must not delete them, and an unrelated save must not touch them.
-  const partner = { partner_id: 'p1', organizationId: 'org-a', partner_name: 'Renamed', tags: [], identifiers: [], dd_documents: [] };
   const partners = async () => (await sql.all(`SELECT partner_id, xmin::text AS xmin, version FROM partners ORDER BY partner_id`));
+  const before = await stamp();
   const partnersBefore = await partners();
-  await synchronizeBusinessRows(sql, { partners: [], contracts: [], ios: [], spendings: [], evaluations: [], notifications: [], templates: [] });
-  await synchronizeBusinessRows(sql, { partners: [partner, { ...partner, partner_id: 'p2', organizationId: 'org-b', partner_name: 'Another edit' }], contracts: [contract('GHOST')] });
+  // Memory holds neither contracts nor partners, by design (and any copy a bug leaves there is ignored): absence must not delete
+  // rows, and presence must not insert or change them.
+  const partner = { partner_id: 'p1', organizationId: 'org-a', partner_name: 'Renamed', tags: [], identifiers: [], dd_documents: [] };
+  const memory: Record<string, any> = { partners: [], contracts: [], allowedUsers: [], branding: { appName: 'X' } };
+  const saver = createCoreSaver(sql, () => memory);
+  await saver.save();
+  Object.assign(memory, { partners: [partner, { ...partner, partner_id: 'p2', organizationId: 'org-b', partner_name: 'Another edit' }], contracts: [contract('GHOST')] });
+  await saver.save();
   assert.deepEqual(await stamp(), before, 'contract rows are byte-for-byte untouched (same xmin, same version)');
   assert.deepEqual(await partners(), partnersBefore, 'partner rows are byte-for-byte untouched too');
-  assert.equal(await contractRepository.get('org-a', 'GHOST'), undefined, 'contracts passed to the sync are ignored, not inserted');
+  assert.equal(await contractRepository.get('org-a', 'GHOST'), undefined, 'contracts left in memory are ignored, not inserted');
 });
 
 test('rows written by the old snapshot format are adopted by migration 0007 without loss', async () => {
@@ -167,14 +170,9 @@ test('rows written by the old snapshot format are adopted by migration 0007 with
     await runMigrations({ migrations: MIGRATIONS.slice(0, 6) });
     assert.equal((await appSql.get(`SELECT 1 AS present FROM information_schema.columns WHERE table_name = 'contracts' AND column_name = 'version'`)), undefined);
     await appSql.exec(`INSERT INTO organization (id, name, slug, "createdAt") VALUES ('org-a', 'A', 'a', now())`);
-    const entity = entityFor('contracts');
-    const partnerEntity = entityFor('partners');
-    entity.repository = false; // the old behaviour: contracts and partners travel with the snapshot
-    partnerEntity.repository = false;
-    try {
-      const legacy = [contract('C1', 'org-a', { status: 'Active' }), contract('C2', 'org-a', { contract_value: 0.29, termination_date: null, termination_document: { fileName: 'x.pdf', url: '/uploads/org-a/abc/Folder Termination/x.pdf' } })];
-      await synchronizeBusinessRows(appSql, { partners: [{ partner_id: 'p1', organizationId: 'org-a', partner_name: 'P', tags: [], identifiers: [], dd_documents: [] }], contracts: legacy });
-    } finally { entity.repository = true; partnerEntity.repository = true; }
+    // The old behaviour: contracts and partners travel with the snapshot.
+    const legacy = [contract('C1', 'org-a', { status: 'Active' }), contract('C2', 'org-a', { contract_value: 0.29, termination_date: null, termination_document: { fileName: 'x.pdf', url: '/uploads/org-a/abc/Folder Termination/x.pdf' } })];
+    await writeLegacySnapshot(appSql, { partners: [{ partner_id: 'p1', organizationId: 'org-a', partner_name: 'P', tags: [], identifiers: [], dd_documents: [] }], contracts: legacy });
     await runMigrations();
     const repository = createContractRepository(appSql);
     const adopted = await repository.list('org-a');

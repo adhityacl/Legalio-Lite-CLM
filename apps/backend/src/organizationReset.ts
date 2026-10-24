@@ -3,9 +3,6 @@ import { keyFromLink, type ObjectStore } from './objectStore';
 import { ENTITIES } from './normalizedSchema';
 import { createEntityRepository } from './repositories/entityRepository';
 
-/** Collections of the in-memory projection that belong to an organization. */
-const COLLECTIONS = ['notifications', 'templates', 'activityLogs'] as const;
-
 /** Editor documents and approvals live in their own tables; each entry deletes one organization's rows. */
 const SQL_STEPS: Array<{ table: string; sql: string }> = [
   { table: 'contract_comments', sql: 'DELETE FROM contract_comments WHERE contract_id IN (SELECT id FROM contract_documents WHERE organization_id = ?)' },
@@ -32,12 +29,8 @@ function collectUploadLinks(value: unknown, found: Set<string>) {
 
 export interface OrganizationResetOptions {
   db: Sql;
-  /** The in-memory projection (`db` in server.ts). */
-  memory: Record<string, any[]>;
   organizationId: string;
   storage: ObjectStore;
-  /** Persists the projection to the database; `alongside` runs in the same transaction after the sync. */
-  save: (alongside?: () => Promise<unknown>) => Promise<void>;
 }
 
 /**
@@ -45,31 +38,19 @@ export interface OrganizationResetOptions {
  * invitations and integrations stay. Only upload files that this organization's own records pointed to are removed.
  */
 export async function resetOrganizationData(options: OrganizationResetOptions) {
-  const { db, memory, organizationId, storage, save } = options;
+  const { db, organizationId, storage } = options;
 
   const removed: Record<string, number> = {};
   const links = new Set<string>();
-  for (const collection of COLLECTIONS) {
-    const rows = memory[collection] || [];
-    const mine = rows.filter(row => row?.organizationId === organizationId);
-    removed[collection] = mine.length;
-    mine.forEach(row => collectUploadLinks(row, links));
-    memory[collection] = rows.filter(row => row?.organizationId !== organizationId);
-  }
-  // Repository-backed tables: their upload links are read first, their rows removed in the same transaction as the snapshot change
-  // (the records that point at them are removed there too).
+  // Upload links are read first; then every table of the organization is emptied in one transaction (records that point at each
+  // other go together, foreign keys are checked at commit).
   const repositories = ENTITIES.filter(entity => entity.repository).map(entity => ({ entity, repository: createEntityRepository(db, entity.table) }));
   for (const { repository } of repositories) {
     for await (const batch of repository.batches(500, 'organization_id = ?', [organizationId])) batch.forEach(row => collectUploadLinks(row, links));
   }
-  await save(async () => {
-    for (const { entity, repository } of repositories) removed[entity.collection] = await repository.removeOrganization(organizationId);
-  });
-
   await db.tx(async () => {
-    for (const step of SQL_STEPS) {
-      removed[step.table] = (await db.run(step.sql, organizationId)).changes;
-    }
+    for (const { entity, repository } of repositories) removed[entity.collection] = await repository.removeOrganization(organizationId);
+    for (const step of SQL_STEPS) removed[step.table] = (await db.run(step.sql, organizationId)).changes;
   });
 
   let files = 0;

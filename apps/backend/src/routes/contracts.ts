@@ -1,10 +1,11 @@
 import { nextEntityId } from '../ids';
 import * as bodySchemas from '../schemas';
 import { resolveActiveGoogleToken, getOrgFolderId, getPartnerCategoryFolderId } from '../googleDrive';
-import { db, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { db, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { contractRepository, CONTRACT_SORTS, type ContractQuery } from '../repositories/contractRepository';
 import { partnerRepository } from '../repositories/partnerRepository';
 import { ioRepository } from '../repositories/ioRepository';
+import { notificationRepository } from '../repositories/notificationRepository';
 import { recordVisible } from '../recordScope';
 import { hasOrganizationScope } from '../rbac';
 import { getRequestTenantId, scopedRecords, addActivityLog, assertRecordAccess, assertRecordWritable, isMatchingOrg, logActivity, orgContextOf, scopeOf } from '../recordAccess';
@@ -856,10 +857,9 @@ app.delete("/api/contracts/:id", async (req: express.Request, res: express.Respo
   if (!ctr) return res.status(404).json({ error: "Kontrak tidak ditemukan." });
   const tenantDenial = assertRecordAccess(req, "contract", ctr);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
-  db.notifications = db.notifications.filter((n) => !(n.organizationId === ctr.organizationId && n.parent_type === 'Contract' && n.parent_id === id));
-  // Insertion orders and notifications live in the snapshot, the contract (and its children's parent link) in its repository:
-  // one transaction, so the contract is never gone while an order still points at it, or the other way round.
-  await saveDb(async () => {
+  // One transaction, so the contract is never gone while an order still points at it, or the other way round.
+  await sql.tx(async () => {
+    await notificationRepository.removeByParents(ctr.organizationId, [id], 'Contract');
     await ioRepository.detachContract(ctr.organizationId, id);
     await contractRepository.removeWithChildren(ctr.organizationId, id);
   });

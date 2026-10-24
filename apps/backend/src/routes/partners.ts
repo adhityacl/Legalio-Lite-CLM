@@ -1,7 +1,9 @@
 import { nextEntityId } from '../ids';
 import { contractRepository } from '../repositories/contractRepository';
+import { sql } from '../db';
 import { ioRepository } from '../repositories/ioRepository';
 import { spendingRepository } from '../repositories/spendingRepository';
+import { notificationRepository } from '../repositories/notificationRepository';
 import { evaluationRepository } from '../repositories/evaluationRepository';
 import { partnerRepository, PARTNER_SORTS, type PartnerQuery } from '../repositories/partnerRepository';
 import { recordVisible } from '../recordScope';
@@ -9,7 +11,7 @@ import { hasOrganizationScope } from '../rbac';
 import { generateRedlineAnalysis } from '../redlineAnalysis';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity, orgContextOf, scopeOf } from '../recordAccess';
-import { db, sanitizePartnerTags, sanitizeCountryCode, countryNameForPrompt, sanitizeIdentifiers, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { db, sanitizePartnerTags, sanitizeCountryCode, countryNameForPrompt, sanitizeIdentifiers, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { upload } from '../uploadMiddleware';
 import { ensureAiAvailable, getValidAiModel, generateContentWithRetryAndFallback, withDocumentTranscriptField, extractAndCacheDocumentTranscript } from '../aiClient';
 import { computeInputSha256, globalOcrCache, buildCheapOcrContents } from '../lib/cheapOcrPipeline';
@@ -427,19 +429,19 @@ app.delete("/api/partners/:id", async (req: express.Request, res: express.Respon
   }
   const tenantDenial = assertRecordAccess(req, "partner", partner);
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
-  const sameOrg = (row: any) => row?.organizationId === partner.organizationId;
-  const contractIds = await contractRepository.idsByPartner(partner.organizationId, id);
-  const ioIds = await ioRepository.idsByPartnerOrContracts(partner.organizationId, id, contractIds);
-  db.notifications = db.notifications.filter(
-    (n) => !(sameOrg(n) && (contractIds.includes(n.parent_id) || ioIds.includes(n.parent_id))),
-  );
-  // The partner and its contracts are rows of their own repositories: removed in the same transaction as the orders and notifications.
-  await saveDb(async () => {
+  // One transaction: the partner, its contracts, orders and notifications go together; invoices and evaluations lose the link only.
+  // The partner row is locked first, so a contract being created for it meanwhile either lands before (and goes too) or fails its foreign key.
+  const { contractIds, ioIds } = await sql.tx(async () => {
+    await sql.get("SELECT 1 FROM partners WHERE organization_id = ? AND partner_id = ? FOR UPDATE", partner.organizationId, id);
+    const contractIds = await contractRepository.idsByPartner(partner.organizationId, id);
+    const ioIds = await ioRepository.idsByPartnerOrContracts(partner.organizationId, id, contractIds);
+    await notificationRepository.removeByParents(partner.organizationId, [...contractIds, ...ioIds]);
     await spendingRepository.detachVendor(partner.organizationId, id);
     await evaluationRepository.detachPartner(partner.organizationId, id);
     await ioRepository.removeMany(partner.organizationId, ioIds);
     await contractRepository.removeByPartner(partner.organizationId, id);
     await partnerRepository.remove(partner.organizationId, id);
+    return { contractIds, ioIds };
   });
   await logActivity(req, "DELETE", "PARTNER", `Menghapus Partner '${partner.partner_name}' beserta ${contractIds.length} Kontrak dan ${ioIds.length} Insertion Order pendukung.`);
   await triggerAutoPushToGoogleSheet(req);

@@ -34,14 +34,14 @@ export const ENTITIES: EntitySchema[] = [
     ...fields('partner_id review_date supplier_name type_of_work obligation_target incident_frequency communication pricing final_evaluation recommendation_status notes evaluator_email evaluator_name'),
     ...fields('sla_score calculated_score total_score', 'number'), ...dates,
   ] },
-  { table: 'notifications', key: 'notif_id', collection: 'notifications', search: [], fields: [
+  { table: 'notifications', key: 'notif_id', collection: 'notifications', repository: true, search: [], fields: [
     ...fields('parent_type parent_id parent_number parent_title notification_type sent_at recipient message'),
     ...fields('is_sent is_read', 'boolean'), ...fields('message_params', 'json'),
   ] },
   { table: 'activity_logs', key: 'id', collection: 'activityLogs', search: [], appendOnly: true, fields: [
     ...fields('timestamp userEmail userName role actionType module description ipAddress userAgent'),
   ] },
-  { table: 'templates', key: 'id', collection: 'templates', search: ['name'], fields: [
+  { table: 'templates', key: 'id', collection: 'templates', repository: true, search: ['name'], fields: [
     ...fields('name contentId'), ...fields('version', 'number'), ...fields('customFields', 'json'),
     { api: 'createdAt', sql: 'created_at', kind: 'text' }, { api: 'updatedAt', sql: 'updated_at', kind: 'text' },
   ] },

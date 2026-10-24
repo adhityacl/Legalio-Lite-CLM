@@ -26,8 +26,7 @@ import { hasServiceAccountCredentials } from "./lib/googleServiceAccountAuth";
 import { componentLog, errorResponder, requestLogging } from "./logger";
 import { mailTemplates, sendPlatformMail } from "./mailHelpers";
 import { syncIdSequences } from "./ids";
-import { coreSaver, db, demoData, migrateLegacyRecords, normalizeContractRecord, normalizeIoRecord, normalizePartnerRecord, normalizeStoredContracts, normalizeSpendingRecord, normalizeStoredIos, normalizeStoredPartners, normalizeStoredSpendings, migrateLegacySpendingIds, refreshTenantProjection, saveDb, seedContracts, seedEvaluations, seedIos, seedPartners, seedSpendings, syncAdderNames } from "./memoryDb";
-import { resetSyncCache } from "./normalizedCoreStore";
+import { coreSaver, db, demoData, normalizeContractRecord, normalizeIoRecord, normalizePartnerRecord, normalizeStoredContracts, normalizeSpendingRecord, normalizeStoredIos, normalizeStoredPartners, normalizeStoredSpendings, migrateLegacySpendingIds, refreshTenantProjection, saveDb, seedContracts, seedEvaluations, seedIos, seedNotifications, seedPartners, seedSpendings, syncAdderNames } from "./memoryDb";
 import { createOrganizationAdminRouter } from "./organizationAdminRoutes";
 import { seedOrganizationsFromDataset } from "./organizationProvisioning";
 import { isEmptyInstall } from "./organizationSettingsStore";
@@ -63,9 +62,7 @@ import { getStore, uploadBackfillRecords } from "./uploadStorage";
 import { backfillUploadOwners, uploadBackfillPending } from "./uploadOwnership";
 import { contractRepository } from "./repositories/contractRepository";
 import { partnerRepository } from "./repositories/partnerRepository";
-import { ioRepository } from "./repositories/ioRepository";
-import { spendingRepository } from "./repositories/spendingRepository";
-import { evaluationRepository } from "./repositories/evaluationRepository";
+import { anyBusinessData } from "./businessData";
 import { insertRepositoryRows } from "./repositories/seed";
 import { ensureSchema } from "./schema";
 
@@ -122,8 +119,6 @@ app.use((req: express.Request, _res: express.Response, next: express.NextFunctio
  * Everything that reads or writes the database runs here; main.ts connects first and awaits it before serving this app.
  */
 export async function init() {
-  // Onboarding retries init() after a failure, possibly against another database: forget what an earlier attempt wrote.
-  resetSyncCache(sql);
   await ensureSchema();
   await reloadAuthConfiguration();
   await googleCredentials.init();
@@ -143,9 +138,7 @@ export async function init() {
     log.info(`Seeded bootstrap superuser: ${demoAdminEmail}`);
   }
   const initialData = await loadCoreData();
-  const hasCoreData = ["notifications", "templates", "activityLogs"]
-    .some((key) => Array.isArray((initialData as any)[key]) && (initialData as any)[key].length > 0)
-    || await contractRepository.anyAtAll() || await partnerRepository.anyAtAll() || await ioRepository.anyAtAll() || await spendingRepository.anyAtAll() || await evaluationRepository.anyAtAll();
+  const hasCoreData = await anyBusinessData();
   const seedDemoContracts = !(hasCoreData || !freshInstall);
 
   // An initialized workspace may intentionally contain no business records after a reset.
@@ -170,7 +163,6 @@ export async function init() {
   delete db.departments;
   delete db.activeTenantId;
   await refreshTenantProjection();
-  migrateLegacyRecords();
   await normalizeStoredPartners();
   await normalizeStoredIos();
   await normalizeStoredSpendings();
@@ -186,7 +178,7 @@ export async function init() {
   // Demo partners and contracts are repository-backed: they commit together with the orders that reference each other.
   // Reverse order keeps the dataset's order (each insert goes to the front).
   await saveDb(seedDemoContracts ? async () => {
-    await insertRepositoryRows(sql, { partners: seedPartners, contracts: seedContracts, ios: seedIos, spendings: seedSpendings, evaluations: seedEvaluations }, { partners: (row) => normalizePartnerRecord(structuredClone(row)), contracts: normalizeContractRecord, insertion_orders: normalizeIoRecord, spendings: normalizeSpendingRecord });
+    await insertRepositoryRows(sql, { partners: seedPartners, contracts: seedContracts, ios: seedIos, spendings: seedSpendings, evaluations: seedEvaluations, notifications: seedNotifications }, { partners: (row) => normalizePartnerRecord(structuredClone(row)), contracts: normalizeContractRecord, insertion_orders: normalizeIoRecord, spendings: normalizeSpendingRecord });
   } : undefined);
   if (await uploadBackfillPending(sql)) {
     const uploadRecords: Array<{ organizationId: string; record: any }> = [];
@@ -195,7 +187,7 @@ export async function init() {
   }
   // The auth console reads platform configuration (SMTP) from `db`; it no longer
   // hydrates identities, memberships or organizations from this projection.
-  setConsoleDbReference(db, saveDb, getStore, async (organizationId?: string) => {
+  setConsoleDbReference(getStore, async (organizationId?: string) => {
     if (organizationId) await onOrganizationChanged(organizationId);
     else await refreshTenantProjection();
   });

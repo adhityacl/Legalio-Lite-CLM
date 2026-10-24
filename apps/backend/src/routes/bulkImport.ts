@@ -5,7 +5,7 @@ import { ioRepository } from '../repositories/ioRepository';
 import { spendingRepository } from '../repositories/spendingRepository';
 import { evaluationRepository } from '../repositories/evaluationRepository';
 import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
-import { getRequestTenantId, isMatchingOrg, scopeOf, addActivityLog } from '../recordAccess';
+import { getRequestTenantId, scopeOf, addActivityLog } from '../recordAccess';
 import { tenantDefaultCurrency, normalizePartnerDocuments, computeDueDiligenceStatus } from '../tenantPolicy';
 import { sanitizeCountryCode, sanitizeIdentifiers, sanitizePartnerTags } from '../memoryDb';
 import { normalizeCurrencyCode, convertToUsdWithFallback } from '@legalio/shared/currencyUtils';
@@ -75,7 +75,6 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
   });
   const tenantId = getRequestTenantId(req);
   const tenantCurrency = tenantDefaultCurrency(tenantId);
-  const inTenant = (row: any) => isMatchingOrg(row?.organizationId, tenantId);
   const succeeded = [];
   const skipped = [];
   const failed = [];

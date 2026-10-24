@@ -1,10 +1,11 @@
 import crypto from 'crypto';
-import { onDbSaved, db, saveDb } from './memoryDb';
+import { onDbSaved, db } from './memoryDb';
 import { seedLedgerFromLegacy, planReminders, existingKeys as existingReminderKeys, enqueue as enqueueReminder, ReminderSender, deliverDue as deliverDueReminders, createReminderScheduler, schedulerOptionsFromEnv } from './reminders';
 import { sql } from './db';
 import { contractLifecycleMode, contractLifecycle } from '@legalio/shared/contractLifecycle';
 import { contractRepository } from './repositories/contractRepository';
 import { ioRepository } from './repositories/ioRepository';
+import { notificationRepository } from './repositories/notificationRepository';
 import { getTenantSettings, findTenant, computeLifecycle } from './tenantPolicy';
 import { todayInTimezone } from '@legalio/shared/policy';
 import { normalizeContractStatus } from '@legalio/types/domainStatus';
@@ -21,7 +22,7 @@ onDbSaved(() => { lifecyclesFreshUntil = 0; });
 export async function seedReminderLedger() {
   const records = new Map((await reminderRecords()).map((item) => [`${item.kind}:${item.recordId}`, item]));
   const entries: Array<{ organizationId: string; kind: "contract" | "commercial"; recordId: string; cycleEnd: string; offsetDays: number }> = [];
-  for (const notification of db.notifications || []) {
+  for (const notification of await notificationRepository.legacyReminders()) {
     const match = /^Reminder (?:(\d+)d|H-(\d+))$/.exec(notification.notification_type || "");
     if (!match) continue;
     const offsetDays = Number(match[1] ?? match[2]);
@@ -194,8 +195,10 @@ export async function enqueueDueReminders(): Promise<number> {
       const entry = { organizationId: tenantId, kind: item.kind, recordId: item.recordId, cycleEnd: item.cycleEnd, trigger: plan.trigger, offsetDays: plan.offsetDays, recipients };
       if (plan.skip) { await enqueueReminder(sql, { ...entry, skip: true }); continue; }
       const notificationId = `notif-${item.kind === "contract" ? "ctr" : "doc"}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
-      if (!await enqueueReminder(sql, { ...entry, notificationId })) continue; // another pass or instance got there first
-      db.notifications.unshift({
+      // The ledger entry and the in-app notification commit together; a pass or instance that got there first makes this a no-op.
+      const created = await sql.tx(async () => {
+        if (!await enqueueReminder(sql, { ...entry, notificationId })) return false;
+        await notificationRepository.insert({
         notif_id: notificationId,
         organizationId: tenantId,
         parent_type: item.kind === "contract" ? "Contract" : "IO",
@@ -211,11 +214,12 @@ export async function enqueueDueReminders(): Promise<number> {
         // Lets the UI render the message in the viewer's language; `message` stays in the organization language.
         ...(plan.trigger === "offset" ? { message_params: { kind: item.kind, daysRemaining: item.daysRemaining, noticeType: content.noticeType, noticeDays: content.noticeDays } } : {}),
         is_read: false,
+        });
+        return true;
       });
-      queued++;
+      if (created) queued++;
     }
   }
-  if (queued) await saveDb();
   return queued;
 }
 /** Sends one ledger row through the platform SMTP relay. */
@@ -246,12 +250,10 @@ export const sendLedgerReminder: ReminderSender = async (row) => {
 };
 export async function deliverReminders() {
   const result = await deliverDueReminders(sql, sendLedgerReminder, {
-    onSent: (row) => {
-      const notification = (db.notifications || []).find((n: any) => n.notif_id === row.notification_id);
-      if (notification) notification.is_sent = true;
+    onSent: async (row) => {
+      if (row.notification_id) await notificationRepository.markSent(row.organization_id, row.notification_id);
     },
   });
-  if (result.sent) await saveDb();
   if (result.attempted) reminderLog.info(`Reminder delivery: ${result.sent} sent, ${result.failed} failed (will retry), ${result.dead} abandoned, ${result.skipped} skipped.`);
   return result;
 }

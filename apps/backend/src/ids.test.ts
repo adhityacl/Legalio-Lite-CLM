@@ -9,7 +9,6 @@ Object.assign(process.env, { APP_TEST_MODE: '1', APP_DATA_DIR: dir, BETTER_AUTH_
 const { sql } = await import('./db');
 const { createTestDatabase } = await import('./testDatabase');
 const { ensureSchema } = await import('./schema');
-const { db } = await import('./memoryDb');
 const { nextEntityId, syncIdSequences } = await import('./ids');
 
 let database: Awaited<ReturnType<typeof createTestDatabase>>;

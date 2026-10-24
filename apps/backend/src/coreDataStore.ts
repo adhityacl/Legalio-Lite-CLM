@@ -1,5 +1,3 @@
-import { resetSyncCache, synchronizeBusinessRows } from './normalizedCoreStore';
-import { ENTITIES } from './normalizedSchema';
 import type { Sql } from './db';
 import { sealProviderSecrets } from './providerSecrets';
 
@@ -25,8 +23,7 @@ export function isValidAllowedUserRow(row: any) {
 async function synchronizeCoreDataTransaction(db: Sql, data: any) {
   if (!data || typeof data !== 'object') return;
 
-  // Business collections live in the normalized tables; only the onboarding allowlist is still a payload table.
-  await synchronizeBusinessRows(db, data);
+  // Business records are written by their repositories (src/repositories); this persists the allowlist and the installation configuration.
   const users = Array.isArray(data.allowedUsers) ? data.allowedUsers.filter(isValidAllowedUserRow) : [];
   const existing = new Map((await db.all(`SELECT id, payload FROM allowed_users`) as { id: string; payload: string }[])
     .map(row => [row.id, row.payload]));
@@ -113,7 +110,7 @@ export async function synchronizeCoreData(db: Sql, data: any) {
 }
 
 /** Parts of the in-memory projection that synchronizeCoreData persists. */
-const PERSISTED = ['allowedUsers', ...ENTITIES.filter(entity => !entity.appendOnly && !entity.repository).map(entity => entity.collection), 'branding', 'googleConfig', 'appSettings', 'newsTicker'];
+const PERSISTED = ['allowedUsers', 'branding', 'googleConfig', 'appSettings', 'newsTicker'];
 
 /**
  * Serialized saves of the in-memory projection. Each save snapshots the collections synchronously when its turn
@@ -138,7 +135,6 @@ export function createCoreSaver(db: Sql, memory: () => Record<string, any>, relo
         await alongside?.();
       });
     } catch (error) {
-      resetSyncCache(db);
       // Still holding the lock: the next queued save must snapshot the reloaded state, not the one that just failed.
       await reload?.();
       throw error;

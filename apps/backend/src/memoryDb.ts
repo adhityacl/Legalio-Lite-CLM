@@ -31,7 +31,7 @@ export const DEFAULT_BRANDING = {
 export const demoData = buildDemoDataset();
 // APP_TEST_MODE never reseeds demo data (PRD §15); fixtures are created explicitly.
 export const seedData = IS_TEST_MODE
-  ? { partners: [], contracts: [], ios: [], notifications: [], activityLogs: [], evaluations: [], spendings: [] }
+  ? { partners: [], contracts: [], ios: [], notifications: [], evaluations: [], spendings: [] }
   : demoData;
 /** Demo contracts to insert (through the repository) when a first run seeds the demo workspace; empty in test mode. */
 export const seedContracts: any[] = seedData.contracts;
@@ -43,12 +43,11 @@ export const seedIos: any[] = seedData.ios;
 export const seedSpendings: any[] = seedData.spendings;
 /** Demo evaluations to insert (through the repository) on a first run; empty in test mode. */
 export const seedEvaluations: any[] = seedData.evaluations;
+/** Demo notifications to insert (through the repository) on a first run; empty in test mode. */
+export const seedNotifications: any[] = seedData.notifications;
 export const db: any = {
   allowedUsers: [],
-  notifications: seedData.notifications,
-  activityLogs: seedData.activityLogs,
   tenants: [],
-  templates: [],
   newsTicker: { items: [] as string[], lastGeneratedAt: null as string | null },
   branding: DEFAULT_BRANDING,
   googleConfig: {
@@ -78,23 +77,13 @@ repositoryBacked('partners', 'repositories/partnerRepository');
 repositoryBacked('ios', 'repositories/ioRepository');
 repositoryBacked('spendings', 'repositories/spendingRepository');
 repositoryBacked('evaluations', 'repositories/evaluationRepository');
+repositoryBacked('notifications', 'repositories/notificationRepository');
+repositoryBacked('templates', 'repositories/templateRepository');
 bindTenantStore(() => db);
 
 /** Rebuilds the read-only `db.tenants` projection from canonical organization rows (PRD §7.3). */
 export async function refreshTenantProjection() {
   db.tenants = await buildTenantProjection(sql);
-}
-/**
- * Bring records written by earlier releases in line with the current model:
- * - Indonesian status labels become stable codes (see src/lib/domainStatus);
- * - due-diligence checklists are rebuilt from the tenant's policy packs,
- *   keeping every document that was already uploaded.
- * Idempotent: running it on migrated data changes nothing.
- */
-export function migrateLegacyRecords() {
-  // Organization ownership is never guessed here: records without a canonical
-  // organization stay quarantined until the 002 migration maps them (PRD §14.3).
-  if (!db.templates) db.templates = [];
 }
 /** JSON with object keys sorted at every level, to compare records regardless of key order. */
 export function stableJson(value: unknown): string {

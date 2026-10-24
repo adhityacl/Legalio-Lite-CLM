@@ -10,11 +10,12 @@ import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'legalio-adoption-'));
 Object.assign(process.env, { APP_TEST_MODE: '1', APP_DATA_DIR: dir, BETTER_AUTH_ENABLE_INFRA: 'false', LOG_LEVEL: 'silent' });
-const { connect, end, sql } = await import('./db');
+const { sql } = await import('./db');
 const { runMigrations } = await import('./migrate');
 const { MIGRATIONS } = await import('./migrations');
 const { ENTITIES } = await import('./normalizedSchema');
-const { synchronizeBusinessRows, readBusinessRows, searchBusinessRows } = await import('./normalizedCoreStore');
+const { readBusinessRows, searchBusinessRows } = await import('./normalizedCoreStore');
+const { writeLegacySnapshot } = await import('./legacySnapshot');
 const { createEntityRepository } = await import('./repositories/entityRepository');
 const { createTestDatabase } = await import('./testDatabase');
 
@@ -51,13 +52,11 @@ const FIXTURE: Record<string, any[]> = {
 test('rows written by the previous release are adopted by the migrations without loss and can then be edited with versions', async () => {
   const database = await createTestDatabase();
   const snapshotEntities = ENTITIES.filter((entity) => !entity.appendOnly && entity.table !== 'contracts');
-  const flags = new Map(snapshotEntities.map((entity) => [entity, entity.repository]));
   try {
     await runMigrations({ migrations: MIGRATIONS.slice(0, MIGRATIONS.findIndex((m) => m.id === PREVIOUS_RELEASE_LAST_MIGRATION) + 1) });
     await sql.exec(`INSERT INTO organization (id, name, slug, "createdAt") VALUES ('org-a', 'A', 'a', now()), ('org-b', 'B', 'b', now())`);
     // The previous release wrote these entities through the full-snapshot sync (before they had a version column).
-    for (const entity of snapshotEntities) entity.repository = false;
-    try { await synchronizeBusinessRows(sql, FIXTURE); } finally { for (const [entity, flag] of flags) entity.repository = flag; }
+    await writeLegacySnapshot(sql, FIXTURE);
     const beforeRows: Record<string, any[]> = {};
     for (const entity of snapshotEntities) beforeRows[entity.table] = await readBusinessRows(sql, entity.table);
     const beforeSearch = (await searchBusinessRows(sql, 'org-a', 'Orchard')).map((hit) => hit.entity_id);
@@ -73,15 +72,14 @@ test('rows written by the previous release are adopted by the migrations without
       assert.ok(expected.length > 0, `fixture covers ${entity.table}`);
       // Migrated tables gained a `version` of 1; nothing else changes (order included).
       assert.deepEqual(adopted.map(({ version, ...row }) => row), expected.map(({ version: _v, ...row }) => row), `${entity.table} rows unchanged`);
-      const versioned = (await sql.get(`SELECT 1 AS present FROM information_schema.columns WHERE table_name = ? AND column_name = 'version'`, entity.table));
-      if (entity.repository) {
-        assert.ok(versioned, `${entity.table} has a version column`);
-        assert.ok(adopted.every((row) => row.version === 1), `${entity.table} rows start at version 1`);
-        const repository = createEntityRepository(sql, entity.table);
-        const first = adopted[0];
-        const edited = await repository.update({ ...first, ...(entity.search[0] ? { [entity.search[0]]: 'Edited after adoption' } : { message: 'Edited after adoption' }) }, 1);
-        assert.equal(edited.version, 2, `${entity.table} can be edited after adoption`);
-      }
+      assert.ok(await sql.get(`SELECT 1 AS present FROM information_schema.columns WHERE table_name = ? AND column_name = 'version'`, entity.table), `${entity.table} has a version column`);
+      // Templates already counted their own saves in `version`; every other table starts at 1.
+      const expectedVersion = (row: any) => (entity.table === 'templates' ? Number(FIXTURE.templates.find((t) => t.id === row.id)!.version) : 1);
+      assert.ok(adopted.every((row) => row.version === expectedVersion(row)), `${entity.table} rows keep or start at their version`);
+      const first = adopted[0];
+      const edited = await createEntityRepository(sql, entity.table).update(
+        { ...first, ...(entity.search[0] ? { [entity.search[0]]: 'Edited after adoption' } : { message: 'Edited after adoption' }) }, first.version);
+      assert.equal(edited.version, first.version + 1, `${entity.table} can be edited after adoption`);
     }
   } finally {
     await database.drop();

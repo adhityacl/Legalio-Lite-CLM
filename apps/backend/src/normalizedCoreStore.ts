@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import type { Sql } from './db';
 import { ENTITIES, entityFor, type EntitySchema, type Field } from './normalizedSchema';
 import { migratePartnerContact } from './partnerContact';
@@ -143,7 +142,7 @@ export function decodeFields(record: Row, fields: Field[]) {
   }
   return row;
 }
-function upsert(db: DB, table: string, key: string[], values: Row) {
+export function upsert(db: DB, table: string, key: string[], values: Row) {
   const columns = Object.keys(values);
   const changed = columns.filter(column => !key.includes(column));
   return db.run(`INSERT INTO ${q(table)} (${columns.map(q).join(',')}) VALUES (${columns.map(column => '@' + column).join(',')})
@@ -249,57 +248,6 @@ export async function writeSearchRecord(db: DB, entity: EntitySchema, row: Row, 
   if (!entity.search.length) return;
   const texts = entity.search.map(key => String(row[key] || ''));
   await upsert(db,'search_records',['entity_type','entity_id'],{ organization_id: row.organizationId, entity_type: entity.table, entity_id: id, title: texts[0], body: texts.slice(1).join('\n') });
-}
-// Fingerprints of rows as last written, so an unchanged row costs one hash instead of several SQL round trips.
-// Business tables are written only through this function, so the cache stays valid until a rollback or a direct
-// delete (application reset) calls resetSyncCache. Callers whose outer transaction fails must reset it too.
-const syncedRows = new WeakMap<DB, Map<string, string>>();
-const fingerprintOf = (table: string, position: number, input: Row) =>
-  table + '\u0000' + createHash('sha1').update(position + ':' + JSON.stringify(input)).digest('base64');
-export const resetSyncCache = (db: DB) => { syncedRows.delete(db); };
-export async function synchronizeBusinessRows(db: DB, data: Row) {
-  const known = syncedRows.get(db) ?? new Map<string, string>();
-  const written = new Map<string, string>();
-  // All tables commit together. Deferred constraints support reparenting and full replacement.
-  try {
-  await db.tx(async () => {
-    for (const entity of ENTITIES) {
-      if (entity.appendOnly || entity.repository) continue;
-      const rows = Array.isArray(data[entity.collection]) ? data[entity.collection] : [];
-      const seen = new Set<string>();
-      for (const [position,input] of rows.entries()) {
-        const fingerprint = fingerprintOf(entity.table,position,input);
-        const unchanged = known.get(fingerprint);
-        if (unchanged !== undefined) {
-          if (seen.has(unchanged)) throw new Error(`Duplicate ${entity.key} in ${entity.table}: ${unchanged}`);
-          seen.add(unchanged);
-          written.set(fingerprint,unchanged);
-          continue;
-        }
-        const row = canonicalize(entity,input);
-        const id = String(row[entity.key] || '');
-        if (!id.trim()) throw new Error(`Missing ${entity.key} in ${entity.table}`);
-        if (seen.has(id)) throw new Error(`Duplicate ${entity.key} in ${entity.table}: ${id}`);
-        seen.add(id);
-        written.set(fingerprint,id);
-        const markerKeys = childMarkerKeys(entity.table);
-        const values = { [entity.key]: id, organization_id: row.organizationId ?? null, record_position: position, ...encodeFields(arrayMarkers(row,markerKeys), entity.fields, [entity.key,'organizationId']) };
-        await upsert(db,entity.table,[entity.key],values);
-        await writeChildren(db,entity,row);
-        await writeSearchRecord(db,entity,row,id);
-      }
-      const stored = await db.all<{id:string}>(`SELECT ${q(entity.key)} AS id FROM ${q(entity.table)}`);
-      for (const {id} of stored) if (!seen.has(id)) {
-        await db.run(`DELETE FROM ${q(entity.table)} WHERE ${q(entity.key)} = ?`, id);
-        await db.run('DELETE FROM search_records WHERE entity_type = ? AND entity_id = ?', entity.table,id);
-      }
-    }
-  });
-  } catch (error) {
-    syncedRows.delete(db); // rolled back: nothing about the cache can be trusted
-    throw error;
-  }
-  syncedRows.set(db,written);
 }
 export interface SearchHit { entity_type: string; entity_id: string; title: string }
 /** `ILIKE` patterns for each word of a free-text query (at most 16); `_` and `\` are literal. */

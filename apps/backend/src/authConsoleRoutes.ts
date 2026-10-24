@@ -25,15 +25,11 @@ import { addMembershipRecord, createIdentityRecord, createOrganizationRecord } f
 export const authConsoleRouter = Router();
 forwardAsyncRouteErrors(authConsoleRouter);
 
-let globalDbRef: any = null;
-let saveDbFnRef: ((alongside?: () => Promise<unknown>) => Promise<void>) | null = null;
 let organizationChangedRef: ((organizationId?: string) => Promise<void>) | null = null;
 let storeRef: (() => ObjectStore) | null = null;
 
-/** server.ts shares its projection (for SMTP/branding reads), upload storage and a refresh hook. No hydration happens here. */
-export function setConsoleDbReference(dbStore: any, saveFn: (alongside?: () => Promise<unknown>) => Promise<void>, getStore: () => ObjectStore, onOrganizationsChanged?: (organizationId?: string) => Promise<void>) {
-  globalDbRef = dbStore;
-  saveDbFnRef = saveFn;
+/** server.ts shares its upload storage and a refresh hook. No hydration happens here. */
+export function setConsoleDbReference(getStore: () => ObjectStore, onOrganizationsChanged?: (organizationId?: string) => Promise<void>) {
   storeRef = getStore;
   organizationChangedRef = onOrganizationsChanged || null;
 }
@@ -530,16 +526,14 @@ authConsoleRouter.put('/organizations/:id', platformHandler(async (req, res, ide
 authConsoleRouter.post('/organizations/:id/reset', platformHandler(async (req, res, identity) => {
   const id = req.params.id;
   await readOrganizationSettings(sql, id); // 404 for unknown IDs
-  if (!globalDbRef || !saveDbFnRef || !storeRef) throw new ApiError(503, 'NOT_READY', 'Business data is not ready.');
+  if (!storeRef) throw new ApiError(503, 'NOT_READY', 'Business data is not ready.');
   const organization = await sql.get('SELECT slug FROM organization WHERE id = ?', id) as { slug?: string } | undefined;
   const confirmation = String(req.body?.confirm ?? '').trim().toLowerCase();
   if (!organization?.slug || confirmation !== organization.slug.toLowerCase()) throw bad('Type the organization slug to confirm the reset.');
   const result = await resetOrganizationData({
     db: sql,
-    memory: globalDbRef,
     organizationId: id,
     storage: storeRef(),
-    save: saveDbFnRef,
   });
   await appendAudit(sql, auditActorFor(req, identity), {
     organizationId: id, action: 'organization.reset', targetType: 'organization', targetId: id, outcome: 'success',
@@ -552,7 +546,7 @@ authConsoleRouter.post('/organizations/:id/reset', platformHandler(async (req, r
 authConsoleRouter.delete('/organizations/:id', platformHandler(async (req, res, identity) => {
   const id = req.params.id;
   await readOrganizationSettings(sql, id); // 404 for unknown IDs
-  const owned = await organizationOwnsBusinessData(globalDbRef, id);
+  const owned = await organizationOwnsBusinessData(id);
   if (owned) throw new ApiError(409, 'ORGANIZATION_IN_USE', "Move or remove this organization's records first.");
   await sql.tx(async () => {
     await sql.run('DELETE FROM "teamMember" WHERE "teamId" IN (SELECT id FROM team WHERE "organizationId" = ?)', id);

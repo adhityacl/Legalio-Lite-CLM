@@ -492,6 +492,46 @@ for (const entity of PERSISTED_ENTITIES) {
   });
 }
 
+test('templates: a template\'s version is its concurrency token; concurrent saves of one template never lose an update', async () => {
+  const created = ok(await api('adminA', 'POST', '/api/templates', { org: A, body: { name: 'NDA', contentId: 'doc-1', customFields: [] } })).template;
+  assert.equal(created.version, 1);
+  const save = (name: string, version?: number) => api('adminA', 'POST', '/api/templates', { org: A, body: { id: created.id, name, contentId: 'doc-1', customFields: [], ...(version ? { version } : {}) } });
+  const race = await Promise.all([save('Writer one', 1), save('Writer two', 1)]);
+  assert.deepEqual(race.map((reply) => reply.status).sort(), [200, 409], race.map((r) => r.raw.slice(0, 120)).join(' | '));
+  assert.equal(race.find((reply) => reply.status === 409)!.body.code, 'VERSION_CONFLICT');
+  assert.equal(race.find((reply) => reply.status === 200)!.body.template.version, 2);
+  assert.equal((await save('Old copy', 1)).status, 409);
+  assert.equal((await save('No version')).body.template.version, 3, 'a client without a version replaces the current one, like before');
+  const listed = ok(await api('adminA', 'GET', '/api/templates', { org: A }));
+  assert.equal(listed.filter((t: any) => t.id === created.id).length, 1);
+  assert.deepEqual(ok(await api('adminB', 'GET', '/api/templates', { org: B })), [], 'another organization sees none');
+  denied(await api('adminB', 'POST', '/api/templates', { org: B, body: { id: created.id, name: 'hijack', contentId: 'x' } }), [404]);
+  denied(await api('adminB', 'DELETE', `/api/templates/${created.id}`, { org: B }), [404]);
+  ok(await api('adminA', 'DELETE', `/api/templates/${created.id}`, { org: A }));
+  denied(await api('adminA', 'DELETE', `/api/templates/${created.id}`, { org: A }), [404]);
+});
+
+test('notifications: mark-read and delete touch only what the caller may see; deleting a contract removes its notifications', async () => {
+  const seedNote = (id: string, org: string, parent: string) => sql.run(
+    `INSERT INTO notifications (notif_id, organization_id, record_position, parent_type, parent_id, message, is_read, is_sent) VALUES (?, ?, 0, 'Contract', ?, 'note', 0, 0)`, id, org, parent);
+  const legal = await seed(A, 'adminA', 'NOTE1', 'Legal');
+  await seedNote('note-sales', A, fixtureA.contract.contract_id);
+  await seedNote('note-legal', A, legal.contract.contract_id);
+  await seedNote('note-b', B, fixtureB.contract.contract_id);
+  const salesView = ok(await api('salesEditorA', 'GET', '/api/notification-logs', { org: A }));
+  assert.ok(salesView.some((n: any) => n.notif_id === 'note-sales') && !salesView.some((n: any) => n.notif_id === 'note-legal'));
+  ok(await api('salesEditorA', 'POST', '/api/notification-logs/mark-read', { org: A, body: { markAll: true } }));
+  const read = async (id: string) => (await sql.get(`SELECT is_read FROM notifications WHERE notif_id = ?`, id)).is_read;
+  assert.equal(await read('note-sales'), 1);
+  assert.equal(await read('note-legal'), 0, 'another department\'s notification is untouched');
+  assert.equal(await read('note-b'), 0, 'so is another organization\'s');
+  ok(await api('salesEditorA', 'POST', '/api/notification-logs/delete', { org: A, body: { deleteAll: true } }));
+  assert.equal((await sql.get(`SELECT COUNT(*) AS n FROM notifications WHERE notif_id IN ('note-legal', 'note-b')`)).n, 2);
+  assert.equal((await sql.get(`SELECT COUNT(*) AS n FROM notifications WHERE notif_id = 'note-sales'`)).n, 0);
+  ok(await api('adminA', 'DELETE', `/api/contracts/${legal.contract.contract_id}`, { org: A }));
+  assert.equal((await sql.get(`SELECT COUNT(*) AS n FROM notifications WHERE notif_id = 'note-legal'`)).n, 0, 'removed with its contract');
+});
+
 test('partners: two document uploads to different due-diligence documents on one partner both land', async () => {
   const partner = ok(await api('adminA', 'POST', '/api/partners', { org: A, body: { partner_name: 'DD Race Partner', internal_pic: 'Sales', country: 'ID' } })).partner;
   const docs = (partner.dd_documents as any[]).slice(0, 2).map((d) => d.name);

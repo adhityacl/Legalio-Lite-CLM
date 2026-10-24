@@ -34,8 +34,13 @@ export function createEntityRepository(db: Sql, table: string) {
   /** Column values of an API row; `version` and the organization never travel in extra_json. */
   const columns = (input: Row): Row => {
     const { version: _version, ...row } = input;
-    return encodeFields(arrayMarkers(canonicalize(entity, row), childMarkerKeys(table)), entity.fields, [entity.key, 'organizationId']);
+    const values = encodeFields(arrayMarkers(canonicalize(entity, row), childMarkerKeys(table)), entity.fields, [entity.key, 'organizationId']);
+    // The concurrency column is never written from the API row (an entity whose own business field is called `version` shares the column).
+    delete values.version;
+    return values;
   };
+  /** An entity with a business field called `version` (templates) keeps the stored value on insert; the column is its concurrency token too. */
+  const ownVersion = entity.fields.some((field) => field.sql === 'version');
   const children = (input: Row) => {
     const { version: _version, ...row } = input;
     return canonicalize(entity, row);
@@ -68,6 +73,7 @@ export function createEntityRepository(db: Sql, table: string) {
         const edge = options.position === 'last' ? 'COALESCE(MAX(record_position), -1) + 1' : 'COALESCE(MIN(record_position), 1) - 1';
         const first = await db.get<{ position: number }>(`SELECT ${edge} AS position FROM ${t} WHERE organization_id = ?`, organizationId);
         const values: Row = { [entity.key]: id, organization_id: organizationId, record_position: Number(first?.position ?? 0), ...columns(row) };
+        if (ownVersion && Number(row.version) > 0) values.version = Number(row.version);
         const names = Object.keys(values);
         await db.run(`INSERT INTO ${t} (${names.map(quote).join(',')}) VALUES (${names.map((name) => '@' + name).join(',')})`, values);
         await writeChildren(db, entity, children(row));

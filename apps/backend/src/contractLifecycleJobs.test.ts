@@ -12,7 +12,7 @@ const { createTestDatabase } = await import('./testDatabase');
 const { ensureSchema } = await import('./schema');
 const { contractRepository } = await import('./repositories/contractRepository');
 const jobs = await import('./reminderJobs');
-const { normalizeStoredContracts, db } = await import('./memoryDb');
+const { normalizeStoredContracts } = await import('./memoryDb');
 
 let database: Awaited<ReturnType<typeof createTestDatabase>>;
 before(async () => { database = await createTestDatabase(); await ensureSchema(); });

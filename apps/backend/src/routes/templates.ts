@@ -1,5 +1,7 @@
-import { getRequestTenantId, isMatchingOrg, orgContextOf } from '../recordAccess';
-import { db, saveDb } from '../memoryDb';
+import { randomBytes } from 'node:crypto';
+import { getRequestTenantId, orgContextOf } from '../recordAccess';
+import { templateRepository } from '../repositories/templateRepository';
+import { requestedVersion } from '../requestVersion';
 import { sendRouteError } from '../apiErrors';
 import { ensureAiAvailable, getValidAiModel, generateContentWithRetryAndFallback } from '../aiClient';
 import { aiPolicyContext } from '../tenantPolicy';
@@ -16,11 +18,14 @@ export function createTemplatesRouter() {
 
 // Custom Template & Translation Endpoints
 // Contract templates are tenant-scoped (PRD §3.3.3, §3.4.1).
-app.get("/api/templates", (req, res) => {
-  const tenantId = getRequestTenantId(req);
-  res.json((db.templates || []).filter((t: any) => isMatchingOrg(t.organizationId, tenantId)));
+app.get("/api/templates", async (req, res) => {
+  res.json(await templateRepository.list(getRequestTenantId(req)));
 });
 
+/**
+ * Creates a template, or saves a new version of the one named by `id`. A save that names the `version` it was based on is rejected
+ * with 409 VERSION_CONFLICT when someone saved in between; without one it replaces the current version.
+ */
 app.post("/api/templates", async (req, res) => {
   try {
     const { id, name, contentId, customFields } = req.body;
@@ -28,52 +33,36 @@ app.post("/api/templates", async (req, res) => {
       return res.status(400).json({ error: "Name and content are required." });
     }
     const tenantId = getRequestTenantId(req);
-    const templateId = id || `tpl-${Date.now()}`;
+    const templateId = id || `tpl-${Date.now()}-${randomBytes(3).toString("hex")}`;
     const nowIso = new Date().toISOString();
 
-    if (!db.templates) {
-      db.templates = [];
-    }
-
-    const existingIndex = db.templates.findIndex((t: any) => t.id === templateId);
-    if (existingIndex >= 0 && !isMatchingOrg(db.templates[existingIndex].organizationId, tenantId)) {
+    const previous = await templateRepository.get(tenantId, templateId);
+    if (!previous && await templateRepository.getAnyOrganization(templateId)) {
       return res.status(404).json({ error: "Template not found." });
     }
-    const previous = existingIndex >= 0 ? db.templates[existingIndex] : null;
     const templateData = {
       id: templateId,
-      organizationId: previous?.organizationId || tenantId,
+      organizationId: tenantId,
       name: String(name).slice(0, 200),
       contentId,
       customFields: Array.isArray(customFields) ? customFields : [],
-      version: (Number(previous?.version) || 0) + 1,
       createdAt: previous?.createdAt || nowIso,
       updatedAt: nowIso,
     };
-
-    if (existingIndex >= 0) {
-      db.templates[existingIndex] = templateData;
-    } else {
-      db.templates.push(templateData);
-    }
-
-    await saveDb();
-    res.json({ success: true, template: templateData });
+    const template = previous
+      ? await templateRepository.update(templateData, requestedVersion(req, req.body.version) ?? previous.version)
+      : await templateRepository.insert(templateData, { position: "last" });
+    res.json({ success: true, template });
   } catch (err: any) {
     sendRouteError(req, res, err, "request failed", "Could not save the template.", { status: 500 });
   }
 });
 
 app.delete("/api/templates/:id", async (req, res) => {
-  const tenantId = getRequestTenantId(req);
-  const index = (db.templates || []).findIndex(
-    (t: any) => t.id === req.params.id && isMatchingOrg(t.organizationId, tenantId),
-  );
-  if (index < 0) {
+  const removed = await templateRepository.remove(getRequestTenantId(req), req.params.id);
+  if (!removed) {
     return res.status(404).json({ error: "Template not found." });
   }
-  db.templates.splice(index, 1);
-  await saveDb();
   res.json({ success: true });
 });
 

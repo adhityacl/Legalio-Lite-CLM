@@ -7,7 +7,7 @@ import { hasOrganizationScope } from '../rbac';
 import { contractRepository } from '../repositories/contractRepository';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity, orgContextOf, scopeOf } from '../recordAccess';
-import { db, countryNameForPrompt, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { db, countryNameForPrompt, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { normalizeCurrencyCode, convertToUsdWithFallback, getDefaultUsdRate } from '@legalio/shared/currencyUtils';
 import { tenantDefaultCurrency, aiPolicyContext, getTenantSettings, findTenant, computeLifecycle } from '../tenantPolicy';
 import { upload } from '../uploadMiddleware';

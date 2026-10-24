@@ -15,11 +15,13 @@ const { sql } = await import('./db');
 const { createTestDatabase } = await import('./testDatabase');
 const { ensureSchema } = await import('./schema');
 const { VersionConflictError } = await import('./repositories/errors');
-const { synchronizeBusinessRows, resetSyncCache } = await import('./normalizedCoreStore');
+const { createCoreSaver } = await import('./coreDataStore');
 const { partnerRepository } = await import('./repositories/partnerRepository');
 const { ioRepository } = await import('./repositories/ioRepository');
 const { spendingRepository } = await import('./repositories/spendingRepository');
 const { evaluationRepository } = await import('./repositories/evaluationRepository');
+const { notificationRepository } = await import('./repositories/notificationRepository');
+const { templateRepository } = await import('./repositories/templateRepository');
 
 type Row = Record<string, any>;
 interface Spec {
@@ -53,6 +55,15 @@ const SPECS: Spec[] = [
   {
     name: 'evaluations', table: 'evaluations', key: 'id', repo: evaluationRepository, field: 'supplier_name',
     make: (id, org = 'org-a') => ({ id, organizationId: org, partner_id: null, supplier_name: `Supplier ${id}`, review_date: '2026-02-01', sla_score: 80, calculated_score: 91.5, final_evaluation: 'Recommended', notes: 'solid orchard work', custom_extension: { keep: true } }),
+  },
+  {
+    name: 'notifications', table: 'notifications', key: 'notif_id', repo: notificationRepository, field: 'message',
+    make: (id, org = 'org-a') => ({ notif_id: id, organizationId: org, parent_type: 'Contract', parent_id: 'C1', parent_number: 'CTR-1', notification_type: 'Reminder 30d', message: `Message ${id}`, is_sent: false, is_read: false,
+      message_params: { daysRemaining: 30 }, custom_extension: { keep: true } }),
+  },
+  {
+    name: 'templates', table: 'templates', key: 'id', repo: templateRepository, field: 'name',
+    make: (id, org = 'org-a') => ({ id, organizationId: org, name: `Template ${id}`, contentId: 'doc-1', customFields: [{ key: 'party', label: 'Party' }], createdAt: '2026-01-01', updatedAt: '2026-01-02', custom_extension: { keep: true } }),
   },
 ];
 
@@ -135,17 +146,19 @@ for (const spec of SPECS) {
       assert.equal((await sql.get(`SELECT COUNT(*) AS n FROM search_records WHERE entity_id = 'X1'`)).n, 0);
     });
 
-    test('the snapshot sync never writes, reads or deletes these rows', async () => {
+    test('the in-memory snapshot save never writes, reads or deletes these rows', async () => {
       await repo.insert(spec.make('X1'));
       await repo.insert(spec.make('X2'));
       const stamp = async () => sql.all(`SELECT ${spec.key} AS id, xmin::text AS xmin, version FROM ${spec.table} ORDER BY ${spec.key}`);
       const before = await stamp();
-      resetSyncCache(sql);
       const collection = (await import('./normalizedSchema')).entityFor(spec.table).collection;
-      await synchronizeBusinessRows(sql, { [collection]: [] });
-      await synchronizeBusinessRows(sql, { [collection]: [spec.make('GHOST')] });
+      const memory: Record<string, any> = { [collection]: [], allowedUsers: [], branding: { appName: 'X' } };
+      const saver = createCoreSaver(sql, () => memory);
+      await saver.save();
+      memory[collection] = [spec.make('GHOST')];
+      await saver.save();
       assert.deepEqual(await stamp(), before, 'rows are byte-for-byte untouched (same xmin, same version)');
-      assert.equal(await repo.get('org-a', 'GHOST'), undefined, 'rows passed to the sync are ignored, not inserted');
+      assert.equal(await repo.get('org-a', 'GHOST'), undefined, 'rows left in memory are ignored, not inserted');
     });
   });
 }

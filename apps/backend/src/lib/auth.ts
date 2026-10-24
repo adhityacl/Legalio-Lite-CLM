@@ -1,4 +1,3 @@
-import { readBusinessRows } from '../normalizedCoreStore';
 import { synchronizeCoreData } from '../coreDataStore';
 import { openProviderSecrets } from '../providerSecrets';
 import { betterAuth, type BetterAuthOptions, type BetterAuthPlugin } from "better-auth";
@@ -106,17 +105,10 @@ const orgRoles = {
 
 export async function loadCoreData() {
   const payloads = async (table: string) => (await sql.all(`SELECT payload FROM ${table}`)).map((r: any) => JSON.parse(r.payload));
-  const business = (table: string) => readBusinessRows(sql, table);
   const single = async (text: string) => { const row = await sql.get(text); return row ? JSON.parse(row.payload) : null; };
   const rows = {
+    // Business records are repository-backed (src/repositories): the projection holds the allowlist and the installation configuration only.
     allowedUsers: await payloads('allowed_users'),
-    // Repository-backed (repositories/partnerRepository.ts): never loaded into the snapshot.
-    // Repository-backed (repositories/contractRepository.ts): never loaded into the snapshot.
-    // Repository-backed (repositories/ioRepository.ts): never loaded into the snapshot.
-    notifications: await business('notifications'),
-    // Append-only table, read per organization through activityLog.ts: never loaded into memory.
-    activityLogs: [] as any[],
-    templates: await business('templates'),
     branding: await single(`SELECT payload FROM branding WHERE id = 'branding'`),
     googleConfig: await single(`SELECT payload FROM app_settings WHERE id = 'google_config'`).then(config => config && openProviderSecrets(config)),
     newsTicker: await single(`SELECT payload FROM news_ticker WHERE id = 'default'`),
