@@ -38,21 +38,31 @@ Upgrade notes: schema changes are versioned migrations (see POSTGRES_STORAGE.md)
 - Record ids (`P0001`, `C0001`, `IO0001`, `SP0001`, `EVAL-2026-001`) now come from PostgreSQL sequences created by migration `0006_id_sequences`. At every start each sequence is moved past the highest number stored, so existing data continues without gaps; numbers of deleted records are no longer reused.
 - API request bodies for partners, contracts, IOs, spendings and evaluations are validated and whitelisted (HTTP 400 `VALIDATION_FAILED` with `issues`); errors use `{ error, code, message, status, requestId }` and no longer carry internal error text. Quote the `requestId` to find the cause in the logs.
 
-### Contracts are repository-backed (Phase 2B)
+### Repository-backed data and several instances (Phase 2)
 
-- Migration `0007_contract_versions` adds `contracts.version` (default 1) and two indexes; existing contract rows are adopted in place and the old
-  snapshot rows are the new rows: nothing is copied or re-imported. It is additive, so code rollback is safe (the old release ignores the column and
-  keeps working on the same table).
-- Contract writes are committed row by row; a second editor saving a stale copy gets HTTP 409 `VERSION_CONFLICT` (reload and re-apply).
-- Contracts are no longer loaded into memory at boot; startup time and memory no longer grow with the number of contracts.
+- Migrations `0007` and `0009` .. `0014` add a `version` column (default 1) and lookup indexes to contracts, partners, insertion orders, spendings,
+  evaluations, notifications and templates (templates keep their own `version`; empty ones become 1). Existing rows are adopted in place: nothing is
+  copied or re-imported. The migrations are additive, so rolling the *code* back is safe (the old release ignores the columns and keeps working on the
+  same tables), but never run an old and a current release against one database at the same time.
+- Migration `0015_drive_backup_index` creates the shared Drive backup index; the first backup pass imports and renames `APP_DATA_DIR/drive-backup.json`.
+- The legacy `spd-...` spending ids of the earliest releases are renumbered from the id sequence at start (once; the old release renumbered them from 1).
+- Writes are committed row by row; a second editor saving a stale copy gets HTTP 409 `VERSION_CONFLICT` (reload and re-apply). Deleting a partner is
+  one transaction (its contracts, orders and notifications go; invoices and evaluations keep their record without the partner link).
+- No business record is loaded into memory at boot; startup time and memory no longer grow with the amount of data.
+- **Several backend instances can share one database** (behind a load balancer; keep `REMINDER_SCHEDULER_ENABLED` as is, the advisory lock picks one).
+  Start them in any order, also together. Configuration changes (branding, Google/SMTP/AI settings, organization policy, credentials) reach the other
+  instances within a moment through `NOTIFY` and at the latest after `SHARED_STATE_POLL_MS` (default 30000, `0` turns the periodic reload off;
+  `SHARED_STATE_SYNC=false` turns the whole mechanism off, e.g. for a single instance behind a restricted connection pooler). `NOTIFY` / `LISTEN` needs a
+  session connection to PostgreSQL (not transaction-mode pgbouncer). Per-instance limits: rate limiters count per process (N instances = up to N times
+  the configured rate), and the file-upload debounce queue of the Drive backup is lost on restart (the next full backup pass catches up).
 
 ### Paged lists and search (Phase 2B)
 
 - `GET /api/contracts`, `/api/partners`, `/api/ios`, `/api/partner-spendings` still return the complete array when called without parameters (and
   `/api/init-data` is unchanged). With `limit` (1-500, default 50 when only `offset` is given), `offset`, `q` (words that must all match),
   `sort` + `dir=asc|desc` and per-endpoint filters they return one page and the number of matching, *visible* records in `X-Total-Count`.
-  Tenant and department scoping apply before counting. Contracts page in SQL for organization-scope roles and filter-then-page for department roles;
-  the other lists page in memory after scoping (cheap until their repositories exist).
+  Tenant and department scoping apply before counting. Lists page in SQL for organization-scope roles and filter-then-page for department roles.
+  `GET /api/partner-evaluations` accepts the same parameters (filters `partner_id`, `final_evaluation`).
   Filters: contracts `status`, `status_approval`, `document_type`, `partner_id`, `internal_pic`, `end_from`, `end_to`; partners `internal_pic`,
   `partner_type`, `status_dd`, `country`; orders `status`, `partner_id`, `contract_id`; spendings `payment_status`, `vendor_id`, `currency`.
 - `GET /api/search?q=&type=&limit=` runs in SQL, reads the matching records of each type in one query, and returns only records the caller may see.

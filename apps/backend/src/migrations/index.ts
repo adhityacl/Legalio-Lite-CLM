@@ -12,8 +12,9 @@ import { migration as spendingVersions } from './0011_spending_versions';
 import { migration as evaluationVersions } from './0012_evaluation_versions';
 import { migration as notificationVersions } from './0013_notification_versions';
 import { migration as templateVersions } from './0014_template_versions';
+import { migration as driveBackupIndex } from './0015_drive_backup_index';
 import type { Migration } from './types';
 
 /** Append new migrations at the end with the next number. */
-export const MIGRATIONS: Migration[] = [baseline, reminderLedger, uploadOwners, aiUsage, auditImmutable, idSequences, contractVersions, searchTrigram, partnerVersions, orderVersions, spendingVersions, evaluationVersions, notificationVersions, templateVersions];
+export const MIGRATIONS: Migration[] = [baseline, reminderLedger, uploadOwners, aiUsage, auditImmutable, idSequences, contractVersions, searchTrigram, partnerVersions, orderVersions, spendingVersions, evaluationVersions, notificationVersions, templateVersions, driveBackupIndex];
 export type { Migration };

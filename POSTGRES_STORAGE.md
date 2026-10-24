@@ -24,7 +24,7 @@ Upload links keep the `/uploads/...` form. Each link maps to the object key `<pr
 
 An application reset deletes every object under the prefix, one request per object. Use a dedicated bucket or prefix for each installation.
 
-The Google Drive backup index is kept in `APP_DATA_DIR/drive-backup.json`. The old `uploads.drive-backup.json` is no longer used.
+The Google Drive backup index (which stored objects were already mirrored, by ETag) is the table `drive_backup_index`. An existing `APP_DATA_DIR/drive-backup.json` is imported into it by the first backup pass and renamed to `drive-backup.json.imported`. The old `uploads.drive-backup.json` is no longer used.
 
 ## Credential encryption
 
@@ -32,7 +32,7 @@ Rows in `integration_credentials` (Google and COS) are encrypted with AES-256-GC
 
 ## Operations
 
-- **Run one instance only.** The backend keeps an in-memory copy of the workspace and caches credentials per process. Do not run two backends against the same database.
+- **Several instances may share one database.** Business data is read from and written to PostgreSQL per request (row-level, with optimistic concurrency); only configuration is cached per process and kept in step by `NOTIFY` plus a 30-second reload. Details, the tested guarantees and the exact list of what is still per process (rate limiters, concurrent edits of different configuration sections, the Drive backup debounce queue) are in [docs/ARCHITECTURE-persistence.md](docs/ARCHITECTURE-persistence.md). Do not run an old (snapshot) release and a current one at the same time against one database.
 - **Backups:** run `scripts/backup.sh` (pg_dump custom format, timestamped, with retention) and `scripts/restore.sh`, and enable versioning on the COS bucket for files. Back up `BETTER_AUTH_SECRET` separately. See [docs/RUNBOOK.md](docs/RUNBOOK.md). The optional Google Drive backup copies uploaded files only, not the database.
 - **Old SQLite data is not imported.** Do not delete `/data/kaelyn.db` on existing servers; it is the archive of the old SQLite installation.
 
@@ -42,8 +42,9 @@ Rows in `integration_credentials` (Google and COS) are encrypted with AES-256-GC
 - `npm run build:sys`, then `npm run test:e2e:postgres` and `npm run test:e2e:data-entry`: real HTTP and Chromium checks against an isolated test database and an in-memory object store. They need Playwright Chromium.
 
 
-## Repository-backed contracts (Phase 2B)
+## Repository-backed persistence (Phase 2)
 
-Contracts are no longer part of the in-memory snapshot or its full-database sync. They are read and written row by row by
-`apps/backend/src/repositories/contractRepository.ts`, with an optimistic-concurrency `version` column (migration `0007_contract_versions`).
-Existing rows are adopted in place (same table, version 1). See `docs/ARCHITECTURE-persistence.md`.
+Partners, contracts, insertion orders, spendings, evaluations, notifications, templates and the legacy allowlist are read and written row by
+row by `apps/backend/src/repositories/*`, each with an optimistic-concurrency `version` column (additive migrations `0007`, `0009` .. `0014`;
+existing rows are adopted in place at version 1, templates keep their own version). The in-memory snapshot holds installation configuration
+only, and its save no longer touches or deletes any business row. See `docs/ARCHITECTURE-persistence.md`.

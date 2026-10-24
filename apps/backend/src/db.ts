@@ -196,6 +196,20 @@ export async function withAdvisoryLock<T>(key: number, fn: () => Promise<T>): Pr
   }
 }
 
+/**
+ * Like `withAdvisoryLock`, but waits (polling, so the pool's statement timeout never cuts the wait) until the lock is free. For work that
+ * must run in one instance at a time while the others simply follow, such as the seeding and one-time repairs of a start.
+ */
+export async function withAdvisoryLockWait<T>(key: number, fn: () => Promise<T>, timeoutMs = 120_000): Promise<T> {
+  const started = Date.now();
+  for (;;) {
+    const outcome = await withAdvisoryLock(key, fn);
+    if (outcome.ran) return outcome.value as T;
+    if (Date.now() - started > timeoutMs) throw new Error(`Timed out after ${timeoutMs} ms waiting for another instance to finish starting up.`);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+}
+
 export type Sql = ReturnType<typeof buildPg>;
 
 /** The application's facade over `pool()`. */

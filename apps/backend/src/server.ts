@@ -10,7 +10,7 @@ import { aiContext } from "./aiLimits";
 import { sendApiError } from "./apiErrors";
 import { forwardAsyncRouteErrors } from "./asyncRoutes";
 import { setConsoleDbReference, authConsoleRouter, ensureUserAccountsExist } from "./authConsoleRoutes";
-import { sql } from "./db";
+import { sql, withAdvisoryLockWait } from "./db";
 import { removeDemoAccounts } from "./demoAccounts";
 import { demoAdminEmail, demoAdminPassword, shouldSeedDemoAdmin } from "./demoAdmin";
 import { createSensitiveRateLimiter, trustProxySetting } from "./edgeConfig";
@@ -26,7 +26,7 @@ import { hasServiceAccountCredentials } from "./lib/googleServiceAccountAuth";
 import { componentLog, errorResponder, requestLogging } from "./logger";
 import { mailTemplates, sendPlatformMail } from "./mailHelpers";
 import { syncIdSequences } from "./ids";
-import { coreSaver, db, demoData, normalizeContractRecord, normalizeIoRecord, normalizePartnerRecord, normalizeStoredContracts, normalizeSpendingRecord, normalizeStoredIos, normalizeStoredPartners, normalizeStoredSpendings, migrateLegacySpendingIds, refreshTenantProjection, saveDb, seedContracts, seedEvaluations, seedIos, seedNotifications, seedPartners, seedSpendings, syncAdderNames } from "./memoryDb";
+import { coreSaver, db, demoData, normalizeContractRecord, normalizeIoRecord, normalizePartnerRecord, normalizeStoredContracts, normalizeSpendingRecord, normalizeStoredIos, normalizeStoredPartners, normalizeStoredSpendings, migrateLegacySpendingIds, markConfigSynced, refreshTenantProjection, saveDb, seedContracts, seedEvaluations, seedIos, seedNotifications, seedPartners, seedSpendings } from "./memoryDb";
 import { createOrganizationAdminRouter } from "./organizationAdminRoutes";
 import { seedOrganizationsFromDataset } from "./organizationProvisioning";
 import { isEmptyInstall } from "./organizationSettingsStore";
@@ -65,6 +65,7 @@ import { partnerRepository } from "./repositories/partnerRepository";
 import { anyBusinessData } from "./businessData";
 import { insertRepositoryRows } from "./repositories/seed";
 import { ensureSchema } from "./schema";
+import { startSharedStateSync, stopSharedStateSync } from "./sharedState";
 
 const log = componentLog("server");
 
@@ -122,6 +123,15 @@ export async function init() {
   await ensureSchema();
   await reloadAuthConfiguration();
   await googleCredentials.init();
+  // Seeding the demo workspace and the one-time data repairs run in one instance at a time; an instance that starts meanwhile waits,
+  // then finds nothing left to do (every step is idempotent).
+  await withAdvisoryLockWait(STARTUP_LOCK_KEY, prepareData);
+  reminderScheduler.start();
+  // Other instances' changes to the configuration, the organizations' policies and the credentials arrive by NOTIFY (with a periodic fallback).
+  if (process.env.SHARED_STATE_SYNC !== "false") startSharedStateSync();
+}
+const STARTUP_LOCK_KEY = 0x4c475354; // "LGST"
+async function prepareData() {
   const freshInstall = await isEmptyInstall(sql);
   if (freshInstall && !IS_TEST_MODE) {
     await seedOrganizationsFromDataset(sql, demoData, {
@@ -148,10 +158,10 @@ export async function init() {
       googleConfig: initialData.googleConfig ?? db.googleConfig,
       newsTicker: initialData.newsTicker ?? db.newsTicker,
     });
+    markConfigSynced();
     log.info("Database loaded from PostgreSQL as the source of truth.");
   } else {
     Object.assign(db, {
-      allowedUsers: initialData.allowedUsers || [],
       branding: initialData.branding || db.branding,
       googleConfig: initialData.googleConfig || db.googleConfig,
       newsTicker: initialData.newsTicker || db.newsTicker,
@@ -171,8 +181,7 @@ export async function init() {
   // Demo-dataset logins share DEMO_ADMIN_PASSWORD, so a production server never keeps them —
   // including servers that created them before this rule existed.
   if (process.env.NODE_ENV === "production") {
-    const { allowedUsers, removed } = await removeDemoAccounts(sql, db.allowedUsers || []);
-    db.allowedUsers = allowedUsers;
+    const { removed } = await removeDemoAccounts(sql);
     if (removed) log.info(`Production: removed ${removed} demo login account(s).`);
   }
   // Demo partners and contracts are repository-backed: they commit together with the orders that reference each other.
@@ -197,12 +206,10 @@ export async function init() {
       log.error("Startup category folder provisioning error:", err),
     );
   }
-  syncAdderNames();
   await saveDb();
   await syncIdSequences();
   await recalculateStatuses();
   await seedReminderLedger();
-  reminderScheduler.start();
 }
 
 app.use("/api", createGoogleCredentialsRouter(googleCredentials));
@@ -271,6 +278,7 @@ app.all("/api/*", (req: express.Request, res: express.Response) => {
 app.use(errorResponder());
 /** Graceful shutdown: stop background work, then wait for queued database saves. The caller closes the pool afterwards. */
 export async function drain() {
+  await stopSharedStateSync();
   await stopReminderScheduler();
   await coreSaver.idle();
 }

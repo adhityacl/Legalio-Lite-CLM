@@ -3,7 +3,10 @@ import { OrgContext, buildMatrix as buildRbacMatrix, can, hasOrganizationScope }
 import { sql } from '../db';
 import { capabilitiesOf, identityResponse } from '../organizationAdminRoutes';
 import { orgContextOf, addActivityLog } from '../recordAccess';
-import { syncAdderNames, db, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { randomBytes } from 'node:crypto';
+import { allowedUserRepository, withAdderNames, LastAdminError } from '../repositories/allowedUserRepository';
+import { RecordNotFoundError, RepositoryError } from '../repositories/errors';
 import { checkIsAdmin } from '../adminCheck';
 import { hashPassword } from 'better-auth/crypto';
 import { sendRouteError } from '../apiErrors';
@@ -91,9 +94,8 @@ app.post("/api/user/log-activity", async (req: express.Request, res: express.Res
   await addActivityLog("", "", "", actionType, "AUTH", actionType === "LOGOUT" ? "Signed out" : "Signed in", req, ctx?.organizationId ?? null);
   res.json({ success: true });
 });
-app.get("/api/user/allowed-users", (req: express.Request, res: express.Response) => {
-  syncAdderNames();
-  res.json(db.allowedUsers);
+app.get("/api/user/allowed-users", async (req: express.Request, res: express.Response) => {
+  res.json(withAdderNames(await allowedUserRepository.list()));
 });
 app.post("/api/user/allowed-users", async (req: express.Request, res: express.Response) => {
   const { email, name, role, department, adminEmail, adminName } = req.body;
@@ -108,16 +110,13 @@ app.post("/api/user/allowed-users", async (req: express.Request, res: express.Re
       .status(400)
       .json({ error: "Email, Nama, dan Role wajib diisi." });
   }
-  const exists = db.allowedUsers.some(
-    (u) => u.email.toLowerCase() === email.trim().toLowerCase(),
-  );
-  if (exists) {
+  if (await allowedUserRepository.findByEmail(email)) {
     return res
       .status(400)
       .json({ error: `Email '${email}' sudah ada dalam daftar whitelist.` });
   }
   const newUser = {
-    id: `usr-${Date.now()}`,
+    id: `usr-${Date.now()}-${randomBytes(3).toString("hex")}`,
     email: email.trim().toLowerCase(),
     name,
     role,
@@ -127,9 +126,7 @@ app.post("/api/user/allowed-users", async (req: express.Request, res: express.Re
     addedByEmail: adminCheck.adminEmail,
     createdAt: new Date().toISOString(),
   };
-  db.allowedUsers.unshift(newUser);
-  syncAdderNames();
-  await saveDb();
+  await allowedUserRepository.insert(newUser);
   await addActivityLog(
     adminCheck.adminEmail || "admin@app",
     adminCheck.adminName || "Admin",
@@ -151,27 +148,19 @@ app.put("/api/user/allowed-users/:id", async (req: express.Request, res: express
       .status(403)
       .json({ error: "Forbidden: Only Admins can manage whitelist." });
   }
-  const user = db.allowedUsers.find((u) => u.id === id);
-  if (!user) {
-    return res.status(404).json({ error: "Pengguna tidak ditemukan." });
+  let user;
+  try {
+    user = await allowedUserRepository.mutate(id, (entry) => {
+      if (role) entry.role = role;
+      if (department) entry.department = department;
+      if (status) entry.status = status;
+      if (name) entry.name = name;
+    });
+  } catch (err) {
+    if (err instanceof RecordNotFoundError) return res.status(404).json({ error: "Pengguna tidak ditemukan." });
+    if (err instanceof LastAdminError) return res.status(400).json({ error: err.message });
+    throw err;
   }
-  if (user.role === "Admin" && role && role !== "Admin") {
-    const adminCount = db.allowedUsers.filter((u) => u.role === "Admin").length;
-    if (adminCount <= 1) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Sistem membutuhkan minimal 1 akun Admin aktif. Buat Admin lain terlebih dahulu sebelum mengubah role akun ini.",
-        });
-    }
-  }
-  if (role) user.role = role;
-  if (department) user.department = department;
-  if (status) user.status = status;
-  if (name) user.name = name;
-  syncAdderNames();
-  await saveDb();
   await addActivityLog(
     adminCheck.adminEmail || "admin@app",
     adminCheck.adminName || "Admin",
@@ -193,34 +182,18 @@ app.delete("/api/user/allowed-users/:id", async (req: express.Request, res: expr
       .status(403)
       .json({ error: "Forbidden: Only Admins can manage whitelist." });
   }
-  const user = db.allowedUsers.find((u) => u.id === id);
-  if (!user) {
-    return res.status(404).json({ error: "Pengguna tidak ditemukan." });
+  let user;
+  try {
+    user = await allowedUserRepository.remove(id, (entry) => {
+      if (adminCheck.adminEmail && entry.email.toLowerCase() === adminCheck.adminEmail.toLowerCase()) {
+        throw new RepositoryError(400, "SELF_DELETE", "Anda tidak dapat menghapus akun Anda sendiri saat sedang login.");
+      }
+    });
+  } catch (err) {
+    if (err instanceof RecordNotFoundError) return res.status(404).json({ error: "Pengguna tidak ditemukan." });
+    if (err instanceof LastAdminError || (err instanceof RepositoryError && err.apiCode === "SELF_DELETE")) return res.status(400).json({ error: (err as Error).message });
+    throw err;
   }
-  if (
-    adminCheck.adminEmail &&
-    user.email.toLowerCase() === adminCheck.adminEmail.toLowerCase()
-  ) {
-    return res
-      .status(400)
-      .json({
-        error:
-          "Anda tidak dapat menghapus akun Anda sendiri saat sedang login.",
-      });
-  }
-  if (user.role === "Admin") {
-    const adminCount = db.allowedUsers.filter((u) => u.role === "Admin").length;
-    if (adminCount <= 1) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Tidak dapat menghapus satu-satunya akun Admin yang tersisa di sistem.",
-        });
-    }
-  }
-  db.allowedUsers = db.allowedUsers.filter((u) => u.id !== id);
-  await saveDb();
   await addActivityLog(
     adminCheck.adminEmail || "admin@app",
     adminCheck.adminName || "Admin",
@@ -258,9 +231,7 @@ app.post("/api/user/reset-password", async (req: express.Request, res: express.R
     const hashedPassword = await hashPassword(newPassword.trim());
     const nowIso = new Date().toISOString();
     if (!targetUser) {
-      const allowedUser = db.allowedUsers.find(
-        (u) => u.email.toLowerCase() === trimmedEmail,
-      );
+      const allowedUser = await allowedUserRepository.findByEmail(trimmedEmail);
       const userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       const userName = allowedUser?.name || email.split("@")[0];
       const userRole = "user"; // platform role only; organization access comes from memberships

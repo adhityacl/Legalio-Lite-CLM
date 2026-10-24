@@ -30,7 +30,7 @@ interface StoredRow<T> {
  * Integration credentials set by a superuser: Google JSON files (preferred over .env) and Tencent COS.
  * Every payload is sealed with a BETTER_AUTH_SECRET-derived key (secretBox.ts).
  */
-export function createGoogleCredentialStore(db: Sql) {
+export function createGoogleCredentialStore(db: Sql, onChange?: () => void) {
   // Rows mirrored in memory so token callbacks and status reads stay synchronous; only save/remove write them.
   const rows = new Map<string, StoredRow<unknown>>();
   const init = async () => {
@@ -68,6 +68,7 @@ export function createGoogleCredentialStore(db: Sql) {
       ON CONFLICT (id) DO UPDATE SET payload = excluded.payload, updated_by = excluded.updated_by, updated_at = excluded.updated_at
     `, id, seal(JSON.stringify(value)), actorId, updated_at);
     rows.set(id, { value, updated_at });
+    onChange?.();
   };
 
   const save = (kind: GoogleCredentialKind, value: ServiceAccountFile | OAuthClientFile, actorId: string) => write(ROW_ID[kind], value, actorId);
@@ -87,6 +88,7 @@ export function createGoogleCredentialStore(db: Sql) {
   const remove = async (kind: GoogleCredentialKind) => {
     await db.run(`DELETE FROM integration_credentials WHERE id = ?`, ROW_ID[kind]);
     rows.delete(ROW_ID[kind]);
+    onChange?.();
   };
 
   const status = (): GoogleCredentialStatus => {

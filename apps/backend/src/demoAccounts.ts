@@ -22,15 +22,17 @@ export const isDemoAccountEmail = (email: unknown) => {
 };
 
 /**
- * Deletes the demo-dataset login accounts (user, credentials, sessions, memberships) and returns
- * the app user list without them. Both must go: every boot recreates a login, with the
- * DEMO_ADMIN_PASSWORD, for each entry left in the app user list.
+ * Deletes the demo-dataset login accounts (user, credentials, sessions, memberships) and their allowlist entries.
+ * Both must go: every boot recreates a login, with the DEMO_ADMIN_PASSWORD, for each entry left in the allowlist.
  */
-export async function removeDemoAccounts<T extends { id?: unknown; email?: unknown }>(auth: Sql, allowedUsers: T[], keepUserId?: string) {
+export async function removeDemoAccounts(auth: Sql, keepUserId?: string) {
   const doomed = (await auth.all(`SELECT id, email FROM "user"`) as Array<{ id: string; email: string }>).filter(
     (u) => isDemoAccountEmail(u.email) && u.id !== keepUserId,
   );
   await auth.tx(async () => {
+    const listed = (await auth.all(`SELECT id, email FROM allowed_users`) as Array<{ id: string; email: string }>)
+      .filter((u) => isDemoAccountEmail(u.email) && u.id !== keepUserId);
+    for (const { id } of listed) await auth.run(`DELETE FROM allowed_users WHERE id = ?`, id);
     for (const { id } of doomed) {
       for (const table of ["session", "account", "member", "teamMember"]) {
         await auth.run(`DELETE FROM "${table}" WHERE "userId" = ?`, id);
@@ -38,8 +40,5 @@ export async function removeDemoAccounts<T extends { id?: unknown; email?: unkno
       await auth.run(`DELETE FROM "user" WHERE id = ?`, id);
     }
   });
-  return {
-    allowedUsers: allowedUsers.filter((u) => !isDemoAccountEmail(u.email) || u.id === keepUserId),
-    removed: doomed.length,
-  };
+  return { removed: doomed.length };
 }

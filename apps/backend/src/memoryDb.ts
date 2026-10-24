@@ -13,6 +13,7 @@ import { spendingRepository } from './repositories/spendingRepository';
 import { nextEntityId } from './ids';
 import { migratePartnerContact } from './partnerContact';
 import { loadCoreData } from './lib/auth';
+import { notifySharedState, registerSharedState } from './sharedState';
 import { componentLog } from './logger';
 const log = componentLog('memoryDb');
 
@@ -46,7 +47,6 @@ export const seedEvaluations: any[] = seedData.evaluations;
 /** Demo notifications to insert (through the repository) on a first run; empty in test mode. */
 export const seedNotifications: any[] = seedData.notifications;
 export const db: any = {
-  allowedUsers: [],
   tenants: [],
   newsTicker: { items: [] as string[], lastGeneratedAt: null as string | null },
   branding: DEFAULT_BRANDING,
@@ -81,10 +81,40 @@ repositoryBacked('notifications', 'repositories/notificationRepository');
 repositoryBacked('templates', 'repositories/templateRepository');
 bindTenantStore(() => db);
 
-/** Rebuilds the read-only `db.tenants` projection from canonical organization rows (PRD §7.3). */
-export async function refreshTenantProjection() {
+/** Rebuilds the read-only `db.tenants` projection from canonical organization rows (PRD §7.3), in this process only. */
+async function loadTenantProjection() {
   db.tenants = await buildTenantProjection(sql);
 }
+/** Rebuilds the projection here and tells the other instances to do the same (an organization or its policy changed). */
+export async function refreshTenantProjection() {
+  await loadTenantProjection();
+  await notifySharedState('tenants');
+}
+registerSharedState('tenants', loadTenantProjection);
+
+/**
+ * The installation configuration (branding, Google/SMTP/AI settings, news ticker) is read synchronously all over the code, so each
+ * process keeps a copy. `configSeen` is that part as last read from or written to the database: a reload (after another instance
+ * saved) replaces the copy only when it still equals it, i.e. when this process has no unsaved change in flight.
+ */
+const CONFIG_KEYS = ['branding', 'googleConfig', 'newsTicker'] as const;
+const configSeen: Record<string, string> = {};
+const configStamp = (value: unknown) => JSON.stringify(value ?? null);
+export function markConfigSynced(data: Record<string, any> = db) {
+  for (const key of CONFIG_KEYS) if (data[key] !== undefined) configSeen[key] = configStamp(data[key]);
+}
+export async function reloadConfigFromDatabase() {
+  const fresh: Record<string, any> = await loadCoreData();
+  for (const key of CONFIG_KEYS) {
+    if (fresh[key] == null) continue;
+    const incoming = configStamp(fresh[key]);
+    if (incoming === configSeen[key]) continue; // unchanged in the database
+    if (configStamp(db[key]) !== configSeen[key]) continue; // an unsaved local change is in flight: its save wins
+    db[key] = fresh[key];
+    configSeen[key] = incoming;
+  }
+}
+registerSharedState('config', reloadConfigFromDatabase);
 /** JSON with object keys sorted at every level, to compare records regardless of key order. */
 export function stableJson(value: unknown): string {
   return JSON.stringify(value, (_key, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v);
@@ -247,7 +277,10 @@ export function sanitizeIdentifiers(value: unknown): Array<{ scheme: string; val
 export const saveListeners: Array<() => void> = [];
 /** Runs before every save: caches derived from the projection (upload index, lifecycle freshness) register here to be dropped. */
 export function onDbSaved(listener: () => void) { saveListeners.push(listener); }
-export const coreSaver = createCoreSaver(sql, () => db, async () => { Object.assign(db, await loadCoreData()); });
+export const coreSaver = createCoreSaver(sql, () => db, async () => { Object.assign(db, await loadCoreData()); markConfigSynced(); }, (saved) => {
+  markConfigSynced(saved);
+  void notifySharedState('config');
+});
 /**
  * Persists the in-memory projection: one writer at a time, never inside sql.tx. `alongside` runs in the same transaction
  * right after the sync, for repository writes that must commit or fail together with the snapshot change (e.g. deleting a
@@ -265,39 +298,4 @@ export async function saveDb(alongside?: () => Promise<unknown>) {
 }
 export function triggerAutoPushToGoogleSheet(_req?: any, _options?: any): Promise<void> {
   return Promise.resolve();
-}
-export function syncAdderNames() {
-  const userByEmail = new Map();
-  db.allowedUsers.forEach((u) => {
-    if (u.email) {
-      userByEmail.set(u.email.trim().toLowerCase(), u);
-    }
-  });
-  db.allowedUsers.forEach((u) => {
-    if (
-      u.addedByEmail &&
-      userByEmail.has(u.addedByEmail.trim().toLowerCase())
-    ) {
-      const creator = userByEmail.get(u.addedByEmail.trim().toLowerCase());
-      u.addedBy = creator.name;
-    } else if (
-      u.addedBy &&
-      u.addedBy !== "System Core" &&
-      u.addedBy !== "System"
-    ) {
-      for (const creator of db.allowedUsers) {
-        const creatorEmail = creator.email.trim().toLowerCase();
-        const creatorName = creator.name.trim().toLowerCase();
-        const currentAddedBy = u.addedBy.trim().toLowerCase();
-        if (
-          currentAddedBy === creatorEmail ||
-          currentAddedBy === creatorName
-        ) {
-          u.addedByEmail = creator.email;
-          u.addedBy = creator.name;
-          break;
-        }
-      }
-    }
-  });
 }

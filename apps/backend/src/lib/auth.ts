@@ -104,11 +104,9 @@ const orgRoles = {
 };
 
 export async function loadCoreData() {
-  const payloads = async (table: string) => (await sql.all(`SELECT payload FROM ${table}`)).map((r: any) => JSON.parse(r.payload));
   const single = async (text: string) => { const row = await sql.get(text); return row ? JSON.parse(row.payload) : null; };
   const rows = {
-    // Business records are repository-backed (src/repositories): the projection holds the allowlist and the installation configuration only.
-    allowedUsers: await payloads('allowed_users'),
+    // Business records and the allowlist are repository-backed (src/repositories): the projection holds the installation configuration only.
     branding: await single(`SELECT payload FROM branding WHERE id = 'branding'`),
     googleConfig: await single(`SELECT payload FROM app_settings WHERE id = 'google_config'`).then(config => config && openProviderSecrets(config)),
     newsTicker: await single(`SELECT payload FROM news_ticker WHERE id = 'default'`),

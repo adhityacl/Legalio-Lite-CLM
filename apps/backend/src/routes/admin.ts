@@ -6,6 +6,7 @@ import { clearRepositoryRows, insertRepositoryRows } from '../repositories/seed'
 import { identityOf } from '../identity';
 import { sql } from '../db';
 import { removeDemoAccounts } from '../demoAccounts';
+import { allowedUserRepository } from '../repositories/allowedUserRepository';
 import { seedOrganizationsFromDataset } from '../organizationProvisioning';
 import { buildTenantProjection, appendAudit } from '../organizationSettingsStore';
 import { saveCoreData } from '../lib/auth';
@@ -100,7 +101,8 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       for (const table of ["contract_comments", "document_metadata", "contract_drafts", "contract_documents", "metadata_fields", "ai_ocr_cache", "search_records", "activity_logs", "upload_owners"]) {
         await sql.run(`DELETE FROM "${table}"`);
       }
-      await removeDemoAccounts(sql, [], identity.userId);
+      await removeDemoAccounts(sql, identity.userId);
+      await allowedUserRepository.removeAll();
       for (const table of ["invitation", "apikey", "teamMember", "team", "member", "organization_settings", "organization_integrations", "organization"]) {
         await sql.run(`DELETE FROM "${table}"`);
       }
@@ -119,7 +121,6 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       let snapshot: ReturnType<typeof coreSaver.snapshot>;
       Object.assign(db, {
         tenants,
-        allowedUsers: [],
         newsTicker: { byTenant: {} },
         branding: { ...DEFAULT_BRANDING },
         customTranslations: {},
