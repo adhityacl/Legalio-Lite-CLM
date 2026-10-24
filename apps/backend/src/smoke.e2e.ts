@@ -442,6 +442,27 @@ try {
   await expect(page.locator('.ProseMirror').first()).toContainText('Closing words.');
   steps.push('playbook in the contract editor: "Replace the sentence" swapped the violating sentence for the library fallback');
 
+  // AI chat: the answer is based on records found by search and cites them; the chips deep-link into the application.
+  const chatReply = await api('/api/chat', { method: 'POST', body: JSON.stringify({ query: 'Smoke contract edited', history: [] }) });
+  assert.equal(chatReply.status, 200, JSON.stringify(chatReply.body).slice(0, 300));
+  const chatSources = (chatReply.body as { sources: Array<{ ref: string; type: string; id: string; tab: string; param: string; cited: boolean; origin: string }> }).sources;
+  assert.ok(chatSources.some((src) => src.type === 'contract' && src.id === created.contract_id && src.tab === 'contracts' && src.param === 'id'), 'the contract is a source');
+  await page.goto(`${frontendURL}/app?tab=dashboard`);
+  await page.getByRole('button', { name: /open legalio ai assistant/i }).click();
+  const chatPanel = page.getByTestId('ai-chat-panel');
+  await chatPanel.getByRole('textbox').fill('Smoke contract edited');
+  await chatPanel.getByRole('textbox').press('Enter');
+  const chip = chatPanel.getByTestId('chat-source').first();
+  await expect(chip).toBeVisible({ timeout: 30_000 });
+  await expect(chip).toHaveAttribute('href', /^\?tab=[a-z-]+&(id|document)=/);
+  await expect(chatPanel.getByTestId('chat-source').filter({ has: page.locator(`xpath=self::*[@data-source-id="${created.contract_id}"]`) })).toHaveCount(1);
+  await shot(page, 'chat-sources');
+  await checkAccessibility(page, 'AI chat panel with citations', '[data-testid="ai-chat-panel"]');
+  await chatPanel.locator(`[data-source-id="${created.contract_id}"]`).click();
+  await expect(page.getByRole('dialog').first()).toContainText(/smoke contract/i, { timeout: 30_000 });
+  steps.push('AI chat answered from retrieved records: the answer cites them and the chip opens the contract record through its deep link');
+  await page.keyboard.press('Escape');
+
   // 7. A third key page: the dashboard.
   await page.goto(`${frontendURL}/app?tab=dashboard`);
   await expect(page.getByRole('region', { name: /expiring documents/i })).toBeVisible({ timeout: 30_000 });

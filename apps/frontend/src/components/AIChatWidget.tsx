@@ -1,9 +1,10 @@
-import { assistantApi } from '../api/assistant';
+import { assistantApi, type ChatSource } from '../api/assistant';
 import { isApiError } from '../api/client';
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, User, Loader2, RotateCcw, Copy, Check } from 'lucide-react';
+import { MessageSquare, X, Send, User, Loader2, RotateCcw, Copy, Check, FileText, Building2, ListChecks, BookMarked, CreditCard, ClipboardCheck, FileSpreadsheet, Quote, FilePen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useLanguage } from '../context/LanguageContext';
+import { useNavigation } from '../context/NavigationContext';
 
 import { Button } from '@legalio/ui-components/button';
 import { Table, TableColumnHeader, TableCell, TableScrollArea } from '@legalio/ui-components/table';
@@ -20,7 +21,58 @@ interface Message {
   id: string;
   role: 'user' | 'ai';
   text: string;
+  /** Records the answer was based on (citation chips). */
+  sources?: ChatSource[];
 }
+
+const SOURCE_ICONS: Record<ChatSource['type'], React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>> = {
+  contract: FileText, partner: Building2, order: FileSpreadsheet, spending: CreditCard, evaluation: ClipboardCheck, obligation: ListChecks, clause: BookMarked, key_term: Quote, document: FilePen,
+};
+const SOURCE_TYPE_KEYS: Record<ChatSource['type'], [string, string]> = {
+  contract: ['ai_chat.source.contract', 'Contract'], partner: ['ai_chat.source.partner', 'Partner'], order: ['ai_chat.source.order', 'Order'], spending: ['ai_chat.source.spending', 'Invoice'],
+  evaluation: ['ai_chat.source.evaluation', 'Evaluation'], obligation: ['ai_chat.source.obligation', 'Obligation'], clause: ['ai_chat.source.clause', 'Clause'],
+  key_term: ['ai_chat.source.key_term', 'Key clause'], document: ['ai_chat.source.document', 'Document'],
+};
+const MAX_UNCITED_CHIPS = 5;
+
+/** The records an answer cites (or, when it names none, the best matches), each a link into the application: `?tab=...&id=...`. */
+const SourceChips: React.FC<{ sources: ChatSource[] }> = ({ sources }) => {
+  const { t } = useLanguage();
+  const { setActiveTab } = useNavigation();
+  const cited = sources.filter((s) => s.cited);
+  const shown = cited.length ? cited : sources.filter((s) => s.origin === 'match').slice(0, MAX_UNCITED_CHIPS);
+  if (!shown.length) return null;
+  const hrefOf = (s: ChatSource) => `?tab=${encodeURIComponent(s.tab)}&${s.param}=${encodeURIComponent(s.id)}`;
+  return (
+    <div className="flex min-w-0 flex-col gap-g5 border-t border-border pt-g8" data-testid="chat-sources">
+      <Text size="xs" weight="semibold" tone="muted">{cited.length ? t('ai_chat.sources_cited', 'Sources') : t('ai_chat.sources_related', 'Related records')}</Text>
+      <ul className="flex min-w-0 flex-wrap gap-g5">
+        {shown.map((s) => {
+          const Icon = SOURCE_ICONS[s.type] ?? FileText;
+          const typeLabel = t(...SOURCE_TYPE_KEYS[s.type] ?? SOURCE_TYPE_KEYS.contract);
+          return (
+            <li key={`${s.ref}-${s.id}`} className="min-w-0 max-w-full">
+              <a href={hrefOf(s)} data-testid="chat-source" data-source-type={s.type} data-source-id={s.id}
+                title={s.subtitle ? `${s.title} — ${s.subtitle}` : s.title}
+                className="inline-flex max-w-full min-w-0 items-center gap-g5 rounded-full border border-border bg-muted px-g8 py-g3 text-xs text-foreground no-underline hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+                onClick={(event) => {
+                  // A document opens in the editor, which reads its id from the address; every other record opens on its page.
+                  if (s.param !== 'id' || event.metaKey || event.ctrlKey || event.shiftKey) return;
+                  event.preventDefault();
+                  setActiveTab(s.tab, undefined, { recordId: s.id });
+                }}>
+                <Icon className="size-g13 shrink-0" aria-hidden />
+                <span className="sr-only">{typeLabel}: </span>
+                <span className="shrink-0 font-mono text-muted-foreground">{s.ref}</span>
+                <span className="min-w-0 truncate">{s.title}</span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+};
 
 const INITIAL_MESSAGE: Message = {
   id: 'welcome',
@@ -131,7 +183,7 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
     setIsLoading(true);
 
     try {
-      let data: { reply?: string; error?: string } = {};
+      let data: { reply?: string; error?: string; sources?: ChatSource[] } = {};
       let ok = true;
       try {
         data = await assistantApi.chat({ query: userMessage.text, history: historyPayload });
@@ -148,7 +200,8 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
           {
             id: (Date.now() + 1).toString(),
             role: 'ai',
-            text: data.reply
+            text: data.reply,
+            sources: Array.isArray(data.sources) ? data.sources : undefined
           }
         ]);
       } else {
@@ -216,7 +269,7 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
                 {msg.role === 'user' ? (
                   <Card size="sm" className="border-primary bg-primary p-g13 text-sm whitespace-pre-wrap text-primary-foreground">{msg.text}</Card>
                 ) : (
-                  <Card size="sm" className="gap-g8 p-g13">
+                  <Card size="sm" className="min-w-0 gap-g8 p-g13">
                     <Typeset className="text-sm">
                       <ReactMarkdown
                         components={{
@@ -233,6 +286,7 @@ export const AIChatWidget: React.FC<{ initiallyOpen?: boolean }> = ({ initiallyO
                         {displayText(msg)}
                       </ReactMarkdown>
                     </Typeset>
+                    {msg.sources && <SourceChips sources={msg.sources} />}
                     <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-sm" className="self-start max-sm:size-11 [&>svg]:size-g13" onClick={() => handleCopy(msg)}
                       aria-label={copiedId === msg.id ? t('ai_chat.copied', 'Tersalin') : t('ai_chat.copy', 'Salin jawaban')}>
                       {copiedId === msg.id ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}

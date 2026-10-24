@@ -10,10 +10,22 @@ export const fakeProviderEnabled = (testMode: boolean, env: NodeJS.ProcessEnv = 
 
 const promptText = (params: any): string => {
   const contents = params?.contents;
-  if (typeof contents === 'string') return contents;
-  if (!Array.isArray(contents)) return '';
-  return contents.map((c: any) => (typeof c === 'string' ? c : c?.text ?? (c?.parts ?? []).map((p: any) => p?.text ?? '').join('\n'))).join('\n');
+  const system = typeof params?.config?.systemInstruction === 'string' ? `${params.config.systemInstruction}\n` : '';
+  if (typeof contents === 'string') return system + contents;
+  if (!Array.isArray(contents)) return system;
+  return system + contents.map((c: any) => (typeof c === 'string' ? c : c?.text ?? (c?.parts ?? []).map((p: any) => p?.text ?? '').join('\n'))).join('\n');
 };
+
+/** The chat task: answers from the retrieved records in the workspace JSON and cites the first one, like a well-behaved model would. */
+function chatAnswer(prompt: string): string {
+  const block = /BEGIN-WORKSPACE-JSON\n([\s\S]*?)\nEND-WORKSPACE-JSON/.exec(prompt);
+  let records: Array<{ ref: string; record: Record<string, unknown> }> = [];
+  try { records = JSON.parse(block?.[1] ?? '{}').records ?? []; } catch { /* no context */ }
+  const first = records[0];
+  if (!first) return 'I could not find a matching record in your workspace.';
+  const label = ['title', 'name', 'reference', 'vendor_name', 'supplier_name', 'term'].map((k) => first.record[k]).find((v) => typeof v === 'string' && v) as string | undefined;
+  return `Best match: ${label ?? first.ref} [${first.ref}]`;
+}
 
 const DATE = /\b(\d{4}-\d{2}-\d{2})\b/;
 const TYPE_HINTS: Array<[RegExp, string]> = [[/\bpay|invoice|fee\b/i, 'payment'], [/\bdeliver|hand over\b/i, 'delivery'], [/\breport\b/i, 'reporting'], [/\bnotice|renew/i, 'renewal_notice'], [/\bcompl|audit|certif/i, 'compliance']];
@@ -50,6 +62,7 @@ export const fakeAiGenerator: AiGenerator = async ({ params }) => {
   let body: unknown;
   if (/Task: CONTRACT_EXTRACTION/.test(prompt)) body = extractionAnswer(prompt);
   else if (/Task: PLAYBOOK_SEMANTIC_CHECK/.test(prompt)) body = { findings: [] };
+  else if (/Task: WORKSPACE_CHAT/.test(prompt)) return { text: chatAnswer(prompt), usageMetadata: { totalTokenCount: Math.ceil(prompt.length / 4) } };
   else body = null;
   const text = body === null ? 'The assistant is running on the built-in test model, which only knows the structured tasks.' : JSON.stringify(body);
   return { text, usageMetadata: { totalTokenCount: Math.ceil(prompt.length / 4) } };

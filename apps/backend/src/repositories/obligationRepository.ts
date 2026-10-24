@@ -165,8 +165,14 @@ export function createObligationRepository(db: Sql) {
     });
   }
 
+  /** Several obligations of the organization by id (with the display columns), in no particular order. */
+  async function getMany(organizationId: string, ids: string[]): Promise<Obligation[]> {
+    if (!ids.length) return [];
+    return db.all<Obligation>(`SELECT ${SELECT} FROM ${FROM} WHERE o.organization_id = ? AND o.id = ANY(?)`, organizationId, ids);
+  }
+
   return {
-    get, list, insert, update, mutate,
+    get, getMany, list, insert, update, mutate,
     async remove(organizationId: string, id: string): Promise<boolean> {
       return (await db.run('DELETE FROM obligations WHERE organization_id = ? AND id = ?', organizationId, id)).changes > 0;
     },
