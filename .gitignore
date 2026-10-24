@@ -152,6 +152,8 @@ docs/*
 !docs/ARCHITECTURE-*.md
 !docs/API.md
 !docs/WEBHOOKS.md
+!docs/SSO.md
+!docs/SIGNATURES.md
 !docs/rls-proposal.md
 playwright*.config.ts
 .devcontainer/

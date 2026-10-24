@@ -7,6 +7,7 @@ import { MAILER_TRANSLATIONS } from '../mailer';
 import { OBLIGATION_TRANSLATIONS } from '../obligations';
 import { CHAT_SOURCE_TRANSLATIONS } from '../chatSources';
 import { CLAUSE_TRANSLATIONS } from '../clauses';
+import { SSO_TRANSLATIONS } from '../sso';
 import { SUGGESTION_TRANSLATIONS } from '../suggestions';
 import { TENANT_BOUNDARIES_TRANSLATIONS } from '../tenantBoundaries';
 import { UI_REFINEMENTS } from '../uiRefinements';
@@ -21,6 +22,7 @@ const EN: Record<string, string> = {
   ...OBLIGATION_TRANSLATIONS.EN,
   ...SUGGESTION_TRANSLATIONS.EN,
   ...CLAUSE_TRANSLATIONS.EN,
+  ...SSO_TRANSLATIONS.EN,
   ...CHAT_SOURCE_TRANSLATIONS.EN,
 };
 export default EN;

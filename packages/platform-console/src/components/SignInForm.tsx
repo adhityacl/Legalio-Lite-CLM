@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { authClient } from '../lib/auth-client';
 import { useAuth } from '../context/AuthContext';
 import { LANGUAGE_OPTIONS, useLanguage, type Language } from '../context/LanguageContext';
-import { Clock, Mail } from 'lucide-react';
+import { Clock, KeyRound, Mail } from 'lucide-react';
 import { Spinner } from '@legalio/ui-components/spinner';
 import { Button } from '@legalio/ui-components/button';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
@@ -16,6 +16,14 @@ import { Text } from '@legalio/ui-components/text';
 import { capturePendingInvitation, loadInvitationPreview, type InvitationPreview } from './account/InvitationPrompt';
 import { Image } from '@legalio/ui-components/image';
 import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
+interface SsoOrganizationHint { slug: string; name: string }
+/** `/sso/<organization-slug>`: the per-organization sign-in link. */
+const ssoSlugFromPath = (): string => /^\/sso\/([a-z0-9-]{1,80})\/?$/i.exec(window.location.pathname)?.[1]?.toLowerCase() ?? '';
+const startSso = (slug: string, loginHint?: string) => {
+  const query = loginHint ? `?login_hint=${encodeURIComponent(loginHint)}` : '';
+  window.location.assign(`/api/sso/${encodeURIComponent(slug)}/start${query}`);
+};
+
 interface SignInFormProps {
   allowRegistration?: boolean;
   onOpenPrivacyPolicy?: () => void;
@@ -52,6 +60,37 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
   const [storage, setStorage] = useState({ secretId: '', secretKey: '', bucket: '', region: '', prefix: '' });
   const setDb = (key: keyof typeof database) => (e: React.ChangeEvent<HTMLInputElement>) => setDatabase(prev => ({ ...prev, [key]: e.target.value }));
   const setCos = (key: keyof typeof storage) => (e: React.ChangeEvent<HTMLInputElement>) => setStorage(prev => ({ ...prev, [key]: e.target.value }));
+
+  // Single sign-on: the per-organization link (/sso/<slug>), or organizations found for the typed e-mail domain.
+  const [ssoSlug] = useState(ssoSlugFromPath);
+  const [ssoOrgs, setSsoOrgs] = useState<SsoOrganizationHint[]>([]);
+  const [ssoChecked, setSsoChecked] = useState(!ssoSlug);
+  const [ssoError, setSsoError] = useState(() => {
+    const code = new URLSearchParams(window.location.search).get('sso_error');
+    if (code) {
+      try { window.history.replaceState(null, '', window.location.pathname + window.location.hash); } catch { /* history unavailable */ }
+    }
+    return code && /^[A-Z_]{3,60}$/.test(code) ? code : '';
+  });
+  useEffect(() => {
+    if (!ssoSlug) return;
+    let active = true;
+    api.get<{ organizations: SsoOrganizationHint[] }>(`/sso/lookup?slug=${encodeURIComponent(ssoSlug)}`, { notifyUnauthorized: false })
+      .then((result) => { if (active) setSsoOrgs(result.organizations ?? []); })
+      .catch(() => undefined)
+      .finally(() => { if (active) setSsoChecked(true); });
+    return () => { active = false; };
+  }, [ssoSlug]);
+  useEffect(() => {
+    if (ssoSlug || !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) { if (!ssoSlug) setSsoOrgs([]); return; }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      api.get<{ organizations: SsoOrganizationHint[] }>(`/sso/lookup?email=${encodeURIComponent(email)}`, { notifyUnauthorized: false })
+        .then((result) => { if (active) setSsoOrgs(result.organizations ?? []); })
+        .catch(() => { if (active) setSsoOrgs([]); });
+    }, 400);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [email, ssoSlug]);
 
   // An invitation link survives sign-in/registration in this tab (PRD §8.4).
   const [invitation, setInvitation] = useState<InvitationPreview | null>(null);
@@ -128,6 +167,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSsoError('');
 
     try {
       if (allowRegistration && !setupMode) {
@@ -196,10 +236,11 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
   const isPending = /menunggu|pending/i.test(error);
   const blocked = loading || (!allowRegistration && !statusReady) || (Boolean(linkToken) && invitationState !== 'ready');
   const invited = invitationState === 'ready' && invitation !== null && !setupMode;
-  const errorAlert = error && (
+  const ssoMessage = ssoError ? t(`sso.error.${ssoError}`, t('sso.error.generic', 'Single sign-on failed. Please try again or contact your administrator.')) : '';
+  const errorAlert = (error || ssoMessage) && (
     <Alert status={isPending ? 'warning' : 'error'} role="alert">
       <AlertIndicator />
-      <AlertContent><AlertDescription className="text-sm">{error}</AlertDescription></AlertContent>
+      <AlertContent><AlertDescription className="text-sm">{error || ssoMessage}</AlertDescription></AlertContent>
     </Alert>
   );
   const shell = (card: React.ReactNode) => (
@@ -292,8 +333,10 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
     );
   }
 
-  const title = invited ? t('invite.title', 'You’ve been invited to join {org}', { org: invitation.organizationName }) : setupMode ? t('login.setup_title', 'Setup Legalio Website') : isRegister ? t('login.create_account') : t('login.welcome_back', 'Welcome back');
-  const subtitle = invited ? (isRegister
+  const ssoOrg = ssoSlug ? ssoOrgs[0] : undefined;
+  const showSso = !setupMode && !isRegister && !invited && (ssoOrgs.length > 0 || (Boolean(ssoSlug) && ssoChecked));
+  const title = ssoOrg && !invited && !setupMode && !isRegister ? t('sso.signin.org_title', 'Sign in to {org}', { org: ssoOrg.name }) : invited ? t('invite.title', 'You’ve been invited to join {org}', { org: invitation.organizationName }) : setupMode ? t('login.setup_title', 'Setup Legalio Website') : isRegister ? t('login.create_account') : t('login.welcome_back', 'Welcome back');
+  const subtitle = ssoOrg && !invited && !setupMode && !isRegister ? t('sso.signin.org_hint', 'Your organization uses single sign-on. You will be sent to your identity provider and brought back here.') : invited ? (isRegister
     ? t('invite.register_hint', 'Create your account to accept your invitation and get started with your team.')
     : t('invite.signin_hint', 'Sign in with your existing account to accept your invitation.')) : setupMode ? t('login.setup_subtitle', 'Set your website URL, create the first superuser and connect file storage.') : isRegister ? t('login.fill_form_reg') : t('login.welcome_subtitle', 'Please sign in with your Legalio account');
 
@@ -310,6 +353,28 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
           <AlertIndicator />
           <AlertContent><AlertDescription className="text-sm">{t('login.forgot_hint', 'Ask your workspace administrator to reset your password.')}</AlertDescription></AlertContent>
         </Alert>
+      )}
+
+      {showSso && (
+        <div className="flex flex-col gap-g13">
+          {ssoOrgs.length > 0 ? (
+            <div className="flex flex-col gap-g8">
+              {ssoOrgs.map((org) => (
+                <Button key={org.slug} type="button" variant={ssoSlug ? 'default' : 'outline'} className="w-full" onClick={() => startSso(org.slug, email)}>
+                  <KeyRound aria-hidden="true" />{ssoOrgs.length > 1 ? t('sso.signin.continue_org', 'Continue with SSO ({org})', { org: org.name }) : t('sso.signin.continue', 'Continue with SSO')}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <Alert status="info" role="status">
+              <AlertIndicator />
+              <AlertContent><AlertDescription className="text-sm">{t('sso.signin.not_available', 'Single sign-on is not available for this address. Sign in with your password.')}</AlertDescription></AlertContent>
+            </Alert>
+          )}
+          <div className="flex items-center gap-g8 text-xs text-muted-foreground" aria-hidden="true">
+            <span className="h-px flex-1 bg-border" />{t('sso.signin.divider', 'or')}<span className="h-px flex-1 bg-border" />
+          </div>
+        </div>
       )}
 
       <form onSubmit={(event) => void handleSubmit(event)} className={`flex flex-col ${setupMode ? 'gap-[11px]' : 'gap-g13'}`} aria-busy={loading}>
