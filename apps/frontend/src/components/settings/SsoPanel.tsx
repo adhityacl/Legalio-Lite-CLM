@@ -167,7 +167,7 @@ const SsoDialog: React.FC<{ organizationId: string; data: SsoResponse; onClose: 
         <Field>
           <FieldLabel htmlFor={ids.redirect}>{t('sso.redirect_uri', 'Redirect URI (register this at your provider)')}</FieldLabel>
           <div className="flex gap-g8">
-            <Input id={ids.redirect} readOnly value={data.redirectUri} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+             <Input id={ids.redirect} readOnly value={data.redirectUri} className="min-w-0 flex-1 font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
             <Button type="button" variant="outline" className="shrink-0" onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? t('sso.copied', 'Copied') : t('sso.copy', 'Copy')}</Button>
           </div>
         </Field>
@@ -199,7 +199,7 @@ const SsoDialog: React.FC<{ organizationId: string; data: SsoResponse; onClose: 
         </div>
 
         <fieldset className="flex min-w-0 flex-col gap-g13 border-t border-border pt-g13">
-          <legend className="text-sm font-semibold">{t('sso.field.jit', 'Create accounts automatically on first sign-in')}</legend>
+          <legend className="text-sm font-semibold">{t('sso.section.provisioning', 'Provisioning and roles')}</legend>
           <Checkbox checked={jit} onCheckedChange={(details) => setJit(details.checked === true)}><CheckboxControl /><CheckboxLabel>{t('sso.field.jit', 'Create accounts automatically on first sign-in')}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
           <Text size="xs" className="text-muted-foreground">{t('sso.field.jit_hint', 'Limited to the allowed domains.')}</Text>
           <Field>
@@ -244,7 +244,7 @@ const SsoDialog: React.FC<{ organizationId: string; data: SsoResponse; onClose: 
         </fieldset>
 
         <fieldset className="flex min-w-0 flex-col gap-g13 border-t border-border pt-g13">
-          <legend className="text-sm font-semibold">{t('sso.field.require', 'Require single sign-on')}</legend>
+          <legend className="text-sm font-semibold">{t('sso.section.enforcement', 'Enforcement')}</legend>
           <Checkbox checked={requireSso} onCheckedChange={(details) => setRequireSso(details.checked === true)}><CheckboxControl /><CheckboxLabel>{t('sso.field.require', 'Require single sign-on')}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
           <Text size="xs" className="text-muted-foreground">{t('sso.field.require_hint', 'Members can no longer sign in with a password.')}</Text>
           <Fieldset>

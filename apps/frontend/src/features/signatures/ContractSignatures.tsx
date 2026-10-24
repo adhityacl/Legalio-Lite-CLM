@@ -6,7 +6,7 @@ import { Badge, type StatusTone } from '@legalio/ui-components/badge';
 import { Button } from '@legalio/ui-components/button';
 import { Card } from '@legalio/ui-components/card';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
-import { Field, FieldHelperText, FieldLabel } from '@legalio/ui-components/field';
+import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { Heading } from '@legalio/ui-components/heading';
 import { Input } from '@legalio/ui-components/input';
 import { NativeSelect } from '@legalio/ui-components/native-select';
@@ -260,7 +260,7 @@ const CreateDialog: React.FC<{ contractId: string; defaultTitle: string; onClose
         </Field>
         <div>
           <Checkbox checked={sendNow} onCheckedChange={(details) => setSendNow(details.checked === true)}><CheckboxControl /><CheckboxLabel>{t('signatures.create.field.send', 'Mark as sent right away')}</CheckboxLabel><CheckboxHiddenInput /></Checkbox>
-          <FieldHelperText>{t('signatures.create.field.send_hint', '')}</FieldHelperText>
+          <Text size="xs" tone="muted" className="mt-g3 ps-g34">{t('signatures.create.field.send_hint', 'Choose this when you send the document with your signing tool straight after creating the request.')}</Text>
         </div>
         {error && <Alert status="error" role="alert"><AlertIndicator /><AlertContent><AlertDescription>{error}</AlertDescription></AlertContent></Alert>}
         <div className="flex justify-end gap-g8">

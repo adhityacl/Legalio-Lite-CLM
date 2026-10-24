@@ -751,7 +751,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     content: '',
     // The ribbon follows the caret in the header or footer.
     shouldRerenderOnTransaction: true,
-    editorProps: { attributes: { 'aria-label': kind === 'header' ? t('editor.header_label', 'Page header content') : t('editor.footer_label', 'Page footer content') } },
+    editorProps: { attributes: { role: 'textbox', 'aria-multiline': 'true', 'aria-label': kind === 'header' ? t('editor.header_label', 'Page header content') : t('editor.footer_label', 'Page footer content') } },
     onUpdate: ({ editor: instance }) => setPageLayout((layout) => ({ ...layout, [kind]: instance.getHTML() })),
   });
   const headerEditor = useHeaderFooterEditor('header');
@@ -785,7 +785,7 @@ export const ContractDocumentEditor: React.FC<ContractCreatorViewProps> = ({
     },
     editorProps: {
       // The editing surface is a textbox; it needs an accessible name for screen readers (and axe).
-      attributes: { 'aria-label': t('editor.document_label', 'Document content'), 'aria-multiline': 'true' },
+      attributes: { role: 'textbox', 'aria-label': t('editor.document_label', 'Document content'), 'aria-multiline': 'true' },
       handleClick: (_view, _pos, event) => {
         if ((event.target as HTMLElement | null)?.closest?.('[data-comment-id]')) {
           setSidebarOpen(true);

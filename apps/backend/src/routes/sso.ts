@@ -89,7 +89,9 @@ export function createSsoRouter({ db, deps = () => ({}) }: { db: Sql; deps?: () 
     } catch (err) {
       if (err instanceof SsoLoginDenied) {
         await auditSso(db, requestId, err.organizationId, err.userId, 'sso.login_denied', 'denied', err.code);
-        return res.redirect(302, appUrl(`/?sso_error=${encodeURIComponent(err.code)}`));
+        // Back to the organization's own sign-in page, where the message is shown next to the button to try again.
+        const slug = err.organizationId ? (await db.get<{ slug: string }>(`SELECT slug FROM organization WHERE id = ?`, err.organizationId))?.slug : null;
+        return res.redirect(302, appUrl(`${slug ? `/sso/${encodeURIComponent(slug)}` : '/'}?sso_error=${encodeURIComponent(err.code)}`));
       }
       throw err;
     }
