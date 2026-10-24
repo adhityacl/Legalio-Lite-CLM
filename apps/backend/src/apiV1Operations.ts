@@ -8,9 +8,10 @@ import { PARTNER_SORTS } from './repositories/partnerRepository';
 import { SPENDING_SORTS } from './repositories/spendingRepository';
 import { OBLIGATION_SORTS } from './repositories/obligationRepository';
 import { CLAUSE_SORTS } from './repositories/clauseRepository';
+import { SIGNATURE_STATUSES } from './signatureStates';
 import { OBLIGATION_SOURCES, OBLIGATION_STATUSES, OBLIGATION_TYPES } from '@legalio/shared/obligations';
 
-export type V1Resource = 'contracts' | 'partners' | 'orders' | 'spendings' | 'obligations' | 'clauses';
+export type V1Resource = 'contracts' | 'partners' | 'orders' | 'spendings' | 'obligations' | 'clauses' | 'signatures';
 export interface V1Filter { name: string; description: string; enum?: readonly string[] }
 export interface V1ResourceSpec {
   resource: V1Resource;
@@ -62,6 +63,10 @@ export const V1_RESOURCES: V1ResourceSpec[] = [
     { name: 'category', description: 'Exact category.' }, { name: 'risk', description: 'Comma-separated risk levels (low, medium, high).' },
     { name: 'language', description: 'Clause language (en, id, zh).' }, { name: 'jurisdiction', description: 'Exact jurisdiction.' }, { name: 'tag', description: 'One tag.' },
     { name: 'status', description: 'active (default), archived or all.' },
+  ] },
+  { resource: 'signatures', singular: 'signature', legacy: '/api/signatures', responseKey: 'request', idField: 'id', sorts: ['created_at'], readOnly: true, filters: [
+    { name: 'contract_id', description: 'Signature requests of one contract.' },
+    { name: 'status', description: `Comma-separated statuses (${SIGNATURE_STATUSES.join(', ')}).` },
   ] },
 ];
 

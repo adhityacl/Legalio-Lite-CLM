@@ -16,10 +16,10 @@ const log = componentLog('webhooks');
 
 export const WEBHOOK_LOCK_KEY = 0x4c475748; // "LGWH"
 export const API_VERSION = '2026-10-01';
-/** Subscribable events. `signature.completed` is reserved for the e-signature work (nothing emits it yet). */
+/** Subscribable events. The `signature.*` events are raised by the e-signature requests (signatures.ts). */
 export const WEBHOOK_EVENTS = [
   'contract.created', 'contract.updated', 'contract.status_changed', 'contract.terminated',
-  'reminder.sent', 'approval.requested', 'approval.decided', 'document.exported', 'signature.completed',
+  'reminder.sent', 'approval.requested', 'approval.decided', 'document.exported', 'signature.sent', 'signature.completed', 'signature.declined', 'signature.expired',
   'obligation.created', 'obligation.due_soon', 'obligation.overdue', 'obligation.completed',
 ] as const;
 export type WebhookEventType = (typeof WEBHOOK_EVENTS)[number];

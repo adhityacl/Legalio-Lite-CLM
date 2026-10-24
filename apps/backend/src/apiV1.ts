@@ -21,6 +21,9 @@ import { obligationRepository, presentObligation } from './repositories/obligati
 import { createObligationsRouter, organizationToday } from './routes/obligations';
 import { clauseRepository, presentClause } from './repositories/clauseRepository';
 import { createClausesRouter } from './routes/clauses';
+import { createSignaturesRouter } from './routes/signatures';
+import { getRequest } from './signatures';
+import { sql } from './db';
 import { V1_OPERATIONS, type V1Operation, type V1Resource } from './apiV1Operations';
 import { buildOpenApiDocument } from './apiV1OpenApi';
 
@@ -31,6 +34,7 @@ const MAX_PAGE = 200;
 
 const repositories: Record<V1Resource, { get: (organizationId: string, id: string) => Promise<any> }> = {
   contracts: contractRepository, partners: partnerRepository, orders: ioRepository, spendings: spendingRepository, obligations: obligationRepository, clauses: clauseRepository,
+  signatures: { get: (organizationId, id) => getRequest(sql, organizationId, id) },
 };
 
 const defaultCode = (status: number) => (status === 400 ? 'INVALID_REQUEST' : status === 401 ? 'UNAUTHENTICATED' : status === 403 ? 'INSUFFICIENT_PERMISSION' : status === 404 ? 'RESOURCE_NOT_FOUND' : status === 409 ? 'CONFLICT' : 'REQUEST_FAILED');
@@ -46,7 +50,7 @@ export function createApiV1Router() {
   const router = express.Router();
   forwardAsyncRouteErrors(router);
   const legacy = express.Router();
-  for (const factory of [createPartnersRouter, createContractsRouter, createIoRouter, createSpendingsRouter, createObligationsRouter, createClausesRouter]) legacy.use(factory());
+  for (const factory of [createPartnersRouter, createContractsRouter, createIoRouter, createSpendingsRouter, createObligationsRouter, createClausesRouter, createSignaturesRouter]) legacy.use(factory());
 
   /** Runs the existing handler for `legacyPath` and reshapes its JSON answer. */
   const handOff = (req: express.Request, res: express.Response, next: express.NextFunction, legacyPath: string, shape: (status: number, body: any) => { status: number; body: unknown }, legacyMethod = req.method) => {

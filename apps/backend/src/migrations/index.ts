@@ -24,8 +24,9 @@ import { migration as aiSuggestions } from './0023_ai_suggestions';
 import { migration as clauseLibrary } from './0024_clause_library';
 import { migration as retrievalIndexes } from './0025_retrieval_indexes';
 import { migration as sso } from './0026_sso';
+import { migration as signatures } from './0027_signatures';
 import type { Migration } from './types';
 
 /** Append new migrations at the end with the next number. */
-export const MIGRATIONS: Migration[] = [baseline, reminderLedger, uploadOwners, aiUsage, auditImmutable, idSequences, contractVersions, searchTrigram, partnerVersions, orderVersions, spendingVersions, evaluationVersions, notificationVersions, templateVersions, driveBackupIndex, uploadOwnerTrigram, exportJobs, apiKeys, webhooks, approvalSlaNotices, digest, obligations, aiSuggestions, clauseLibrary, retrievalIndexes, sso];
+export const MIGRATIONS: Migration[] = [baseline, reminderLedger, uploadOwners, aiUsage, auditImmutable, idSequences, contractVersions, searchTrigram, partnerVersions, orderVersions, spendingVersions, evaluationVersions, notificationVersions, templateVersions, driveBackupIndex, uploadOwnerTrigram, exportJobs, apiKeys, webhooks, approvalSlaNotices, digest, obligations, aiSuggestions, clauseLibrary, retrievalIndexes, sso, signatures];
 export type { Migration };

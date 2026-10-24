@@ -8,6 +8,8 @@ import { componentLog } from './logger';
 import { DIGEST_LOCK_KEY, runDigestPass, type DigestDeps } from './digest';
 import { APPROVAL_SLA_LOCK_KEY, deliverApprovalNotices, onApprovalNoticeQueued, runApprovalSlaPass, type ApprovalNoticeDeps } from './approvalNotifications';
 import { OBLIGATION_LOCK_KEY, deliverObligationNotices, onObligationNoticeQueued, runObligationPass, type ObligationNoticeDeps } from './obligationJobs';
+import { SIGNATURE_LOCK_KEY, expireDueRequests, onSignatureNoticeQueued, pruneReceipts } from './signatures';
+import { deliverSignatureNotices, type SignatureNoticeDeps } from './signatureNotifications';
 import { outboundPolicyFromEnv } from './ssrfGuard';
 import { WEBHOOK_LOCK_KEY, deliverDueWebhooks, onWebhookQueued, pruneDeliveries } from './webhooks';
 
@@ -80,7 +82,31 @@ export const obligationJob = createPeriodicJob({
 /** The same pass on demand (POST /api/cron/trigger-check), under the same advisory lock. */
 export const runObligationReminders = () => withAdvisoryLock(OBLIGATION_LOCK_KEY, obligationPass);
 
-const jobs = [exportJob, webhookJob, approvalJob, digestJob, obligationJob];
+async function signatureDeps(): Promise<SignatureNoticeDeps> {
+  const { mailTemplates, sendSmtpEmail } = await import('./mailHelpers');
+  const { db: memory } = await import('./memoryDb');
+  const { getPublicBaseUrl } = await import('./installationSettings');
+  return {
+    smtpAvailable: () => Boolean(memory.googleConfig?.smtpEnabled),
+    send: async (input) => { const result = await sendSmtpEmail(input); return { success: Boolean(result?.success), error: result?.success ? undefined : String((result as { error?: unknown })?.error ?? '') }; },
+    render: (id, values, trusted) => mailTemplates.render(id, values, trusted),
+    publicUrl: () => getPublicBaseUrl() || process.env.PUBLIC_URL || '',
+  };
+}
+let lastReceiptPrune = 0;
+const signaturePass = async () => {
+  const expired = await expireDueRequests(sql);
+  if (Date.now() - lastReceiptPrune > 6 * 3600_000) { lastReceiptPrune = Date.now(); await pruneReceipts(sql); }
+  return { expired, delivery: await deliverSignatureNotices(sql, await signatureDeps()) };
+};
+/** Every 5 minutes: expire the signature requests whose date has passed and deliver (or retry) the requester notices. Under an advisory lock, so one instance acts. */
+export const signatureJob = createPeriodicJob({
+  name: 'Signature expiry and notices', lockKey: SIGNATURE_LOCK_KEY, intervalMs: 5 * 60_000, startupDelayMs: 75_000, enabled, run: signaturePass,
+});
+/** The same pass on demand (tests, POST /api/cron/trigger-check), under the same advisory lock. */
+export const runSignaturePass = () => withAdvisoryLock(SIGNATURE_LOCK_KEY, signaturePass);
+
+const jobs = [exportJob, webhookJob, approvalJob, digestJob, obligationJob, signatureJob];
 export const startBackgroundJobs = () => {
   const policy = outboundPolicyFromEnv();
   if (process.env.NODE_ENV === 'production' && (policy.allowHttp || policy.allowPrivateNetworks)) {
@@ -92,6 +118,7 @@ export const startBackgroundJobs = () => {
     onWebhookQueued(() => { void webhookJob.runOnce(); });
     onApprovalNoticeQueued(() => { void approvalJob.runOnce(); });
     onObligationNoticeQueued(() => { void obligationJob.runOnce(); });
+    onSignatureNoticeQueued(() => { void signatureJob.runOnce(); });
   }
 };
-export const stopBackgroundJobs = async () => { onWebhookQueued(null); onApprovalNoticeQueued(null); onObligationNoticeQueued(null); await Promise.all(jobs.map((job) => job.stop())); };
+export const stopBackgroundJobs = async () => { onWebhookQueued(null); onApprovalNoticeQueued(null); onObligationNoticeQueued(null); onSignatureNoticeQueued(null); await Promise.all(jobs.map((job) => job.stop())); };

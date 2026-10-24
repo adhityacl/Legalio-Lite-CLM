@@ -61,7 +61,7 @@ try{
  await call('/api/mailer/templates',{token:mailerUserToken,status:403});
  await call('/api/mailer/templates/verification',{method:'PUT',token:mailerUserToken,body:{},status:403});
  const mailerCatalog = await call('/api/mailer/templates');
- assert.equal(mailerCatalog.templates.length, 11);
+ assert.equal(mailerCatalog.templates.length, 12);
  await call('/api/mailer/templates', {token:'', status:401});
  const verificationTemplate = mailerCatalog.templates.find((t:any) => t.id === 'verification');
  await call('/api/mailer/templates/verification', {method:'PUT', body:{subject:'Missing link', html:'<p>Hi</p>',expectedVersion:0},status:400});

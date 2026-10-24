@@ -64,6 +64,7 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/sso/lookup', pub('sign-in page: organizations with SSO for an e-mail domain or slug; empty for unknown and non-SSO organizations alike')],
   ['GET', '/api/sso/callback', pub('OIDC redirect URI: single-use state, PKCE, nonce and a browser-binding cookie are all verified')],
   ['GET', '/api/sso/:slug/start', pub('starts the authorization-code flow for an organization that enabled SSO')],
+  ['POST', '/api/signatures/webhook/:endpointId', pub('signed inbound delivery: HMAC-SHA256 over the raw body with the endpoint\'s sealed secret, 5-minute timestamp window, idempotency key')],
   ['GET', '/api/invitations/:token/preview', pub('token possession; minimal preview')],
   ['GET', '/api/auth-console/invitations/verify', pub('legacy adapter to invitation preview')],
 
@@ -110,6 +111,12 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['POST', '/api/organizations/:organizationId/sso/test', orgParam('tenant.sso.manage', 'runs OIDC discovery for the saved issuer')],
   ['DELETE', '/api/organizations/:organizationId/sso', orgParam('tenant.sso.manage', 'removes the provider and its linked identities; audited')],
 
+  ['GET', '/api/organizations/:organizationId/signature-endpoints', orgParam('tenant.signature.manage', 'never returns secrets')],
+  ['POST', '/api/organizations/:organizationId/signature-endpoints', orgParam('tenant.signature.manage', 'the HMAC secret is returned once, sealed at rest; audited')],
+  ['PATCH', '/api/organizations/:organizationId/signature-endpoints/:id', orgParam('tenant.signature.manage', 'audited')],
+  ['DELETE', '/api/organizations/:organizationId/signature-endpoints/:id', orgParam('tenant.signature.manage', 'audited')],
+  ['POST', '/api/organizations/:organizationId/signature-endpoints/:id/rotate-secret', orgParam('tenant.signature.manage', 'new secret returned once; audited')],
+
   ['GET', '/api/organizations/:organizationId/approval-settings', orgParam('tenant.settings.read')],
   ['PUT', '/api/organizations/:organizationId/approval-settings', orgParam('tenant.settings.update', 'SLA hours and escalation target; audited')],
   ['GET', '/api/organizations/:organizationId/my-notifications', orgParam('document.create', 'the caller\'s own in-app notifications only')],
@@ -147,6 +154,8 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/v1/obligations/:id', apiKey('obligations:read')],
   ['GET', '/api/v1/clauses', apiKey('clauses:read')],
   ['GET', '/api/v1/clauses/:id', apiKey('clauses:read')],
+  ['GET', '/api/v1/signatures', apiKey('signatures:read', 'signature requests with signers, status and timeline links; no files')],
+  ['GET', '/api/v1/signatures/:id', apiKey('signatures:read', 'status, signers and the event timeline')],
 
   /* ---------------- canonical tenant API ---------------- */
   ['*', '/api/organizations/:organizationId/*', router('path organization + membership/platform context')],
@@ -324,6 +333,18 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['PUT', '/api/clauses/:id', tenant('document.edit', 'version checked; audited')],
   ['DELETE', '/api/clauses/:id', tenant('document.delete', 'audited')],
   ['POST', '/api/playbook/check', tenant('document.view', 'read-only advisory check; the optional AI step uses the organization AI budget')],
+  ['GET', '/api/signatures/providers', tenant('document.view')],
+  ['GET', '/api/signatures', tenant('document.view', 'signature requests of the contracts the caller may see')],
+  ['POST', '/api/signatures', tenant('document.edit', 'a request on a contract the caller may change')],
+  ['GET', '/api/signatures/:id', tenant('document.view', 'contract visibility checked')],
+  ['POST', '/api/signatures/:id/send', tenant('document.edit', 'contract writability checked')],
+  ['POST', '/api/signatures/:id/resend', tenant('document.edit')],
+  ['POST', '/api/signatures/:id/cancel', tenant('document.edit')],
+  ['POST', '/api/signatures/:id/signers/:signerId/signed', tenant('document.edit', 'manual progress; sequence enforced')],
+  ['POST', '/api/signatures/:id/signers/:signerId/declined', tenant('document.edit')],
+  ['POST', '/api/signatures/:id/complete', tenant('document.edit', 'signed copy required; completion updates the contract')],
+  ['POST', '/api/signatures/:id/files', tenant('document.edit', 'evidence or a late signed copy; magic bytes and size validated')],
+  ['GET', '/api/signatures/:id/files/:fileId', tenant('document.view', 'contract visibility checked; served as an attachment')],
   ['GET', '/api/metadata-fields', tenant('document.view')],
   ['POST', '/api/metadata-fields', tenant('tenant.settings.update')],
   ['DELETE', '/api/metadata-fields/:fieldId', tenant('tenant.settings.update')],

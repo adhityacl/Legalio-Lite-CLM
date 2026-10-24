@@ -281,6 +281,11 @@ export const MAIL_CATALOG = {
     defaults: notice,
     sample: { ...noticeSample('[Kewajiban jatuh tempo] Pembayaran termin 2', 'Kewajiban segera jatuh tempo', 'Kewajiban berikut mendekati tenggat.', 'Buka kewajiban'), actionUrl: 'https://example.com/app?tab=obligations' }, required: [],
   },
+  'signature-update': {
+    name: 'Pembaruan tanda tangan', description: 'Dikirim ke pengaju saat permintaan tanda tangan selesai, ditolak, atau kedaluwarsa.', recipient: 'Pengaju permintaan tanda tangan',
+    defaults: notice,
+    sample: { ...noticeSample('[Ditandatangani] CTR-001 — Perjanjian layanan', 'Permintaan tanda tangan Anda selesai', 'Semua pihak telah menandatangani.', 'Buka kontrak'), actionUrl: 'https://example.com/app?tab=contracts' }, required: [],
+  },
   digest: {
     name: 'Ringkasan berkala', description: 'Ringkasan harian atau mingguan: tenggat pemberitahuan, kontrak berakhir, persetujuan menunggu, dan item terlambat.', recipient: 'Pengguna yang berlangganan ringkasan',
     defaults: { subject: notice.subject, html: notice.html.replace('{{footer}}', '{{footer}}<br><a href="{{unsubscribeUrl}}" style="color:#64748b;">{{unsubscribeLabel}}</a>') },

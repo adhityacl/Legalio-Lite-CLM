@@ -75,7 +75,7 @@ export const ADMINISTRATIVE_PERMISSIONS: Record<TenantRole, readonly string[]> =
     'department.view', 'department.create', 'department.edit', 'department.delete',
     'tenant.integration.read', 'tenant.integration.update', 'tenant.audit.read',
     'tenant.data.import', 'tenant.data.export',
-    'tenant.apikey.manage', 'tenant.webhook.manage', 'tenant.sso.manage',
+    'tenant.apikey.manage', 'tenant.webhook.manage', 'tenant.sso.manage', 'tenant.signature.manage',
     'workspace.view', 'workspace.switch',
   ],
   manager: [

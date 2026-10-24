@@ -45,6 +45,7 @@ import { createDataExportRouter } from "./routes/dataExport";
 import { createOrgApiKeysRouter } from "./routes/orgApiKeys";
 import { createOrgWebhooksRouter } from "./routes/orgWebhooks";
 import { createSsoRouter } from "./routes/sso";
+import { createSignaturesRouter } from "./routes/signatures";
 import { createOrgApprovalsRouter } from "./routes/orgApprovals";
 import { createOrgDigestRouter } from "./routes/orgDigest";
 import { createApiV1Router } from "./apiV1";
@@ -92,7 +93,11 @@ forwardAsyncRouteErrors(app);
 app.set("trust proxy", trustProxySetting());
 app.use(requestLogging());
 app.use(createSensitiveRateLimiter());
-app.use(express.json({ limit: "25mb" }));
+// The signed inbound webhook is authenticated by an HMAC over the exact bytes received, so those bytes are kept for that route only.
+app.use(express.json({
+  limit: "25mb",
+  verify: (req, _res, buf) => { if ((req as express.Request).originalUrl.startsWith("/api/signatures/webhook/")) (req as any).rawBody = buf; },
+}));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 // Older clients and CSV files still send the Indonesian field names; they are mapped once, here. Responses never use them.
 const LEGACY_FIELD_ROUTES = /^\/api\/(partners|contracts|ios|partner-spendings|partner-evaluations|bulk-import|notification-logs)(\/|$)/;
@@ -282,6 +287,7 @@ app.use(createUploadsRouter());
 app.use(createTemplatesRouter());
 app.use(createNotificationsRouter());
 app.use(createObligationsRouter());
+app.use(createSignaturesRouter());
 app.use(createSuggestionsRouter());
 app.use(createClausesRouter());
 app.use(createSearchRouter());

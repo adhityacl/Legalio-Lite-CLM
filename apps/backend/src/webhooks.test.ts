@@ -317,6 +317,6 @@ test('approval, reminder, export and document events reach subscribed endpoints'
   // Direct emission for the rest (their producers are exercised by their own tests).
   assert.equal(await emitWebhookEvent(h.sql, 'org-a', 'document.exported', { kind: 'google_doc' }), 2, 'this endpoint and the catch-all endpoint of the test-button case');
   assert.equal(await emitWebhookEvent(h.sql, 'org-b', 'document.exported', { kind: 'google_doc' }), 1, 'org B has its own endpoint from the earlier test');
-  assert.equal(await emitWebhookEvent(h.sql, 'org-a', 'signature.completed', {}), 1, 'reserved event: only the catch-all endpoint hears it (nothing emits it yet)');
+  assert.equal(await emitWebhookEvent(h.sql, 'org-a', 'signature.completed', {}), 1, 'only the catch-all endpoint hears an event nobody filtered for');
   assert.equal(await emitWebhookEvent(h.sql, null, 'document.exported', {}), 0);
 });

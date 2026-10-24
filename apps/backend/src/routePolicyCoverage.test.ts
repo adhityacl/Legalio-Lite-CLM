@@ -102,6 +102,7 @@ test('the set of unauthenticated (public) routes is explicit and reviewed', () =
     'POST /api/digest/unsubscribe',
     'POST /api/google-auth/exchange-code',
     'POST /api/google-auth/sync-session',
+    'POST /api/signatures/webhook/:endpointId',
     'POST /api/system/setup',
   ]);
 });
