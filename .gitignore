@@ -150,6 +150,9 @@ tools/
 docs/*
 !docs/RUNBOOK.md
 !docs/ARCHITECTURE-*.md
+!docs/API.md
+!docs/WEBHOOKS.md
+!docs/rls-proposal.md
 playwright*.config.ts
 .devcontainer/
 handover.md
