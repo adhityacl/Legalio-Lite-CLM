@@ -603,7 +603,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
             </DialogHeader>
 
             <Tabs value={detailTab} onValueChange={(details) => setDetailTab(details.value as 'overview' | 'obligations' | 'playbook')} className="flex min-h-0 flex-1 flex-col gap-0">
-            <TabsList aria-label={t('contracts.record_sections', 'Contract record')} className="mx-g21 mt-g13 w-fit">
+            <TabsList aria-label={t('contracts.record_sections', 'Contract record')} className="mx-g21 mt-g13 w-fit shrink-0">
               <TabsTrigger value="overview"><FileText aria-hidden="true" />{t('contracts.tab_overview', 'Overview')}</TabsTrigger>
               <TabsTrigger value="obligations"><ListChecks aria-hidden="true" />{t('obligations.contract_tab', 'Obligations')}</TabsTrigger>
               <TabsTrigger value="playbook"><ClipboardCheck aria-hidden="true" />{t('playbook.tab', 'Playbook')}</TabsTrigger>
