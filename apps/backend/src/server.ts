@@ -42,6 +42,8 @@ import { createAiRouter } from "./routes/ai";
 import { createBulkImportRouter } from "./routes/bulkImport";
 import { createContractsRouter } from "./routes/contracts";
 import { createDataExportRouter } from "./routes/dataExport";
+import { createOrgApiKeysRouter } from "./routes/orgApiKeys";
+import { createApiV1Router } from "./apiV1";
 import { createEvaluationsRouter } from "./routes/evaluations";
 import { createGoogleAuthRouter } from "./routes/googleAuth";
 import { createGoogleIntegrationRouter } from "./routes/googleIntegration";
@@ -258,6 +260,8 @@ app.use("/api", createOrganizationAdminRouter({
 }));
 
 app.use("/api", createDataExportRouter({ db: sql, deps: () => ({ store: getStore }) }));
+app.use("/api", createOrgApiKeysRouter({ db: sql }));
+app.use(createApiV1Router());
 app.use(createPartnersRouter());
 app.use(createEvaluationsRouter());
 app.use(createSpendingsRouter());

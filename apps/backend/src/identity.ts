@@ -29,6 +29,8 @@ export interface Identity {
   sessionToken: string;
   sessionDefaultOrganizationId: string | null;
   viaCookie: boolean;
+  /** Set when the caller is an organization API key (routes of kind `apiKey` only); there is no session behind it. */
+  apiKey?: { id: string; name: string; prefix: string; scopes: string[] };
 }
 
 export class RequestDenied extends Error {

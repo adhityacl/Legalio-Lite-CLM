@@ -92,6 +92,7 @@ test('the set of unauthenticated (public) routes is explicit and reviewed', () =
     'GET /api/invitations/:token/preview',
     'GET /api/system/public-status',
     'GET /api/system/ui-texts',
+    'GET /api/v1/openapi.json',
     'POST /api/auth/google/exchange-code',
     'POST /api/auth/google/sync-session',
     'POST /api/google-auth/exchange-code',

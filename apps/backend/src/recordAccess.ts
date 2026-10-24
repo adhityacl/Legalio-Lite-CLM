@@ -92,7 +92,8 @@ export async function addActivityLog(
   if (identity) {
     userEmail = identity.email;
     userName = identity.name;
-    role = ctx?.tenantRole
+    role = identity.apiKey ? "API key"
+      : ctx?.tenantRole
       ? ctx.tenantRole.replace(/^./, (c: string) => c.toUpperCase())
       : identity.platformRole === "superuser" ? "Platform administrator" : "User";
   }

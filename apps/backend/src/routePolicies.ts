@@ -11,7 +11,8 @@
  *   router    — verified identity; the canonical router resolves path context
  *   platform  — platform permission (superuser only)
  *   tenant    — legacy route: verified organization context with ALL listed permissions
- *   orgParam  — legacy route whose `:id` path segment is the organization
+ *   orgParam  — route whose `:id` (or `:organizationId`) path segment is the organization
+ *   apiKey    — public API (/api/v1): `Authorization: Bearer <organization API key>` with the named scope; cookie sessions are not accepted
  */
 import type express from 'express';
 import type { Sql } from './db';
@@ -22,6 +23,7 @@ import {
   resolveOrganizationContext, sendError,
 } from './identity';
 import { can, type PlatformPermission } from './rbac';
+import { authenticateApiKey } from './apiKeys';
 
 export type RoutePolicy =
   | { kind: 'public'; note?: string }
@@ -29,7 +31,8 @@ export type RoutePolicy =
   | { kind: 'router'; note?: string }
   | { kind: 'platform'; permission: PlatformPermission; note?: string }
   | { kind: 'tenant'; permissions: string[]; includeBody?: boolean; note?: string }
-  | { kind: 'orgParam'; permissions: string[]; note?: string };
+  | { kind: 'orgParam'; permissions: string[]; note?: string }
+  | { kind: 'apiKey'; scope: string | null; note?: string };
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | '*';
 export type PolicyEntry = [Method, string, RoutePolicy];
@@ -40,6 +43,7 @@ const router = (note?: string): RoutePolicy => ({ kind: 'router', note });
 const platform = (permission: PlatformPermission, note?: string): RoutePolicy => ({ kind: 'platform', permission, note });
 const tenant = (permissions: string | string[], note?: string, includeBody = true): RoutePolicy =>
   ({ kind: 'tenant', permissions: Array.isArray(permissions) ? permissions : [permissions], note, includeBody });
+const apiKey = (scope: string | null, note?: string): RoutePolicy => ({ kind: 'apiKey', scope, note });
 const orgParam = (permissions: string | string[], note?: string): RoutePolicy =>
   ({ kind: 'orgParam', permissions: Array.isArray(permissions) ? permissions : [permissions], note });
 
@@ -83,6 +87,30 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/organizations/:organizationId/exports', orgParam('tenant.data.export')],
   ['GET', '/api/organizations/:organizationId/exports/:jobId', orgParam('tenant.data.export')],
   ['GET', '/api/organizations/:organizationId/exports/:jobId/download', orgParam('tenant.data.export', 'streams the finished ZIP until it expires; audited')],
+
+  ['GET', '/api/organizations/:organizationId/api-keys', orgParam('tenant.apikey.manage', 'never returns secrets or hashes')],
+  ['POST', '/api/organizations/:organizationId/api-keys', orgParam('tenant.apikey.manage', 'the secret is returned once, hashed at rest; audited')],
+  ['POST', '/api/organizations/:organizationId/api-keys/:keyId/revoke', orgParam('tenant.apikey.manage', 'audited')],
+
+  /* ---------------- public API v1 (organization API keys) ---------------- */
+  ['GET', '/api/v1/openapi.json', pub('API description; no data')],
+  ['GET', '/api/v1/whoami', apiKey(null, 'any valid key; returns its own organization and scopes')],
+  ['GET', '/api/v1/contracts', apiKey('contracts:read')],
+  ['GET', '/api/v1/contracts/:id', apiKey('contracts:read')],
+  ['POST', '/api/v1/contracts', apiKey('contracts:write')],
+  ['PATCH', '/api/v1/contracts/:id', apiKey('contracts:write', 'version required')],
+  ['GET', '/api/v1/partners', apiKey('partners:read')],
+  ['GET', '/api/v1/partners/:id', apiKey('partners:read')],
+  ['POST', '/api/v1/partners', apiKey('partners:write')],
+  ['PATCH', '/api/v1/partners/:id', apiKey('partners:write', 'version required')],
+  ['GET', '/api/v1/orders', apiKey('orders:read')],
+  ['GET', '/api/v1/orders/:id', apiKey('orders:read')],
+  ['POST', '/api/v1/orders', apiKey('orders:write')],
+  ['PATCH', '/api/v1/orders/:id', apiKey('orders:write', 'version required')],
+  ['GET', '/api/v1/spendings', apiKey('spendings:read')],
+  ['GET', '/api/v1/spendings/:id', apiKey('spendings:read')],
+  ['POST', '/api/v1/spendings', apiKey('spendings:write')],
+  ['PATCH', '/api/v1/spendings/:id', apiKey('spendings:write', 'version required')],
 
   /* ---------------- canonical tenant API ---------------- */
   ['*', '/api/organizations/:organizationId/*', router('path organization + membership/platform context')],
@@ -292,6 +320,20 @@ export function createAuthorizationMiddleware(db: Sql) {
     if (!found) return sendError(req, res, 404, 'RESOURCE_NOT_FOUND', 'Unknown or unclassified API route.');
     const { policy, params } = found;
     if (policy.kind === 'public') return next();
+    if (policy.kind === 'apiKey') {
+      // An organization API key, never a session: the key's own organization and scopes are the whole context.
+      try {
+        const principal = await authenticateApiKey(db, req, res, policy.scope);
+        (req as any).identity = principal.identity;
+        (req as any).orgContext = principal.context;
+        (req as any).actor = legacyActorOf(principal.context);
+        (req as any).teams = [];
+        return next();
+      } catch (err: any) {
+        if (err instanceof RequestDenied) return sendError(req, res, err.status, err.error, err.message);
+        return next(err);
+      }
+    }
     try {
       const identity = await resolveIdentity(db, req);
       if (identity.viaCookie && !SAFE_METHODS.has(req.method) && !isSameOriginRequest(req)) {
