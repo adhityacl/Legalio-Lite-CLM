@@ -6,6 +6,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { usePermissions } from '../../lib/permissions';
 import { ApiError, isApiError } from '../../api/client';
 import { workspaceApi, type WorkspaceSnapshot } from '../../api/workspace';
+import { SERVER_QUERY_ROOTS } from './workspaceCache';
 import type { GoogleSheetsConfig } from '@legalio/types';
 
 type WorkspaceData = WorkspaceSnapshot;
@@ -32,7 +33,8 @@ export function normalizeWorkspace(data: Partial<WorkspaceData>): WorkspaceData 
 }
 
 /** Query cache owns workspace records; UI state stays in the feature views. */
-export function useWorkspaceData() {
+export function useWorkspaceData(options: { enabled?: boolean } = {}) {
+  const { enabled: wanted = true } = options;
   const { identity } = useIdentity();
   const { activeTenantId } = useTenant();
   const { t } = useLanguage();
@@ -56,7 +58,7 @@ export function useWorkspaceData() {
       return normalizeWorkspace(data);
     },
     // Only after this organization's capabilities are ready and allow reading (PRD §11.3).
-    enabled: Boolean(identity?.id && activeTenantId && capabilityOrganization === activeTenantId && hasPermission('document.view')),
+    enabled: wanted && Boolean(identity?.id && activeTenantId && capabilityOrganization === activeTenantId && hasPermission('document.view')),
     staleTime: 10_000,
   });
 
@@ -79,6 +81,7 @@ export function useWorkspaceData() {
 
   const cancelPendingLoad = useCallback(() => queryClient.cancelQueries({ queryKey, exact: true }), [queryClient, queryKey]);
   const loadAllData = useCallback(async () => {
+    for (const root of SERVER_QUERY_ROOTS) void queryClient.invalidateQueries({ queryKey: root });
     await queryClient.invalidateQueries({ queryKey, exact: true });
   }, [queryClient, queryKey]);
 
@@ -89,5 +92,5 @@ export function useWorkspaceData() {
   }), [data.services.googleUploadsAvailable]);
 
   return { ...data, googleConfig, queryKey, updateData, cancelPendingLoad, loadAllData,
-    workspaceLoading: query.isFetching && !query.data, workspaceError: query.isError };
+    workspaceLoading: query.isFetching && !query.data, snapshotLoaded: Boolean(query.data), workspaceError: query.isError };
 }

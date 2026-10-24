@@ -3,12 +3,15 @@ import { BulkSelectionBar } from './ui/bulk-selection-bar';
 import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { formatBusinessDate } from '../lib/displayDate';
-import { sortServiceOrders, type ServiceOrderSortField, type SortOrder } from '../lib/serviceOrderSort';
+import type { ServiceOrderSortField } from '../lib/serviceOrderSort';
+import { useServerList } from '../lib/useServerList';
+import { useRecordLookup } from '../lib/useRecordLookup';
+import { useFacets } from '../features/aggregates/useAggregates';
 import { FilterSummary } from './ui/filter-summary';
 import { TableEmptyState } from './ui/table-empty-state';
 import React, { useState, useMemo, useEffect } from 'react';
 import { CONTRACT_STATUS_LABEL_KEY, DD_STATUS_LABEL_KEY, DOC_STATUS_LABEL_KEY } from '@legalio/types/domainStatus';
-import { InsertionOrder, Contract, Partner, PRICING_MODELS } from '@legalio/types';
+import { InsertionOrder, PRICING_MODELS } from '@legalio/types';
 import { formatMoney } from '@legalio/shared/currencyUtils';
 import { FileDown, FileSpreadsheet,
   Search,
@@ -33,7 +36,6 @@ import { FileDown, FileSpreadsheet,
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
-  canViewIO,
   canEditIO,
   canCreateIO,
   canDeletePartner,
@@ -54,11 +56,16 @@ import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { Text } from '@legalio/ui-components/text';
-interface IOViewProps {
-  ios: InsertionOrder[];
-  contracts: Contract[];
-  partners: Partner[];
-  onAddIO: () => void;
+/** An order row as the list endpoint answers it: the partner's name comes with it. */
+type IORow = InsertionOrder & { partner_name?: string | null };
+
+/** Column header -> the API's sort key. */
+const IO_SORT_KEYS: Record<ServiceOrderSortField, string> = {
+  no: 'io_number', judul: 'io_title', partner: 'partner_name', pricing: 'pricing_model', value: 'io_value', duration: 'end_date', start: 'start_date', end: 'end_date', status: 'status',
+};
+const IO_FILTERS = ['status', 'pricing_model', 'charging_type'] as const;
+
+interface IOViewProps {  onAddIO: () => void;
   onEditIO: (io: InsertionOrder) => void;
   onDeleteIO: (ioId: string) => void;
   onDeleteIOs: (ids: string[]) => Promise<void>;
@@ -67,9 +74,6 @@ interface IOViewProps {
 }
 
 export const IOView: React.FC<IOViewProps> = ({
-  ios,
-  contracts,
-  partners,
   onAddIO,
   onEditIO,
   onDeleteIO,
@@ -81,30 +85,31 @@ export const IOView: React.FC<IOViewProps> = ({
   const { hasPermission } = usePermissions();
   const { t, language } = useLanguage();
 
-  // Search & Filters State
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
-  const [selectedPricingModel, setSelectedPricingModel] = useState<string>('ALL');
-  const [selectedChargingType, setSelectedChargingType] = useState<string>('ALL');
-
-  // Row selection & Pagination State
-  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
-  const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useRowsPerPage('io');
+  const list = useServerList<IORow>({
+    entity: 'ios', path: '/ios', pageSize, filterKeys: IO_FILTERS, toApiSort: (field) => IO_SORT_KEYS[field as ServiceOrderSortField] ?? null,
+  });
+  const { state: listState } = list;
+  const searchTerm = list.searchInput;
+  const selectedStatus = listState.filters.status ?? 'ALL';
+  const selectedPricingModel = listState.filters.pricing_model ?? 'ALL';
+  const selectedChargingType = listState.filters.charging_type ?? 'ALL';
 
-  // Sorting State
+  // Row selection State
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+
   type SortField = ServiceOrderSortField;
-  const [sortField, setSortField] = useState<SortField | null>(null);
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const sortField = listState.sort as SortField | null;
+  const sortOrder = listState.dir;
 
   // Detail Modal State
-  const [detailIO, setDetailIO] = useState<InsertionOrder | null>(null);
+  const [detailIO, setDetailIO] = useState<IORow | null>(null);
+  const opened = useRecordLookup<IORow>('ios', '/ios', 'io_id', openDocumentId);
   useEffect(() => {
-    if (!openDocumentId) return;
-    const io = ios.find(item => item.io_id === openDocumentId);
-    if (io && hasPermission('document.view') && canViewIO(io, partners, user)) setDetailIO(io);
+    if (!openDocumentId || opened.isLoading) return;
+    if (opened.data && hasPermission('document.view')) setDetailIO(opened.data);
     onDocumentOpened?.();
-  }, [openDocumentId, ios, partners, user, hasPermission, onDocumentOpened]);
+  }, [openDocumentId, opened.data, opened.isLoading, hasPermission, onDocumentOpened]);
 
   // Action Menu State
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
@@ -137,58 +142,16 @@ export const IOView: React.FC<IOViewProps> = ({
   };
 
   // Standard models plus any legacy/custom value still stored on existing orders.
+  const facets = useFacets();
   const pricingFilterOptions = useMemo(
-    () => [...new Set([...PRICING_MODELS, ...ios.map((i) => i.pricing_model).filter(Boolean)])],
-    [ios],
+    () => [...new Set([...PRICING_MODELS, ...(facets.data?.pricingModels ?? [])])],
+    [facets.data?.pricingModels],
   );
 
-  const partnerNameOf = (id: string) => partners.find((p) => p.partner_id === id)?.partner_name || '';
-
-  // Filtering Logic
-  const filteredIOs = useMemo(() => {
-    return ios.filter((i) => {
-      // 1. Department Scoping & RBAC restriction (based on internal PIC of partner)
-      if (!canViewIO(i, partners, user)) {
-        return false;
-      }
-
-      const matchSearch =
-        searchTerm === '' ||
-        i.io_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        i.io_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        partnerNameOf(i.partner_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (i.media_channel && i.media_channel.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      const matchStatus = selectedStatus === 'ALL' || i.status === selectedStatus;
-      const matchPricing = selectedPricingModel === 'ALL' || (i.pricing_model) === selectedPricingModel;
-      const matchCharging = selectedChargingType === 'ALL' || (i.charging_type || i.payment_scheme) === selectedChargingType;
-
-      return matchSearch && matchStatus && matchPricing && matchCharging;
-    });
-  }, [ios, partners, user, searchTerm, selectedStatus, selectedPricingModel, selectedChargingType]);
-
-  // Sorting Logic
-  const sortedIOs = useMemo(
-    () => (sortField ? sortServiceOrders(filteredIOs, sortField, sortOrder, partnerNameOf) : filteredIOs),
-    [filteredIOs, sortField, sortOrder, partners],
-  );
-
-  // Paginated Slices
-  const pageCount = Math.ceil(sortedIOs.length / pageSize);
-  const paginatedIOs = useMemo(() => {
-    const start = pageIndex * pageSize;
-    return sortedIOs.slice(start, start + pageSize);
-  }, [sortedIOs, pageIndex, pageSize]);
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      if (sortOrder === 'asc') setSortOrder('desc');
-      else setSortField(null);
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-  };
+  const paginatedIOs = list.items;
+  const pageCount = list.pageCount;
+  const partnerNameOf = (row: IORow) => row.partner_name || '';
+  const handleSort = (field: SortField) => list.toggleSort(field);
 
   const renderSortHeader = (label: string, field: SortField) => {
     const isSorted = sortField === field;
@@ -216,19 +179,8 @@ export const IOView: React.FC<IOViewProps> = ({
     );
   };
 
-  const isFiltered =
-    searchTerm !== '' ||
-    selectedStatus !== 'ALL' ||
-    selectedPricingModel !== 'ALL' ||
-    selectedChargingType !== 'ALL';
-
-  const resetFilters = () => {
-    setSearchTerm('');
-    setSelectedStatus('ALL');
-    setSelectedPricingModel('ALL');
-    setSelectedChargingType('ALL');
-    setPageIndex(0);
-  };
+  const isFiltered = searchTerm !== '' || Object.keys(listState.filters).length > 0;
+  const resetFilters = () => list.reset();
 
   // Row selection handlers
   const handleSelectAll = (checked: boolean) => {
@@ -255,7 +207,7 @@ export const IOView: React.FC<IOViewProps> = ({
   // CSV Export
   const handleExportCSV = () => {
     const dataToExport =
-      selectedRowIds.size > 0 ? ios.filter((i) => selectedRowIds.has(i.io_id)) : sortedIOs;
+      selectedRowIds.size > 0 ? paginatedIOs.filter((i) => selectedRowIds.has(i.io_id)) : paginatedIOs;
 
     const headers = [
       'Nomor IO',
@@ -279,7 +231,7 @@ export const IOView: React.FC<IOViewProps> = ({
         i.io_number,
         i.io_title,
         i.contract_id || '-',
-        partnerNameOf(i.partner_id) || '-',
+        partnerNameOf(i) || '-',
         i.media_channel || '-',
         i.pricing_model || '-',
         i.payment_scheme || '-',
@@ -325,7 +277,7 @@ export const IOView: React.FC<IOViewProps> = ({
           {hasPermission('export.csv') && (
             <Tooltip><TooltipTrigger asChild><Button variant="outline"
               onClick={handleExportCSV}
-              disabled={filteredIOs.length === 0} aria-label={t('io.export_csv', 'Ekspor CSV')}
+              disabled={paginatedIOs.length === 0} aria-label={t('io.export_csv', 'Ekspor CSV')}
             >
               <Download className="w-g16 h-g16" />
               <span>{t('io.export_csv', 'Ekspor CSV')}</span>
@@ -355,8 +307,7 @@ export const IOView: React.FC<IOViewProps> = ({
               aria-label={t('ui.search')}
               value={searchTerm}
               onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setPageIndex(0);
+                list.setSearch(e.target.value);
               }}
             />
           </InputGroup>
@@ -365,7 +316,7 @@ export const IOView: React.FC<IOViewProps> = ({
           <AlphabeticalSelect
             aria-label={t('ui.filter_status')}
               value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
+            onChange={(e) => list.setFilter('status', e.target.value)}
             className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('io.all_status', 'Semua Status')}</option>
@@ -379,7 +330,7 @@ export const IOView: React.FC<IOViewProps> = ({
           <AlphabeticalSelect
             aria-label={t('ui.filter_pricing')}
               value={selectedPricingModel}
-            onChange={(e) => setSelectedPricingModel(e.target.value)}
+            onChange={(e) => list.setFilter('pricing_model', e.target.value)}
             className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('io.all_pricing_models', 'Semua Model Pricing')}</option>
@@ -390,7 +341,7 @@ export const IOView: React.FC<IOViewProps> = ({
           <AlphabeticalSelect
             aria-label={t('ui.filter_charging')}
               value={selectedChargingType}
-            onChange={(e) => setSelectedChargingType(e.target.value)}
+            onChange={(e) => list.setFilter('charging_type', e.target.value)}
             className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('io.all_charging_types', 'Semua Skema Pembayaran')}</option>
@@ -445,7 +396,7 @@ export const IOView: React.FC<IOViewProps> = ({
         />
       )}
       <Card className="overflow-hidden">
-        <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_status'), value: selectedStatus, active: selectedStatus !== 'ALL' }, { label: t('ui.filter_pricing'), value: selectedPricingModel, active: selectedPricingModel !== 'ALL' }, { label: t('ui.filter_charging'), value: selectedChargingType, active: selectedChargingType !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedStatus('ALL'); setSelectedPricingModel('ALL'); setSelectedChargingType('ALL'); }} />
+        <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_status'), value: selectedStatus, active: selectedStatus !== 'ALL' }, { label: t('ui.filter_pricing'), value: selectedPricingModel, active: selectedPricingModel !== 'ALL' }, { label: t('ui.filter_charging'), value: selectedChargingType, active: selectedChargingType !== 'ALL' }]} onReset={list.reset} />
         <Text size="xs" tone="muted" className="px-g13 py-g8 md:hidden">{t('ui.scroll_table')}</Text>
         <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
           <Table>
@@ -528,7 +479,7 @@ export const IOView: React.FC<IOViewProps> = ({
                       {/* Partner */}
                       {visibleColumns.partner && (
                         <TableCell>
-                          {partnerNameOf(io.partner_id) || '-'}
+                          {partnerNameOf(io) || '-'}
                         </TableCell>
                       )}
                       {/* Kanal */}
@@ -607,7 +558,7 @@ export const IOView: React.FC<IOViewProps> = ({
                                 icon: <ExternalLink className="w-g13 h-g13" />,
                                 onClick: () => setDetailIO(io),
                               },
-                              ...(canEditIO(io, partners, user)
+                              ...(canEditIO(io, [], user)
                                 ? [
                                     {
                                       label: t('io.action_edit', 'Edit'),
@@ -640,13 +591,13 @@ export const IOView: React.FC<IOViewProps> = ({
         </TableScrollArea>
 
         <TablePagination
-          currentPage={pageIndex + 1}
+          currentPage={listState.page}
           totalPages={pageCount}
           rowsPerPage={pageSize}
-          onPageChange={(page) => setPageIndex(page - 1)}
+          onPageChange={list.setPage}
           onRowsPerPageChange={(size) => {
             setPageSize(size);
-            setPageIndex(0);
+            list.setPage(1);
           }}
         />
       </Card>
@@ -675,7 +626,7 @@ export const IOView: React.FC<IOViewProps> = ({
               <Card className="grid grid-cols-1 sm:grid-cols-2 gap-g13 p-g13 bg-background">
                 <div>
                   <Text as="span" size="xs" weight="medium" tone="muted" className="block">{t('io.detail_partner_label', 'Partner / Vendor:')}</Text>
-                  <Text as="span" size="xs" weight="bold">{partnerNameOf(detailIO.partner_id) || '-'}</Text>
+                  <Text as="span" size="xs" weight="bold">{partnerNameOf(detailIO) || '-'}</Text>
                 </div>
                 <div>
                   <Text as="span" size="xs" weight="medium" tone="muted" className="block">{t('io.detail_channel_label', 'Kanal Media Placement:')}</Text>

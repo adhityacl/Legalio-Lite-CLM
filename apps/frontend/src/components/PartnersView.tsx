@@ -4,7 +4,9 @@ import { TableViewMenu, TableViewOption } from './ui/table-view-menu';
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { FilterSummary } from './ui/filter-summary';
 import { TableEmptyState } from './ui/table-empty-state';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useServerList } from '../lib/useServerList';
+import { useFacets } from '../features/aggregates/useAggregates';
 import { CONTRACT_STATUS_LABEL_KEY, DD_STATUS_LABEL_KEY, DOC_STATUS_LABEL_KEY } from '@legalio/types/domainStatus';
 import { isTerminationNoticeDocument, localizeDueDiligenceDocument } from '@legalio/shared/dueDiligence';
 import { useTenantSettings } from '../context/TenantSettingsContext';
@@ -74,8 +76,14 @@ export function getValidPartnerTags(tags?: string[]): string[] {
   return valid.length > 0 ? valid : ['Advertising'];
 }
 
+/** A partner row as the list endpoint answers it: with the number of its active contracts. */
+type PartnerRow = Partner & { active_contract_count?: number };
+const PARTNER_SORT_KEYS: Record<string, string> = { channel: 'codename', name: 'partner_name', status: 'partner_status', pic: 'pic_name', status_dd: 'status_dd' };
+const PARTNER_FILTERS = ['partner_status', 'status_dd', 'country', 'internal_pic'] as const;
+
 interface PartnersViewProps {
-  partners: Partner[];
+  /** Only the evaluation sub-tab still works on the whole workspace (it cross-references every record type). */
+  partners?: Partner[];
   contracts?: Contract[];
   ios?: InsertionOrder[];
   spendings?: PartnerSpending[];
@@ -92,7 +100,7 @@ interface PartnersViewProps {
 }
 
 export const PartnersView: React.FC<PartnersViewProps> = ({
-  partners,
+  partners = [],
   contracts = [],
   ios = [],
   spendings = [],
@@ -120,25 +128,39 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
     }
   }, [initialSubTab]);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDDStatus, setSelectedDDStatus] = useState<string>('ALL');
-  const [selectedBadanHukum, setSelectedBadanHukum] = useState<string>('ALL');
   const { policy } = useTenantSettings();
   const homeCountry = policy.settings.countryCode;
   const countryLabel = (code: string) => (code ? `${code} · ${getCountryPack(code).code === code ? localizeName(getCountryPack(code).name, language) : countryDisplayName(code, language)}` : t('common.unknown', 'Unknown'));
-  const [selectedPartnerStatus, setSelectedPartnerStatus] = useState<string>('ALL');
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('ALL');
-  const [selectedPartnerDetail, setSelectedPartnerDetail] = useState<Partner | null>(null);
+  const mapFilters = useCallback((filters: Record<string, string>) => {
+    const { country, partner_status, ...rest } = filters;
+    return {
+      ...rest,
+      partner_status: partner_status === 'Nonaktif' ? 'Inactive' : partner_status,
+      country: country === 'DOMESTIC' ? homeCountry : country === 'FOREIGN' ? undefined : country,
+      exclude_country: country === 'FOREIGN' ? homeCountry : undefined,
+    };
+  }, [homeCountry]);
+  const [rowsPerPage, setRowsPerPage] = useRowsPerPage('partners');
+  const list = useServerList<PartnerRow>({
+    entity: 'partners', path: '/partners', pageSize: rowsPerPage, filterKeys: PARTNER_FILTERS, mapFilters, enabled: subTab === 'list',
+    toApiSort: (field) => PARTNER_SORT_KEYS[field] ?? null,
+  });
+  const { state: listState } = list;
+  const searchTerm = list.searchInput;
+  const selectedDDStatus = listState.filters.status_dd ?? 'ALL';
+  const selectedBadanHukum = listState.filters.country ?? 'ALL';
+  const selectedPartnerStatus = listState.filters.partner_status ?? 'ALL';
+  const selectedDepartment = listState.filters.internal_pic ?? 'ALL';
+  const facets = useFacets();
+  const [selectedPartnerDetail, setSelectedPartnerDetail] = useState<PartnerRow | null>(null);
   const [uploadModalState, setUploadModalState] = useState<{
     partner: Partner;
     docName: string;
   } | null>(null);
 
   type SortField = 'channel' | 'name' | 'tags' | 'status' | 'pic' | 'status_dd';
-  type SortOrder = 'asc' | 'desc';
-
-  const [sortField, setSortField] = useState<SortField | null>(null);
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const sortField = listState.sort as SortField | null;
+  const sortOrder = listState.dir;
   // Key order is both the Toggle Kolom menu order and the table's column order.
   const DEFAULT_PARTNER_COLUMNS = {
     partner_name: true,
@@ -165,126 +187,25 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
     });
   };
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      if (sortOrder === 'asc') {
-        setSortOrder('desc');
-      } else {
-        setSortField(null);
-        setSortOrder('asc');
-      }
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-  };
+  const handleSort = (field: SortField) => list.toggleSort(field);
 
-  const getPartnerActiveContractsCount = (partnerId: string): number => {
-    if (!contracts || contracts.length === 0) return 0;
-    return contracts.filter(
-      (c) => c.partner_id === partnerId && (c.status === 'Active' || c.status === 'Expiring')
-    ).length;
-  };
+  const getPartnerActiveContractsCount = (partner: PartnerRow): number => Number(partner.active_contract_count) || 0;
+  const getPartnerStatus = (partner: PartnerRow): 'Active' | 'Inactive' =>
+    getPartnerActiveContractsCount(partner) > 0 ? 'Active' : 'Inactive';
 
-  const getPartnerStatus = (partnerId: string): 'Active' | 'Inactive' => {
-    return getPartnerActiveContractsCount(partnerId) > 0 ? 'Active' : 'Inactive';
-  };
-
-  const filteredPartners = partners.filter((p) => {
-    // 1. Department Scoping & RBAC restriction (based on internal_pic)
-    if (!canViewPartner(p, user)) {
-      return false;
-    }
-
-    const partnerTags = getValidPartnerTags(p.tags);
-    const pCountry = partnerCountry(p);
-
-    const matchSearch =
-      p.partner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.codename && p.codename.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      countryLabel(pCountry).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      [p.pic_name, p.pic_email, p.pic_phone].some((value) => value?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.internal_pic && p.internal_pic.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      p.partner_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      partnerTags.some((t) => t.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    const matchStatus = selectedDDStatus === 'ALL' || p.status_dd === selectedDDStatus;
-    const matchBadanHukum =
-      selectedBadanHukum === 'ALL' ||
-      (selectedBadanHukum === 'DOMESTIC' && pCountry === homeCountry) ||
-      (selectedBadanHukum === 'FOREIGN' && pCountry !== homeCountry) ||
-      pCountry === selectedBadanHukum;
-
-    const pStatus = getPartnerStatus(p.partner_id);
-    const matchPartnerStatus =
-      selectedPartnerStatus === 'ALL' || pStatus === selectedPartnerStatus;
-
-    const matchDepartment =
-      selectedDepartment === 'ALL' ||
-      Boolean(p.internal_pic && p.internal_pic.toLowerCase() === selectedDepartment.toLowerCase());
-
-    return matchSearch && matchStatus && matchBadanHukum && matchPartnerStatus && matchDepartment;
-  });
-
-  const sortedPartners = React.useMemo(() => {
-    if (!sortField) return filteredPartners;
-
-    return [...filteredPartners].sort((a, b) => {
-      let valA = '';
-      let valB = '';
-
-      switch (sortField) {
-        case 'channel':
-          valA = (a.codename || a.partner_id || '').toLowerCase();
-          valB = (b.codename || b.partner_id || '').toLowerCase();
-          break;
-        case 'name':
-          valA = (a.partner_name || '').toLowerCase();
-          valB = (b.partner_name || '').toLowerCase();
-          break;
-        case 'tags':
-          valA = getValidPartnerTags(a.tags).join(', ').toLowerCase();
-          valB = getValidPartnerTags(b.tags).join(', ').toLowerCase();
-          break;
-        case 'status':
-          valA = getPartnerStatus(a.partner_id).toLowerCase();
-          valB = getPartnerStatus(b.partner_id).toLowerCase();
-          break;
-        case 'pic':
-          valA = (a.pic_name || '').toLowerCase();
-          valB = (b.pic_name || '').toLowerCase();
-          break;
-        case 'status_dd':
-          valA = (a.status_dd || '').toLowerCase();
-          valB = (b.status_dd || '').toLowerCase();
-          break;
-        default:
-          return 0;
-      }
-
-      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [filteredPartners, sortField, sortOrder, contracts]);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useRowsPerPage('partners');
+  const currentPartners = list.items;
+  const currentPage = listState.page;
+  const totalPages = list.pageCount;
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedRows(sortedPartners.map(item => item.partner_id));
+    if (checked) setSelectedRows(currentPartners.map(item => item.partner_id));
     else setSelectedRows([]);
   };
 
   const handleSelectRow = (id: string) => {
     setSelectedRows(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
   };
-
-  const totalPages = Math.ceil(sortedPartners.length / rowsPerPage);
-  const indexOfLast = currentPage * rowsPerPage;
-  const indexOfFirst = indexOfLast - rowsPerPage;
-  const currentPartners = sortedPartners.slice(indexOfFirst, indexOfLast);
 
   const getDDStatusBadge = (status: Partner['status_dd']) => {
     return statusTone(status);
@@ -347,8 +268,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
         : Math.round((adaDocs / totalDocs) * 100);
 
       const pTags = getValidPartnerTags(p.tags).join('; ');
-      const pStatus = getPartnerStatus(p.partner_id);
-      const activeContractsCount = getPartnerActiveContractsCount(p.partner_id);
+      const pStatus = getPartnerStatus(p);
+      const activeContractsCount = getPartnerActiveContractsCount(p);
 
       return [
         p.partner_id,
@@ -425,7 +346,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               {hasPermission('export.csv') && (
                 <Tooltip><TooltipTrigger asChild><Button variant="outline"
                   onClick={handleExportCSV}
-                  disabled={filteredPartners.length === 0} aria-label={t('contracts.export_csv', 'Ekspor CSV')}
+                  disabled={currentPartners.length === 0} aria-label={t('contracts.export_csv', 'Ekspor CSV')}
                 >
                   <Download className="w-g16 h-g16" />
                   <span>{t('contracts.export_csv', 'Ekspor CSV')}</span>
@@ -455,8 +376,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   aria-label={t('ui.search')}
               value={searchTerm}
                   onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setCurrentPage(1);
+                    list.setSearch(e.target.value);
                   }}
                 />
               </InputGroup>
@@ -466,8 +386,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                 aria-label={t('ui.filter_status')}
               value={selectedPartnerStatus}
                 onChange={(e) => {
-                  setSelectedPartnerStatus(e.target.value);
-                  setCurrentPage(1);
+                  list.setFilter('partner_status', e.target.value);
                 }}
                 className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
               >
@@ -481,8 +400,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                 aria-label={t('ui.filter_dd')}
               value={selectedDDStatus}
                 onChange={(e) => {
-                  setSelectedDDStatus(e.target.value);
-                  setCurrentPage(1);
+                  list.setFilter('status_dd', e.target.value);
                 }}
                 className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
               >
@@ -497,15 +415,14 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                 aria-label={t('partners.country_filter', 'Country of incorporation')}
               value={selectedBadanHukum}
                 onChange={(e) => {
-                  setSelectedBadanHukum(e.target.value);
-                  setCurrentPage(1);
+                  list.setFilter('country', e.target.value);
                 }}
                 className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
               >
                 <option value="ALL">{t('partners.all_legal_entity')}</option>
                 <option value="DOMESTIC">{t('partners.domestic', 'Domestic')}</option>
                 <option value="FOREIGN">{t('partners.foreign', 'Foreign')}</option>
-                {Array.from(new Set(partners.map(partnerCountry).filter(Boolean))).sort().map((code) => (
+                {(facets.data?.countries ?? []).map((code) => (
                   <option key={code} value={code}>{countryLabel(code)}</option>
                 ))}
               </AlphabeticalSelect>
@@ -542,7 +459,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
           {/* Partners List: TABLE VIEW */}
           <Card className="overflow-hidden">
-              <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_dd'), value: selectedDDStatus, active: selectedDDStatus !== 'ALL' }, { label: t('ui.filter_country'), value: selectedBadanHukum, active: selectedBadanHukum !== 'ALL' }, { label: t('ui.filter_status'), value: selectedPartnerStatus, active: selectedPartnerStatus !== 'ALL' }, { label: t('ui.filter_department'), value: selectedDepartment, active: selectedDepartment !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedDDStatus('ALL'); setSelectedBadanHukum('ALL'); setSelectedPartnerStatus('ALL'); setSelectedDepartment('ALL'); }} />
+              <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_dd'), value: selectedDDStatus, active: selectedDDStatus !== 'ALL' }, { label: t('ui.filter_country'), value: selectedBadanHukum, active: selectedBadanHukum !== 'ALL' }, { label: t('ui.filter_status'), value: selectedPartnerStatus, active: selectedPartnerStatus !== 'ALL' }, { label: t('ui.filter_department'), value: selectedDepartment, active: selectedDepartment !== 'ALL' }]} onReset={list.reset} />
         <Text size="xs" tone="muted" className="px-g13 py-g8 md:hidden">{t('ui.scroll_table')}</Text>
         <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
                 <Table>
@@ -550,13 +467,13 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                     <TableRow>
                       <TableColumnHeader scope="col" className="w-g42">
                         <div className="flex items-center justify-start">
-                          <Checkbox checked={selectedRows.length > 0 && selectedRows.length === sortedPartners.length} aria-label={t('partners.select_all', 'Pilih semua partner')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
+                          <Checkbox checked={currentPartners.length > 0 && currentPartners.every((item) => selectedRows.includes(item.partner_id))} aria-label={t('partners.select_all', 'Pilih semua partner')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                         </div>
                       </TableColumnHeader>
                       {visibleColumns.partner_name && renderSortHeader(t('partners.col_name', 'Nama Partner'), 'name')}
                       {visibleColumns.channel && renderSortHeader(t('partners.col_channel', 'Nama Channel'), 'channel')}
                       {visibleColumns.legal_status_flag && <TableColumnHeader scope="col">{t('partners.col_entity', 'Badan Hukum')}</TableColumnHeader>}
-                      {visibleColumns.kategori && renderSortHeader(t('partners.col_category', 'Kategori Kerjasama'), 'tags')}
+                      {visibleColumns.kategori && <TableColumnHeader scope="col">{t('partners.col_category', 'Kategori Kerjasama')}</TableColumnHeader>}
                       {visibleColumns.pic && renderSortHeader(t('partners.col_pic', 'PIC Name'), 'pic')}
                       {visibleColumns.email && <TableColumnHeader scope="col">{t('partners.col_email', 'Email')}</TableColumnHeader>}
                       {visibleColumns.telepon && <TableColumnHeader scope="col">{t('partners.col_phone', 'Telepon')}</TableColumnHeader>}
@@ -574,7 +491,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                       <TableEmptyState colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} />
                     ) : (
                       currentPartners.map((partner) => {
-                        const pStatus = getPartnerStatus(partner.partner_id);
+                        const pStatus = getPartnerStatus(partner);
 
                         return (
                           <TableRow key={partner.partner_id}>
@@ -726,10 +643,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                 currentPage={currentPage}
                 totalPages={totalPages}
                 rowsPerPage={rowsPerPage}
-                onPageChange={setCurrentPage}
+                onPageChange={list.setPage}
                 onRowsPerPageChange={(size) => {
                   setRowsPerPage(size);
-                  setCurrentPage(1);
+                  list.setPage(1);
                 }}
               />
             </Card>

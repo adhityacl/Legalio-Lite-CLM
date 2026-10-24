@@ -26,25 +26,10 @@ export function vendorColor(id: string): string {
   return MATERIAL_SERIES_COLORS[(hash >>> 0) % MATERIAL_SERIES_COLORS.length];
 }
 
-export function buildSpendingSeries(rows: PartnerSpending[], year: string, category: string,
-  categories: (row: PartnerSpending) => string[], amount: (row: PartnerSpending) => number,
-  otherLabel: string) {
-  const values: { period: string; id: string; name: string; value: number }[] = [];
-  let skipped = 0;
-  for (const row of rows) {
-    if (category !== 'ALL' && !categories(row).some(c => c.toLowerCase() === category.toLowerCase())) continue;
-    const allocations = spendingReportingAllocations(row);
-    if (!allocations.length) { skipped++; continue; }
-    const convertedTotal = amount(row);
-    if (!Number.isFinite(convertedTotal) || convertedTotal < 0) { skipped++; continue; }
-    const sourceTotal = Number(row.total_amount);
-    // Preserve the invoice's stored exchange rate for every allocated month.
-    const rate = sourceTotal > 0 ? convertedTotal / sourceTotal : 0;
-    for (const allocation of allocations) {
-      if (year !== 'ALL' && !allocation.month.startsWith(year + '-')) continue;
-      values.push({ period: allocation.month, id: row.vendor_id || row.vendor_name || 'unknown', name: row.vendor_name || otherLabel, value: allocation.amount * rate });
-    }
-  }
+interface SeriesValue { period: string; id: string; name: string; value: number }
+
+/** Top-five vendor series per month (the rest as "other") from already-converted monthly amounts. */
+function seriesFromValues(values: SeriesValue[], year: string, otherLabel: string, skipped: number) {
   const totals = new Map<string, { name: string; total: number }>();
   for (const row of values) {
     const previous = totals.get(row.id);
@@ -68,4 +53,56 @@ export function buildSpendingSeries(rows: PartnerSpending[], year: string, categ
     return { month: period, ...Object.fromEntries(series.map(s => [s.key, buckets.get(period)?.[s.key] || 0])) };
   });
   return { data, series, total: values.reduce((sum, row) => sum + row.value, 0), skipped };
+}
+
+/** One row of `GET /api/aggregates/dashboard` `spending`: the reporting month's amount of a vendor in an invoice currency. */
+export interface SpendingAggregateRow {
+  vendor_id: string | null; vendor_name: string; month: string; currency: string; amount: number; amount_usd: number | null; categories: string[];
+}
+
+/** The same chart from the server's monthly roll-up (the invoices' own exchange rates are already applied to `amount_usd`). */
+export function buildSpendingSeriesFromAggregate(rows: SpendingAggregateRow[], year: string, category: string,
+  amount: (row: SpendingAggregateRow) => number, otherLabel: string, noCategoryLabel: string) {
+  const values: SeriesValue[] = [];
+  for (const row of rows) {
+    if (year !== 'ALL' && !row.month.startsWith(year + '-')) continue;
+    const categories = row.categories.length ? row.categories : [noCategoryLabel];
+    if (category !== 'ALL' && !categories.some(c => c.toLowerCase() === category.toLowerCase())) continue;
+    const value = amount(row);
+    if (!Number.isFinite(value) || value < 0) continue;
+    values.push({ period: row.month, id: row.vendor_id || row.vendor_name || 'unknown', name: row.vendor_name || otherLabel, value });
+  }
+  return seriesFromValues(values, year, otherLabel, 0);
+}
+
+/** Total of the active contracts' value (`activeValueByCurrency` of the dashboard aggregate) in one currency. */
+export function aggregateValueInCurrency(rows: Array<{ currency: string; amount: number; amountUsdKnown: number; amountMissingUsd: number }>, currency: string): number {
+  return rows.reduce((sum, row) => {
+    const source = row.currency || currency;
+    if (source === currency) return sum + row.amount;
+    const usd = row.amountUsdKnown + convertToUsdWithFallback(row.amountMissingUsd, source);
+    return sum + usd / (getDefaultUsdRate(currency) || 1);
+  }, 0);
+}
+
+export function buildSpendingSeries(rows: PartnerSpending[], year: string, category: string,
+  categories: (row: PartnerSpending) => string[], amount: (row: PartnerSpending) => number,
+  otherLabel: string) {
+  const values: SeriesValue[] = [];
+  let skipped = 0;
+  for (const row of rows) {
+    if (category !== 'ALL' && !categories(row).some(c => c.toLowerCase() === category.toLowerCase())) continue;
+    const allocations = spendingReportingAllocations(row);
+    if (!allocations.length) { skipped++; continue; }
+    const convertedTotal = amount(row);
+    if (!Number.isFinite(convertedTotal) || convertedTotal < 0) { skipped++; continue; }
+    const sourceTotal = Number(row.total_amount);
+    // Preserve the invoice's stored exchange rate for every allocated month.
+    const rate = sourceTotal > 0 ? convertedTotal / sourceTotal : 0;
+    for (const allocation of allocations) {
+      if (year !== 'ALL' && !allocation.month.startsWith(year + '-')) continue;
+      values.push({ period: allocation.month, id: row.vendor_id || row.vendor_name || 'unknown', name: row.vendor_name || otherLabel, value: allocation.amount * rate });
+    }
+  }
+  return seriesFromValues(values, year, otherLabel, skipped);
 }

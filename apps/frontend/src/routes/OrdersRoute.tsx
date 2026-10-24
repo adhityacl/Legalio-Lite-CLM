@@ -6,14 +6,11 @@ import { useWorkspace } from '../features/workspace/WorkspaceContext';
 export default function OrdersRoute() {
   const { t } = useLanguage();
   const { recordId, clearRecordId } = useNavigation();
-  const { ios, contracts, partners, openEditor, actions } = useWorkspace();
+  const { openEditor, actions } = useWorkspace();
   return (
     <IOView
       openDocumentId={recordId ?? undefined}
       onDocumentOpened={clearRecordId}
-      ios={ios}
-      contracts={contracts}
-      partners={partners}
       onAddIO={() => openEditor({ kind: 'io', record: null })}
       onEditIO={(io) => openEditor({ kind: 'io', record: io })}
       onDeleteIO={actions.deleteOrder}

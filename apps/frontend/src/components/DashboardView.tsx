@@ -2,24 +2,16 @@ import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { DashboardOverview } from './DashboardOverview';
 import { RecentDocumentsTable } from './RecentDocumentsTable';
 import { TableEmptyMessage, TableEmptyState } from './ui/table-empty-state';
-import { buildSpendingSeries, contractTotalInCurrency } from '../lib/dashboardMetrics';
+import { aggregateValueInCurrency, buildSpendingSeriesFromAggregate } from '../lib/dashboardMetrics';
+import type { DashboardAggregate, DashboardDocument } from '../api/aggregates';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import React, { useState, useMemo } from 'react';
 import { useTenantSettings } from '../context/TenantSettingsContext';
 import { convertToUsdWithFallback, getActiveFormattingLocale, getDefaultUsdRate } from '@legalio/shared/currencyUtils';
-import { Contract, InsertionOrder, Partner, NotificationLog, PartnerSpending } from '@legalio/types';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../lib/permissions';
-import {
-  canViewPartner,
-  canViewContract,
-  canViewIO,
-  canViewSpending,
-} from '../lib/rbacScoping';
-import { getSavedCategories } from '../lib/categoryUtils';
 import { Badge, statusTone } from '@legalio/ui-components/badge';
-import { spendingReportingAllocations } from '@legalio/shared/spendingAllocations';
 import { NewsTicker } from './NewsTicker';
 import {
   FileText,
@@ -63,26 +55,24 @@ import { Text } from '@legalio/ui-components/text';
 import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
 import { TableCardHeader } from '@legalio/ui-components/blocks';
 interface DashboardViewProps {
-  contracts: Contract[];
-  ios: InsertionOrder[];
-  partners: Partner[];
-  spendings?: PartnerSpending[];
-  notifications: NotificationLog[];
-  onNavigateTab: (tab: string) => void;
-  onSelectContract: (contract: Contract) => void;
-  onSelectPartner: (partner: Partner) => void;
+  /** SQL-computed figures for the caller's organization and departments (`GET /api/aggregates/dashboard`). */
+  data: DashboardAggregate | undefined;
+  loading?: boolean;
+  onNavigateTab: (tab: string, recordId?: string) => void;
 }
 
+const NO_DATA: DashboardAggregate = {
+  organizationId: '', partners: { total: 0, active: 0, byDdStatus: {} }, contracts: { total: 0, byStatus: {}, byApproval: {}, activeValueByCurrency: [] },
+  ios: { total: 0, byStatus: {} }, notifications: { total: 0, unread: 0 }, expiring: { contracts: [], ios: [] }, recent: { contracts: [], ios: [] }, categories: [], spending: [],
+};
+const activeCount = (byStatus: Record<string, number>) => (byStatus.Active ?? 0) + (byStatus.Expiring ?? 0);
+
 export const DashboardView: React.FC<DashboardViewProps> = ({
-  contracts,
-  ios,
-  partners,
-  spendings = [],
-  notifications,
+  data: loaded,
+  loading = false,
   onNavigateTab,
-  onSelectContract,
-  onSelectPartner,
 }) => {
+  const data = loaded ?? NO_DATA;
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const caps = usePermissions();
@@ -109,13 +99,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return `${greetingWord}, ${userName}`;
   };
 
-  // Department-scoped datasets based on RBAC and Internal PIC of Partner
-  const scopedPartners = useMemo(() => (partners || []).filter((p) => canViewPartner(p, user)), [partners, user]);
-  const scopedContracts = useMemo(() => (contracts || []).filter((c) => canViewContract(c, partners, user)), [contracts, partners, user]);
   // Commercial documents disappear from every widget and table while their module is off.
   const commercialEnabled = useTenantSettings().policy.settings.modules.commercialDocuments;
-  const scopedIOs = useMemo(() => (commercialEnabled ? ios || [] : []).filter((i) => canViewIO(i, partners, user)), [commercialEnabled, ios, partners, user]);
-  const scopedSpendings = useMemo(() => (spendings || []).filter((s) => canViewSpending(s, partners, user)), [spendings, partners, user]);
 
   // Stacked Spending Chart State & Filter Controls
   const [spendingFilterYear, setSpendingFilterYear] = useState<string>(() => String(new Date().getFullYear()));
@@ -126,12 +111,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [spendingCurrencyView, setSpendingCurrencyView] = useState<string>('USD');
   const currencyViews = Array.from(new Set(['USD', localCurrency]));
   const viewCurrency = currencyViews.includes(spendingCurrencyView) ? spendingCurrencyView : 'USD';
-  const toViewCurrency = (s: PartnerSpending): number => {
-    const usd = s.total_amount_usd ?? convertToUsdWithFallback(s.total_amount, s.currency || localCurrency);
-    if (viewCurrency === 'USD') return usd;
-    if ((s.currency || localCurrency) === viewCurrency) return s.total_amount;
-    return usd / (getDefaultUsdRate(viewCurrency) || 1);
-  };
   const formatView = (value: number, compact = false) => {
     try {
       return new Intl.NumberFormat(getActiveFormattingLocale(), {
@@ -146,37 +125,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   };
 
-  // Available Cooperation Categories directly and exclusively from Contracts (c.cooperation_categories)
-  const categoryOptions = useMemo(() => {
-    const catSet = new Set<string>();
-    (scopedContracts || []).forEach((c) => {
-      (c.cooperation_categories || []).forEach((cat) => {
-        if (cat && cat.trim()) catSet.add(cat.trim());
-      });
-    });
+  // Cooperation categories of the contracts the caller may see.
+  const categoryOptions = useMemo(() => [...data.categories].sort((a, b) => a.localeCompare(b)), [data.categories]);
 
-    return Array.from(catSet).sort((a, b) => a.localeCompare(b));
-  }, [scopedContracts]);
-
-  // Use the same reporting periods for the year filter and chart amounts.
+  // The same reporting periods feed the year filter and the chart amounts.
   const availableSpendingYears = useMemo(() => {
-    const yearsSet = new Set<string>();
-    (scopedSpendings || []).forEach((s) => {
-      spendingReportingAllocations(s).forEach(({ month }) => yearsSet.add(month.slice(0, 4)));
-    });
+    const yearsSet = new Set<string>(data.spending.map((row) => row.month.slice(0, 4)));
     if (yearsSet.size === 0) yearsSet.add(new Date().getFullYear().toString());
     return Array.from(yearsSet).sort().reverse();
-  }, [scopedSpendings]);
+  }, [data.spending]);
 
-  const spendingChart = useMemo(() => buildSpendingSeries(
-    scopedSpendings, spendingFilterYear, spendingCategoryFilter,
-    row => {
-      const partner = scopedPartners.find(p => p.partner_id === row.vendor_id || p.partner_name === row.vendor_name);
-      const categories = scopedContracts.filter(c => c.partner_id === partner?.partner_id)
-        .flatMap(c => c.cooperation_categories || []);
-      return categories.length ? categories : [t('ui.other')];
-    }, toViewCurrency, t('ui.other'),
-  ), [scopedSpendings, scopedPartners, scopedContracts, spendingFilterYear, spendingCategoryFilter, viewCurrency, localCurrency, language]);
+  const toViewCurrencyRow = (row: DashboardAggregate['spending'][number]): number => {
+    if (viewCurrency === 'USD') return row.amount_usd ?? convertToUsdWithFallback(row.amount, row.currency || localCurrency);
+    if ((row.currency || localCurrency) === viewCurrency) return row.amount;
+    const usd = row.amount_usd ?? convertToUsdWithFallback(row.amount, row.currency || localCurrency);
+    return usd / (getDefaultUsdRate(viewCurrency) || 1);
+  };
+  const spendingChart = useMemo(() => buildSpendingSeriesFromAggregate(
+    data.spending, spendingFilterYear, spendingCategoryFilter, toViewCurrencyRow, t('ui.other'), t('ui.other'),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [data.spending, spendingFilterYear, spendingCategoryFilter, viewCurrency, localCurrency, language]);
   const stackedData = spendingChart.data;
   const stackKeys = spendingChart.series.map(s => s.key);
   const stackColors = Object.fromEntries(spendingChart.series.map(s => [s.key, s.color]));
@@ -185,43 +153,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }).format(new Date(`${/^\d{2}$/.test(period) ? `2000-${period}` : period}-01T00:00:00Z`));
 
   // Calculations
-  const activeContracts = scopedContracts.filter((c) => c.status === 'Active' || c.status === 'Expiring');
-  const activeIOs = scopedIOs.filter((i) => i.status === 'Active' || i.status === 'Expiring');
-  const expiringContracts = scopedContracts.filter((c) => c.status === 'Expiring');
-  const expiringIOs = scopedIOs.filter((i) => i.status === 'Expiring');
-  const partnerNameById = new Map((partners || []).map((p) => [p.partner_id, p.partner_name]));
-  const expiredContracts = scopedContracts.filter((c) => c.status === 'Expired');
+  const activeContractsCount = activeCount(data.contracts.byStatus);
+  const activeIOsCount = commercialEnabled ? activeCount(data.ios.byStatus) : 0;
+  const totalIOs = commercialEnabled ? data.ios.total : 0;
+  const expiringCount = data.contracts.byStatus.Expiring ?? 0;
+  const documentLabel = (row: DashboardDocument) => row.document_type === 'Agreement Addendum'
+    ? t('contracts.agreement_addendum', 'Agreement Addendum')
+    : t('contracts.master_agreement', 'Master Agreement');
   const requiringActionDocuments = [
-    ...expiringContracts.map((contract) => ({
-      id: contract.contract_id,
-      name: contract.contract_title,
-      type: contract.document_type === 'Agreement Addendum'
-        ? t('contracts.agreement_addendum', 'Agreement Addendum')
-        : t('contracts.master_agreement', 'Master Agreement'),
-      partner: partnerNameById.get(contract.partner_id) || '—',
-      endDate: contract.end_date,
-      remainingDays: contract.days_remaining,
-      onOpen: () => onSelectContract(contract),
+    ...data.expiring.contracts.map((contract) => ({
+      id: contract.id,
+      name: contract.title,
+      type: documentLabel(contract),
+      partner: contract.partner_name || '—',
+      endDate: contract.end_date ?? '',
+      remainingDays: contract.days_remaining ?? undefined,
+      onOpen: () => onNavigateTab('contracts', contract.id),
     })),
-    ...expiringIOs.map((io) => ({
-      id: io.io_id,
-      name: io.io_title,
+    ...(commercialEnabled ? data.expiring.ios : []).map((io) => ({
+      id: io.id,
+      name: io.title,
       type: t('dashboard.insertion_orders', 'IO / SO / SOW'),
-      partner: partnerNameById.get(io.partner_id) || '—',
-      endDate: io.end_date || io.completion_date || '',
-      remainingDays: io.days_remaining,
-      onOpen: () => onNavigateTab('ios'),
+      partner: io.partner_name || '—',
+      endDate: io.end_date ?? '',
+      remainingDays: io.days_remaining ?? undefined,
+      onOpen: () => onNavigateTab('ios', io.id),
     })),
   ].sort((a, b) => Date.parse(a.endDate) - Date.parse(b.endDate)).slice(0, 5);
 
-  // Partner Aktif = minimal 1 kontrak dengan status Active atau Expiring
-  const activePartnersCount = scopedPartners.filter((p) =>
-    scopedContracts.some((c) => c.partner_id === p.partner_id && (c.status === 'Active' || c.status === 'Expiring'))
-  ).length;
-
-  const totalNilaiKontrak = contractTotalInCurrency(activeContracts, viewCurrency);
+  const totalNilaiKontrak = aggregateValueInCurrency(data.contracts.activeValueByCurrency, viewCurrency);
   return (
-    <div className="flex flex-col gap-g21 animate-in fade-in-50 duration-200">
+    <div className="flex flex-col gap-g21 animate-in fade-in-50 duration-200" aria-busy={loading}>
       {noDepartmentAccess && (
         <Alert status="warning" role="status"><AlertIndicator />
           <AlertContent><AlertDescription>{t('tb.no_department_access', 'You are not assigned to a department in this organization, so no records are shown. Ask an administrator to assign one.')}</AlertDescription></AlertContent>
@@ -229,12 +191,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       )}
       <DashboardOverview
         greeting={getGreetingText()}
-        expiring={expiringContracts.length}
+        expiring={expiringCount}
         metrics={[
-          { label: t('dashboard.active_partners'), value: activePartnersCount, total: scopedPartners.length, detail: t('dashboard.min_one_contract'), icon: Building2, tone: 'mint', onClick: () => onNavigateTab('partners') },
-          { label: t('dashboard.active_contracts'), value: activeContracts.length, total: scopedContracts.length, detail: `${t('dashboard.value')}: ${formatView(totalNilaiKontrak, true)}`, icon: FileText, tone: 'blue', onClick: () => onNavigateTab('contracts') },
-          ...(commercialEnabled ? [{ label: t('dashboard.insertion_orders'), value: activeIOs.length, total: scopedIOs.length, detail: t('dashboard.from_contracts', 'From {contracts} Contracts', { contracts: scopedContracts.length }), icon: FileSpreadsheet, tone: 'violet' as const, onClick: () => onNavigateTab('ios') }] : []),
-          { label: t('dashboard.expiring_contracts'), value: expiringContracts.length, detail: t('dashboard.extension_termination'), icon: AlertTriangle, tone: 'amber', onClick: () => onNavigateTab('contracts') },
+          { label: t('dashboard.active_partners'), value: data.partners.active, total: data.partners.total, detail: t('dashboard.min_one_contract'), icon: Building2, tone: 'mint', onClick: () => onNavigateTab('partners') },
+          { label: t('dashboard.active_contracts'), value: activeContractsCount, total: data.contracts.total, detail: `${t('dashboard.value')}: ${formatView(totalNilaiKontrak, true)}`, icon: FileText, tone: 'blue', onClick: () => onNavigateTab('contracts') },
+          ...(commercialEnabled ? [{ label: t('dashboard.insertion_orders'), value: activeIOsCount, total: totalIOs, detail: t('dashboard.from_contracts', 'From {contracts} Contracts', { contracts: data.contracts.total }), icon: FileSpreadsheet, tone: 'violet' as const, onClick: () => onNavigateTab('ios') }] : []),
+          { label: t('dashboard.expiring_contracts'), value: expiringCount, detail: t('dashboard.extension_termination'), icon: AlertTriangle, tone: 'amber', onClick: () => onNavigateTab('contracts') },
         ]}
       />
       <NewsTicker />
@@ -324,7 +286,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </TableScrollArea>
       </Card>
 
-      <RecentDocumentsTable contracts={scopedContracts} ios={scopedIOs} partners={partners}onNavigate={onNavigateTab} />
+      <RecentDocumentsTable contracts={data.recent.contracts} ios={commercialEnabled ? data.recent.ios : []} onNavigate={onNavigateTab} />
 
       {/* Stacked Spending Chart Card (Under Table); hidden with the spending module (PRD §4.5.3) */}
       {policy.settings.modules.spending && (

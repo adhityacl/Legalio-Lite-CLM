@@ -1,20 +1,15 @@
 import { DashboardView } from '../components/DashboardView';
 import { useNavigation } from '../context/NavigationContext';
-import { useWorkspace } from '../features/workspace/WorkspaceContext';
+import { useDashboardAggregate } from '../features/aggregates/useAggregates';
 
 export default function DashboardRoute() {
   const { setActiveTab } = useNavigation();
-  const { contracts, ios, partners, spendings, notifications } = useWorkspace();
+  const dashboard = useDashboardAggregate();
   return (
     <DashboardView
-      contracts={contracts}
-      ios={ios}
-      partners={partners}
-      spendings={spendings}
-      notifications={notifications}
-      onNavigateTab={setActiveTab}
-      onSelectContract={() => setActiveTab('contracts')}
-      onSelectPartner={() => setActiveTab('partners')}
+      data={dashboard.data}
+      loading={dashboard.isLoading}
+      onNavigateTab={(tab, recordId) => setActiveTab(tab, undefined, recordId ? { recordId } : undefined)}
     />
   );
 }

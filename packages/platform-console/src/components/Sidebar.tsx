@@ -283,12 +283,14 @@ interface PaletteItem {
 const EMPTY_SEARCH_RESULTS: WorkspaceSearchResult[] = [];
 
 /** Search available navigation and the current workspace's visible records. */
-function NavigationCommandPalette({ sections, onNavigate, searchResults = EMPTY_SEARCH_RESULTS, searchLoading, onSelectSearchResult }: {
+function NavigationCommandPalette({ sections, onNavigate, searchResults = EMPTY_SEARCH_RESULTS, searchLoading, onSelectSearchResult, onSearchQueryChange }: {
   sections: NavSection[];
   onNavigate: (tab: string) => void;
   searchResults?: WorkspaceSearchResult[];
   searchLoading?: boolean;
   onSelectSearchResult?: (result: WorkspaceSearchResult) => void;
+  /** Called with the text typed in the palette, so the host can run a server-side search for it. */
+  onSearchQueryChange?: (query: string) => void;
 }) {
   const { t } = useLanguage();
   const [query, setQuery] = useState('');
@@ -314,12 +316,13 @@ function NavigationCommandPalette({ sections, onNavigate, searchResults = EMPTY_
   useEffect(() => { set(items); }, [items, set]);
   return (
     <CommandPalettePanel>
-      <CommandPaletteCombobox collection={collection} inputValue={query} onInputValueChange={details => setQuery(details.inputValue)}
+      <CommandPaletteCombobox collection={collection} inputValue={query} onInputValueChange={details => { setQuery(details.inputValue); onSearchQueryChange?.(details.inputValue); }}
         onSelect={details => {
           const item = items.find(candidate => candidate.id === details.itemValue);
           if (item?.record) onSelectSearchResult?.(item.record);
           else if (item) onNavigate(item.target);
           setQuery('');
+          onSearchQueryChange?.('');
         }}>
         <CommandPaletteSearch placeholder={onSelectSearchResult ? t('nav.workspace_search_placeholder', 'Search menu, vendor, or document...') : t('nav.search_placeholder', 'Cari menu...')} />
         <CommandPaletteList>
@@ -353,7 +356,7 @@ function NavigationCommandPalette({ sections, onNavigate, searchResults = EMPTY_
  * Application shell (moduix Sidebar dashboard block): a resizable, collapsible navigation panel beside
  * the content inset on desktop, and the same navigation in a moduix Drawer on small screens.
  */
-export function AppShell({ navigation, header, children, className, searchResults, searchLoading, onSelectSearchResult }: {
+export function AppShell({ navigation, header, children, className, searchResults, searchLoading, onSelectSearchResult, onSearchQueryChange }: {
   navigation: AppNavigationProps;
   header: React.ReactNode;
   children: React.ReactNode;
@@ -361,6 +364,7 @@ export function AppShell({ navigation, header, children, className, searchResult
   searchResults?: WorkspaceSearchResult[];
   searchLoading?: boolean;
   onSelectSearchResult?: (result: WorkspaceSearchResult) => void;
+  onSearchQueryChange?: (query: string) => void;
 }) {
   const { t } = useLanguage();
   const desktop = useIsDesktop();
@@ -413,7 +417,7 @@ export function AppShell({ navigation, header, children, className, searchResult
           </DrawerPositioner>
         </Drawer>
       )}
-      <NavigationCommandPalette sections={sections} onNavigate={navigate} searchResults={searchResults} searchLoading={searchLoading} onSelectSearchResult={onSelectSearchResult} />
+      <NavigationCommandPalette sections={sections} onNavigate={navigate} searchResults={searchResults} searchLoading={searchLoading} onSelectSearchResult={onSelectSearchResult} onSearchQueryChange={onSearchQueryChange} />
     </CommandPalette>
   );
 }

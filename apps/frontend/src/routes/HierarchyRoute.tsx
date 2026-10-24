@@ -1,9 +1,11 @@
 import { HierarchyTreemapView } from '../components/HierarchyTreemapView';
 import { useNavigation } from '../context/NavigationContext';
-import { useWorkspace } from '../features/workspace/WorkspaceContext';
+import { useSnapshotDemand, useWorkspace } from '../features/workspace/WorkspaceContext';
 
 export default function HierarchyRoute() {
   const { setActiveTab } = useNavigation();
+  // The hierarchy cross-references every record type, so it works on the full workspace snapshot.
+  useSnapshotDemand(true);
   const { partners, contracts, ios, evaluations, spendings, workspaceLoading, workspaceError, loadAllData, openEditor } = useWorkspace();
   return (
     <HierarchyTreemapView

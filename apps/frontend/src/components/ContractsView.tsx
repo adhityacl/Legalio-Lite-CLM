@@ -6,8 +6,11 @@ import { formatBusinessDate } from '../lib/displayDate';
 import { FilterSummary } from './ui/filter-summary';
 import { TableEmptyState } from './ui/table-empty-state';
 import React, { useState, useMemo, useEffect } from 'react';
+import { useServerList } from '../lib/useServerList';
+import { useRecordLookup, useRelatedRecords } from '../lib/useRecordLookup';
+import { useFacets } from '../features/aggregates/useAggregates';
 import { getActiveFormattingLocale, convertToUsdWithFallback } from '@legalio/shared/currencyUtils';
-import { Contract, Partner, InsertionOrder } from '@legalio/types';
+import { Contract, InsertionOrder } from '@legalio/types';
 import { formatMoney } from '@legalio/shared/currencyUtils';
 import { ActionMenu } from './ui/action-menu';
 import { TablePagination } from './ui/TablePagination';
@@ -40,7 +43,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
-  canViewContract,
   canEditContract,
   canCreateContract,
   canDeletePartner,
@@ -57,11 +59,17 @@ import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { Text } from '@legalio/ui-components/text';
-interface ContractsViewProps {
-  contracts: Contract[];
-  partners: Partner[];
-    ios: InsertionOrder[];
-  onAddContract: () => void;
+/** A contract row as the list endpoint answers it: the partner's name comes with it. */
+type ContractRow = Contract & { partner_name?: string | null };
+
+/** Column header -> the API's sort key. */
+const CONTRACT_SORT_KEYS: Record<string, string> = {
+  no: 'contract_number', partner: 'partner_name', doc_type: 'document_type', value: 'contract_value_usd',
+  duration: 'end_date', start: 'start_date', end: 'end_date', status: 'status', document: 'file',
+};
+const CONTRACT_FILTERS = ['document_type', 'category', 'status'] as const;
+
+interface ContractsViewProps {  onAddContract: () => void;
   onEditContract: (contract: Contract) => void;
   onDeleteContract: (contractId: string) => void;
   onDeleteContracts: (ids: string[]) => Promise<void>;
@@ -71,9 +79,6 @@ interface ContractsViewProps {
 }
 
 export const ContractsView: React.FC<ContractsViewProps> = ({
-  contracts,
-  partners,
-    ios,
   onAddContract,
   onEditContract,
   onDeleteContract,
@@ -85,53 +90,35 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
   const { user, isLegal, isAdmin } = useAuth();
   const { hasPermission } = usePermissions();
   const { t, language } = useLanguage();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
-  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
-
-  const [selectedJenisDokumen, setSelectedJenisDokumen] = useState<string>('ALL');
-  const [detailContract, setDetailContract] = useState<Contract | null>(null);
+  const [rowsPerPage, setRowsPerPage] = useRowsPerPage('contracts');
+  const list = useServerList<ContractRow>({
+    entity: 'contracts', path: '/contracts', pageSize: rowsPerPage, filterKeys: CONTRACT_FILTERS,
+    toApiSort: (field) => CONTRACT_SORT_KEYS[field] ?? null,
+  });
+  const { state: listState } = list;
+  const searchTerm = list.searchInput;
+  const selectedJenisDokumen = listState.filters.document_type ?? 'ALL';
+  const selectedCategory = listState.filters.category ?? 'ALL';
+  const selectedStatus = listState.filters.status ?? 'ALL';
+  const [detailContract, setDetailContract] = useState<ContractRow | null>(null);
+  const opened = useRecordLookup<ContractRow>('contracts', '/contracts', 'contract_id', openDocumentId);
   useEffect(() => {
     if (!openDocumentId) return;
-    const contract = contracts.find(item => item.contract_id === openDocumentId);
-    if (contract && hasPermission('document.view') && canViewContract(contract, partners, user)) setDetailContract(contract);
+    if (opened.isLoading) return;
+    if (opened.data && hasPermission('document.view')) setDetailContract(opened.data);
     onDocumentOpened?.();
-  }, [openDocumentId, contracts, partners, user, hasPermission, onDocumentOpened]);
+  }, [openDocumentId, opened.data, opened.isLoading, hasPermission, onDocumentOpened]);
 
-  // Categories list
-  const allCategories = useMemo(() => Array.from(new Set(contracts.flatMap(c => c.cooperation_categories || []))), [contracts]);
-  const partnersById = useMemo(() => new Map(partners.map(partner => [partner.partner_id, partner])), [partners]);
-
-  // Filter logic
-  const filteredContracts = useMemo(() => contracts.filter((c) => {
-    // 1. Department Scoping & RBAC restriction (based on internal PIC of partner)
-    if (!canViewContract(c, partners, user)) {
-      return false;
-    }
-
-    const jenis = c.document_type || 'Master Agreement';
-    const matchJenis = selectedJenisDokumen === 'ALL' || jenis === selectedJenisDokumen;
-
-    const matchSearch =
-      c.contract_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.contract_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (partnersById.get(c.partner_id)?.partner_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.internal_pic.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (c.parent_contract_number && c.parent_contract_number.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    const matchCategory =
-      selectedCategory === 'ALL' || (c.cooperation_categories && c.cooperation_categories.includes(selectedCategory));
-
-    const matchStatus = selectedStatus === 'ALL' || c.status === selectedStatus;
-
-    return matchJenis && matchSearch && matchCategory && matchStatus;
-  }), [contracts, partners, partnersById, user, selectedJenisDokumen, selectedCategory, selectedStatus, searchTerm]);
+  const facets = useFacets();
+  const allCategories = facets.data?.categories ?? [];
+  const addenda = useRelatedRecords<Contract>('contracts', '/contracts', { parent_contract_id: detailContract?.contract_id ?? '' }, Boolean(detailContract) && detailContract?.document_type !== 'Agreement Addendum');
+  const linkedIos = useRelatedRecords<InsertionOrder>('ios', '/ios', { contract_id: detailContract?.contract_id ?? '' }, Boolean(detailContract));
+  const childAddenda = addenda.data ?? [];
+  const detailIos = linkedIos.data ?? [];
 
   type SortField = 'no' | 'partner' | 'doc_type' | 'value' | 'duration' | 'start' | 'end' | 'status' | 'document';
-  type SortOrder = 'asc' | 'desc';
-
-  const [sortField, setSortField] = useState<SortField | null>(null);
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const sortField = listState.sort as SortField | null;
+  const sortOrder = listState.dir;
   const DEFAULT_CONTRACT_COLUMNS = {
     document_type: false,
     contract_number: true,
@@ -159,100 +146,21 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
   };
 
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      if (sortOrder === 'asc') {
-        setSortOrder('desc');
-      } else {
-        setSortField(null);
-        setSortOrder('asc');
-      }
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-  };
+  const handleSort = (field: SortField) => list.toggleSort(field);
 
-  const sortedContracts = React.useMemo(() => {
-    if (!sortField) return filteredContracts;
-
-    return [...filteredContracts].sort((a, b) => {
-      let valA: any = '';
-      let valB: any = '';
-
-      const getPartnerName = (c: Contract) => partnersById.get(c.partner_id)?.partner_name || '';
-
-      switch (sortField) {
-        case 'no':
-          valA = a.contract_number;
-          valB = b.contract_number;
-          break;
-        case 'partner':
-          valA = getPartnerName(a);
-          valB = getPartnerName(b);
-          break;
-        case 'doc_type':
-          valA = `${a.document_type || ''}_${(a.cooperation_categories || []).join(', ')}`;
-          valB = `${b.document_type || ''}_${(b.cooperation_categories || []).join(', ')}`;
-          break;
-        case 'value':
-          valA = a.contract_value_usd ?? a.contract_value;
-          valB = b.contract_value_usd ?? b.contract_value;
-          break;
-        case 'duration':
-          valA = a.end_date || a.completion_date || a.start_date || '';
-          valB = b.end_date || b.completion_date || b.start_date || '';
-          break;
-        case 'start':
-          valA = a.start_date || '';
-          valB = b.start_date || '';
-          break;
-        case 'end':
-          valA = a.end_date || a.completion_date || '';
-          valB = b.end_date || b.completion_date || '';
-          break;
-        case 'status':
-          valA = a.status || '';
-          valB = b.status || '';
-          break;
-        case 'document':
-          valA = a.contract_file_link || '';
-          valB = b.contract_file_link || '';
-          break;
-        default:
-          return 0;
-      }
-
-      if (typeof valA === 'number' && typeof valB === 'number') {
-        return sortOrder === 'asc' ? valA - valB : valB - valA;
-      }
-
-      const res = String(valA || '').localeCompare(String(valB || ''), undefined, {
-        numeric: true,
-        sensitivity: 'base',
-      });
-      return sortOrder === 'asc' ? res : -res;
-    });
-  }, [filteredContracts, sortField, sortOrder, partnersById]);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useRowsPerPage('contracts');
+  const currentContracts = list.items;
+  const currentPage = listState.page;
+  const totalPages = list.pageCount;
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedRows(sortedContracts.map(item => item.contract_id));
+    if (checked) setSelectedRows(currentContracts.map(item => item.contract_id));
     else setSelectedRows([]);
   };
 
   const handleSelectRow = (id: string) => {
     setSelectedRows(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
   };
-
-  const totalPages = Math.ceil(sortedContracts.length / rowsPerPage);
-  const indexOfLast = currentPage * rowsPerPage;
-  const indexOfFirst = indexOfLast - rowsPerPage;
-  const currentContracts = sortedContracts.slice(indexOfFirst, indexOfLast);
-
 
   const renderSortHeader = (label: string, field: SortField) => {
     const isSorted = sortField === field;
@@ -302,8 +210,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
     ];
 
     const rows = currentContracts.map((c) => {
-      const partnerObj = partnersById.get(c.partner_id);
-      const partnerName = partnerObj?.partner_name || '-';
+      const partnerName = c.partner_name || '-';
       return [
         c.document_type || 'Master Agreement',
         c.contract_number,
@@ -361,7 +268,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
           {hasPermission('export.csv') && (
             <Tooltip><TooltipTrigger asChild><Button variant="outline"
               onClick={handleExportCSV}
-              disabled={filteredContracts.length === 0} aria-label={t('contracts.export_csv', 'Ekspor CSV')}
+              disabled={currentContracts.length === 0} aria-label={t('contracts.export_csv', 'Ekspor CSV')}
             >
               <Download className="w-g16 h-g16" />
               <span>{t('contracts.export_csv', 'Ekspor CSV')}</span>
@@ -392,8 +299,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               aria-label={t('ui.search')}
               value={searchTerm}
               onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
+                list.setSearch(e.target.value);
               }}
             />
           </InputGroup>
@@ -401,7 +307,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
           <AlphabeticalSelect
             aria-label={t('ui.filter_type')}
               value={selectedJenisDokumen}
-            onChange={(e) => setSelectedJenisDokumen(e.target.value)}
+            onChange={(e) => list.setFilter('document_type', e.target.value)}
             className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('contracts.all_types')}</option>
@@ -412,7 +318,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
           <AlphabeticalSelect
             aria-label={t('ui.filter_category')}
               value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
+            onChange={(e) => list.setFilter('category', e.target.value)}
             className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('contracts.all_categories')}</option>
@@ -426,7 +332,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
           <AlphabeticalSelect
             aria-label={t('ui.filter_status')}
               value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
+            onChange={(e) => list.setFilter('status', e.target.value)}
             className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('contracts.all_status')}</option>
@@ -468,7 +374,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
         />
       )}
       <Card className="overflow-hidden">
-        <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_type'), value: selectedJenisDokumen, active: selectedJenisDokumen !== 'ALL' }, { label: t('ui.filter_category'), value: selectedCategory, active: selectedCategory !== 'ALL' }, { label: t('ui.filter_status'), value: selectedStatus, active: selectedStatus !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedJenisDokumen('ALL'); setSelectedCategory('ALL'); setSelectedStatus('ALL'); }} />
+        <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_type'), value: selectedJenisDokumen, active: selectedJenisDokumen !== 'ALL' }, { label: t('ui.filter_category'), value: selectedCategory, active: selectedCategory !== 'ALL' }, { label: t('ui.filter_status'), value: selectedStatus, active: selectedStatus !== 'ALL' }]} onReset={list.reset} />
         <Text size="xs" tone="muted" className="px-g13 py-g8 md:hidden">{t('ui.scroll_table')}</Text>
         <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
           <Table>
@@ -476,7 +382,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               <TableRow>
                 <TableColumnHeader scope="col" className="w-g42">
                   <div className="flex items-center justify-start">
-                    <Checkbox checked={selectedRows.length > 0 && selectedRows.length === sortedContracts.length} aria-label={t('contracts.select_all', 'Pilih semua kontrak')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
+                    <Checkbox checked={selectedRows.length > 0 && currentContracts.every((item) => selectedRows.includes(item.contract_id))} aria-label={t('contracts.select_all', 'Pilih semua kontrak')} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
                 </TableColumnHeader>
                 {visibleColumns.document_type && renderSortHeader(t('contracts.col_doc_type', 'Jenis'), 'doc_type')}
@@ -506,10 +412,6 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               ) : (
                 currentContracts.map((ctr) => {
                   const isAddendum = ctr.document_type === 'Agreement Addendum';
-                  const childAddendums = contracts.filter(
-                    (c) => c.document_type === 'Agreement Addendum' && c.parent_contract_id === ctr.contract_id
-                  );
-                  const ctrIOs = ios.filter((i) => i.contract_id === ctr.contract_id);
 
                   return (
                     <TableRow key={ctr.contract_id}>
@@ -548,7 +450,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
 
                       {/* 2. Partner */}
                       {visibleColumns.partner && (
-                        <TableCell>{partnersById.get(ctr.partner_id)?.partner_name || '-'}</TableCell>
+                        <TableCell>{ctr.partner_name || '-'}</TableCell>
                       )}
 
                       {/* Kategori */}
@@ -625,7 +527,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                                 icon: <ExternalLink className="w-g13 h-g13" />,
                                 onClick: () => setDetailContract(ctr),
                               },
-                              ...(canEditContract(ctr, partners, user)
+                              ...(canEditContract(ctr, [], user)
                                 ? [
                                     {
                                       label: t('hierarchy.edit_btn', 'Edit'),
@@ -661,10 +563,10 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
           currentPage={currentPage}
           totalPages={totalPages}
           rowsPerPage={rowsPerPage}
-          onPageChange={setCurrentPage}
+          onPageChange={list.setPage}
           onRowsPerPageChange={(size) => {
             setRowsPerPage(size);
-            setCurrentPage(1);
+            list.setPage(1);
           }}
         />
       </Card>
@@ -703,7 +605,7 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                 <div>
                   <span className="text-muted-foreground block">{t('contracts.partner', 'Partner:')}</span>
                   <span className="font-bold text-foreground">
-                    {partnersById.get(detailContract.partner_id)?.partner_name || '-'}
+                    {detailContract.partner_name || '-'}
                   </span>
                 </div>
                 <div>
@@ -757,18 +659,13 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                     <Link2 className="w-g16 h-g16 text-status-special" />
                     <span>{t('contract.addendum_list', 'Daftar Agreement Addendum Turunan')}</span>
                   </Heading>
-                  {contracts.filter(
-                    (c) => c.document_type === 'Agreement Addendum' && c.parent_contract_id === detailContract.contract_id
-                  ).length === 0 ? (
+                  {childAddenda.length === 0 ? (
                     <Card className="p-g13 text-muted-foreground text-center text-xs">
                       {t('contracts.belum_ada_agreement_addendum_turunan_untuk', 'Belum ada Agreement Addendum turunan untuk kontrak induk ini.')}
                     </Card>
                   ) : (
                     <div className="space-y-g8">
-                      {contracts
-                        .filter(
-                          (c) => c.document_type === 'Agreement Addendum' && c.parent_contract_id === detailContract.contract_id
-                        )
+                      {childAddenda
                         .map((add) => (
                           <div
                             key={add.contract_id}
@@ -813,16 +710,13 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                   <span>{t('contracts.histori_perubahan_amendment_track_change', 'Histori Perubahan (Amendment Track-Change)')}</span>
                 </Heading>
 
-                {contracts.filter(
-                  (a) => a.document_type === 'Agreement Addendum' && a.parent_contract_id === detailContract.contract_id
-                ).length === 0 ? (
+                {childAddenda.length === 0 ? (
                   <Card className="p-g13 text-muted-foreground text-center">
                     {t('contracts.belum_ada_addendum_amendment_tercatat_untuk', 'Belum ada addendum/amendment tercatat untuk kontrak ini.')}
                   </Card>
                 ) : (
                   <div className="space-y-g13 relative border-l-2 border-status-special-border ml-g13 pl-g13 pt-g3">
-                    {contracts
-                      .filter((a) => a.document_type === 'Agreement Addendum' && a.parent_contract_id === detailContract.contract_id)
+                    {childAddenda
                       .map((add) => {
                         const fieldsChanged = Array.isArray(add.changed_fields)
                           ? add.changed_fields
@@ -865,14 +759,13 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                   <span>{t('contracts.insertion_orders_io_turunan', 'Insertion Orders (IO) Turunan')}</span>
                 </Heading>
 
-                {ios.filter((i) => i.contract_id === detailContract.contract_id).length === 0 ? (
+                {detailIos.length === 0 ? (
                   <Card className="p-g13 text-muted-foreground text-center text-xs">
                     {t('contracts.tidak_ada_io_turunan_di_bawah', 'Tidak ada IO turunan di bawah kontrak ini.')}
                   </Card>
                 ) : (
                   <div className="space-y-g8">
-                    {ios
-                      .filter((i) => i.contract_id === detailContract.contract_id)
+                    {detailIos
                       .map((io) => (
                         <Card key={io.io_id} className="p-g13 flex flex-row items-center justify-between gap-g13">
                           <div>

@@ -62,10 +62,15 @@ export function collectionMutation<Vars, Result>(config: CollectionMutation<Vars
       });
     },
     async onSettled() {
+      // The paged lists and the SQL aggregates are derived from the same records: refresh them with the snapshot.
+      for (const root of SERVER_QUERY_ROOTS) void queryClient.invalidateQueries({ queryKey: root });
       if (!config.skipInvalidate) await queryClient.invalidateQueries({ queryKey, exact: true });
     },
   };
 }
+
+/** Cache roots of the server-computed views (paged lists, aggregates and notifications). */
+export const SERVER_QUERY_ROOTS = [['lists'], ['aggregates'], ['notifications']] as const;
 
 const now = () => new Date().toISOString();
 

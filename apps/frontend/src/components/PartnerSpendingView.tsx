@@ -60,6 +60,10 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useLanguage } from '../context/LanguageContext';
+import { useServerList } from '../lib/useServerList';
+import { useRecordLookup } from '../lib/useRecordLookup';
+import { useFacets } from '../features/aggregates/useAggregates';
+import { useSnapshotDemand, useWorkspace } from '../features/workspace/WorkspaceContext';
 import { useConfirm } from '../context/ConfirmDialogContext';
 import { useAlertToast } from '../context/AlertToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -121,7 +125,13 @@ const CHECK_TEXT: Record<string, string> = {
   ahead_of_schedule: 'Billing is {value} points ahead of the service order period',
 };
 
+const SPENDING_SORT_KEYS: Record<string, string> = {
+  invoice_no: 'invoice_number', vendor: 'vendor_name', invoice_month: 'invoice_month', amount: 'total_amount_usd', invoice_date: 'invoice_date', attachment: 'attachment',
+};
+const SPENDING_FILTERS = ['year', 'vendor_name', 'month'] as const;
+
 interface PartnerSpendingViewProps {
+  /** Reference data for the invoice form and its checks; loaded only while the form is open. The table reads its page from the server. */
   partners: Partner[];
   spendings: PartnerSpending[];
   /** For linking an invoice to a service order and checking it against contracts. */
@@ -147,12 +157,20 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   const showAlert = useAlertToast();
   const { user } = useAuth();
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedYear, setSelectedYear] = useState<string>('ALL');
-  const [selectedVendorFilter, setSelectedVendorFilter] = useState<string>('ALL');
-  const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('ALL');
-
   const [showModal, setShowModal] = useState(false);
+  useSnapshotDemand(showModal);
+  const { workspaceLoading: referenceLoading } = useWorkspace();
+  const [rowsPerPage, setRowsPerPage] = useRowsPerPage('partner_spending');
+  const list = useServerList<PartnerSpending>({
+    entity: 'spendings', path: '/partner-spendings', pageSize: rowsPerPage, filterKeys: SPENDING_FILTERS,
+    toApiSort: (field) => SPENDING_SORT_KEYS[field] ?? null,
+  });
+  const { state: listState } = list;
+  const searchTerm = list.searchInput;
+  const selectedYear = listState.filters.year ?? 'ALL';
+  const selectedVendorFilter = listState.filters.vendor_name ?? 'ALL';
+  const selectedMonthFilter = listState.filters.month ?? 'ALL';
+  const facets = useFacets();
 
   const [editingSpending, setEditingSpending] = useState<PartnerSpending | null>(null);
 
@@ -446,140 +464,15 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   }, []);
 
   const availableYears = useMemo(() => {
-    const years = new Set<string>();
-    spendings.forEach((s) => {
-      let hasMonthYear = false;
-      if (s.invoice_month && s.invoice_month.length > 0) {
-        s.invoice_month.forEach((m) => {
-          const parsedList = parseAllMonths(m);
-          parsedList.forEach((p) => {
-            if (p.year) {
-              years.add(p.year);
-              hasMonthYear = true;
-            }
-          });
-        });
-      }
-      if (!hasMonthYear && s.invoice_date && s.invoice_date.length >= 4) {
-        const y = s.invoice_date.startsWith('20') ? s.invoice_date.slice(0, 4) : s.invoice_date.slice(-4);
-        if (/^\d{4}$/.test(y)) years.add(y);
-      }
-    });
-    if (years.size === 0) years.add(new Date().getFullYear().toString());
-    return Array.from(years).sort().reverse();
-  }, [spendings]);
-
-  const filteredSpendings = useMemo(() => {
-    return spendings.filter((s) => {
-      // 1. Department Scoping & RBAC restriction (based on internal PIC of partner)
-      if (!canViewSpending(s, partners, user)) {
-        return false;
-      }
-
-      const matchSearch =
-        (s.id && s.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        s.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.vendor_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (s.invoice_description && s.invoice_description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (s.bank_name && s.bank_name.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      const matchVendor =
-        selectedVendorFilter === 'ALL' || s.vendor_name.toLowerCase() === selectedVendorFilter.toLowerCase();
-
-      // Collect all parsed month info for this spending record
-      const parsedMonths: ReturnType<typeof parseAllMonths> = [];
-      if (s.invoice_month && s.invoice_month.length > 0) {
-        s.invoice_month.forEach((m) => {
-          const parsedList = parseAllMonths(m);
-          parsedList.forEach((p) => parsedMonths.push(p));
-        });
-      } else if (s.invoice_date) {
-        const parsed = parseMonthStr(s.invoice_date);
-        if (parsed) parsedMonths.push(parsed);
-      }
-
-      let matchYear = true;
-      if (selectedYear !== 'ALL') {
-        const itemYears = new Set<string>();
-        parsedMonths.forEach((p) => itemYears.add(p.year));
-        if (s.invoice_date && s.invoice_date.length >= 4) {
-          const y = s.invoice_date.startsWith('20') ? s.invoice_date.slice(0, 4) : s.invoice_date.slice(-4);
-          if (/^\d{4}$/.test(y)) itemYears.add(y);
-        }
-        matchYear = itemYears.has(selectedYear);
-      }
-
-      let matchMonth = true;
-      if (selectedMonthFilter !== 'ALL') {
-        const itemMonths = new Set<string>();
-        parsedMonths.forEach((p) => {
-          if (selectedYear === 'ALL' || p.year === selectedYear) {
-            itemMonths.add(p.month);
-            itemMonths.add(p.monthShort);
-          }
-        });
-        matchMonth = itemMonths.has(selectedMonthFilter);
-      }
-
-      return matchSearch && matchVendor && matchYear && matchMonth;
-    });
-  }, [spendings, partners, user, searchTerm, selectedVendorFilter, selectedYear, selectedMonthFilter]);
+    const years = facets.data?.spendingYears ?? [];
+    return years.length ? years : [new Date().getFullYear().toString()];
+  }, [facets.data?.spendingYears]);
 
   type SortField = 'invoice_no' | 'vendor' | 'invoice_month' | 'amount' | 'invoice_date' | 'attachment';
-  type SortOrder = 'asc' | 'desc';
-
-  const [sortField, setSortField] = useState<SortField | null>(null);
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      if (sortOrder === 'asc') {
-        setSortOrder('desc');
-      } else {
-        setSortField(null);
-        setSortOrder('asc');
-      }
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-  };
-
-  const sortedSpendings = useMemo(() => {
-    if (!sortField) return filteredSpendings;
-    return [...filteredSpendings].sort((a, b) => {
-      let comparison = 0;
-      if (sortField === 'invoice_no') {
-        comparison = (a.invoice_number || '').localeCompare(b.invoice_number || '', undefined, { numeric: true, sensitivity: 'base' });
-      } else if (sortField === 'vendor') {
-        comparison = (a.vendor_name || '').localeCompare(b.vendor_name || '', undefined, { sensitivity: 'base' });
-      } else if (sortField === 'invoice_month') {
-        const getEarliestMonthDate = (item: PartnerSpending) => {
-          if (item.invoice_month && item.invoice_month.length > 0) {
-            const dates = item.invoice_month
-              .flatMap((m) => parseAllMonths(m).map((p) => p.endOfMonthDate))
-              .filter(Boolean)
-              .sort();
-            if (dates.length > 0) return dates[0];
-          }
-          return item.invoice_date || '';
-        };
-        const dateA = getEarliestMonthDate(a);
-        const dateB = getEarliestMonthDate(b);
-        comparison = dateA.localeCompare(dateB);
-      } else if (sortField === 'invoice_date') {
-        const dateA = a.invoice_date || '';
-        const dateB = b.invoice_date || '';
-        comparison = dateA.localeCompare(dateB);
-      } else if (sortField === 'amount') {
-        const amtA = Number(a.total_amount_usd !== undefined && a.total_amount_usd !== null ? a.total_amount_usd : a.total_amount || 0);
-        const amtB = Number(b.total_amount_usd !== undefined && b.total_amount_usd !== null ? b.total_amount_usd : b.total_amount || 0);
-        comparison = amtA - amtB;
-      }
-
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
-  }, [filteredSpendings, sortField, sortOrder]);
+  const sortField = listState.sort as SortField | null;
+  const sortOrder = listState.dir;
+  const handleSort = (field: SortField) => list.toggleSort(field);
+  const sortedSpendings = list.items;
 
   const handleDeleteClick = async (id: string) => {
     const ok = await confirmDialog({ description: t('spending.hapus_data_spending_ini', 'Hapus data spending ini?'), tone: 'danger', confirmLabel: t('io.action_delete', 'Hapus') });
@@ -670,21 +563,21 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
     </TableColumnHeader>
   );
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useRowsPerPage('partner_spending');
+  const currentPage = listState.page;
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  const opened = useRecordLookup<PartnerSpending>('spendings', '/partner-spendings', 'id', openSpendingId);
   useEffect(() => {
-    if (!openSpendingId) return;
-    const spending = spendings.find(item => item.id === openSpendingId);
-    if (spending && hasPermission('document.view') && canViewSpending(spending, partners, user)) {
-      setSearchTerm(spending.invoice_number || spending.vendor_name);
-      setSelectedVendorFilter(spending.vendor_name);
-      setSelectedYear('ALL');
-      setSelectedMonthFilter('ALL');
-      setCurrentPage(1);
+    if (!openSpendingId || opened.isLoading) return;
+    const spending = opened.data;
+    if (spending && hasPermission('document.view')) {
+      // Narrow the table to the opened invoice's vendor and number (what the user was sent here to see).
+      list.reset();
+      list.setSearch(spending.invoice_number || spending.vendor_name);
+      list.setFilter('vendor_name', spending.vendor_name);
     }
     onSpendingOpened?.();
-  }, [openSpendingId, spendings, partners, user, hasPermission, onSpendingOpened]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSpendingId, opened.data, opened.isLoading, hasPermission, onSpendingOpened]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) setSelectedRows(sortedSpendings.map(item => item.id || ''));
@@ -695,10 +588,8 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
     setSelectedRows(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
   };
 
-  const totalPages = Math.ceil(sortedSpendings.length / rowsPerPage);
-  const indexOfLast = currentPage * rowsPerPage;
-  const indexOfFirst = indexOfLast - rowsPerPage;
-  const currentSpendings = sortedSpendings.slice(indexOfFirst, indexOfLast);
+  const totalPages = list.pageCount;
+  const currentSpendings = sortedSpendings;
 
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     invoice_no: true,
@@ -750,7 +641,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
                           const partner = partners.find(p => p.partner_id === e.target.value);
                           handleVendorSelect(partner?.partner_name || e.target.value, partner?.partner_id);
                         }}>
-                          <option value="">{t('spending.vendor_select_ph', '-- Pilih Partner / Vendor --')}</option>
+                          <option value="">{referenceLoading ? t('spending.loading_reference', 'Memuat daftar partner...') : t('spending.vendor_select_ph', '-- Pilih Partner / Vendor --')}</option>
                           {partners.map(p => <option key={p.partner_id} value={p.partner_id}>{p.partner_name} ({p.partner_id})</option>)}
                           {formVendorName && !partners.some(p => p.partner_id === formVendorId || p.partner_name === formVendorName) && <option value={formVendorId || formVendorName}>{formVendorName}</option>}
                         </AlphabeticalSelect>
@@ -990,8 +881,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               aria-label={t('ui.search')}
               value={searchTerm}
               onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
+                list.setSearch(e.target.value);
               }}
             />
           </InputGroup>
@@ -1001,8 +891,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
             aria-label={t('ui.filter_year')}
               value={selectedYear}
             onChange={(e) => {
-              setSelectedYear(e.target.value);
-              setCurrentPage(1);
+              list.setFilter('year', e.target.value);
             }}
             className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
@@ -1017,13 +906,12 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
             aria-label={t('ui.filter_partner')}
               value={selectedVendorFilter}
             onChange={(e) => {
-              setSelectedVendorFilter(e.target.value);
-              setCurrentPage(1);
+              list.setFilter('vendor_name', e.target.value);
             }}
             className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
             <option value="ALL">{t('spending.all_vendors', 'Semua Partner')}</option>
-            {Array.from(new Set(spendings.map(s => s.vendor_name).filter(Boolean))).sort().map(vendor => (
+            {(facets.data?.vendors ?? []).map(vendor => (
               <option key={vendor} value={vendor}>{vendor}</option>
             ))}
           </AlphabeticalSelect>
@@ -1033,8 +921,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
             aria-label={t('ui.filter_month')}
               value={selectedMonthFilter}
             onChange={(e) => {
-              setSelectedMonthFilter(e.target.value);
-              setCurrentPage(1);
+              list.setFilter('month', e.target.value);
             }}
             className="w-full" controlProps={{ className: "flex-1 min-w-g144" }}
           >
@@ -1082,7 +969,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
         />
       )}
       <Card className="overflow-hidden">
-        <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_year'), value: selectedYear, active: selectedYear !== 'ALL' }, { label: t('ui.filter_partner'), value: selectedVendorFilter, active: selectedVendorFilter !== 'ALL' }, { label: t('ui.filter_month'), value: selectedMonthFilter, active: selectedMonthFilter !== 'ALL' }]} onReset={() => { setSearchTerm(''); setSelectedYear('ALL'); setSelectedVendorFilter('ALL'); setSelectedMonthFilter('ALL'); }} />
+        <FilterSummary filters={[{ label: t('ui.search'), value: searchTerm, active: Boolean(searchTerm) }, { label: t('ui.filter_year'), value: selectedYear, active: selectedYear !== 'ALL' }, { label: t('ui.filter_partner'), value: selectedVendorFilter, active: selectedVendorFilter !== 'ALL' }, { label: t('ui.filter_month'), value: selectedMonthFilter, active: selectedMonthFilter !== 'ALL' }]} onReset={list.reset} />
         <Text size="xs" tone="muted" className="px-g13 py-g8 md:hidden">{t('ui.scroll_table')}</Text>
         <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
           <Table>
@@ -1090,7 +977,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
               <TableRow>
                 <TableColumnHeader scope="col" className="w-g42">
                   <div className="flex items-center justify-start">
-                    <Checkbox aria-label={t('spending.pilih_semua_spending', 'Pilih semua spending')} checked={selectedRows.length > 0 && selectedRows.length === sortedSpendings.length} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
+                    <Checkbox aria-label={t('spending.pilih_semua_spending', 'Pilih semua spending')} checked={sortedSpendings.length > 0 && sortedSpendings.every((item) => selectedRows.includes(item.id || ''))} onCheckedChange={(details) => handleSelectAll(details.checked === true)}><CheckboxControl /><CheckboxHiddenInput /></Checkbox>
                   </div>
                 </TableColumnHeader>
                 {visibleColumns.invoice_no && renderSortHeader(t('spending.col_invoice_no', 'No. Invoice'), 'invoice_no')}
@@ -1236,10 +1123,10 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
           currentPage={currentPage}
           totalPages={totalPages}
           rowsPerPage={rowsPerPage}
-          onPageChange={setCurrentPage}
+          onPageChange={list.setPage}
           onRowsPerPageChange={(size) => {
             setRowsPerPage(size);
-            setCurrentPage(1);
+            list.setPage(1);
           }}
         />
       </Card>

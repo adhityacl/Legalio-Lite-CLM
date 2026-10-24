@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTenant } from '../context/TenantContext';
@@ -13,7 +13,9 @@ import { OrganizationOnboarding } from '../components/account/OrganizationOnboar
 import { LoadingState, StateScreen } from '../components/StateScreen';
 import { usePermissions } from '../lib/permissions';
 import { SYSTEM_TABS } from '../lib/appRoutes';
-import { buildWorkspaceSearchResults } from '@legalio/platform-console/lib/workspaceSearch';
+import { useBadgeAggregate } from '../features/aggregates/useAggregates';
+import { useWorkspaceSearch } from '../features/aggregates/useWorkspaceSearch';
+import { useNotifications } from '../features/notifications/useNotifications';
 import { WorkspaceProvider, useWorkspace } from '../features/workspace/WorkspaceContext';
 import { ROUTES } from '../routes/registry';
 import { RouteBoundary } from '../routes/RouteBoundary';
@@ -105,16 +107,18 @@ const WorkspaceShell: React.FC<{ user: SignedInUser; gate: Gate; isPlatformAdmin
   const { policy } = useTenantSettings();
   const modules = policy.settings.modules;
   const workspace = useWorkspace();
-  const { organizationId: dataOrganizationId, contracts, ios, partners, notifications, evaluations, spendings, googleConfig,
-    timestamp: lastSyncTimestamp, loadAllData, workspaceLoading, editor, closeEditor, amendmentOpen, amendmentParent, closeAmendment, actions } = workspace;
+  // The editors and the amendment dialog pick from every partner/contract/order: the workspace snapshot is loaded while one is open.
+  const { contracts, ios, partners, googleConfig, loadAllData, workspaceError, snapshotLoaded, editor, closeEditor, amendmentOpen, amendmentParent, closeAmendment, actions } = workspace;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const searchResults = useMemo(() => caps.status === 'ready' && dataOrganizationId === activeTenantId
-    ? buildWorkspaceSearchResults({ organizationId: activeTenantId, partners, contracts, ios, evaluations, spendings }, user)
-    : [], [caps.status, dataOrganizationId, activeTenantId, partners, contracts, ios, evaluations, spendings, user]);
-
-  const expiringContractsCount = contracts.filter((c) => c.status === 'Expiring').length;
-  const unreadNotifsCount = notifications.filter((n) => !n.is_read).length;
+  // Search palette, navigation badges and the bell come from the server (search, aggregates, notification list), not from a snapshot.
+  const search = useWorkspaceSearch();
+  const badges = useBadgeAggregate();
+  const { notifications } = useNotifications();
+  const expiringContractsCount = badges.data?.expiringContracts ?? 0;
+  const unreadNotifsCount = badges.data?.unreadNotifications ?? 0;
+  const lastSyncTimestamp = badges.dataUpdatedAt || 0;
+  const editorWaiting = Boolean(editor) && !snapshotLoaded;
 
   const permittedHome = hasPermission('document.view') ? 'dashboard' : isPlatformAdmin ? 'admin-system-dashboard' : null;
   const gateScreen =
@@ -135,7 +139,14 @@ const WorkspaceShell: React.FC<{ user: SignedInUser; gate: Gate; isPlatformAdmin
 
   let content: React.ReactNode = gateScreen;
   if (!content) {
-    if (editor?.kind === 'contract') {
+    if (editorWaiting) {
+      content = workspaceError ? (
+        <StateScreen title={t('app.failed_to_fetch_initial_data', 'Failed to fetch initial data')}>
+          <Button variant="outline" size="lg" type="button" onClick={() => void loadAllData()}>{t('tb.retry', 'Retry')}</Button>
+          <Button variant="link" type="button" onClick={closeEditor}>{t('common.close', 'Tutup')}</Button>
+        </StateScreen>
+      ) : <LoadingState label={t('app.memuat_halaman', 'Memuat halaman...')} />;
+    } else if (editor?.kind === 'contract') {
       content = (
         <ContractModal
           key={editor.record?.contract_id || 'new'}
@@ -191,8 +202,9 @@ const WorkspaceShell: React.FC<{ user: SignedInUser; gate: Gate; isPlatformAdmin
         {t('app.skip_to_content', 'Lewati ke konten utama')}
       </a>
       <AppShell
-        searchResults={searchResults}
-        searchLoading={workspaceLoading}
+        searchResults={search.results}
+        searchLoading={search.loading}
+        onSearchQueryChange={search.setQuery}
         // The record id goes into the URL (`?tab=contracts&id=C0001`), so the opened record can be shared and reloaded.
         onSelectSearchResult={result => setActiveTab(result.tab, undefined, { recordId: result.recordId })}
         navigation={{
@@ -241,7 +253,7 @@ const WorkspaceShell: React.FC<{ user: SignedInUser; gate: Gate; isPlatformAdmin
       </AppShell>
 
       <Suspense fallback={null}>
-        {amendmentOpen && (
+        {amendmentOpen && snapshotLoaded && (
           <AmendmentModal
             initialParent={amendmentParent}
             contracts={contracts}

@@ -110,6 +110,13 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   const pageErrors: string[] = [];
   const serverErrors: string[] = [];
+  const initDataRequests: string[] = [];
+  const listRequests: string[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === '/api/init-data') initDataRequests.push(request.url());
+    if (url.pathname === '/api/contracts' && url.searchParams.has('q')) listRequests.push(request.url());
+  });
   page.on('pageerror', (error) => pageErrors.push(error.message));
   page.on('response', (response) => { if (response.url().includes('/api/') && response.status() >= 500) serverErrors.push(`${response.status()} ${response.url()}`); });
 
@@ -151,6 +158,74 @@ try {
   steps.push(`deep link ?tab=contracts&id=${target.contract_id} opens the record and then clears id`);
   await page.keyboard.press('Escape');
   await expect(detail).toHaveCount(0);
+
+  // 3b. Server-side lists: paging, sorting and debounced search live in the URL, and none of the list pages loads the whole workspace.
+  const totalOf = async (route: string) => Number((await api(route + (route.includes('?') ? '&' : '?') + 'limit=1')).headers.get('x-total-count'));
+  // The demo workspace has one page of contracts; add a few more so there are several.
+  const pdfData = 'data:application/pdf;base64,' + Buffer.from('%PDF-1.4 smoke').toString('base64');
+  for (let n = 1; n <= 8; n += 1) {
+    const made = await api('/api/contracts', { method: 'POST', body: JSON.stringify({
+      partner_id: (existing[0] as unknown as { partner_id: string }).partner_id, contract_number: `PAGED-${String(n).padStart(2, '0')}`, contract_title: `Paged contract ${n}`,
+      start_date: '2026-01-01', end_date: '2099-12-31', currency: 'USD', contract_value: 100 + n, internal_pic: 'Legal', fileName: `paged-${n}.pdf`, fileData: pdfData,
+    }) });
+    assert.equal(made.status, 200, JSON.stringify(made.body).slice(0, 200));
+  }
+  const contractTotal = await totalOf('/api/contracts');
+  assert.ok(contractTotal > 5, `the demo workspace has more than one page of contracts (${contractTotal})`);
+  const pageSize = 5;
+  const pages = Math.ceil(contractTotal / pageSize);
+  await page.goto(`${frontendURL}/app?tab=contracts`);
+  await expect(rows.first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(new RegExp(`Page 1 of ${pages}`))).toBeVisible();
+  const firstOnPageOne = await rows.first().innerText();
+  await page.getByRole('button', { name: /next page/i }).click();
+  await expect(page.getByText(new RegExp(`Page 2 of ${pages}`))).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => new URL(page.url()).searchParams.get('l.page')).toBe('2');
+  await expect.poll(async () => (await rows.first().innerText()) !== firstOnPageOne, { message: 'page 2 shows other rows' }).toBe(true);
+  await page.reload();
+  await expect(page.getByText(new RegExp(`Page 2 of ${pages}`))).toBeVisible({ timeout: 30_000 });
+  steps.push(`contracts paged on the server (${contractTotal} records, ${pages} pages); page 2 survives a reload through ?l.page=2`);
+
+  const sortHeader = page.getByRole('columnheader', { name: /agreement no|nomor/i }).getByRole('button').first();
+  await sortHeader.click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('l.sort')).toBe('no');
+  await expect(page.getByText(new RegExp(`Page 1 of ${pages}`))).toBeVisible({ timeout: 15_000 });
+  const sortedFirst = (await api('/api/contracts?sort=contract_number&dir=asc&limit=5')).body as Array<{ contract_number: string }>;
+  await expect(rows.first()).toContainText(sortedFirst[0].contract_number, { timeout: 15_000 });
+  steps.push('sorting by agreement number is done by the server and written to the URL (?l.sort=no)');
+
+  const wanted = existing[0].contract_number;
+  const search = page.locator('main').getByRole('textbox', { name: /search|cari/i }).first();
+  listRequests.length = 0;
+  await search.pressSequentially(wanted, { delay: 15 });
+  await expect.poll(() => new URL(page.url()).searchParams.get('l.q')).toBe(wanted);
+  const matching = await totalOf('/api/contracts?q=' + encodeURIComponent(wanted));
+  await expect.poll(async () => rows.count(), { timeout: 15_000 }).toBe(Math.min(matching, pageSize));
+  await expect(rows.first()).toContainText(wanted);
+  assert.ok(listRequests.length <= 3, `typing ${wanted.length} characters sent ${listRequests.length} searches (debounced)`);
+  steps.push(`search for "${wanted}" is debounced (${listRequests.length} request(s) for ${wanted.length} keystrokes) and returns ${matching} match(es)`);
+
+  for (const [tab, route, label] of [['partners', '/api/partners', 'partners'], ['ios', '/api/ios', 'orders'], ['partner-spending', '/api/partner-spendings', 'spendings']] as const) {
+    const total = await totalOf(route);
+    await page.goto(`${frontendURL}/app?tab=${tab}`);
+    await expect(rows.first()).toBeVisible({ timeout: 30_000 });
+    const expectedPages = Math.max(1, Math.ceil(total / pageSize));
+    await expect(page.getByText(new RegExp(`Page 1 of ${expectedPages}`))).toBeVisible({ timeout: 15_000 });
+    if (expectedPages > 1) {
+      await page.getByRole('button', { name: /next page/i }).click();
+      await expect(page.getByText(new RegExp(`Page 2 of ${expectedPages}`))).toBeVisible({ timeout: 15_000 });
+    }
+    assert.equal(new URL(page.url()).searchParams.get('l.q'), null, 'the search of the previous page does not follow to another page');
+    steps.push(`${label}: ${total} record(s) in ${expectedPages} page(s) from the server`);
+  }
+
+  // Dashboard figures come from the SQL aggregates; the command palette searches on the server.
+  await page.goto(`${frontendURL}/app?tab=dashboard`);
+  await expect(page.getByRole('region', { name: /expiring documents/i })).toBeVisible({ timeout: 30_000 });
+  const aggregate = (await api('/api/aggregates/dashboard')).body as { contracts: { total: number } };
+  await expect(page.getByText(String(aggregate.contracts.total)).first()).toBeVisible();
+  assert.deepEqual(initDataRequests, [], `list pages, dashboard and search did not call /api/init-data: ${initDataRequests.join(', ')}`);
+  steps.push('contracts, partners, orders, spending, dashboard and navigation load without /api/init-data');
 
   // 4. Create a contract through the form.
   const number = `SMOKE/${Date.now()}`;

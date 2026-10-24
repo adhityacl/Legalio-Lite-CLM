@@ -6,5 +6,7 @@ export { ordersApi, type OrderPageQuery } from './orders';
 export { spendingsApi, type SpendingPageQuery } from './spendings';
 export { evaluationsApi } from './evaluations';
 export { notificationsApi } from './notifications';
+export { aggregatesApi, type DashboardAggregate, type BadgeAggregate, type FacetAggregate, type PartnerRollup, type SpendingMonthRow, type DashboardDocument } from './aggregates';
 export { workspaceApi, type WorkspaceSnapshot } from './workspace';
 export { bulkImportApi, type BulkImportResult } from './bulkImport';
+export { searchApi, type SearchResponse } from './search';

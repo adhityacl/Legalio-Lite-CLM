@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { ArrowUpRight, FilePlus2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { CONTRACT_STATUS_LABEL_KEY } from '@legalio/types/domainStatus';
-import type { Contract, InsertionOrder, Partner } from '@legalio/types';
+import type { DashboardDocument } from '../api/aggregates';
 import { TableCardHeader } from '@legalio/ui-components/blocks';
 import { Badge, statusTone } from '@legalio/ui-components/badge';
 import { TableEmptyState } from './ui/table-empty-state';
@@ -13,42 +13,33 @@ import { Heading } from '@legalio/ui-components/heading';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 import { Card } from '@legalio/ui-components/card';
-export function RecentDocumentsTable({ contracts, ios, partners, onNavigate }: {
-  contracts: Contract[];
-  ios: InsertionOrder[];
-  partners: Partner[];
-  onNavigate: (tab: 'contracts' | 'ios') => void;
+export function RecentDocumentsTable({ contracts, ios, onNavigate }: {
+  /** The newest rows of the last three months, already limited and scoped by the server (`recent` of the dashboard aggregate). */
+  contracts: DashboardDocument[];
+  ios: DashboardDocument[];
+  onNavigate: (tab: 'contracts' | 'ios', recordId?: string) => void;
 }) {
   const { t, language } = useLanguage();
-  const records = useMemo(() => {
-    const now = new Date();
-    const cutoff = new Date(now);
-    cutoff.setMonth(cutoff.getMonth() - 3);
-    const partnerNameById = new Map(partners.map(p => [p.partner_id, p.partner_name]));
-    return [
-      ...contracts.map(contract => ({
-        id: contract.contract_id,
-        title: contract.contract_title,
-        type: contract.document_type === 'Agreement Addendum'
-          ? t('contracts.agreement_addendum', 'Agreement Addendum')
-          : t('contracts.master_agreement', 'Master Agreement'),
-        partner: partnerNameById.get(contract.partner_id) || '—', status: contract.status,
-        createdAt: contract.created_at, tab: 'contracts' as const,
-      })),
-      ...ios.map(io => ({
-        id: io.io_id, title: io.io_title,
-        type: t('dashboard.insertion_orders', 'IO / SO / SOW'),
-        partner: partnerNameById.get(io.partner_id) || '—', status: io.status,
-        createdAt: io.created_at, tab: 'ios' as const,
-      })),
-    ]
-      .filter(record => {
-        const createdAt = Date.parse(record.createdAt);
-        return Number.isFinite(createdAt) && createdAt >= cutoff.getTime() && createdAt <= now.getTime();
-      })
-      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-      .slice(0, 5);
-  }, [contracts, ios, partners, t]);
+  const records = useMemo(() => [
+    ...contracts.map(contract => ({
+      id: contract.id,
+      title: contract.title,
+      type: contract.document_type === 'Agreement Addendum'
+        ? t('contracts.agreement_addendum', 'Agreement Addendum')
+        : t('contracts.master_agreement', 'Master Agreement'),
+      partner: contract.partner_name || '—', status: contract.status,
+      createdAt: contract.created_at, tab: 'contracts' as const,
+    })),
+    ...ios.map(io => ({
+      id: io.id, title: io.title,
+      type: t('dashboard.insertion_orders', 'IO / SO / SOW'),
+      partner: io.partner_name || '—', status: io.status,
+      createdAt: io.created_at, tab: 'ios' as const,
+    })),
+  ]
+    .filter(record => Number.isFinite(Date.parse(record.createdAt)))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    .slice(0, 5), [contracts, ios, t]);
 
   return (
     <Card asChild><section aria-label={t('ui.recent_documents')} className="overflow-hidden">
@@ -74,7 +65,7 @@ export function RecentDocumentsTable({ contracts, ios, partners, onNavigate }: {
               <TableCell>{record.partner}</TableCell>
               <TableCell><Badge tone={statusTone(record.status)}>{t(CONTRACT_STATUS_LABEL_KEY[record.status], record.status)}</Badge></TableCell>
               <TableCell className="whitespace-nowrap">{new Date(record.createdAt).toLocaleDateString(language === 'EN' ? 'en-GB' : language === 'ZH' ? 'zh-CN' : 'id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</TableCell>
-              <TableCell className="text-right w-g89"><Button variant="secondary" size="icon-sm" type="button" onClick={() => onNavigate(record.tab)} aria-label={`${t('common.open', 'Open')} ${record.title}`}><ArrowUpRight className="size-g16" /></Button></TableCell>
+              <TableCell className="text-right w-g89"><Button variant="secondary" size="icon-sm" type="button" onClick={() => onNavigate(record.tab, record.id)} aria-label={`${t('common.open', 'Open')} ${record.title}`}><ArrowUpRight className="size-g16" /></Button></TableCell>
             </TableRow>)}
           </TableBody>
         </Table>

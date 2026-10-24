@@ -34,9 +34,13 @@ export const readRecordFromUrl = (basePath = APP_PATH): string | null => {
   return id && RECORD_PATTERN.test(id) ? id : null;
 };
 
-/** Builds `/app?tab=<tab>[&id=<record>]`, keeping any other query parameters and the hash. The record id never outlives its page. */
+/** Query parameters that belong to one page's list (page, search, sort, filters); they do not follow the user to another page. */
+export const LIST_PARAM_PREFIX = 'l.';
+
+/** Builds `/app?tab=<tab>[&id=<record>]`, keeping any other query parameters and the hash. The record id and the list state never outlive their page. */
 export const buildAppUrl = (tab: string, basePath = APP_PATH, recordId?: string | null): string => {
   const params = new URLSearchParams(isAppLocation(basePath) ? window.location.search : '');
+  if (params.get(TAB_PARAM) !== tab) for (const key of [...params.keys()]) if (key.startsWith(LIST_PARAM_PREFIX)) params.delete(key);
   params.set(TAB_PARAM, tab);
   if (recordId && RECORD_PATTERN.test(recordId)) params.set(RECORD_PARAM, recordId);
   else params.delete(RECORD_PARAM);

@@ -1,8 +1,10 @@
 import { NotificationsView } from '../components/NotificationsView';
 import { useWorkspace } from '../features/workspace/WorkspaceContext';
+import { useNotifications } from '../features/notifications/useNotifications';
 
 export default function NotificationsRoute() {
-  const { notifications, loadAllData, actions } = useWorkspace();
+  const { loadAllData, actions } = useWorkspace();
+  const { notifications } = useNotifications();
   return (
     <NotificationsView
       notifications={notifications}
