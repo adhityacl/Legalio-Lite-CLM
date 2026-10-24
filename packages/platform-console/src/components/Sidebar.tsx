@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { api } from '@legalio/shared/apiClient';
 import {
   Globe2,
   LayoutDashboard,
@@ -107,8 +108,11 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
   const approvalInboxCount = useQuery({
     queryKey: ['approvals', activeTenantId, 'badge'],
     queryFn: async () => {
-      const res = await fetch('/api/approvals?box=inbox');
-      return res.ok ? ((await res.json()).stats?.waiting as number) : 0;
+      try {
+        return (await api.get<{ stats?: { waiting?: number } }>('/approvals?box=inbox')).stats?.waiting ?? 0;
+      } catch {
+        return 0;
+      }
     },
     enabled: Boolean(activeTenantId) && !showSystemAdmin && hasPermission('document.create'),
     refetchInterval: 60_000,

@@ -57,4 +57,19 @@ export default tseslint.config(
     files: ['apps/backend/src/**/*.ts'],
     rules: { '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { arguments: false, attributes: false } }] },
   },
+  // Browser code reaches the backend through the shared API client (one transport: credentials, request ids, one error shape).
+  // The files that remain on raw fetch talk to third parties (Google APIs, the exchange-rate provider) or implement the client itself.
+  {
+    files: ['apps/frontend/src/**/*.{ts,tsx}', 'apps/backend/console/src/**/*.{ts,tsx}', 'packages/platform-console/src/**/*.{ts,tsx}', 'packages/shared/src/**/*.ts'],
+    ignores: [
+      '**/*.test.{ts,tsx}',
+      'packages/shared/src/apiClient.ts',
+      'packages/shared/src/currencyRates.ts',
+      'packages/platform-console/src/lib/apiFetch.ts',
+      'packages/platform-console/src/lib/googleAuthService.ts',
+    ],
+    rules: {
+      'no-restricted-globals': ['error', { name: 'fetch', message: 'Use the shared API client: import { api, apiRequest } from "@legalio/shared/apiClient".' }],
+    },
+  },
 );

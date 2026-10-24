@@ -1,3 +1,4 @@
+import { apiRequest } from '@legalio/shared/apiClient';
 import React, { useCallback, useEffect, useState } from 'react';
 import { HardDrive } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
@@ -20,11 +21,8 @@ type LoadState = { status: 'loading' } | { status: 'error'; message: string } | 
 const API = '/api/integrations/storage/cos';
 const EMPTY = { secretId: '', secretKey: '', bucket: '', region: '', prefix: '' };
 
-async function request(init?: RequestInit): Promise<StorageStatus> {
-  const res = await fetch(API, { ...init, headers: { 'Content-Type': 'application/json' } });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.message || body.error || `HTTP ${res.status}`);
-  return body as StorageStatus;
+function request(init: { method?: 'GET' | 'PUT'; body?: unknown } = {}): Promise<StorageStatus> {
+  return apiRequest<StorageStatus>(API, init);
 }
 
 /** Superuser setup for Tencent COS, where uploads are stored. The server tests the credentials before saving them; the secret key is never shown again. */
@@ -52,7 +50,7 @@ export const CosStorageForm: React.FC = () => {
     setBusy(true);
     setError('');
     try {
-      setState({ status: 'ready', data: await request({ method: 'PUT', body: JSON.stringify(form) }) });
+      setState({ status: 'ready', data: await request({ method: 'PUT', body: form }) });
       setForm(EMPTY);
       showAlert({ title: t('cos_setup.saved', 'File storage saved'), variant: 'success' });
     } catch (err) {

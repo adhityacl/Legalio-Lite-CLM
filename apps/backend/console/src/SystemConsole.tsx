@@ -1,3 +1,4 @@
+import { api } from '@legalio/shared/apiClient';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@legalio/ui-components/button';
@@ -40,8 +41,7 @@ export function SystemConsole() {
               if (!workspace) throw new Error(t('sys.popup_blocked', 'Allow pop-ups to open the organization in a new tab.'));
               workspace.opener = null;
               try {
-                const res = await fetch(`/api/organizations/${encodeURIComponent(org.id)}/capabilities`, { cache: 'no-store' });
-                if (!res.ok) throw new Error(t('sys.organization_denied', 'Organization access denied.'));
+                await api.get(`/organizations/${encodeURIComponent(org.id)}/capabilities`, { cache: 'no-store' }).catch(() => { throw new Error(t('sys.organization_denied', 'Organization access denied.')); });
                 workspace.sessionStorage.setItem(`activeOrganizationId:${identity.id}`, org.id);
                 workspace.location.replace('/app?tab=settings-organization');
               } catch (error) {

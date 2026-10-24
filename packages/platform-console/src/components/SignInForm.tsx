@@ -1,3 +1,4 @@
+import { api, apiRequest, errorMessage, isApiError } from '@legalio/shared/apiClient';
 import React, { useEffect, useState } from 'react';
 import { authClient } from '../lib/auth-client';
 import { useAuth } from '../context/AuthContext';
@@ -73,10 +74,11 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
     return () => { active = false; };
   }, [allowRegistration, linkToken, previewAttempt]);
 
-  const loadStatus = () => fetch('/api/system/public-status', { cache: 'no-store' })
-    .then((res) => {
-      if (!res.ok && !allowRegistration) throw new Error(t('sys.status_failed', 'Could not load system status. Refresh to retry.'));
-      return res.ok ? res.json() : null;
+  const loadStatus = () => apiRequest<any>('/system/public-status', { cache: 'no-store' })
+    .catch((err) => {
+      if (!allowRegistration) throw new Error(isApiError(err) && err.status > 0 ? t('sys.status_failed', 'Could not load system status. Refresh to retry.') : err.message);
+      if (isApiError(err) && err.status > 0) return null;
+      throw err;
     })
     .then((status) => { setNeedsDatabase(Boolean(status?.needsDatabase)); setSetupMode(Boolean(status?.needsSetup)); setPublicUrl(status?.publicUrl || window.location.origin); setStatusReady(true); })
     .catch((err) => { if (!allowRegistration) setError(err.message); });
@@ -87,21 +89,16 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/system/database', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...database, port: Number(database.port) }),
-      });
-      const data = await res.json().catch(() => ({}));
-      // 409: the database was connected meanwhile (another tab or visitor); the status below shows the next step.
-      if (!res.ok && res.status !== 409) {
-        setError(data.message || t('db_setup.failed', 'Could not connect to the database.'));
-        return;
+      try {
+        await api.post('/system/database', { ...database, port: Number(database.port) }, { notifyUnauthorized: false });
+      } catch (err) {
+        // 409: the database was connected meanwhile (another tab or visitor); the status below shows the next step.
+        if (!(isApiError(err) && err.status === 409)) throw err;
       }
       setDatabase(prev => ({ ...prev, password: '' }));
       await loadStatus();
     } catch (err: any) {
-      setError(err?.message || t('db_setup.failed', 'Could not connect to the database.'));
+      setError(errorMessage(err, t('db_setup.failed', 'Could not connect to the database.')));
     } finally {
       setLoading(false);
     }
@@ -140,15 +137,13 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
         } catch { /* storage unavailable */ }
       }
       if (setupMode) {
-        const res = await fetch('/api/system/setup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password, publicUrl, storage }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          if (data.error === 'ALREADY_SET_UP') setSetupMode(false);
-          setError(data.message || t('login.setup_failed', 'Could not create the admin account.'));
+        let data: { publicUrl?: string };
+        try {
+          data = await api.post<{ publicUrl?: string }>('/system/setup', { name, email, password, publicUrl, storage });
+        } catch (err) {
+          if (!isApiError(err) || err.status === 0) throw err;
+          if (err.error === 'ALREADY_SET_UP' || err.code === 'ALREADY_SET_UP') setSetupMode(false);
+          setError(errorMessage(err, t('login.setup_failed', 'Could not create the admin account.')));
           return;
         }
         setSetupMode(false);

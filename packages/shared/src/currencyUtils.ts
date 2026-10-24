@@ -1,3 +1,4 @@
+import { api } from './apiClient';
 /**
  * Currency helpers (PRD §3.3.5).
  *
@@ -118,14 +119,9 @@ export async function fetchHistoricalRate(
   const code = normalizeCurrencyCode(currency);
   if (code === 'USD') return { rate: 1, isFallback: false };
   try {
-    const params = new URLSearchParams({ currency: code });
-    if (dateStr) params.append('date', dateStr);
-    const res = await fetch(`/api/exchange-rate-historical?${params.toString()}`);
-    if (res.ok) {
-      const data = await res.json() as { rate?: unknown; isFallback?: unknown };
-      if (typeof data.rate === 'number' && !isNaN(data.rate) && data.rate > 0) {
-        return { rate: data.rate, isFallback: Boolean(data.isFallback) };
-      }
+    const data = await api.get<{ rate?: unknown; isFallback?: unknown }>('/exchange-rate-historical', { query: { currency: code, date: dateStr }, notifyUnauthorized: false });
+    if (typeof data.rate === 'number' && !isNaN(data.rate) && data.rate > 0) {
+      return { rate: data.rate, isFallback: Boolean(data.isFallback) };
     }
   } catch (e) {
     console.warn('Failed to fetch historical exchange rate:', e);

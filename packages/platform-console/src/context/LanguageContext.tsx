@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { api } from '@legalio/shared/apiClient';
 import { loadAllCatalogs, loadCatalogWithFallback, loadedCatalog } from '../i18n/catalogLoader';
 import { readPreference, setPreferenceUser, writePreference } from '../lib/userPreferences';
 import { useOptionalIdentity } from './AuthContext';
@@ -191,9 +192,11 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const dictionary = useQuery<UITextDictionary>({
     queryKey,
     queryFn: async () => {
-      const response = await fetch('/api/system/ui-texts', { cache: 'no-store' });
-      if (!response.ok) throw new Error('Could not load shared UI texts.');
-      return response.json();
+      try {
+        return await api.get<UITextDictionary>('/system/ui-texts', { cache: 'no-store', notifyUnauthorized: false });
+      } catch {
+        throw new Error('Could not load shared UI texts.');
+      }
     },
     // ponytail: one read per active browser every 5s; use SSE if polling load becomes significant.
     refetchInterval: 5_000,
@@ -204,12 +207,11 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => { sharedCustomTranslations = customTranslations; }, [customTranslations]);
   const saveDictionary = useMutation({
     mutationFn: async (values: { overrides?: Partial<UITextOverrides>; reset?: true }): Promise<UITextDictionary> => {
-      const response = await fetch('/api/platform/configuration', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section: 'uiTexts', values }),
-      });
-      if (!response.ok) throw new Error(builtIn(language)['tb.texts_save_failed'] || 'Could not save the UI texts.');
-      return response.json();
+      try {
+        return await api.patch<UITextDictionary>('/platform/configuration', { section: 'uiTexts', values });
+      } catch {
+        throw new Error(builtIn(language)['tb.texts_save_failed'] || 'Could not save the UI texts.');
+      }
     },
     onSuccess: (data) => {
       sharedCustomTranslations = data.overrides;

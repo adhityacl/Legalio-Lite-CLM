@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAuthHeaders } from '../lib/apiFetch';
+import { api } from '@legalio/shared/apiClient';
 import { useTenant } from '../context/TenantContext';
 
 export function useDepartments() {
@@ -10,15 +10,10 @@ export function useDepartments() {
   const fetchDepartments = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/departments', {
-        headers: getAuthHeaders(),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.departments)) {
-          setDepartments(data.departments);
-          return;
-        }
+      const data = await api.get<{ success?: boolean; departments?: string[] }>('/departments');
+      if (data.success && Array.isArray(data.departments)) {
+        setDepartments(data.departments);
+        return;
       }
     } catch (err) {
       console.error('Failed to fetch dynamic departments:', err);

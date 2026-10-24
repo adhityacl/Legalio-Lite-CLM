@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, X } from 'lucide-react';
+import { apiRequest } from '@legalio/shared/apiClient';
 import { useLanguage } from '../context/LanguageContext';
 import { useConfirm } from '../context/ConfirmDialogContext';
 import { useAlertToast } from '../context/AlertToastContext';
@@ -34,16 +35,7 @@ const CONFIGURATION_SECTIONS: Record<ConsoleConfigurationSection, PlatformConfig
 };
 
 async function consoleApi<T = any>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
-  const res = await fetch(`/api/auth-console${path}`, {
-    method: init.method || 'GET',
-    headers: init.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-    credentials: 'include',
-    cache: 'no-store',
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
-  return data as T;
+  return apiRequest<T>(`/auth-console${path}`, { method: (init.method || 'GET') as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', body: init.body, cache: 'no-store' });
 }
 
 /**

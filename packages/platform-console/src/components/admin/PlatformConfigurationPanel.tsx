@@ -6,7 +6,7 @@ import { GoogleCredentialsForm } from '../settings/GoogleCredentialsDialog';
 import { CosStorageForm } from '../settings/CosStorageForm';
 import { useLanguage } from '../../context/LanguageContext';
 import { useConfirm } from '../../context/ConfirmDialogContext';
-import { getAuthHeaders } from '../../lib/apiFetch';
+import { api, errorMessage, isApiError } from '@legalio/shared/apiClient';
 import { UITextManagerModal } from '../UITextManagerModal';
 import { AiIcon } from '../icons/AiIcon';
 import {
@@ -111,8 +111,8 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
   const [config, setConfig] = useState<GoogleSheetsConfig>(EMPTY_CONFIG);
 
   const loadConfig = async () => {
-    const res = await fetch('/api/google-integration', { cache: 'no-store' });
-    if (res.ok) setConfig({ ...EMPTY_CONFIG, ...(await res.json()) });
+    const data = await api.get<Partial<GoogleSheetsConfig>>('/google-integration', { cache: 'no-store' }).catch(() => null);
+    if (data) setConfig({ ...EMPTY_CONFIG, ...data });
   };
   useEffect(() => { void loadConfig(); }, []);
 
@@ -126,13 +126,11 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
   ) => {
     const allowed = ['masterSpreadsheetId', 'aiModel', 'geminiApiKey', 'smtpEnabled', 'smtpHost', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPassword', 'smtpFromEmail', 'smtpFromName'];
     const extras = Object.fromEntries(Object.entries(extraConfig).filter(([key, value]) => allowed.includes(key) && value !== undefined));
-    const res = await fetch('/api/google-integration', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ spreadsheetId: spreadsheetId || null, driveFolderId: driveFolderId || null, ...extras }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.message || data?.error || t('app.gagal_menyimpan_konfigurasi', 'Gagal menyimpan konfigurasi.'));
+    try {
+      await api.post('/google-integration', { spreadsheetId: spreadsheetId || null, driveFolderId: driveFolderId || null, ...extras });
+    } catch (error) {
+      throw new Error(errorMessage(error, t('app.gagal_menyimpan_konfigurasi', 'Gagal menyimpan konfigurasi.')));
+    }
     await loadConfig();
   };
 
@@ -214,9 +212,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
   const handleBackupNow = async () => {
     setBackupState({ running: true, message: '' });
     try {
-      const res = await fetch('/api/google-integration/backup', { method: 'POST' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Backup gagal.');
+      const data = await api.post<any>('/google-integration/backup').catch((error) => { throw new Error(errorMessage(error, 'Backup gagal.')); });
       if (data.skipped === 'not_connected') throw new Error('Akun Google belum terhubung. Hubungkan akun Google (OAuth) agar backup bisa berjalan.');
       if (data.skipped === 'no_root_folder') throw new Error('Root Folder Drive belum diatur.');
       if (data.busy) throw new Error('Backup sedang berjalan, coba lagi sebentar.');
@@ -241,10 +237,11 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     setSuccessMsg(null);
     try {
       // Platform service authority: every organization's folder, then partner category folders.
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const headers: Record<string, string> = {};
       if (accessToken) headers['x-google-access-token'] = accessToken;
-      await fetch('/api/tenants/auto-provision-folders', { method: 'POST', headers, credentials: 'include' });
-      await fetch('/api/google-integration/provision-folders', { method: 'POST', headers }).catch((e) => console.warn('Category provision warning:', e));
+      // Best effort, as before: a refused provisioning step is logged and the sync carries on.
+      await api.post('/tenants/auto-provision-folders', undefined, { headers }).catch((e) => console.warn('Folder provision warning:', e));
+      await api.post('/google-integration/provision-folders', undefined, { headers }).catch((e) => console.warn('Category provision warning:', e));
       window.dispatchEvent(new CustomEvent('organization-updated'));
       setSuccessMsg(t('settings.berhasil_menyinkronkan_seluruh_data_sheet_folder', 'Berhasil menyinkronkan seluruh data sheet, folder organisasi, dan file ke Master Root!'));
       setTimeout(() => setSuccessMsg(null), 6000);
@@ -324,19 +321,8 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
       // Sinkronisasi otomatis status isConnected dan token ke konfigurasi server
       try {
-        const headers = getAuthHeaders();
-        if (token) headers['x-google-access-token'] = token;
         const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('google_refresh_token') : null;
-        await fetch('/api/google-integration/connect', {
-          method: 'POST',
-          headers,
-          credentials: 'include',
-          body: JSON.stringify({
-            accessToken: token,
-            refreshToken,
-            googleUser: profile,
-          }),
-        });
+        await api.post('/google-integration/connect', { accessToken: token, refreshToken, googleUser: profile }, { headers: token ? { 'x-google-access-token': token } : {} });
       } catch (syncErr) {
         console.warn('[Google Connect] Gagal menyinkronkan token ke server:', syncErr);
       }
@@ -354,12 +340,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     try {
       // Pemutusan akun yang bersih: update server database
       try {
-        const headers = getAuthHeaders();
-        await fetch('/api/google-integration/disconnect', {
-          method: 'POST',
-          headers,
-          credentials: 'include',
-        });
+        await api.post('/google-integration/disconnect');
       } catch (discErr) {
         console.warn('[Google Disconnect] Gagal mengirim permintaan disconnect ke server:', discErr);
       }
@@ -385,19 +366,8 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
       // Sinkronisasi otomatis token hasil refresh ke server
       try {
-        const headers = getAuthHeaders();
-        if (token) headers['x-google-access-token'] = token;
         const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('google_refresh_token') : null;
-        await fetch('/api/google-integration/connect', {
-          method: 'POST',
-          headers,
-          credentials: 'include',
-          body: JSON.stringify({
-            accessToken: token,
-            refreshToken,
-            googleUser: profile,
-          }),
-        });
+        await api.post('/google-integration/connect', { accessToken: token, refreshToken, googleUser: profile }, { headers: token ? { 'x-google-access-token': token } : {} });
       } catch (syncErr) {
         console.warn('[Google Refresh] Gagal menyinkronkan token ke server:', syncErr);
       }
@@ -421,32 +391,14 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     setSaving(true);
     setErrorMsg(null);
     try {
-      const headers = getAuthHeaders();
-      if (token) headers['x-google-access-token'] = token;
-
-      const res = await fetch('/api/google-integration/auto-provision-master', {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({ accessToken: token }),
+      const data = await api.post<any>('/google-integration/auto-provision-master', { accessToken: token }, { headers: token ? { 'x-google-access-token': token } : {} }).catch((error) => {
+        if (!isApiError(error) || error.status === 0) throw error;
+        if (error.status === 403) throw new Error(t('settings.akses_ditolak_hanya_admin_superuser_yang', 'Akses ditolak: Hanya Admin/Superuser yang berhak membuat Master Root.'));
+        throw new Error(/^HTTP \d+$/.test(error.message)
+          ? t('settings.gagal_memproses_permintaan_http', 'Gagal memproses permintaan (HTTP {status}): {value}', { status: error.status, value: 'Server error' })
+          : error.message || t('settings.gagal_membuat_master_root_secara_otomatis', 'Gagal membuat Master Root secara otomatis.'));
       });
-
-      let data: any = {};
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        if (!res.ok) {
-          throw new Error(
-            res.status === 403
-              ? t('settings.akses_ditolak_hanya_admin_superuser_yang', 'Akses ditolak: Hanya Admin/Superuser yang berhak membuat Master Root.')
-              : t('settings.gagal_memproses_permintaan_http', 'Gagal memproses permintaan (HTTP {status}): {value}', { status: res.status, value: text.slice(0, 150) || 'Server error' })
-          );
-        }
-      }
-
-      if (!res.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.error || t('settings.gagal_membuat_master_root_secara_otomatis', 'Gagal membuat Master Root secara otomatis.'));
       }
 
@@ -666,29 +618,16 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     setSmtpTestResult(null);
     setErrorMsg(null);
     try {
-      const res = await fetch('/api/smtp/test', {
-        method: 'POST',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          smtpHost: smtpHost.trim(),
-          smtpPort: Number(smtpPort) || (smtpSecure ? 465 : 587),
-          smtpSecure,
-          smtpUser: smtpUser.trim(),
-          smtpPassword,
-          smtpFromEmail: smtpFromEmail.trim(),
-          smtpFromName: smtpFromName.trim(),
-          testRecipient: recipient,
-        }),
-      });
-      let data: any = {};
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      }
-      if (!res.ok) {
-        throw new Error(data.error || t('settings.gagal_terhubung_ke_smtp_relay', 'Gagal terhubung ke SMTP Relay.'));
-      }
+      const data = await api.post<any>('/smtp/test', {
+        smtpHost: smtpHost.trim(),
+        smtpPort: Number(smtpPort) || (smtpSecure ? 465 : 587),
+        smtpSecure,
+        smtpUser: smtpUser.trim(),
+        smtpPassword,
+        smtpFromEmail: smtpFromEmail.trim(),
+        smtpFromName: smtpFromName.trim(),
+        testRecipient: recipient,
+      }).catch((error) => { throw new Error(errorMessage(error, t('settings.gagal_terhubung_ke_smtp_relay', 'Gagal terhubung ke SMTP Relay.'))); });
       setSmtpTestResult({ success: true, message: data.message || t('settings.email_uji_coba_berhasil_dikirim', 'Email uji coba berhasil dikirim!') });
     } catch (err: any) {
       setSmtpTestResult({ success: false, message: err.message || t('settings.gagal_menguji_koneksi_smtp_relay', 'Gagal menguji koneksi SMTP Relay.') });
@@ -760,20 +699,8 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     setApiTestResult(null);
     setErrorMsg(null);
     try {
-      const res = await fetch('/api/ai/test-key', {
-        method: 'POST',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ apiKey: keyToTest, model: aiModel || 'gemini-3.6-flash' }),
-      });
-      let data: any = {};
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      }
-      if (!res.ok) {
-        throw new Error(data.error || t('settings.gagal_terhubung_ke_google_gemini_api', 'Gagal terhubung ke Google Gemini API.'));
-      }
+      const data = await api.post<any>('/ai/test-key', { apiKey: keyToTest, model: aiModel || 'gemini-3.6-flash' })
+        .catch((error) => { throw new Error(errorMessage(error, t('settings.gagal_terhubung_ke_google_gemini_api', 'Gagal terhubung ke Google Gemini API.'))); });
       setApiTestResult({ success: true, message: data.message || t('settings.koneksi_ke_google_gemini_api_berhasil', 'Koneksi ke Google Gemini API berhasil!') });
     } catch (err: any) {
       setApiTestResult({ success: false, message: err.message || t('settings.gagal_terhubung_ke_google_gemini_api', 'Gagal terhubung ke Google Gemini API.') });
@@ -793,25 +720,18 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     try {
       const token = getCachedAccessToken();
       const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('auth_session_token') : null;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const headers: Record<string, string> = {};
       if (token) headers['x-google-access-token'] = token;
       if (sessionToken) {
         headers['Authorization'] = `Bearer ${sessionToken}`;
         headers['x-session-token'] = sessionToken;
       }
 
-      const res = await fetch('/api/google-integration/provision-folders', {
-        method: 'POST',
-        headers,
+      await api.post('/google-integration/provision-folders', undefined, { headers }).catch((error) => {
+        throw new Error(isApiError(error) && error.status > 0 && !/^HTTP \d+$/.test(error.message)
+          ? error.message
+          : t('settings.gagal_sinkronisasi_folder_status', 'Gagal sinkronisasi folder (Status {status})', { status: isApiError(error) ? error.status : 0 }));
       });
-      let data: any = {};
-      try {
-        const text = await res.text();
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        data = {};
-      }
-      if (!res.ok) throw new Error(data.error || t('settings.gagal_sinkronisasi_folder_status', 'Gagal sinkronisasi folder (Status {status})', { status: res.status }));
 
       setSuccessMsg(
         t('settings.4_subfolder_kategori_contract_invoice_billing', '4 Subfolder Kategori (Contract, Invoice/Billing, IO, DD) berhasil dibuat/diperbarui untuk seluruh Partner!')

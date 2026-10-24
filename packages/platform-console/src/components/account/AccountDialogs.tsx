@@ -1,3 +1,4 @@
+import { api } from '@legalio/shared/apiClient';
 import React, { useEffect, useId, useState } from 'react';
 import { AlertCircle, CheckCircle2, Loader2, LogOut, Monitor, Moon, Sun, Trash2, X } from 'lucide-react';
 import { authClient } from '../../lib/auth-client';
@@ -99,9 +100,7 @@ export const AccountProfileDialog: React.FC<{ onClose: () => void }> = ({ onClos
   const loadSessions = async () => {
     setSessionsError(false);
     try {
-      const res = await fetch('/api/me/sessions', { cache: 'no-store' });
-      if (!res.ok) throw new Error();
-      setSessions((await res.json()).sessions);
+      setSessions((await api.get<{ sessions: typeof sessions }>('/me/sessions', { cache: 'no-store' })).sessions);
     } catch {
       setSessionsError(true);
     }
@@ -170,7 +169,7 @@ export const AccountProfileDialog: React.FC<{ onClose: () => void }> = ({ onClos
   };
 
   const revoke = async (id: string) => {
-    await fetch(`/api/me/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    await api.delete(`/me/sessions/${encodeURIComponent(id)}`).catch(() => undefined);
     void loadSessions();
   };
 

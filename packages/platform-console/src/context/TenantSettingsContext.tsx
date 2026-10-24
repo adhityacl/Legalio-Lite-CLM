@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore } from 'react';
+import { api } from '@legalio/shared/apiClient';
 import { useIdentity } from './AuthContext';
 import { useTenant } from './TenantContext';
 import { useLanguage } from './LanguageContext';
@@ -142,16 +143,13 @@ export const TenantSettingsProvider: React.FC<{ children: React.ReactNode }> = (
     }
     setStatus('loading');
     try {
-      const [settingsRes, packsRes] = await Promise.all([
-        fetch(`/api/organizations/${encodeURIComponent(organizationId)}/policy`, { cache: 'no-store' }),
-        fetch('/api/policy-packs', { cache: 'no-cache' }),
+      const [next, packs] = await Promise.all([
+        api.get<TenantPolicyView>(`/organizations/${encodeURIComponent(organizationId)}/policy`, { cache: 'no-store' }),
+        api.get<{ countries?: CountryOption[]; industries?: IndustryOption[] }>('/policy-packs', { cache: 'no-cache' }).catch(() => null),
       ]);
-      if (!settingsRes.ok) throw new Error(`HTTP ${settingsRes.status}`);
-      const next = (await settingsRes.json()) as TenantPolicyView;
       if (currentOrg.current !== organizationId || next.tenantId !== organizationId) return;
       setPolicy(next);
-      if (packsRes.ok) {
-        const packs = await packsRes.json();
+      if (packs) {
         setCountries(Array.isArray(packs.countries) ? packs.countries : []);
         setIndustries(Array.isArray(packs.industries) ? packs.industries : []);
       }
@@ -192,18 +190,12 @@ export const TenantSettingsProvider: React.FC<{ children: React.ReactNode }> = (
   const saveSettings = useCallback(async (settings: Partial<TenantSettings>, legalEntity?: string) => {
     const organizationId = activeTenantId;
     const base = `/api/organizations/${encodeURIComponent(organizationId)}/settings`;
-    const current = await fetch(base, { cache: 'no-store' }).then((r) => r.json());
-    const res = await fetch(base, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        expectedVersion: current.version,
-        policy: settings,
-        ...(legalEntity !== undefined ? { profile: { legalEntity } } : {}),
-      }),
+    const current = await api.get<{ version: number }>(base, { cache: 'no-store' });
+    await api.patch(base, {
+      expectedVersion: current.version,
+      policy: settings,
+      ...(legalEntity !== undefined ? { profile: { legalEntity } } : {}),
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
     window.dispatchEvent(new CustomEvent('organization-updated'));
     await refresh();
     return policy;
@@ -237,9 +229,7 @@ export function PolicyCatalogProvider({ children }: { children: React.ReactNode 
   const refresh = useCallback(async () => {
     if (!identity || identity.platformRole !== 'superuser') return;
     try {
-      const res = await fetch('/api/policy-packs', { cache: 'no-cache' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const packs = await res.json();
+      const packs = await api.get<any>('/policy-packs', { cache: 'no-cache' });
       setCountries(packs.countries || []);
       setIndustries(packs.industries || []);
       setStatus('ready');

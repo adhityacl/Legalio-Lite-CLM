@@ -1,3 +1,4 @@
+import { api, errorMessage, isApiError } from '@legalio/shared/apiClient';
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, Loader2, X } from 'lucide-react';
 import { useIdentity } from '../../context/AuthContext';
@@ -38,10 +39,12 @@ const clearPendingInvitation = () => {
 export interface InvitationPreview { organizationName: string; email: string | null; tenantRole: string; expiresAt: string; status: string }
 
 export async function loadInvitationPreview(token: string): Promise<InvitationPreview | null> {
-  const res = await fetch(`/api/invitations/${encodeURIComponent(token)}/preview`, { cache: 'no-store' });
-  if (res.status === 404 || res.status === 409) return null;
-  if (!res.ok) throw new Error('Could not load invitation.');
-  return res.json();
+  try {
+    return await api.get<InvitationPreview>(`/invitations/${encodeURIComponent(token)}/preview`, { cache: 'no-store', notifyUnauthorized: false });
+  } catch (error) {
+    if (isApiError(error) && (error.status === 404 || error.status === 409)) return null;
+    throw new Error('Could not load invitation.');
+  }
 }
 
 /**
@@ -72,10 +75,12 @@ export const InvitationPrompt: React.FC = () => {
 
   const accept = async () => {
     setState({ kind: 'busy' });
-    const res = await fetch(`/api/invitations/${encodeURIComponent(token)}/accept`, { method: 'POST' });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setState({ kind: 'error', code: data?.error || 'ERROR', message: data?.message || t('tb.invitation_accept_failed', 'The invitation could not be accepted.') });
+    let data: { organizationId?: string };
+    try {
+      data = await api.post<{ organizationId?: string }>(`/invitations/${encodeURIComponent(token)}/accept`);
+    } catch (error) {
+      const rejected = isApiError(error) && error.status > 0 ? error : null;
+      setState({ kind: 'error', code: rejected?.error || 'ERROR', message: rejected ? errorMessage(rejected, t('tb.invitation_accept_failed', 'The invitation could not be accepted.')) : t('tb.invitation_accept_failed', 'The invitation could not be accepted.') });
       return;
     }
     clearPendingInvitation();

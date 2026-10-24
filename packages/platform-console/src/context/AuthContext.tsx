@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { api } from '@legalio/shared/apiClient';
 import { authClient } from '../lib/auth-client';
 import { UserSession } from '@legalio/types';
 import { useQueryClient } from '@tanstack/react-query';
@@ -50,9 +51,7 @@ const authHeaders = (token?: string | null): Record<string, string> => {
 
 async function fetchIdentity(token?: string | null): Promise<Identity | null> {
   try {
-    const res = await fetch('/api/me', { headers: authHeaders(token), credentials: 'include', cache: 'no-store' });
-    if (!res.ok) return null;
-    const data = await res.json();
+    const data = await api.get<any>('/me', { headers: authHeaders(token), cache: 'no-store' });
     if (!data?.identity?.id) return null;
     return {
       ...data.identity,
@@ -116,12 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await fetch('/api/user/log-activity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        credentials: 'include',
-        body: JSON.stringify({ actionType: 'LOGOUT' }),
-      });
+      await api.post('/user/log-activity', { actionType: 'LOGOUT' }, { headers: authHeaders(), notifyUnauthorized: false });
     } catch {
       /* best effort */
     }

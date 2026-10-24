@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { api, apiRequest } from '@legalio/shared/apiClient';
 import { Tenant, TenantBranding } from '@legalio/types';
 import { useIdentity } from './AuthContext';
 import { useConfirm } from './ConfirmDialogContext';
@@ -54,17 +55,6 @@ const DEFAULT_BRANDING: TenantBranding = {
   loginHeadline: 'Contract, partner and commercial document management',
 };
 
-async function safeJson<T = any>(res: Response): Promise<T | null> {
-  try {
-    const text = await res.text();
-    if (!text || text.trim().startsWith('<')) return null;
-    return JSON.parse(text) as T;
-  } catch {
-    return null;
-  }
-}
-
-const json = { 'Content-Type': 'application/json' };
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
 /**
@@ -92,16 +82,12 @@ export const TenantProvider: React.FC<{ children: React.ReactNode; platformOnly?
 
   /** Server-validated session default; the tab selection is committed only on success. */
   const validate = useCallback(async (organizationId: string) => {
-    const res = await fetch('/api/me/active-organization', {
-      method: 'POST', headers: json, credentials: 'include', body: JSON.stringify({ organizationId }),
-    });
-    return res.ok;
+    return api.post('/me/active-organization', { organizationId }).then(() => true, () => false);
   }, []);
 
   // Public presentation branding is available before sign-in.
   useEffect(() => {
-    fetch('/api/branding', { cache: 'no-store' })
-      .then((res) => (res.ok ? safeJson(res) : null))
+    api.get<any>('/branding', { cache: 'no-store' })
       .then((data) => { if (data?.branding) setBranding({ ...DEFAULT_BRANDING, ...data.branding }); })
       .catch(() => {});
   }, []);
@@ -116,8 +102,7 @@ export const TenantProvider: React.FC<{ children: React.ReactNode; platformOnly?
       setSelectionStatus('none');
       return;
     }
-    const tenantsRes = await fetch('/api/tenants', { credentials: 'include', cache: 'no-store' });
-    const data = tenantsRes.ok ? await safeJson(tenantsRes) : null;
+    const data = await api.get<any>('/tenants', { cache: 'no-store' }).catch(() => null);
     const orgs: AccessibleOrganization[] = Array.isArray(data?.organizations) ? data.organizations : [];
     setOrganizations(orgs);
     setTenants(Array.isArray(data?.tenants) ? data.tenants : []);
@@ -222,8 +207,7 @@ export const TenantProvider: React.FC<{ children: React.ReactNode; platformOnly?
   /* Platform organization lifecycle (System Admin). */
   const platformWrite = async (url: string, method: string, body?: unknown) => {
     try {
-      const res = await fetch(url, { method, headers: json, credentials: 'include', body: body === undefined ? undefined : JSON.stringify(body) });
-      if (!res.ok) return false;
+      await apiRequest(url, { method: method as 'POST' | 'PUT' | 'DELETE', body });
       await load({ keepSelection: true });
       return true;
     } catch {
@@ -232,12 +216,9 @@ export const TenantProvider: React.FC<{ children: React.ReactNode; platformOnly?
   };
 
   const updateBranding = async (brandingData: Partial<TenantBranding>) => {
-    const res = await fetch('/api/platform/configuration', {
-      method: 'PATCH', headers: json, credentials: 'include', body: JSON.stringify({ section: 'branding', values: brandingData }),
-    });
-    if (!res.ok) return false;
-    const next = await safeJson(res);
-    if (next) setBranding({ ...DEFAULT_BRANDING, ...next });
+    const next = await api.patch<any>('/platform/configuration', { section: 'branding', values: brandingData }).then((data) => data ?? {}, () => null);
+    if (next === null) return false;
+    if (Object.keys(next).length) setBranding({ ...DEFAULT_BRANDING, ...next });
     return true;
   };
 

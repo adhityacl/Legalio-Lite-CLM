@@ -3,6 +3,7 @@ import React, { useEffect, useId, useState } from 'react';
 import { ShieldAlert, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTenantSettings } from '../../context/TenantSettingsContext';
+import { api } from '@legalio/shared/apiClient';
 import { localize } from '@legalio/shared/policy';
 import { Button } from '@legalio/ui-components/button';
 
@@ -62,17 +63,11 @@ export const ResetWorkspaceDialog: React.FC<ResetWorkspaceDialogProps> = ({ open
     if (!canSubmit) return;
     setStatus({ kind: 'running' });
     try {
-      const res = await fetch('/api/admin/reset-database', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          confirmKeyword: confirmText.trim(),
-          mode,
-          organization: mode === 'empty' ? { name: name.trim(), countryCode, industry, language } : undefined,
-        }),
+      const data = await api.post<{ message?: string; defaultOrgId?: string }>('/admin/reset-database', {
+        confirmKeyword: confirmText.trim(),
+        mode,
+        organization: mode === 'empty' ? { name: name.trim(), countryCode, industry, language } : undefined,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
       onDone(data.message || '', data.defaultOrgId || '');
     } catch (err: any) {
       setStatus({ kind: 'error', message: err?.message || String(err) });

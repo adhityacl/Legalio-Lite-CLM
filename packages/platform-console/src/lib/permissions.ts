@@ -8,6 +8,7 @@
  * matrix and no wildcard.
  */
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { api } from '@legalio/shared/apiClient';
 import { useIdentity } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import { getSelectionRevision } from './organizationSelection';
@@ -69,12 +70,9 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     void (async () => {
       try {
-        const res = await fetch(`/api/organizations/${encodeURIComponent(activeTenantId)}/capabilities`, { cache: 'no-store', signal: controller.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const caps = await res.json();
-        const depts = await fetch('/api/departments', { cache: 'no-store', signal: controller.signal, headers: { 'x-organization-id': activeTenantId } })
-          .then((r) => (r.ok ? r.json() : { items: [] }))
-          .catch(() => ({ items: [] }));
+        const caps = await api.get<any>(`/organizations/${encodeURIComponent(activeTenantId)}/capabilities`, { cache: 'no-store', signal: controller.signal });
+        const depts = await api.get<{ items?: Array<{ id: string; name: string }> }>('/departments', { cache: 'no-store', signal: controller.signal, organizationId: activeTenantId })
+          .catch(() => ({ items: [] as Array<{ id: string; name: string }> }));
         // Ignore responses for an organization that is no longer selected (AC-026).
         if (request !== requestRef.current || caps.organizationId !== activeTenantId || selection !== getSelectionRevision()) return;
         const names = new Map<string, string>((depts.items || []).map((d: { id: string; name: string }) => [d.id, d.name]));
@@ -97,7 +95,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
         if (controller.signal.aborted || request !== requestRef.current) return;
         loadedFor.current = '';
         setState({ ...EMPTY, status: 'error', organizationId: activeTenantId, tenantId: activeTenantId });
-        if (String(err?.message || '').includes('404')) {
+        if (err?.status === 404) {
           window.dispatchEvent(new CustomEvent('organization-access-lost', { detail: activeTenantId }));
         }
       }

@@ -1,3 +1,4 @@
+import { apiRequest, ApiError } from '@legalio/shared/apiClient';
 import React, { useCallback, useEffect, useId, useState } from 'react';
 import { ChevronDown, FileJson, RotateCcw, Upload } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
@@ -32,11 +33,13 @@ type LoadState = { status: 'loading' } | { status: 'error'; message: string } | 
 const API = '/api/integrations/google/credentials';
 const MAX_FILE_BYTES = 100 * 1024;
 
-async function requestStatus(path: string, init?: RequestInit): Promise<GoogleCredentialStatus> {
-  const res = await fetch(`${API}${path}`, { ...init, headers: { 'Content-Type': 'application/json' } });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(body.message || body.error || `HTTP ${res.status}`), { code: body.error });
-  return body as GoogleCredentialStatus;
+async function requestStatus(path: string, init: { method?: 'GET' | 'PUT' | 'DELETE'; body?: unknown } = {}): Promise<GoogleCredentialStatus> {
+  try {
+    return await apiRequest<GoogleCredentialStatus>(`${API}${path}`, init);
+  } catch (error) {
+    // The server's own error name (`invalid_private_key`, ...) is what the form switches on.
+    throw error instanceof ApiError ? Object.assign(new Error(error.message), { code: error.error }) : error;
+  }
 }
 
 /**
@@ -93,7 +96,7 @@ export const GoogleCredentialsForm: React.FC = () => {
     if (parsed.ok === false) return setError(kind, errorText(parsed.code));
     setBusy(kind);
     try {
-      const data = await requestStatus(`/${kind}`, { method: 'PUT', body: JSON.stringify({ file: json }) });
+      const data = await requestStatus(`/${kind}`, { method: 'PUT', body: { file: json } });
       setState({ status: 'ready', data });
       showAlert({ title: t('google_setup.saved', 'Kredensial Google tersimpan'), variant: 'success' });
     } catch (err) {

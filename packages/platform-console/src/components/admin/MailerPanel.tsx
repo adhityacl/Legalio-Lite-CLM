@@ -3,6 +3,7 @@ import { Mail, Save, RotateCcw, Monitor, Smartphone, WandSparkles, Code2, Eye, P
 import { MAIL_CATALOG, MailTemplateError, renderMailTemplate, validateMailTemplate, type MailTemplate, type MailTemplateId } from '@legalio/shared/mailTemplates';
 import { Button } from '@legalio/ui-components/button';
 import { Card } from '@legalio/ui-components/card';
+import { apiRequest, ApiError } from '@legalio/shared/apiClient';
 import { Heading } from '@legalio/ui-components/heading';
 import { useLanguage } from '../../context/LanguageContext';
 import { useConfirm } from '../../context/ConfirmDialogContext';
@@ -11,17 +12,13 @@ import { registerDirtyCheck } from '../../lib/unsavedChanges';
 
 type SavedTemplate = MailTemplate & { id: MailTemplateId; version: number; updatedAt: string | null };
 async function api(path = '', body?: unknown) {
-  const response = await fetch(`/api/mailer/templates${path}`, {
-    method: body ? 'PUT' : 'GET', credentials: 'include', cache: 'no-store',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    const key = response.status === 409 ? 'conflict' : response.status === 404 ? 'not_found' : [401, 403].includes(response.status) ? 'access' : response.status === 400 ? 'invalid' : 'request';
-    throw new MailTemplateError(`mailer.error.${key}`, data.message || data.error || 'Request failed');
+  try {
+    return await apiRequest<any>(`/mailer/templates${path}`, { method: body ? 'PUT' : 'GET', cache: 'no-store', body });
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status === 0) throw error;
+    const key = error.status === 409 ? 'conflict' : error.status === 404 ? 'not_found' : [401, 403].includes(error.status) ? 'access' : error.status === 400 ? 'invalid' : 'request';
+    throw new MailTemplateError(`mailer.error.${key}`, error.message || 'Request failed');
   }
-  return data;
 }
 const fieldClass = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60';
 export function MailerPanel() {

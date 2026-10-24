@@ -1,3 +1,4 @@
+import { api, isApiError } from '@legalio/shared/apiClient';
 import { translateStatic as t } from '../context/LanguageContext';
 
 /*
@@ -66,13 +67,10 @@ export const loadGoogleIdentityScript = (): Promise<void> => {
 export const getGoogleClientId = async (): Promise<string | null> => {
   if (fetchedClientId) return fetchedClientId;
   try {
-    const res = await fetch('/api/auth/google/client-id');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.clientId) {
-        fetchedClientId = data.clientId;
-        return data.clientId;
-      }
+    const data = await api.get<{ clientId?: string }>('/auth/google/client-id', { notifyUnauthorized: false });
+    if (data.clientId) {
+      fetchedClientId = data.clientId;
+      return data.clientId;
     }
   } catch (err) {
     console.warn('Could not fetch client-id from backend:', err);
@@ -113,15 +111,8 @@ export const signInWithGoogleCodeFlow = async (): Promise<{ accessToken: string;
           }
 
           try {
-            const exchangeRes = await fetch('/api/auth/google/exchange-code', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code: response.code, redirect_uri: 'postmessage' }),
-            });
-            const data = await exchangeRes.json();
-            if (!exchangeRes.ok) {
-              throw new Error(data.error || t('google_auth.exchange_failed', 'Gagal menukarkan Authorization Code.'));
-            }
+            const data = await api.post<any>('/auth/google/exchange-code', { code: response.code, redirect_uri: 'postmessage' }, { notifyUnauthorized: false })
+              .catch((error) => { throw new Error((isApiError(error) && error.status > 0 && error.error) || t('google_auth.exchange_failed', 'Gagal menukarkan Authorization Code.')); });
 
             cachedAccessToken = data.accessToken;
             const profile: GoogleUserProfile = data.profile || {
@@ -211,22 +202,11 @@ export const syncTokenToServer = async (
   profile?: GoogleUserProfile
 ): Promise<void> => {
   try {
-    const res = await fetch('/api/google-integration/connect', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-google-access-token': token,
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        accessToken: token,
-        refreshToken: refreshToken || undefined,
-        googleUser: profile,
-      }),
-    });
-    if (!res.ok) {
-      console.warn('[GoogleAuth] Server sync returned non-OK status:', res.status);
-    }
+    await api.post('/google-integration/connect', {
+      accessToken: token,
+      refreshToken: refreshToken || undefined,
+      googleUser: profile,
+    }, { headers: { 'x-google-access-token': token } });
   } catch (err) {
     console.warn('[GoogleAuth] Failed to sync token to backend server:', err);
   }
@@ -235,14 +215,10 @@ export const syncTokenToServer = async (
 /** Exchanges a verified Google access token for an app (Better Auth) session; '' if the server refused. */
 const createAppSession = async (profile: GoogleUserProfile, accessToken: string, invitationToken?: string): Promise<string> => {
   try {
-    const syncRes = await fetch('/api/auth/google/sync-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(invitationToken ? { 'x-invitation-token': invitationToken } : {}) },
-      credentials: 'include',
-      body: JSON.stringify({ email: profile.email, name: profile.name, photoURL: profile.photoURL, accessToken }),
-    });
-    if (!syncRes.ok) return '';
-    const syncData = await syncRes.json();
+    const syncData = await api.post<{ sessionToken?: string }>('/auth/google/sync-session', { email: profile.email, name: profile.name, photoURL: profile.photoURL, accessToken }, {
+      headers: invitationToken ? { 'x-invitation-token': invitationToken } : {}, notifyUnauthorized: false,
+    }).catch((error) => { if (isApiError(error) && error.status > 0) return null; throw error; });
+    if (!syncData) return '';
     if (syncData.sessionToken && typeof window !== 'undefined') {
       localStorage.setItem('auth_session_token', syncData.sessionToken);
     }
@@ -272,11 +248,7 @@ export const silentRefreshGoogleToken = signInWithGoogleCodeFlow;
 export const logoutGoogle = async () => {
   // Beritahu backend untuk memutus koneksi Google secara bersih
   try {
-    await fetch('/api/google-integration/disconnect', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
+    await api.post('/google-integration/disconnect');
   } catch (discErr) {
     console.warn('[GoogleAuth] Gagal mengirim disconnect ke server:', discErr);
   }
@@ -304,18 +276,13 @@ export const requestGoogleAccessToken = async (forceRefresh: boolean = false): P
 
   // Request fresh token from server backend (which uses refresh_token)
   try {
-    const res = await fetch('/api/auth/google/token', {
-      headers: { 'Cache-Control': 'no-cache' },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.accessToken) {
-        cachedAccessToken = data.accessToken;
-        const expiresAt = Date.now() + 3500 * 1000;
-        localStorage.setItem('google_access_token', data.accessToken);
-        localStorage.setItem('google_token_expires_at', expiresAt.toString());
-        return data.accessToken;
-      }
+    const data = await api.get<{ success?: boolean; accessToken?: string }>('/auth/google/token', { headers: { 'Cache-Control': 'no-cache' }, notifyUnauthorized: false });
+    if (data.success && data.accessToken) {
+      cachedAccessToken = data.accessToken;
+      const expiresAt = Date.now() + 3500 * 1000;
+      localStorage.setItem('google_access_token', data.accessToken);
+      localStorage.setItem('google_token_expires_at', expiresAt.toString());
+      return data.accessToken;
     }
   } catch (err) {
     console.warn('[GoogleAuth] Could not fetch fresh token from backend:', err);
