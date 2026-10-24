@@ -19,11 +19,14 @@ export async function sendSmtpEmail({
   subject,
   html,
   text,
+  headers,
 }: {
   to: any;
   subject: any;
   html?: any;
   text?: any;
+  /** Extra message headers, for example List-Unsubscribe. */
+  headers?: Record<string, string>;
 }) {
   const config = db.googleConfig;
   if (!config.smtpEnabled || !config.smtpHost || !config.smtpUser) {
@@ -51,6 +54,7 @@ export async function sendSmtpEmail({
       subject,
       text: text || html.replace(/<[^>]*>/g, ""),
       html,
+      ...(headers ? { headers } : {}),
     });
     log.info(
       `[SMTP Relay] Email successfully sent to ${recipients} (MessageId: ${info.messageId})`,

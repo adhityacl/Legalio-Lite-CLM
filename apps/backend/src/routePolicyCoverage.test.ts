@@ -84,6 +84,7 @@ test('the set of unauthenticated (public) routes is explicit and reviewed', () =
     'GET /api/auth-console/invitations/verify',
     'GET /api/auth/google/client-id',
     'GET /api/branding',
+    'GET /api/digest/unsubscribe',
     'GET /api/exchange-rate-historical',
     'GET /api/exchange-rates',
     'GET /api/google-auth/client-id',
@@ -95,6 +96,7 @@ test('the set of unauthenticated (public) routes is explicit and reviewed', () =
     'GET /api/v1/openapi.json',
     'POST /api/auth/google/exchange-code',
     'POST /api/auth/google/sync-session',
+    'POST /api/digest/unsubscribe',
     'POST /api/google-auth/exchange-code',
     'POST /api/google-auth/sync-session',
     'POST /api/system/setup',
@@ -105,12 +107,14 @@ test('policies only name known permissions and writes never rest on a view-only 
   const viewOnly = new Set(['document.view', 'workspace.view']);
   // Reads that go through POST (AI over records the caller can already see) are the reviewed exceptions.
   const readViaPost = new Set(['POST /api/chat']);
+  // A member's own e-mail preference: it changes nothing but what is sent to the caller, from data the caller can already see.
+  const personalSetting = new Set(['PUT /api/organizations/:organizationId/digest/preferences']);
   for (const [method, pattern, policy] of ROUTE_POLICIES) {
     if (policy.kind === 'platform') assert.ok(isKnownPermission(policy.permission), `${method} ${pattern}: ${policy.permission}`);
     if (policy.kind !== 'tenant' && policy.kind !== 'orgParam') continue;
     assert.ok(policy.permissions.length > 0, `${method} ${pattern} has no permission`);
     for (const permission of policy.permissions) assert.ok(isKnownPermission(permission), `${method} ${pattern}: ${permission}`);
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && !readViaPost.has(`${method} ${pattern}`)) {
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && !readViaPost.has(`${method} ${pattern}`) && !personalSetting.has(`${method} ${pattern}`)) {
       assert.ok(policy.permissions.some((permission) => !viewOnly.has(permission)), `${method} ${pattern} is a write guarded only by ${policy.permissions.join(',')}`);
     }
   }

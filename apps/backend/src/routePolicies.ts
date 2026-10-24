@@ -107,6 +107,14 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/organizations/:organizationId/my-notifications', orgParam('document.create', 'the caller\'s own in-app notifications only')],
   ['POST', '/api/organizations/:organizationId/my-notifications/read', orgParam('document.create', 'marks only the caller\'s own entries')],
 
+  ['GET', '/api/organizations/:organizationId/digest/preferences', orgParam('document.view', 'the caller\'s own preference')],
+  ['PUT', '/api/organizations/:organizationId/digest/preferences', orgParam('document.view', 'changes only the caller\'s own preference (opt-in or out of a read-only e-mail)')],
+  ['GET', '/api/organizations/:organizationId/digest/preview', orgParam('document.view', 'built from what the caller may see')],
+  ['GET', '/api/organizations/:organizationId/digest/defaults', orgParam('tenant.settings.read')],
+  ['PUT', '/api/organizations/:organizationId/digest/defaults', orgParam('tenant.settings.update', 'audited')],
+  ['GET', '/api/digest/unsubscribe', pub('signed token possession; turns off one member\'s digest')],
+  ['POST', '/api/digest/unsubscribe', pub('RFC 8058 one-click; signed token possession')],
+
   /* ---------------- public API v1 (organization API keys) ---------------- */
   ['GET', '/api/v1/openapi.json', pub('API description; no data')],
   ['GET', '/api/v1/whoami', apiKey(null, 'any valid key; returns its own organization and scopes')],

@@ -278,8 +278,9 @@ export const MAIL_CATALOG = {
   },
   digest: {
     name: 'Ringkasan berkala', description: 'Ringkasan harian atau mingguan: tenggat pemberitahuan, kontrak berakhir, persetujuan menunggu, dan item terlambat.', recipient: 'Pengguna yang berlangganan ringkasan',
-    defaults: notice,
-    sample: { ...noticeSample('[Ringkasan mingguan] PT Contoh Indonesia', 'Ringkasan mingguan Anda', 'Berikut hal-hal yang perlu perhatian Anda.', 'Buka Legalio'), actionUrl: 'https://example.com/app' }, required: [],
+    defaults: { subject: notice.subject, html: notice.html.replace('{{footer}}', '{{footer}}<br><a href="{{unsubscribeUrl}}" style="color:#64748b;">{{unsubscribeLabel}}</a>') },
+    sample: { ...noticeSample('[Ringkasan mingguan] PT Contoh Indonesia', 'Ringkasan mingguan Anda', 'Berikut hal-hal yang perlu perhatian Anda.', 'Buka Legalio'), actionUrl: 'https://example.com/app',
+      unsubscribeUrl: 'https://example.com/api/digest/unsubscribe?token=contoh', unsubscribeLabel: 'Berhenti berlangganan ringkasan ini' }, required: ['unsubscribeUrl'],
   },
   'smtp-test': {
     name: 'Tes koneksi SMTP', description: 'Dikirim secara manual melalui tombol tes pada pengaturan SMTP.', recipient: 'Alamat penerima tes yang diisi admin',

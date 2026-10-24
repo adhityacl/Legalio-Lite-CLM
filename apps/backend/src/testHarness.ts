@@ -13,7 +13,8 @@ export type HarnessRole = 'admin' | 'manager' | 'editor' | 'viewer' | 'superuser
 export interface HarnessOptions {
   tag: string;
   orgs: Array<{ id: string; name: string }>;
-  users: Array<[key: string, org: string | null, role: HarnessRole]>;
+  /** Optional fourth entry: the name of a department (created in the organization) the member belongs to. */
+  users: Array<[key: string, org: string | null, role: HarnessRole, department?: string]>;
   /** Extra environment applied before the application is imported. */
   env?: Record<string, string>;
 }
@@ -29,17 +30,19 @@ export async function bootApp(options: HarnessOptions) {
   const { sql } = await import('./db');
   const { createTestDatabase } = await import('./testDatabase');
   const { ensureSchema } = await import('./schema');
-  const { createOrganizationRecord, createIdentityRecord, addMembershipRecord } = await import('./organizationProvisioning');
+  const { createOrganizationRecord, createIdentityRecord, addMembershipRecord, createTeamRecord } = await import('./organizationProvisioning');
   const { hashPassword } = await import('better-auth/crypto');
   const database = await createTestDatabase();
   await ensureSchema();
   for (const org of options.orgs) await createOrganizationRecord(sql, { id: org.id, name: org.name });
   const hash = await hashPassword(PASSWORD);
   const now = new Date().toISOString();
-  for (const [key, org, role] of options.users) {
+  const teams = new Map<string, string>();
+  for (const [key, org, role, department] of options.users) {
     await createIdentityRecord(sql, { id: key, name: key, email: `${key.toLowerCase()}@example.com`, platformRole: role === 'superuser' ? 'superuser' : 'user' });
     await sql.run(`INSERT INTO account(id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt") VALUES (?, ?, 'credential', ?, ?, ?, ?)`, `acct-${key}`, key, key, hash, now, now);
-    if (org && role !== 'superuser') await addMembershipRecord(sql, { userId: key, organizationId: org, tenantRole: role, departmentIds: [] });
+    if (department && org && !teams.has(`${org}:${department}`)) teams.set(`${org}:${department}`, await createTeamRecord(sql, org, department));
+    if (org && role !== 'superuser') await addMembershipRecord(sql, { userId: key, organizationId: org, tenantRole: role, departmentIds: department && org ? [teams.get(`${org}:${department}`)!] : [] });
   }
   const serverModule = await import('./server');
   await serverModule.init();

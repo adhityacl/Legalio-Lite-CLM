@@ -5,6 +5,7 @@ import { EXPORT_LOCK_KEY, processExports } from './tenantExport';
 import { getStore } from './uploadStorage';
 import { IS_TEST_MODE } from './runtimePaths';
 import { componentLog } from './logger';
+import { DIGEST_LOCK_KEY, runDigestPass, type DigestDeps } from './digest';
 import { APPROVAL_SLA_LOCK_KEY, deliverApprovalNotices, onApprovalNoticeQueued, runApprovalSlaPass, type ApprovalNoticeDeps } from './approvalNotifications';
 import { outboundPolicyFromEnv } from './ssrfGuard';
 import { WEBHOOK_LOCK_KEY, deliverDueWebhooks, onWebhookQueued, pruneDeliveries } from './webhooks';
@@ -42,7 +43,24 @@ export const approvalJob = createPeriodicJob({
   run: async () => { await runApprovalSlaPass(sql); await deliverApprovalNotices(sql, await approvalDeps()); },
 });
 
-const jobs = [exportJob, webhookJob, approvalJob];
+async function digestDeps(): Promise<DigestDeps> {
+  const { mailTemplates, sendSmtpEmail } = await import('./mailHelpers');
+  const { db: memory } = await import('./memoryDb');
+  const { getPublicBaseUrl } = await import('./installationSettings');
+  return {
+    smtpAvailable: () => Boolean(memory.googleConfig?.smtpEnabled),
+    send: async (input) => { const result = await sendSmtpEmail(input); return { success: Boolean(result?.success), error: result?.success ? undefined : String((result as { error?: unknown })?.error ?? '') }; },
+    render: (values) => mailTemplates.render('digest', values, ['details']),
+    publicUrl: () => getPublicBaseUrl() || process.env.PUBLIC_URL || '',
+  };
+}
+/** Every 15 minutes: enqueue the digests whose send time has come (once per member and period) and deliver them. */
+export const digestJob = createPeriodicJob({
+  name: 'Digest', lockKey: DIGEST_LOCK_KEY, intervalMs: 15 * 60_000, startupDelayMs: 90_000, enabled,
+  run: async () => { await runDigestPass(sql, await digestDeps()); },
+});
+
+const jobs = [exportJob, webhookJob, approvalJob, digestJob];
 export const startBackgroundJobs = () => {
   const policy = outboundPolicyFromEnv();
   if (process.env.NODE_ENV === 'production' && (policy.allowHttp || policy.allowPrivateNetworks)) {
