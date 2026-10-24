@@ -19,6 +19,7 @@ const { synchronizeBusinessRows, resetSyncCache } = await import('./normalizedCo
 const { partnerRepository } = await import('./repositories/partnerRepository');
 const { ioRepository } = await import('./repositories/ioRepository');
 const { spendingRepository } = await import('./repositories/spendingRepository');
+const { evaluationRepository } = await import('./repositories/evaluationRepository');
 
 type Row = Record<string, any>;
 interface Spec {
@@ -48,6 +49,10 @@ const SPECS: Spec[] = [
     name: 'spendings', table: 'spendings', key: 'id', repo: spendingRepository, field: 'vendor_name', childTable: 'spending_allocations', childKey: 'spending_id',
     make: (id, org = 'org-a') => ({ id, organizationId: org, vendor_id: null, vendor_name: `Vendor ${id}`, invoice_number: `INV-${id}`, invoice_date: '2026-10-01', total_amount: 10.01, total_amount_usd: 10.01, currency: 'USD',
       invoice_month: ['2026-10'], month_allocations: [{ month: '2026-10', amount: 10.01, custom: 'allocation extra' }], payment_status: 'Paid', custom_extension: { keep: true } }),
+  },
+  {
+    name: 'evaluations', table: 'evaluations', key: 'id', repo: evaluationRepository, field: 'supplier_name',
+    make: (id, org = 'org-a') => ({ id, organizationId: org, partner_id: null, supplier_name: `Supplier ${id}`, review_date: '2026-02-01', sla_score: 80, calculated_score: 91.5, final_evaluation: 'Recommended', notes: 'solid orchard work', custom_extension: { keep: true } }),
   },
 ];
 

@@ -26,7 +26,7 @@ import { hasServiceAccountCredentials } from "./lib/googleServiceAccountAuth";
 import { componentLog, errorResponder, requestLogging } from "./logger";
 import { mailTemplates, sendPlatformMail } from "./mailHelpers";
 import { syncIdSequences } from "./ids";
-import { coreSaver, db, demoData, migrateLegacyRecords, normalizeContractRecord, normalizeIoRecord, normalizePartnerRecord, normalizeStoredContracts, normalizeSpendingRecord, normalizeStoredIos, normalizeStoredPartners, normalizeStoredSpendings, migrateLegacySpendingIds, refreshTenantProjection, saveDb, seedContracts, seedIos, seedPartners, seedSpendings, syncAdderNames } from "./memoryDb";
+import { coreSaver, db, demoData, migrateLegacyRecords, normalizeContractRecord, normalizeIoRecord, normalizePartnerRecord, normalizeStoredContracts, normalizeSpendingRecord, normalizeStoredIos, normalizeStoredPartners, normalizeStoredSpendings, migrateLegacySpendingIds, refreshTenantProjection, saveDb, seedContracts, seedEvaluations, seedIos, seedPartners, seedSpendings, syncAdderNames } from "./memoryDb";
 import { resetSyncCache } from "./normalizedCoreStore";
 import { createOrganizationAdminRouter } from "./organizationAdminRoutes";
 import { seedOrganizationsFromDataset } from "./organizationProvisioning";
@@ -65,6 +65,7 @@ import { contractRepository } from "./repositories/contractRepository";
 import { partnerRepository } from "./repositories/partnerRepository";
 import { ioRepository } from "./repositories/ioRepository";
 import { spendingRepository } from "./repositories/spendingRepository";
+import { evaluationRepository } from "./repositories/evaluationRepository";
 import { insertRepositoryRows } from "./repositories/seed";
 import { ensureSchema } from "./schema";
 
@@ -142,9 +143,9 @@ export async function init() {
     log.info(`Seeded bootstrap superuser: ${demoAdminEmail}`);
   }
   const initialData = await loadCoreData();
-  const hasCoreData = ["evaluations", "notifications", "templates", "activityLogs"]
+  const hasCoreData = ["notifications", "templates", "activityLogs"]
     .some((key) => Array.isArray((initialData as any)[key]) && (initialData as any)[key].length > 0)
-    || await contractRepository.anyAtAll() || await partnerRepository.anyAtAll() || await ioRepository.anyAtAll() || await spendingRepository.anyAtAll();
+    || await contractRepository.anyAtAll() || await partnerRepository.anyAtAll() || await ioRepository.anyAtAll() || await spendingRepository.anyAtAll() || await evaluationRepository.anyAtAll();
   const seedDemoContracts = !(hasCoreData || !freshInstall);
 
   // An initialized workspace may intentionally contain no business records after a reset.
@@ -185,7 +186,7 @@ export async function init() {
   // Demo partners and contracts are repository-backed: they commit together with the orders that reference each other.
   // Reverse order keeps the dataset's order (each insert goes to the front).
   await saveDb(seedDemoContracts ? async () => {
-    await insertRepositoryRows(sql, { partners: seedPartners, contracts: seedContracts, ios: seedIos, spendings: seedSpendings }, { partners: (row) => normalizePartnerRecord(structuredClone(row)), contracts: normalizeContractRecord, insertion_orders: normalizeIoRecord, spendings: normalizeSpendingRecord });
+    await insertRepositoryRows(sql, { partners: seedPartners, contracts: seedContracts, ios: seedIos, spendings: seedSpendings, evaluations: seedEvaluations }, { partners: (row) => normalizePartnerRecord(structuredClone(row)), contracts: normalizeContractRecord, insertion_orders: normalizeIoRecord, spendings: normalizeSpendingRecord });
   } : undefined);
   if (await uploadBackfillPending(sql)) {
     const uploadRecords: Array<{ organizationId: string; record: any }> = [];

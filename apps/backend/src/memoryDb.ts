@@ -41,11 +41,12 @@ export const seedPartners: any[] = seedData.partners;
 export const seedIos: any[] = seedData.ios;
 /** Demo spendings to insert (through the repository) on a first run; empty in test mode. */
 export const seedSpendings: any[] = seedData.spendings;
+/** Demo evaluations to insert (through the repository) on a first run; empty in test mode. */
+export const seedEvaluations: any[] = seedData.evaluations;
 export const db: any = {
   allowedUsers: [],
   notifications: seedData.notifications,
   activityLogs: seedData.activityLogs,
-  evaluations: seedData.evaluations,
   tenants: [],
   templates: [],
   newsTicker: { items: [] as string[], lastGeneratedAt: null as string | null },
@@ -76,6 +77,7 @@ repositoryBacked('contracts', 'repositories/contractRepository');
 repositoryBacked('partners', 'repositories/partnerRepository');
 repositoryBacked('ios', 'repositories/ioRepository');
 repositoryBacked('spendings', 'repositories/spendingRepository');
+repositoryBacked('evaluations', 'repositories/evaluationRepository');
 bindTenantStore(() => db);
 
 /** Rebuilds the read-only `db.tenants` projection from canonical organization rows (PRD §7.3). */

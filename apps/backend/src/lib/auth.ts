@@ -116,7 +116,6 @@ export async function loadCoreData() {
     notifications: await business('notifications'),
     // Append-only table, read per organization through activityLog.ts: never loaded into memory.
     activityLogs: [] as any[],
-    evaluations: await business('evaluations'),
     templates: await business('templates'),
     branding: await single(`SELECT payload FROM branding WHERE id = 'branding'`),
     googleConfig: await single(`SELECT payload FROM app_settings WHERE id = 'google_config'`).then(config => config && openProviderSecrets(config)),

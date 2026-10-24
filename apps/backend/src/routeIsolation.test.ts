@@ -442,6 +442,13 @@ const PERSISTED_ENTITIES: Persisted[] = [
       vendor_id: fixtureA.partner.partner_id, vendor_name: fixtureA.partner.partner_name, invoice_number: `INV-${tag}`, invoice_date: '2026-10-01', invoice_month: ['2026-10-31'], currency: 'USD', total_amount: 5,
     } })).spending,
   },
+  {
+    name: 'evaluations', route: '/api/partner-evaluations', key: 'id', field: 'notes', table: 'evaluations', idColumn: 'id', responseKey: 'evaluation',
+    create: async (tag) => ok(await api('adminA', 'POST', '/api/partner-evaluations', { org: A, body: {
+      partner_id: fixtureA.partner.partner_id, supplier_name: `Supplier ${tag}`, review_date: '2026-10-01', obligation_target: 'Sangat baik', incident_frequency: 'Never',
+      communication: 'Sangat baik', pricing: 'Moderate', final_evaluation: 'Recommended',
+    } })).evaluation,
+  },
 ];
 for (const entity of PERSISTED_ENTITIES) {
   test(`${entity.name}: rows carry a version; concurrent edits of one row never lose an update (409 VERSION_CONFLICT)`, async () => {
@@ -479,6 +486,7 @@ for (const entity of PERSISTED_ENTITIES) {
     ok(await api('adminA', 'PUT', `/api/contracts/${fixtureA.contract.contract_id}`, { org: A, body: { internal_notes: `nudge ${entity.table.length}` } }));
     if (entity.name !== 'ios') ok(await api('adminA', 'PUT', `/api/ios/${fixtureA.io.io_id}`, { org: A, body: { io_title: `nudge ${entity.table.length}` } }));
     if (entity.name !== 'partners') ok(await api('adminA', 'PUT', `/api/partners/${fixtureA.partner.partner_id}`, { org: A, body: { notes: `nudge ${entity.table.length}` } }));
+    if (entity.name !== 'evaluations') ok(await api('adminA', 'PUT', `/api/partner-evaluations/${fixtureA.evaluation.id}`, { org: A, body: { notes: `nudge ${entity.table.length}` } }));
     if (entity.name !== 'spendings') ok(await api('adminA', 'PUT', `/api/partner-spendings/${fixtureA.spending.id}`, { org: A, body: { invoice_title: `nudge ${entity.table.length}` } }));
     assert.deepEqual(await stamp(), before);
   });
@@ -507,6 +515,7 @@ test('partners: deleting one removes its contracts, orders, notifications and ch
   assert.equal((await sql.get(`SELECT COUNT(*) AS n FROM partner_dd_requirements WHERE partner_id = ?`, f.partner.partner_id)).n, 0);
   const spending = (await sql.get(`SELECT vendor_id FROM spendings WHERE id = ?`, f.spending.id));
   assert.equal(spending.vendor_id, null);
+  assert.equal((await sql.get(`SELECT partner_id FROM evaluations WHERE id = ?`, f.evaluation.id)).partner_id, null);
   denied(await api('adminB', 'DELETE', `/api/partners/${fixtureA.partner.partner_id}`, { org: B }), [404]);
 });
 

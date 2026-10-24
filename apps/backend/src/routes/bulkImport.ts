@@ -3,10 +3,11 @@ import { contractRepository } from '../repositories/contractRepository';
 import { partnerRepository } from '../repositories/partnerRepository';
 import { ioRepository } from '../repositories/ioRepository';
 import { spendingRepository } from '../repositories/spendingRepository';
+import { evaluationRepository } from '../repositories/evaluationRepository';
 import { BULK_DATE_FIELDS, bulkDate, bulkNumber } from '@legalio/shared/bulkParse';
 import { getRequestTenantId, isMatchingOrg, scopeOf, addActivityLog } from '../recordAccess';
 import { tenantDefaultCurrency, normalizePartnerDocuments, computeDueDiligenceStatus } from '../tenantPolicy';
-import { db, saveDb, sanitizeCountryCode, sanitizeIdentifiers, sanitizePartnerTags } from '../memoryDb';
+import { sanitizeCountryCode, sanitizeIdentifiers, sanitizePartnerTags } from '../memoryDb';
 import { normalizeCurrencyCode, convertToUsdWithFallback } from '@legalio/shared/currencyUtils';
 import { computeEvaluationScore } from '../evaluationScoring';
 import { normalizeSpendingMonths } from '../spendingMonths';
@@ -387,12 +388,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
         continue;
       }
       const identifier = `${supplierName} \u2014 ${reviewDate}`;
-      const exists = db.evaluations.find(
-        (e) =>
-          inTenant(e) &&
-          e.supplier_name?.toLowerCase() === supplierName.toLowerCase() &&
-          e.review_date === reviewDate,
-      );
+      const exists = await evaluationRepository.findDuplicate(tenantId, supplierName, reviewDate);
       if (exists) {
         skipped.push({
           rowIndex,
@@ -437,7 +433,7 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
           created_at: now,
           updated_at: now,
         };
-        db.evaluations.push(newEval);
+        await evaluationRepository.insert(newEval, { position: "last" });
         succeeded.push({
           rowIndex,
           identifier,
@@ -522,7 +518,6 @@ app.post("/api/bulk-import", async (req: express.Request, res: express.Response)
       .json({ error: `Tipe import tidak dikenal: ${type}` });
   }
   await recalculateStatuses(); // once per import
-  await saveDb(); // evaluations and spendings are still imported into the snapshot
   const totalSucceeded = succeeded.length;
   if (totalSucceeded > 0) {
     await addActivityLog(

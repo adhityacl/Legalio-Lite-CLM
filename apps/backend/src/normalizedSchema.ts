@@ -30,7 +30,7 @@ export const ENTITIES: EntitySchema[] = [
     ...fields('vendor_id vendor_name invoice_number invoice_date invoice_title invoice_description currency payment_status bank_name bank_account_number bank_account_holder_name invoice_file_url invoice_file_name billing_file_url billing_file_name folder_link'),
     ...fields('total_amount total_amount_usd', 'money'), ...dates,
   ] },
-  { table: 'evaluations', key: 'id', collection: 'evaluations', search: ['supplier_name', 'type_of_work', 'notes', 'final_evaluation'], fields: [
+  { table: 'evaluations', key: 'id', collection: 'evaluations', repository: true, search: ['supplier_name', 'type_of_work', 'notes', 'final_evaluation'], fields: [
     ...fields('partner_id review_date supplier_name type_of_work obligation_target incident_frequency communication pricing final_evaluation recommendation_status notes evaluator_email evaluator_name'),
     ...fields('sla_score calculated_score total_score', 'number'), ...dates,
   ] },

@@ -206,6 +206,7 @@ export const evaluationCreateBody = z.object({
   ...analysis,
 });
 export const evaluationUpdateBody = z.object({
+  version: versionField,
   supplier_name: optional(s(500)),
   review_date: optional(date),
   obligation_target: optional(s(100)),

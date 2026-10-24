@@ -121,7 +121,6 @@ app.post("/api/admin/reset-database", async (req: express.Request, res: express.
       Object.assign(db, {
         tenants,
         allowedUsers: [],
-        evaluations: dataset.evaluations,
         notifications: dataset.notifications,
         activityLogs: dataset.activityLogs,
         templates: [],

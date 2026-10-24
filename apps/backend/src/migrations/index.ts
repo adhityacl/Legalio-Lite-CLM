@@ -9,8 +9,9 @@ import { migration as searchTrigram } from './0008_search_trigram';
 import { migration as partnerVersions } from './0009_partner_versions';
 import { migration as orderVersions } from './0010_order_versions';
 import { migration as spendingVersions } from './0011_spending_versions';
+import { migration as evaluationVersions } from './0012_evaluation_versions';
 import type { Migration } from './types';
 
 /** Append new migrations at the end with the next number. */
-export const MIGRATIONS: Migration[] = [baseline, reminderLedger, uploadOwners, aiUsage, auditImmutable, idSequences, contractVersions, searchTrigram, partnerVersions, orderVersions, spendingVersions];
+export const MIGRATIONS: Migration[] = [baseline, reminderLedger, uploadOwners, aiUsage, auditImmutable, idSequences, contractVersions, searchTrigram, partnerVersions, orderVersions, spendingVersions, evaluationVersions];
 export type { Migration };

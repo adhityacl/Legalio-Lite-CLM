@@ -2,8 +2,12 @@ import { partnerRepository } from '../repositories/partnerRepository';
 import { nextEntityId } from '../ids';
 import { computeEvaluationScore } from '../evaluationScoring';
 import * as bodySchemas from '../schemas';
-import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity } from '../recordAccess';
-import { db, countryNameForPrompt, saveDb, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity, orgContextOf, scopeOf } from '../recordAccess';
+import { evaluationRepository, EVALUATION_SORTS, type EvaluationQuery } from '../repositories/evaluationRepository';
+import { requestedVersion } from '../requestVersion';
+import { recordVisible } from '../recordScope';
+import { hasOrganizationScope } from '../rbac';
+import { countryNameForPrompt, triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { ensureAiAvailable } from '../aiClient';
 import { aiPolicyContext } from '../tenantPolicy';
 import { generateRedlineAnalysis } from '../redlineAnalysis';
@@ -19,9 +23,45 @@ export function createEvaluationsRouter() {
   const app = express.Router();
   forwardAsyncRouteErrors(app);
 
+const queryText = (value: unknown, max = 200) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+const queryList = (value: unknown) => queryText(value, 500).split(",").map((v) => v.trim()).filter(Boolean).slice(0, 20);
+/** Paged-list parameters of GET /api/partner-evaluations; `paged` is false when the request asks for the classic full list. */
+function evaluationListQuery(query: express.Request["query"]): EvaluationQuery & { paged: boolean; filtered: boolean } {
+  const requested = queryText(query.sort, 40);
+  const limit = query.limit === undefined ? undefined : Math.min(500, Math.max(1, Math.trunc(Number(query.limit)) || 50));
+  const paged = limit !== undefined || query.offset !== undefined;
+  const filters = { partnerId: queryList(query.partner_id), finalEvaluation: queryList(query.final_evaluation) };
+  const q = queryText(query.q, 200) || undefined;
+  const sort = (EVALUATION_SORTS as readonly string[]).includes(requested) && requested !== "default" ? requested as EvaluationQuery["sort"] : (paged || requested ? "review_date" : "default");
+  return {
+    paged, filtered: Boolean(q) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
+    q, ...filters, sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",
+    limit: limit ?? (query.offset !== undefined ? 50 : undefined), offset: Math.max(0, Math.trunc(Number(query.offset)) || 0),
+  };
+}
+/**
+ * Without list parameters: every visible evaluation as a bare array (unchanged). With limit/offset/q/sort or a filter (partner_id,
+ * final_evaluation; comma lists): the matching visible evaluations, one page at a time, the total in `X-Total-Count`.
+ */
 app.get("/api/partner-evaluations", async (req: express.Request, res: express.Response) => {
-  const list = await scopedRecords(req, "evaluation");
-  res.json(list);
+  const query = evaluationListQuery(req.query);
+  if (!query.paged && !query.filtered) return res.json(await scopedRecords(req, "evaluation"));
+  const ctx = orgContextOf(req);
+  const organizationId = getRequestTenantId(req);
+  let rows: any[];
+  let total: number;
+  if (hasOrganizationScope(ctx)) {
+    ({ rows, total } = await evaluationRepository.list(organizationId, query));
+  } else {
+    // Department roles see a subset decided by partner ownership: filter the matches, then page.
+    const matched = (await evaluationRepository.list(organizationId, { ...query, limit: undefined, offset: 0 })).rows
+      .filter((row) => recordVisible(ctx, scopeOf(req), "evaluation", row));
+    total = matched.length;
+    rows = query.limit === undefined ? matched : matched.slice(query.offset, (query.offset ?? 0) + query.limit);
+  }
+  res.setHeader("X-Total-Count", String(total));
+  res.setHeader("Access-Control-Expose-Headers", "X-Total-Count");
+  res.json(rows);
 });
 /** AI annual review for the partner evaluation form: summarises the year's snapshot and suggests ratings; an existing evaluation stores the result right away. */
 app.post("/api/partner-evaluations/review-analysis", async (req: express.Request, res: express.Response) => {
@@ -30,7 +70,7 @@ app.post("/api/partner-evaluations/review-analysis", async (req: express.Request
     return res.status(400).json({ error: "Partner is required." });
   }
   const organizationId = getRequestTenantId(req);
-  const saved = draft.id ? (db.evaluations || []).find((e) => e.id === String(draft.id)) : undefined;
+  const saved = draft.id ? await evaluationRepository.get(organizationId, String(draft.id)) : undefined;
   if (draft.id && (!saved || assertRecordAccess(req, "evaluation", saved) || assertRecordWritable(req, "evaluation", saved))) {
     return res.status(404).json({ error: "Evaluasi tidak ditemukan." });
   }
@@ -81,13 +121,13 @@ Return JSON with exactly:
 `;
   try {
     const analysis = await generateRedlineAnalysis(req, prompt);
-    if (saved) {
-      saved.redline_analysis = analysis;
-      saved.redline_analyzed_at = analysis.analyzed_at;
-      saved.updated_at = analysis.analyzed_at;
-      await saveDb();
-    }
-    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(saved) });
+    // Row-locked server-side edit: the stored result never overwrites (or fails on) a user's concurrent edit of other fields.
+    const stored = saved ? await evaluationRepository.mutate(saved.organizationId, saved.id, (row) => {
+      row.redline_analysis = analysis;
+      row.redline_analyzed_at = analysis.analyzed_at;
+      row.updated_at = analysis.analyzed_at;
+    }) : undefined;
+    res.json({ success: true, analysis, analyzed_at: analysis.analyzed_at, saved: Boolean(stored) });
   } catch (error) {
     log.error("Error during evaluation review:", error);
     sendRouteError(req, res, error, "request failed", "Gagal melakukan analisis AI. Silakan coba kembali.", { status: 500 });
@@ -154,14 +194,12 @@ app.post("/api/partner-evaluations", validateBody(bodySchemas.evaluationCreateBo
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
-  if (!db.evaluations) db.evaluations = [];
   const writeDenial = assertRecordWritable(req, "evaluation", newEval);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
-  db.evaluations.unshift(newEval);
-  await saveDb();
+  const stored = await evaluationRepository.insert(newEval);
   await logActivity(req, "CREATE", "PARTNER", `Membuat Evaluasi Tahunan Vendor untuk '${newEval.supplier_name}' dengan hasil '${newEval.final_evaluation}' (Skor: ${calculated_score}/100)`);
   await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
-  res.json({ success: true, evaluation: newEval });
+  res.json({ success: true, evaluation: stored });
 });
 app.put("/api/partner-evaluations/:id", validateBody(bodySchemas.evaluationUpdateBody), async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
@@ -177,12 +215,15 @@ app.put("/api/partner-evaluations/:id", validateBody(bodySchemas.evaluationUpdat
     pricing,
     final_evaluation,
     notes,
+    version: clientVersion,
   } = req.body;
-  const evalIndex = (db.evaluations || []).findIndex((e) => e.id === id);
-  if (evalIndex === -1) {
+  const existing = await evaluationRepository.get(getRequestTenantId(req), id);
+  if (!existing) {
     return res.status(404).json({ error: "Data evaluasi tidak ditemukan." });
   }
-  const existing = db.evaluations[evalIndex];
+  // The version the client last saw (body `version` or If-Match) guards against overwriting someone else's edit; clients that
+  // send none are still protected for the duration of this request (the version read above).
+  const expectedVersion = requestedVersion(req, clientVersion) ?? existing.version;
   const accessDenial = assertRecordAccess(req, "evaluation", existing);
   if (accessDenial) return res.status(accessDenial.status).json(accessDenial.body);
   const calculated_score = computeEvaluationScore(
@@ -191,7 +232,7 @@ app.put("/api/partner-evaluations/:id", validateBody(bodySchemas.evaluationUpdat
     communication || existing.communication,
     pricing || existing.pricing,
   );
-  const updatedEval = {
+  const updatedEval: any = {
     ...existing,
     review_date: review_date || existing.review_date,
     partner_id: partner_id !== void 0 ? partner_id : existing.partner_id,
@@ -210,22 +251,19 @@ app.put("/api/partner-evaluations/:id", validateBody(bodySchemas.evaluationUpdat
   updatedEval.organizationId = existing.organizationId;
   const writeDenial = assertRecordWritable(req, "evaluation", updatedEval);
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
-  db.evaluations[evalIndex] = updatedEval;
-  await saveDb();
+  const stored = await evaluationRepository.update(updatedEval, expectedVersion);
   await logActivity(req, "UPDATE", "PARTNER", `Perbarui Evaluasi Tahunan Vendor '${updatedEval.supplier_name}' (${updatedEval.id})`);
-  res.json({ success: true, evaluation: updatedEval });
+  res.json({ success: true, evaluation: stored });
 });
 app.delete("/api/partner-evaluations/:id", async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const evalIndex = (db.evaluations || []).findIndex((e) => e.id === id);
-  if (evalIndex === -1) {
+  const removed = await evaluationRepository.get(getRequestTenantId(req), id);
+  if (!removed) {
     return res.status(404).json({ error: "Data evaluasi tidak ditemukan." });
   }
-  const removed = db.evaluations[evalIndex];
   const accessDenial = assertRecordAccess(req, "evaluation", removed);
   if (accessDenial) return res.status(accessDenial.status).json(accessDenial.body);
-  db.evaluations.splice(evalIndex, 1);
-  await saveDb();
+  await evaluationRepository.remove(removed.organizationId, id);
   await logActivity(req, "DELETE", "PARTNER", `Menghapus Evaluasi Tahunan Vendor '${removed.supplier_name}' (${removed.id})`);
   res.json({ success: true });
 });
