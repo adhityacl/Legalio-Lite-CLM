@@ -44,11 +44,14 @@ function spendingListQuery(query: express.Request["query"]): SpendingQuery & { p
   const limit = query.limit === undefined ? undefined : Math.min(500, Math.max(1, Math.trunc(Number(query.limit)) || 50));
   const paged = limit !== undefined || query.offset !== undefined;
   const filters = { paymentStatus: queryList(query.payment_status), vendorId: queryList(query.vendor_id), currency: queryList(query.currency) };
+  const vendorName = queryText(query.vendor_name, 300) || undefined;
+  const year = /^\d{4}$/.test(queryText(query.year, 4)) ? queryText(query.year, 4) : undefined;
+  const month = /^\d{2}$/.test(queryText(query.month, 2)) ? queryText(query.month, 2) : undefined;
   const q = queryText(query.q, 200) || undefined;
   const sort = (SPENDING_SORTS as readonly string[]).includes(requested) && requested !== "default" ? requested as SpendingQuery["sort"] : (paged || requested ? "invoice_date" : "default");
   return {
-    paged, filtered: Boolean(q) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
-    q, ...filters, sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",
+    paged, filtered: Boolean(q) || Boolean(vendorName) || Boolean(year) || Boolean(month) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
+    q, ...filters, vendorName, year, month, sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",
     limit: limit ?? (query.offset !== undefined ? 50 : undefined), offset: Math.max(0, Math.trunc(Number(query.offset)) || 0),
   };
 }

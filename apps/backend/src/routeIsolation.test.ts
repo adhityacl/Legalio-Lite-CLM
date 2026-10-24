@@ -574,7 +574,8 @@ test('GET /api/contracts pages, filters and sorts on the server and reports the 
   assert.deepEqual(numbers, [...numbers].sort((x, y) => x.toLowerCase().localeCompare(y.toLowerCase())), 'pages continue each other in sort order');
   assert.ok(!first.body.some((c: any) => second.body.some((d: any) => d.contract_id === c.contract_id)), 'pages do not overlap');
   const filtered = await api('adminA', 'GET', '/api/contracts?q=ctr-par&limit=10', { org: A });
-  assert.ok(filtered.body.length >= 4 && filtered.body.every((c: any) => /CTR-PAR-/.test(c.contract_number)));
+  assert.ok(filtered.body.filter((c: any) => /CTR-PAR-/.test(c.contract_number)).length >= 4, 'the contracts named by number are found (partner names match the words too)');
+  assert.equal((await api('adminA', 'GET', '/api/contracts?q=zzqq-nomatch&limit=10', { org: A })).body.length, 0);
   assert.equal(Number(filtered.headers.get('x-total-count')), filtered.body.length);
   const byStatus = await api('adminA', 'GET', '/api/contracts?status=Terminated&limit=10', { org: A });
   assert.equal(byStatus.body.length, 0);
@@ -639,4 +640,65 @@ test('GET /api/search is tenant- and department-scoped, filterable by type and l
   const none = ok(await api('adminA', 'GET', '/api/search?q=%25_%5C', { org: A }));
   assert.equal(none.total, 0, 'wildcard characters are literal');
   denied(await api('adminB', 'GET', '/api/search?q=A1', { org: A }), [403, 404]);
+});
+
+test('GET /api/aggregates/* are SQL-computed, department-scoped and tenant-isolated', async () => {
+  const total = async (user: string, org: string, route: string) => Number((await api(user, 'GET', `${route}?limit=1`, { org })).headers.get('x-total-count'));
+  const admin = ok(await api('adminA', 'GET', '/api/aggregates/dashboard', { org: A }));
+  assert.equal(admin.organizationId, A);
+  assert.equal(admin.contracts.total, await total('adminA', A, '/api/contracts'));
+  assert.equal(admin.partners.total, await total('adminA', A, '/api/partners'));
+  assert.equal(admin.ios.total, await total('adminA', A, '/api/ios'));
+  assert.equal(Object.values(admin.contracts.byStatus).reduce((a: number, b: any) => a + b, 0), admin.contracts.total);
+  assert.ok(admin.spending.some((row: any) => row.month === '2026-10' && row.vendor_name === fixtureA.partner.partner_name && row.amount >= 5 && row.amount_usd === row.amount));
+  assert.ok(admin.spending.some((row: any) => row.vendor_name === fixtureLegal.partner.partner_name));
+
+  const sales = ok(await api('salesEditorA', 'GET', '/api/aggregates/dashboard', { org: A }));
+  assert.equal(sales.contracts.total, await total('salesEditorA', A, '/api/contracts'));
+  assert.equal(sales.partners.total, await total('salesEditorA', A, '/api/partners'));
+  assert.ok(sales.contracts.total < admin.contracts.total, 'Sales sees fewer contracts than the admin');
+  assert.ok(!sales.spending.some((row: any) => row.vendor_name === fixtureLegal.partner.partner_name));
+  assert.ok(sales.spending.some((row: any) => row.vendor_name === fixtureA.partner.partner_name));
+  assert.ok(!JSON.stringify(sales).includes(fixtureLegal.partner.partner_name));
+
+  const other = ok(await api('adminB', 'GET', '/api/aggregates/dashboard', { org: B }));
+  assert.equal(other.contracts.total, await total('adminB', B, '/api/contracts'));
+  assert.ok(!JSON.stringify(other).includes(fixtureA.contract.contract_id) && !JSON.stringify(other).includes(fixtureA.partner.partner_id));
+  denied(await api('adminB', 'GET', '/api/aggregates/dashboard', { org: A }), [403, 404]);
+
+  const badges = ok(await api('adminA', 'GET', '/api/aggregates/badges', { org: A }));
+  assert.equal(typeof badges.expiringContracts, 'number');
+  assert.equal(typeof badges.unreadNotifications, 'number');
+
+  const facets = ok(await api('salesEditorA', 'GET', '/api/aggregates/facets', { org: A }));
+  assert.ok(facets.vendors.includes(fixtureA.partner.partner_name));
+  assert.ok(!facets.vendors.includes(fixtureLegal.partner.partner_name));
+  assert.ok(facets.spendingYears.includes('2026'));
+  assert.ok(!facets.departments.includes('Legal'));
+
+  const partners = await api('adminA', 'GET', '/api/aggregates/partners?limit=1&sort=partner_name', { org: A });
+  assert.equal(ok(partners).length, 1);
+  assert.equal(Number(partners.headers.get('x-total-count')), admin.partners.total);
+  const rows = ok(await api('salesEditorA', 'GET', '/api/aggregates/partners?limit=200', { org: A }));
+  assert.equal(rows.length, sales.partners.total);
+  const row = rows.find((r: any) => r.partner_id === fixtureA.partner.partner_id);
+  assert.ok(row);
+  assert.ok(row.contracts.total >= 1 && row.ios.total >= 1 && row.spending.count >= 1 && row.spending.totalUsd >= 5 && row.evaluations.count >= 1);
+  assert.ok(!rows.some((r: any) => r.partner_id === fixtureLegal.partner.partner_id));
+  const crossPartners = ok(await api('adminB', 'GET', '/api/aggregates/partners', { org: B }));
+  assert.ok(!JSON.stringify(crossPartners).includes(fixtureA.partner.partner_id));
+});
+
+test('list filters and sorts added for the server-side views', async () => {
+  const spend = ok(await api('adminA', 'GET', '/api/partner-spendings?year=2026&month=10&vendor_name=' + encodeURIComponent(fixtureA.partner.partner_name), { org: A }));
+  assert.ok(spend.some((row: any) => row.id === fixtureA.spending.id));
+  assert.ok(spend.every((row: any) => row.vendor_name === fixtureA.partner.partner_name));
+  assert.equal(ok(await api('adminA', 'GET', '/api/partner-spendings?year=2025', { org: A })).length, 0);
+  const sorted = ok(await api('adminA', 'GET', '/api/partners?sort=active_contract_count&dir=desc', { org: A }));
+  assert.ok(sorted.length >= 2);
+  const contracts = ok(await api('adminA', 'GET', '/api/contracts?q=' + encodeURIComponent(fixtureA.partner.partner_name), { org: A }));
+  assert.ok(contracts.some((row: any) => row.contract_id === fixtureA.contract.contract_id), 'contract search matches the partner name');
+  assert.ok(contracts.every((row: any) => row.partner_name === fixtureA.partner.partner_name));
+  const ios = ok(await api('adminA', 'GET', '/api/ios', { org: A }));
+  assert.ok(ios.length > 0 && ios.every((row: any) => typeof row.partner_name === 'string'));
 });

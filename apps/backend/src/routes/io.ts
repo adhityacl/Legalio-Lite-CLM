@@ -40,17 +40,19 @@ function ioListQuery(query: express.Request["query"]): IoQuery & { paged: boolea
   const requested = queryText(query.sort, 40);
   const limit = query.limit === undefined ? undefined : Math.min(500, Math.max(1, Math.trunc(Number(query.limit)) || 50));
   const paged = limit !== undefined || query.offset !== undefined;
-  const filters = { status: queryList(query.status), partnerId: queryList(query.partner_id), contractId: queryList(query.contract_id) };
+  const filters = { status: queryList(query.status), partnerId: queryList(query.partner_id), contractId: queryList(query.contract_id), pricingModel: queryList(query.pricing_model), chargingType: queryList(query.charging_type) };
+  const date = (value: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(queryText(value, 10)) ? queryText(value, 10) : undefined);
+  const window = date(query.window_from) && date(query.window_to) ? { from: date(query.window_from)!, to: date(query.window_to)! } : undefined;
   const q = queryText(query.q, 200) || undefined;
   const sort = (IO_SORTS as readonly string[]).includes(requested) && requested !== "default" ? requested as IoQuery["sort"] : (paged || requested ? "end_date" : "default");
   return {
-    paged, filtered: Boolean(q) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
-    q, ...filters, sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",
+    paged, filtered: Boolean(q) || Boolean(window) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
+    q, ...filters, window, sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",
     limit: limit ?? (query.offset !== undefined ? 50 : undefined), offset: Math.max(0, Math.trunc(Number(query.offset)) || 0),
   };
 }
 /** The order as the API presents it: normalized currency, a USD value and the number of the contract it belongs to. */
-function presentIos(rows: any[], labels: Map<string, { contract_number: string | null }>) {
+function presentIos(rows: any[], labels: Map<string, { contract_number: string | null }>, partnerNames: Map<string, string>) {
   return rows.map((io) => {
     const c = labels.get(io.contract_id);
     const cur = normalizeCurrencyCode(io.currency, tenantDefaultCurrency(io.organizationId));
@@ -66,6 +68,7 @@ function presentIos(rows: any[], labels: Map<string, { contract_number: string |
       currency: cur,
       io_value_usd: usdVal,
       contract_number: c ? c.contract_number : io.contract_number || "-",
+      partner_name: partnerNames.get(io.partner_id) ?? io.partner_name,
     };
   });
 }
@@ -95,7 +98,7 @@ app.get("/api/ios", async (req: express.Request, res: express.Response) => {
     res.setHeader("Access-Control-Expose-Headers", "X-Total-Count");
   }
   const labels = await contractRepository.labels(organizationId, rows.map((io) => io.contract_id));
-  res.json(presentIos(rows, labels));
+  res.json(presentIos(rows, labels, await partnerRepository.names(organizationId, rows.map((io) => io.partner_id))));
 });
 app.post("/api/ios/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
   if (!(await ensureAiAvailable(req, res))) return;

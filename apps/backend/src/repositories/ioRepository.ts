@@ -9,7 +9,7 @@ import { DuplicateValueError } from './errors';
 import { createEntityRepository, type Row, type UpdateOptions } from './entityRepository';
 
 export type InsertionOrder = Row;
-export const IO_SORTS = ['default', 'end_date', 'io_number', 'start_date', 'created_at'] as const;
+export const IO_SORTS = ['default', 'end_date', 'io_number', 'start_date', 'created_at', 'io_title', 'partner_name', 'pricing_model', 'io_value', 'status'] as const;
 export type IoSort = typeof IO_SORTS[number];
 
 export interface IoQuery {
@@ -19,6 +19,11 @@ export interface IoQuery {
   status?: string[];
   partnerId?: string[];
   contractId?: string[];
+  pricingModel?: string[];
+  /** Matches the order's charging type, or its payment scheme when it has none. */
+  chargingType?: string[];
+  /** Orders that start, end or (with their notice period, at most a year) fall due inside the window, for the calendar. */
+  window?: { from: string; to: string };
   sort?: IoSort;
   dir?: 'asc' | 'desc';
   limit?: number;
@@ -28,15 +33,20 @@ export interface IoPage { rows: InsertionOrder[]; total: number }
 /** The columns department scoping reads from orders (the owner comes from the partner, else from the contract). */
 export interface IoDirectoryEntry { io_id: string; organizationId: string; partner_id: string | null; contract_id: string | null; partner_name?: string }
 
-const SORT_SQL: Record<IoSort, string> = {
-  default: 'i.record_position, i.io_id',
-  end_date: 'i.end_date, i.io_id',
-  io_number: 'lower(i.io_number), i.io_id',
-  start_date: 'i.start_date, i.io_id',
-  created_at: 'i.created_at, i.io_id',
+const SORT_SQL: Record<IoSort, string[]> = {
+  default: ['i.record_position', 'i.io_id'],
+  end_date: ['i.end_date', 'i.io_id'],
+  io_number: ['lower(i.io_number)', 'i.io_id'],
+  start_date: ['i.start_date', 'i.io_id'],
+  created_at: ['i.created_at', 'i.io_id'],
+  io_title: ['lower(i.io_title)', 'i.io_id'],
+  partner_name: ['lower(pa.partner_name)', 'i.io_id'],
+  pricing_model: ['lower(i.pricing_model)', 'i.io_id'],
+  io_value: ['COALESCE(i.io_value_minor::numeric / power(10::numeric, COALESCE(i.io_value_scale, 0)), 0)', 'i.io_id'],
+  status: ['i.status', 'i.io_id'],
 };
 const HAYSTACK = `(coalesce(i.io_number, '') || ' ' || coalesce(i.io_title, '') || ' ' || coalesce(i.media_channel, '') || ' ' || coalesce(i.deliverables, '') || ' ' ||
-  coalesce(i.internal_notes, '') || ' ' || i.io_id || ' ' || coalesce(c.contract_number, ''))`;
+  coalesce(i.internal_notes, '') || ' ' || i.io_id || ' ' || coalesce(c.contract_number, '') || ' ' || coalesce(pa.partner_name, ''))`;
 const lowerNumber = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
 export function createIoRepository(db: Sql) {
@@ -53,7 +63,8 @@ export function createIoRepository(db: Sql) {
     if (taken) throw new DuplicateValueError('io_number', `Nomor IO '${String(row.io_number).trim()}' sudah terdaftar dalam sistem.`);
   }
 
-  const FROM = 'insertion_orders i LEFT JOIN contracts c ON c.organization_id = i.organization_id AND c.contract_id = i.contract_id';
+  const FROM = `insertion_orders i LEFT JOIN contracts c ON c.organization_id = i.organization_id AND c.contract_id = i.contract_id
+    LEFT JOIN partners pa ON pa.organization_id = i.organization_id AND pa.partner_id = i.partner_id`;
   function where(organizationId: string, query: IoQuery) {
     const clauses = ['i.organization_id = ?'];
     const params: unknown[] = [organizationId];
@@ -61,6 +72,12 @@ export function createIoRepository(db: Sql) {
     if (query.status?.length) { clauses.push('i.status = ANY(?)'); params.push(query.status); }
     if (query.partnerId?.length) { clauses.push('i.partner_id = ANY(?)'); params.push(query.partnerId); }
     if (query.contractId?.length) { clauses.push('i.contract_id = ANY(?)'); params.push(query.contractId); }
+    if (query.pricingModel?.length) { clauses.push('i.pricing_model = ANY(?)'); params.push(query.pricingModel); }
+    if (query.chargingType?.length) { clauses.push(`COALESCE(NULLIF(i.charging_type, ''), i.payment_scheme) = ANY(?)`); params.push(query.chargingType); }
+    if (query.window) {
+      clauses.push(`(i.start_date BETWEEN ? AND ? OR i.end_date BETWEEN ? AND (?::date + 400)::text OR i.completion_date BETWEEN ? AND ?)`);
+      params.push(query.window.from, query.window.to, query.window.from, query.window.to, query.window.from, query.window.to);
+    }
     for (const pattern of searchPatterns(query.q ?? '')) { clauses.push(`${HAYSTACK} ILIKE ?`); params.push(pattern); }
     return { sql: clauses.join(' AND '), params };
   }
@@ -70,7 +87,7 @@ export function createIoRepository(db: Sql) {
     const filter = where(organizationId, query);
     const total = Number((await db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ${FROM} WHERE ${filter.sql}`, ...filter.params))?.n ?? 0);
     const order = SORT_SQL[query.sort && query.sort in SORT_SQL ? query.sort : 'default'];
-    const orderBy = query.dir === 'desc' ? order.split(', ').map((part) => part + ' DESC').join(', ') : order;
+    const orderBy = order.map((part) => (query.dir === 'desc' ? part + ' DESC' : part)).join(', ');
     const paged = query.limit !== undefined;
     const limit = paged ? Math.min(MAX_PAGE_SIZE, Math.max(1, Math.trunc(Number(query.limit)) || 50)) : undefined;
     const offset = Math.max(0, Math.trunc(Number(query.offset)) || 0);

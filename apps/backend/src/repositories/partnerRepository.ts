@@ -8,12 +8,17 @@ import { MAX_PAGE_SIZE } from './contractRepository';
 import { createEntityRepository, type Row } from './entityRepository';
 
 export type Partner = Row;
-export const PARTNER_SORTS = ['default', 'partner_name', 'created_at', 'updated_at', 'internal_pic', 'status_dd'] as const;
+export const PARTNER_SORTS = ['default', 'partner_name', 'created_at', 'updated_at', 'internal_pic', 'status_dd', 'codename', 'pic_name', 'partner_status'] as const;
 export type PartnerSort = typeof PARTNER_SORTS[number];
 
 export interface PartnerQuery {
-  /** Free text: every word must occur in the name, codename, type, owner, country, notes, id or PIC name (case-insensitive). */
+  /** Free text: every word must occur in the name, codename, type, owner, country, notes, id, PIC name / e-mail / phone or a tag (case-insensitive). */
   q?: string;
+  /** With `q`: a word may also match the number or title of one of the partner's contracts or orders (the hierarchy search). */
+  deep?: boolean;
+  /** `Active` = at least one Active or Expiring contract. */
+  partnerStatus?: 'Active' | 'Inactive';
+  excludeCountry?: string[];
   ids?: string[];
   internalPic?: string[];
   partnerType?: string[];
@@ -28,16 +33,23 @@ export interface PartnerPage { rows: Partner[]; total: number }
 /** The columns department scoping reads from partners (the owning department is `internal_pic`). */
 export interface PartnerDirectoryEntry { partner_id: string; organizationId: string; partner_name: string | null; internal_pic: string | null }
 
-const SORT_SQL: Record<PartnerSort, string> = {
-  default: 'p.record_position, p.partner_id',
-  partner_name: 'lower(p.partner_name), p.partner_id',
-  created_at: 'p.created_at, p.partner_id',
-  updated_at: 'p.updated_at, p.partner_id',
-  internal_pic: 'lower(p.internal_pic), p.partner_id',
-  status_dd: 'p.status_dd, p.partner_id',
+const ACTIVE_CONTRACTS = `(SELECT COUNT(*) FROM contracts ac WHERE ac.organization_id = p.organization_id AND ac.partner_id = p.partner_id AND ac.status IN ('Active', 'Expiring'))`;
+const SORT_SQL: Record<PartnerSort, string[]> = {
+  default: ['p.record_position', 'p.partner_id'],
+  partner_name: ['lower(p.partner_name)', 'p.partner_id'],
+  created_at: ['p.created_at', 'p.partner_id'],
+  updated_at: ['p.updated_at', 'p.partner_id'],
+  internal_pic: ['lower(p.internal_pic)', 'p.partner_id'],
+  status_dd: ['p.status_dd', 'p.partner_id'],
+  codename: ['lower(COALESCE(NULLIF(p.codename, \'\'), p.partner_id))', 'p.partner_id'],
+  pic_name: ['lower(p.pic_name)', 'p.partner_id'],
+  partner_status: [`(${ACTIVE_CONTRACTS} > 0)`, 'lower(p.partner_name)', 'p.partner_id'],
 };
 const HAYSTACK = `(coalesce(p.partner_name, '') || ' ' || coalesce(p.codename, '') || ' ' || coalesce(p.partner_type, '') || ' ' || coalesce(p.internal_pic, '') || ' ' ||
-  coalesce(p.country, '') || ' ' || coalesce(p.notes, '') || ' ' || p.partner_id || ' ' || coalesce(p.pic_name, ''))`;
+  coalesce(p.country, '') || ' ' || coalesce(p.notes, '') || ' ' || p.partner_id || ' ' || coalesce(p.pic_name, '') || ' ' || coalesce(p.pic_email, '') || ' ' || coalesce(p.pic_phone, '') || ' ' ||
+  coalesce((SELECT string_agg(pc.category, ' ') FROM partner_categories pc WHERE pc.partner_id = p.partner_id), ''))`;
+const CHILD_MATCH = `EXISTS (SELECT 1 FROM contracts dc WHERE dc.organization_id = p.organization_id AND dc.partner_id = p.partner_id AND (dc.contract_number ILIKE ? OR dc.contract_title ILIKE ?))
+  OR EXISTS (SELECT 1 FROM insertion_orders di WHERE di.organization_id = p.organization_id AND di.partner_id = p.partner_id AND (di.io_number ILIKE ? OR di.io_title ILIKE ?))`;
 const lower = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
 export function createPartnerRepository(db: Sql) {
@@ -51,7 +63,12 @@ export function createPartnerRepository(db: Sql) {
     if (query.partnerType?.length) { clauses.push('p.partner_type = ANY(?)'); params.push(query.partnerType); }
     if (query.statusDd?.length) { clauses.push('p.status_dd = ANY(?)'); params.push(query.statusDd); }
     if (query.country?.length) { clauses.push('p.country = ANY(?)'); params.push(query.country); }
-    for (const pattern of searchPatterns(query.q ?? '')) { clauses.push(`${HAYSTACK} ILIKE ?`); params.push(pattern); }
+    if (query.excludeCountry?.length) { clauses.push('NOT (COALESCE(p.country, \'\') = ANY(?))'); params.push(query.excludeCountry); }
+    if (query.partnerStatus) clauses.push(`${ACTIVE_CONTRACTS} ${query.partnerStatus === 'Active' ? '> 0' : '= 0'}`);
+    for (const pattern of searchPatterns(query.q ?? '')) {
+      if (query.deep) { clauses.push(`(${HAYSTACK} ILIKE ? OR ${CHILD_MATCH})`); params.push(pattern, pattern, pattern, pattern, pattern); }
+      else { clauses.push(`${HAYSTACK} ILIKE ?`); params.push(pattern); }
+    }
     return { sql: clauses.join(' AND '), params };
   }
 
@@ -60,14 +77,17 @@ export function createPartnerRepository(db: Sql) {
     const filter = where(organizationId, query);
     const total = Number((await db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM partners p WHERE ${filter.sql}`, ...filter.params))?.n ?? 0);
     const order = SORT_SQL[query.sort && query.sort in SORT_SQL ? query.sort : 'default'];
-    const orderBy = query.dir === 'desc' ? order.split(', ').map((part) => part + ' DESC').join(', ') : order;
+    const orderBy = order.map((part) => (query.dir === 'desc' ? part + ' DESC' : part)).join(', ');
     const paged = query.limit !== undefined;
     const limit = paged ? Math.min(MAX_PAGE_SIZE, Math.max(1, Math.trunc(Number(query.limit)) || 50)) : undefined;
     const offset = Math.max(0, Math.trunc(Number(query.offset)) || 0);
     const records = await db.all<Row>(
-      `SELECT p.* FROM partners p WHERE ${filter.sql} ORDER BY ${orderBy}${paged ? ' LIMIT ? OFFSET ?' : ''}`,
+      `SELECT p.*, ${ACTIVE_CONTRACTS} AS active_contract_count FROM partners p WHERE ${filter.sql} ORDER BY ${orderBy}${paged ? ' LIMIT ? OFFSET ?' : ''}`,
       ...filter.params, ...(paged ? [limit, offset] : []));
-    return { rows: await base.hydrate(records), total };
+    const rows = await base.hydrate(records);
+    // Contracts that keep the partner active, counted by the database next to the row (hydrate keeps the order).
+    rows.forEach((row, index) => { row.active_contract_count = Number(records[index].active_contract_count) || 0; });
+    return { rows, total };
   }
 
   return {

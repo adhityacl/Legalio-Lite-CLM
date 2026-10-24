@@ -136,7 +136,11 @@ function contractListQuery(query: express.Request["query"]): (ContractQuery & { 
     status: queryList(query.status).map((v) => normalizeContractStatus(v)),
     statusApproval: queryList(query.status_approval).map((v) => normalizeApprovalStatus(v)),
     documentType: queryText(query.document_type, 80) || undefined,
-    partnerId: queryText(query.partner_id, 100) || undefined,
+    partnerId: queryList(query.partner_id).length === 1 ? queryList(query.partner_id)[0] : undefined,
+    partnerIds: queryList(query.partner_id).length > 1 ? queryList(query.partner_id) : undefined,
+    categories: queryList(query.category),
+    parentContractId: queryText(query.parent_contract_id, 100) || undefined,
+    window: date(query.window_from) && date(query.window_to) ? { from: date(query.window_from)!, to: date(query.window_to)! } : undefined,
     internalPic: queryText(query.internal_pic, 300) || undefined,
     endFrom: date(query.end_from),
     endTo: date(query.end_to),
@@ -154,11 +158,17 @@ function contractListQuery(query: express.Request["query"]): (ContractQuery & { 
 app.get("/api/contracts", async (req: express.Request, res: express.Response) => {
   await refreshContractLifecycles();
   const query = contractListQuery(req.query);
-  if (!query.paged && !query.q && !query.status?.length && !query.statusApproval?.length && !query.documentType && !query.partnerId && !query.internalPic && !query.endFrom && !query.endTo) {
-    return res.json((await scopedRecords(req, "contract")).map(presentContract));
+  const organizationId = getRequestTenantId(req);
+  /** Contracts with the name of their partner next to them (additive field), as the list views show it. */
+  const withPartnerNames = async (rows: any[]) => {
+    const names = await partnerRepository.names(organizationId, rows.map((row) => row.partner_id));
+    return rows.map((row) => ({ ...presentContract(row), partner_name: names.get(row.partner_id) ?? row.partner_name }));
+  };
+  if (!query.paged && !query.q && !query.status?.length && !query.statusApproval?.length && !query.documentType && !query.partnerId && !query.partnerIds && !query.internalPic && !query.endFrom && !query.endTo
+    && !query.categories?.length && !query.parentContractId && !query.window) {
+    return res.json(await withPartnerNames(await scopedRecords(req, "contract")));
   }
   const ctx = orgContextOf(req);
-  const organizationId = getRequestTenantId(req);
   let rows: any[];
   let total: number;
   if (hasOrganizationScope(ctx)) {
@@ -173,7 +183,7 @@ app.get("/api/contracts", async (req: express.Request, res: express.Response) =>
   }
   res.setHeader("X-Total-Count", String(total));
   res.setHeader("Access-Control-Expose-Headers", "X-Total-Count");
-  res.json(rows.map(presentContract));
+  res.json(await withPartnerNames(rows));
 });
 app.post("/api/contracts/parse", upload.single("file") as any, async (req: express.Request, res: express.Response) => {
   if (!(await ensureAiAvailable(req, res))) return;

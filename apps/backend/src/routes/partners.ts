@@ -42,12 +42,13 @@ function partnerListQuery(query: express.Request["query"]): PartnerQuery & { pag
   const requested = queryText(query.sort, 40);
   const limit = query.limit === undefined ? undefined : Math.min(500, Math.max(1, Math.trunc(Number(query.limit)) || 50));
   const paged = limit !== undefined || query.offset !== undefined;
-  const filters = { internalPic: queryList(query.internal_pic), partnerType: queryList(query.partner_type), statusDd: queryList(query.status_dd), country: queryList(query.country) };
+  const filters = { internalPic: queryList(query.internal_pic), partnerType: queryList(query.partner_type), statusDd: queryList(query.status_dd), country: queryList(query.country), excludeCountry: queryList(query.exclude_country) };
+  const partnerStatus = ["Active", "Inactive"].includes(queryText(query.partner_status, 10)) ? queryText(query.partner_status, 10) as "Active" | "Inactive" : undefined;
   const q = queryText(query.q, 200) || undefined;
   const sort = (PARTNER_SORTS as readonly string[]).includes(requested) && requested !== "default" ? requested as PartnerQuery["sort"] : (paged || requested ? "partner_name" : "default");
   return {
-    paged, filtered: Boolean(q) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
-    q, ...filters, sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",
+    paged, filtered: Boolean(q) || Boolean(partnerStatus) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
+    q, ...filters, partnerStatus, deep: query.deep === "1" || query.deep === "true", sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",
     limit: limit ?? (query.offset !== undefined ? 50 : undefined), offset: Math.max(0, Math.trunc(Number(query.offset)) || 0),
   };
 }

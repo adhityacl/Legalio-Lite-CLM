@@ -10,13 +10,19 @@ import { createEntityRepository, type Row, type UpdateOptions } from './entityRe
 
 export type Contract = Row;
 
-export const CONTRACT_SORTS = ['default', 'contract_number', 'contract_title', 'start_date', 'end_date', 'status', 'updated_at', 'created_at'] as const;
+export const CONTRACT_SORTS = ['default', 'contract_number', 'contract_title', 'start_date', 'end_date', 'status', 'updated_at', 'created_at', 'partner_name', 'contract_value_usd', 'document_type', 'file'] as const;
 export type ContractSort = typeof CONTRACT_SORTS[number];
 
 export interface ContractQuery {
-  /** Free text: every word must occur in the number, title, notes or change summary (case-insensitive), or the id. */
+  /** Free text: every word must occur in the number, title, notes, change summary, owner, partner name, parent number or id (case-insensitive). */
   q?: string;
   ids?: string[];
+  /** Any of these cooperation categories. */
+  categories?: string[];
+  parentContractId?: string;
+  /** Contracts that start, end or (with their notice period, at most a year) fall due inside the window, for the calendar. */
+  window?: { from: string; to: string };
+  partnerIds?: string[];
   status?: string[];
   statusApproval?: string[];
   documentType?: string;
@@ -36,16 +42,22 @@ export interface ContractPage { rows: Contract[]; total: number }
 export interface ContractDirectoryEntry { contract_id: string; organizationId: string; partner_id: string | null; internal_pic: string | null; partner_name?: string }
 
 export const MAX_PAGE_SIZE = 500;
-const SORT_SQL: Record<ContractSort, string> = {
-  default: 'c.record_position, c.contract_id',
-  contract_number: 'lower(c.contract_number), c.contract_id',
-  contract_title: 'lower(c.contract_title), c.contract_id',
-  start_date: 'c.start_date, c.contract_id',
-  end_date: 'c.end_date, c.contract_id',
-  status: 'c.status, c.contract_id',
-  updated_at: 'c.updated_at, c.contract_id',
-  created_at: 'c.created_at, c.contract_id',
+const USD_VALUE = `COALESCE(c.contract_value_usd_minor::numeric / power(10::numeric, COALESCE(c.contract_value_usd_scale, 0)), c.contract_value_minor::numeric / power(10::numeric, COALESCE(c.contract_value_scale, 0)))`;
+const SORT_SQL: Record<ContractSort, string[]> = {
+  default: ['c.record_position', 'c.contract_id'],
+  contract_number: ['lower(c.contract_number)', 'c.contract_id'],
+  contract_title: ['lower(c.contract_title)', 'c.contract_id'],
+  start_date: ['c.start_date', 'c.contract_id'],
+  end_date: ['c.end_date', 'c.contract_id'],
+  status: ['c.status', 'c.contract_id'],
+  updated_at: ['c.updated_at', 'c.contract_id'],
+  created_at: ['c.created_at', 'c.contract_id'],
+  partner_name: ['lower(p.partner_name)', 'c.contract_id'],
+  contract_value_usd: [USD_VALUE, 'c.contract_id'],
+  document_type: ["COALESCE(c.document_type, 'Master Agreement')", 'lower(c.contract_number)', 'c.contract_id'],
+  file: ["COALESCE(c.contract_file_link, '')", 'c.contract_id'],
 };
+const FROM = `contracts c LEFT JOIN partners p ON p.organization_id = c.organization_id AND p.partner_id = c.partner_id`;
 const lowerNumber = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
 export function createContractRepository(db: Sql) {
@@ -70,16 +82,20 @@ export function createContractRepository(db: Sql) {
     if (query.statusApproval?.length) { clauses.push('c.status_approval = ANY(?)'); params.push(query.statusApproval); }
     if (query.documentType) { clauses.push('c.document_type = ?'); params.push(query.documentType); }
     if (query.partnerId) { clauses.push('c.partner_id = ?'); params.push(query.partnerId); }
+    if (query.partnerIds?.length) { clauses.push('c.partner_id = ANY(?)'); params.push(query.partnerIds); }
+    if (query.parentContractId) { clauses.push('c.parent_contract_id = ?'); params.push(query.parentContractId); }
+    if (query.categories?.length) { clauses.push('EXISTS (SELECT 1 FROM contract_categories cc WHERE cc.contract_id = c.contract_id AND cc.category = ANY(?))'); params.push(query.categories); }
+    if (query.window) {
+      clauses.push(`(c.start_date BETWEEN ? AND ? OR c.end_date BETWEEN ? AND (?::date + 400)::text OR c.completion_date BETWEEN ? AND ?)`);
+      params.push(query.window.from, query.window.to, query.window.from, query.window.to, query.window.from, query.window.to);
+    }
     if (query.internalPic) { clauses.push('c.internal_pic = ?'); params.push(query.internalPic); }
     if (query.endFrom) { clauses.push('c.end_date >= ?'); params.push(query.endFrom); }
     if (query.endTo) { clauses.push('c.end_date <= ?'); params.push(query.endTo); }
-    if (query.q?.trim()) {
-      const patterns = searchPatterns(query.q);
-      if (patterns.length) {
-        clauses.push(`(c.contract_id ILIKE ? OR c.contract_id IN (
-          SELECT entity_id FROM search_records WHERE entity_type = 'contracts' AND organization_id = ? AND ${searchClauses(SEARCH_TEXT, patterns)}))`);
-        params.push(`${query.q.trim().replaceAll('_', '\\_')}%`, organizationId, ...patterns);
-      }
+    for (const pattern of searchPatterns(query.q ?? '')) {
+      clauses.push(`(c.contract_id ILIKE ? OR c.internal_pic ILIKE ? OR p.partner_name ILIKE ? OR (c.extra_json::jsonb ->> 'parent_contract_number') ILIKE ?
+        OR c.contract_id IN (SELECT entity_id FROM search_records WHERE entity_type = 'contracts' AND organization_id = ? AND ${searchClauses(SEARCH_TEXT, [pattern])}))`);
+      params.push(pattern, pattern, pattern, pattern, organizationId, pattern);
     }
     return { sql: clauses.join(' AND '), params };
   }
@@ -87,15 +103,14 @@ export function createContractRepository(db: Sql) {
   /** A page of the organization's contracts plus the total number that match (before paging). No `limit` returns everything. */
   async function list(organizationId: string, query: ContractQuery = {}): Promise<ContractPage> {
     const filter = where(organizationId, query);
-    const total = Number((await db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM contracts c WHERE ${filter.sql}`, ...filter.params))?.n ?? 0);
+    const total = Number((await db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ${FROM} WHERE ${filter.sql}`, ...filter.params))?.n ?? 0);
     const order = SORT_SQL[query.sort && query.sort in SORT_SQL ? query.sort : 'default'];
-    const direction = query.dir === 'desc' ? ' DESC' : '';
-    const orderBy = direction ? order.split(', ').map((part) => part + direction).join(', ') : order;
+    const orderBy = order.map((part) => (query.dir === 'desc' ? part + ' DESC' : part)).join(', ');
     const paged = query.limit !== undefined;
     const limit = paged ? Math.min(MAX_PAGE_SIZE, Math.max(1, Math.trunc(Number(query.limit)) || 50)) : undefined;
     const offset = Math.max(0, Math.trunc(Number(query.offset)) || 0);
     const records = await db.all<Row>(
-      `SELECT c.* FROM contracts c WHERE ${filter.sql} ORDER BY ${orderBy}${paged ? ' LIMIT ? OFFSET ?' : ''}`,
+      `SELECT c.* FROM ${FROM} WHERE ${filter.sql} ORDER BY ${orderBy}${paged ? ' LIMIT ? OFFSET ?' : ''}`,
       ...filter.params, ...(paged ? [limit, offset] : []));
     return { rows: await base.hydrate(records), total };
   }

@@ -166,6 +166,10 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['POST', '/api/tenants/:id/sync-google', orgParam('tenant.integration.update', 'SYNC_UNAVAILABLE')],
 
   ['GET', '/api/search', tenant('document.view', 'search over permitted records only')],
+  ['GET', '/api/aggregates/dashboard', tenant('document.view', 'SQL aggregates over permitted records only')],
+  ['GET', '/api/aggregates/badges', tenant('document.view', 'SQL aggregates over permitted records only')],
+  ['GET', '/api/aggregates/facets', tenant('document.view', 'distinct filter values of permitted records only')],
+  ['GET', '/api/aggregates/partners', tenant('document.view', 'per-partner roll-ups of permitted records only')],
   ['GET', '/api/partners', tenant('document.view')],
   ['POST', '/api/partners', tenant('document.create')],
   ['POST', '/api/partners/parse', tenant('document.create', 'AI extraction')],

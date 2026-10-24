@@ -8,7 +8,7 @@ import { MAX_PAGE_SIZE } from './contractRepository';
 import { createEntityRepository, type Row } from './entityRepository';
 
 export type Spending = Row;
-export const SPENDING_SORTS = ['default', 'invoice_date', 'vendor_name', 'total_amount_usd', 'created_at'] as const;
+export const SPENDING_SORTS = ['default', 'invoice_date', 'vendor_name', 'total_amount_usd', 'created_at', 'invoice_number', 'invoice_month', 'attachment'] as const;
 export type SpendingSort = typeof SPENDING_SORTS[number];
 
 export interface SpendingQuery {
@@ -17,7 +17,13 @@ export interface SpendingQuery {
   ids?: string[];
   paymentStatus?: string[];
   vendorId?: string[];
+  /** Exact vendor name, case-insensitive. */
+  vendorName?: string;
   currency?: string[];
+  /** Spendings reported in this year (any of their reporting months, or the invoice date's year). */
+  year?: string;
+  /** Two-digit month (`01`..`12`) of any reporting month (inside `year` when given). */
+  month?: string;
   sort?: SpendingSort;
   dir?: 'asc' | 'desc';
   limit?: number;
@@ -25,15 +31,19 @@ export interface SpendingQuery {
 }
 export interface SpendingPage { rows: Spending[]; total: number }
 
+const FIRST_MONTH = `COALESCE((SELECT MIN(rm.month) FROM spending_reporting_months rm WHERE rm.spending_id = s.id), s.invoice_date, '')`;
 const SORT_SQL: Record<SpendingSort, string[]> = {
   default: ['s.record_position', 's.id'],
   invoice_date: ['s.invoice_date', 's.id'],
   vendor_name: ['lower(s.vendor_name)', 's.id'],
   total_amount_usd: ['(s.total_amount_usd_minor::numeric / power(10::numeric, coalesce(s.total_amount_usd_scale, 0)))', 's.id'],
   created_at: ['s.created_at', 's.id'],
+  invoice_number: ['lower(s.invoice_number)', 's.id'],
+  invoice_month: [FIRST_MONTH, 's.id'],
+  attachment: ["COALESCE(s.invoice_file_url, '')", 's.id'],
 };
 const HAYSTACK = `(coalesce(s.vendor_name, '') || ' ' || coalesce(s.invoice_number, '') || ' ' || coalesce(s.invoice_title, '') || ' ' ||
-  coalesce(s.invoice_description, '') || ' ' || coalesce(s.payment_status, '') || ' ' || s.id)`;
+  coalesce(s.invoice_description, '') || ' ' || coalesce(s.payment_status, '') || ' ' || coalesce(s.bank_name, '') || ' ' || s.id)`;
 const lower = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
 export function createSpendingRepository(db: Sql) {
@@ -46,6 +56,15 @@ export function createSpendingRepository(db: Sql) {
     if (query.paymentStatus?.length) { clauses.push('s.payment_status = ANY(?)'); params.push(query.paymentStatus); }
     if (query.vendorId?.length) { clauses.push('s.vendor_id = ANY(?)'); params.push(query.vendorId); }
     if (query.currency?.length) { clauses.push('s.currency = ANY(?)'); params.push(query.currency); }
+    if (query.vendorName) { clauses.push('lower(btrim(s.vendor_name)) = ?'); params.push(query.vendorName.trim().toLowerCase()); }
+    if (query.year || query.month) {
+      const year = /^\d{4}$/.test(query.year ?? '') ? query.year! : '____';
+      const month = /^\d{2}$/.test(query.month ?? '') ? query.month! : '__';
+      const monthPattern = `${year}-${month}%`;
+      clauses.push(`(EXISTS (SELECT 1 FROM spending_reporting_months rm WHERE rm.spending_id = s.id AND rm.month LIKE ?)${query.month ? '' : ' OR s.invoice_date LIKE ?'})`);
+      params.push(monthPattern);
+      if (!query.month) params.push(`${year}%`);
+    }
     for (const pattern of searchPatterns(query.q ?? '')) { clauses.push(`${HAYSTACK} ILIKE ?`); params.push(pattern); }
     return { sql: clauses.join(' AND '), params };
   }
