@@ -82,7 +82,8 @@ export function useServerList<T>(options: ServerListOptions) {
   const query = useMemo(() => ({
     ...fixed,
     limit: pageSize, offset: (state.page - 1) * pageSize,
-    q: state.q || undefined, sort: apiSort ?? undefined, dir: apiSort ? state.dir : undefined,
+    // Without a chosen column the server's own order: newest first, as the screens showed before.
+    q: state.q || undefined, sort: apiSort ?? 'default', dir: apiSort ? state.dir : undefined,
     ...(mapFilters ? mapFilters(state.filters) : state.filters),
   }), [fixed, pageSize, state.page, state.q, apiSort, state.dir, state.filters, mapFilters]);
 

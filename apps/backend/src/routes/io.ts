@@ -44,7 +44,7 @@ function ioListQuery(query: express.Request["query"]): IoQuery & { paged: boolea
   const date = (value: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(queryText(value, 10)) ? queryText(value, 10) : undefined);
   const window = date(query.window_from) && date(query.window_to) ? { from: date(query.window_from)!, to: date(query.window_to)! } : undefined;
   const q = queryText(query.q, 200) || undefined;
-  const sort = (IO_SORTS as readonly string[]).includes(requested) && requested !== "default" ? requested as IoQuery["sort"] : (paged || requested ? "end_date" : "default");
+  const sort = (IO_SORTS as readonly string[]).includes(requested) ? requested as IoQuery["sort"] : (paged || requested ? "end_date" : "default");
   return {
     paged, filtered: Boolean(q) || Boolean(window) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
     q, ...filters, window, sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",

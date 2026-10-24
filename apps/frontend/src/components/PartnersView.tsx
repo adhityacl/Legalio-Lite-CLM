@@ -197,6 +197,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   const currentPage = listState.page;
   const totalPages = list.pageCount;
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  // A selection belongs to the page, search and filters it was made on: leaving them clears it, so "delete selected" never reaches rows that are no longer shown.
+  useEffect(() => { setSelectedRows([]); }, [listState]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) setSelectedRows(currentPartners.map(item => item.partner_id));

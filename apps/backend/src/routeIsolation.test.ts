@@ -701,4 +701,10 @@ test('list filters and sorts added for the server-side views', async () => {
   assert.ok(contracts.every((row: any) => row.partner_name === fixtureA.partner.partner_name));
   const ios = ok(await api('adminA', 'GET', '/api/ios', { org: A }));
   assert.ok(ios.length > 0 && ios.every((row: any) => typeof row.partner_name === 'string'));
+  // `sort=default` is the record order the unpaged lists have (newest first); the screens ask for it until a column is chosen.
+  for (const [route, key] of [['/api/ios', 'io_id'], ['/api/partners', 'partner_id'], ['/api/partner-spendings', 'id'], ['/api/contracts', 'contract_id']] as const) {
+    const whole = ok(await api('adminA', 'GET', route, { org: A }));
+    const page = ok(await api('adminA', 'GET', `${route}?sort=default&limit=3`, { org: A }));
+    assert.deepEqual(page.map((row: any) => row[key]), whole.slice(0, 3).map((row: any) => row[key]), route);
+  }
 });

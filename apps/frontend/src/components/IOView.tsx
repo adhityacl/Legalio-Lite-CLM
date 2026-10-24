@@ -97,6 +97,8 @@ export const IOView: React.FC<IOViewProps> = ({
 
   // Row selection State
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  // A selection belongs to the page, search and filters it was made on: leaving them clears it, so "delete selected" never reaches rows that are no longer shown.
+  useEffect(() => { setSelectedRowIds(new Set()); }, [listState]);
 
   type SortField = ServiceOrderSortField;
   const sortField = listState.sort as SortField | null;

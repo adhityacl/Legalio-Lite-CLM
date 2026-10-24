@@ -80,6 +80,8 @@ Upgrade notes: schema changes are versioned migrations (see POSTGRES_STORAGE.md)
   `deep=1` (also matches the numbers and titles of the partner's contracts and orders) and the sorts `codename`, `pic_name`, `partner_status`;
   orders `pricing_model`, `charging_type`, `window_from`/`window_to` and more sorts; spendings `year`, `month`, `vendor_name` and more sorts. Contract
   and order rows carry `partner_name`, partner rows `active_contract_count`. A caller that sends none of the new parameters gets the earlier answers.
+  `sort=default` (contracts, partners, orders, spendings, evaluations) means the record order of the unpaged lists, newest first; the screens request it
+  until the user picks a column. Paged requests without any `sort` keep their earlier defaults (orders by end date, partners by name, ...).
 - Migration `0016_upload_owner_trigram` adds pg_trgm GIN indexes on `contracts(contract_file_link)`, `(termination_document)` and `(extra_json)` for
   the upload-owner lookup of files that have no ownership row yet. Like `0008` it succeeds without the extension (the lookup then scans).
 - PDF inspection and slimming (`pdf-parse`, `pdf-lib`) run in worker threads when `dist/pdfWorker.cjs` is deployed next to `server.cjs` (it is built by

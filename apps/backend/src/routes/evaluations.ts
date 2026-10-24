@@ -32,7 +32,7 @@ function evaluationListQuery(query: express.Request["query"]): EvaluationQuery &
   const paged = limit !== undefined || query.offset !== undefined;
   const filters = { partnerId: queryList(query.partner_id), finalEvaluation: queryList(query.final_evaluation) };
   const q = queryText(query.q, 200) || undefined;
-  const sort = (EVALUATION_SORTS as readonly string[]).includes(requested) && requested !== "default" ? requested as EvaluationQuery["sort"] : (paged || requested ? "review_date" : "default");
+  const sort = (EVALUATION_SORTS as readonly string[]).includes(requested) ? requested as EvaluationQuery["sort"] : (paged || requested ? "review_date" : "default");
   return {
     paged, filtered: Boolean(q) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
     q, ...filters, sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",

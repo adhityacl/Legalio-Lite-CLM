@@ -565,6 +565,8 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
 
   const currentPage = listState.page;
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  // A selection belongs to the page, search and filters it was made on: leaving them clears it, so "delete selected" never reaches rows that are no longer shown.
+  useEffect(() => { setSelectedRows([]); }, [listState]);
   const opened = useRecordLookup<PartnerSpending>('spendings', '/partner-spendings', 'id', openSpendingId);
   useEffect(() => {
     if (!openSpendingId || opened.isLoading) return;

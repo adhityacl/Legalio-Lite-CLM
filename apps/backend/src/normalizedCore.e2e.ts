@@ -207,7 +207,7 @@ try{
   {contract_number:'E2E/IMP/001',contract_title:'Known partner',partner_name:'E2E CSV Imported',document_type:'Master Agreement',start_date:'2026-01-01',end_date:'2027-01-01',contract_value:'1000'},
   {contract_number:'E2E/IMP/002',contract_title:'Unknown partner',partner_name:'No Such Partner',document_type:'Master Agreement',start_date:'2026-01-01',end_date:'2027-01-01',contract_value:'1000'}]}});
  assert.equal(contractImport.succeeded.length,1);assert.equal(contractImport.failed.length,1);assert.match(contractImport.failed[0].message,/Partner "No Such Partner"/);
- const importedContract=(await call('/api/contracts',{org})).find((c:any)=>c.contract_number==='E2E/IMP/001');assert.equal('partner_name' in importedContract,false);assert.equal(importedContract.partner_id,csvPartner.partner_id);
+ const importedContract=(await call('/api/contracts',{org})).find((c:any)=>c.contract_number==='E2E/IMP/001');assert.equal(importedContract.partner_id,csvPartner.partner_id);assert.equal(importedContract.partner_name,'E2E CSV Imported');assert.equal(JSON.parse((await sql.get("SELECT extra_json FROM contracts WHERE contract_number='E2E/IMP/001'")).extra_json).partner_name,undefined);
  assert.equal((await sql.get("SELECT count(*) n FROM contracts WHERE contract_number='E2E/IMP/002'")).n,0);
  checks.push('Contract import links partner and rejects unknown partner names');
  // Drive is backup only: an upload is always stored locally and the record keeps the local link.
@@ -281,6 +281,7 @@ try{
   await page.goto(frontendURL+`/app?tab=${tab}`);
   await page.getByPlaceholder(/search|cari/i).first().fill('E2E Bulk');
   await expect(page.locator('tbody tr',{hasText:/E2E[ -]Bulk|E2E-BULK/}).first()).toBeVisible({timeout:30000});
+  await expect(page.locator('tbody tr')).toHaveCount(count,{timeout:30000}); // the search is applied by the server after a short debounce: select only once the page shows just the matches
   await page.locator('table thead').getByRole('checkbox').first().click({force:true});
   const deleteSelected=page.getByRole('button',{name:/^(delete selected|hapus terpilih)$/i});
   await expect(deleteSelected).toBeVisible();

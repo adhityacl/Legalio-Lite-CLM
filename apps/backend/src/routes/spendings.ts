@@ -48,7 +48,7 @@ function spendingListQuery(query: express.Request["query"]): SpendingQuery & { p
   const year = /^\d{4}$/.test(queryText(query.year, 4)) ? queryText(query.year, 4) : undefined;
   const month = /^\d{2}$/.test(queryText(query.month, 2)) ? queryText(query.month, 2) : undefined;
   const q = queryText(query.q, 200) || undefined;
-  const sort = (SPENDING_SORTS as readonly string[]).includes(requested) && requested !== "default" ? requested as SpendingQuery["sort"] : (paged || requested ? "invoice_date" : "default");
+  const sort = (SPENDING_SORTS as readonly string[]).includes(requested) ? requested as SpendingQuery["sort"] : (paged || requested ? "invoice_date" : "default");
   return {
     paged, filtered: Boolean(q) || Boolean(vendorName) || Boolean(year) || Boolean(month) || Object.values(filters).some((list) => list.length) || query.sort !== undefined,
     q, ...filters, vendorName, year, month, sort, dir: queryText(query.dir, 4).toLowerCase() === "desc" ? "desc" : "asc",
