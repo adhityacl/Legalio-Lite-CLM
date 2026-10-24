@@ -18,6 +18,7 @@ export interface RouteDef {
 const dashboard = lazy(() => import('./DashboardRoute'));
 const hierarchy = lazy(() => import('./HierarchyRoute'));
 const contracts = lazy(() => import('./ContractsRoute'));
+const obligations = lazy(() => import('./ObligationsRoute'));
 const contractCreator = lazy(() => import('./ContractCreatorRoute'));
 const approvals = lazy(() => import('./ApprovalRoute'));
 const orders = lazy(() => import('./OrdersRoute'));
@@ -33,6 +34,7 @@ export const ROUTES: Record<string, RouteDef> = {
   dashboard: { component: dashboard },
   hierarchy: { component: hierarchy },
   contracts: { component: contracts },
+  obligations: { component: obligations },
   'create-contract': { component: contractCreator },
   'document-approval': { component: approvals },
   ios: { component: orders, module: 'commercialDocuments' },

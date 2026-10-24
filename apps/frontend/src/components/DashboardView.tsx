@@ -1,5 +1,6 @@
 import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { DashboardOverview } from './DashboardOverview';
+import { ObligationsWidget } from '../features/obligations/ObligationsWidget';
 import { RecentDocumentsTable } from './RecentDocumentsTable';
 import { TableEmptyMessage, TableEmptyState } from './ui/table-empty-state';
 import { aggregateValueInCurrency, buildSpendingSeriesFromAggregate } from '../lib/dashboardMetrics';
@@ -199,6 +200,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           { label: t('dashboard.expiring_contracts'), value: expiringCount, detail: t('dashboard.extension_termination'), icon: AlertTriangle, tone: 'amber', onClick: () => onNavigateTab('contracts') },
         ]}
       />
+      <ObligationsWidget onOpen={() => onNavigateTab('obligations')} />
       <NewsTicker />
 
       {/* Notice Period Tracker Table */}

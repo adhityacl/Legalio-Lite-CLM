@@ -21,7 +21,9 @@ import { ModalFrame } from '../ui/modal-frame';
 import { orgApi, orgPath } from './orgApi';
 import { DialogHeader, errorText, formatTime } from './dialogParts';
 
-const RESOURCES = ['contracts', 'partners', 'orders', 'spendings'] as const;
+const RESOURCES = ['contracts', 'partners', 'orders', 'spendings', 'obligations'] as const;
+/** Resources a key can only read. */
+const READ_ONLY = new Set<string>(['obligations']);
 interface ApiKeyDto {
   id: string; name: string; prefix: string; scopes: string[]; rateLimitPerMinute: number; createdAt: string; expiresAt: string | null;
   revokedAt: string | null; lastUsedAt: string | null; status: 'active' | 'revoked' | 'expired';
@@ -166,7 +168,7 @@ const CreateKeyDialog: React.FC<{ organizationId: string; onClose: () => void; o
             {RESOURCES.map((resource) => (
               <React.Fragment key={resource}>
                 <Text size="sm">{t(`data.keys.resource.${resource}`, resource)}</Text>
-                {(['read', 'write'] as const).map((verb) => (
+                {(['read', 'write'] as const).map((verb) => verb === 'write' && READ_ONLY.has(resource) ? <span key={verb} aria-hidden="true" /> : (
                   <Checkbox key={verb} checked={scopes.includes(`${resource}:${verb}`)} onCheckedChange={(details) => toggle(`${resource}:${verb}`, details.checked === true)}>
                     <CheckboxControl /><CheckboxLabel className="sr-only">{t(`data.keys.resource.${resource}`, resource)} — {t(`data.keys.${verb}`, verb)}</CheckboxLabel><CheckboxHiddenInput />
                   </Checkbox>

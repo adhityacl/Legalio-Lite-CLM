@@ -37,8 +37,9 @@ export function scopeOf(req: express.Request) {
 }
 /** Records of `kind` the caller may see: own organization, department scope, before any aggregation. */
 export async function scopedRecords<T = any>(req: express.Request, kind: RecordKind): Promise<T[]> {
-  const tables: Record<RecordKind, string> = { partner: 'partners', contract: 'contracts', io: 'insertion_orders', spending: 'spendings', evaluation: 'evaluations', notification: 'notifications' };
+  const tables: Record<Exclude<RecordKind, 'obligation'>, string> = { partner: 'partners', contract: 'contracts', io: 'insertion_orders', spending: 'spendings', evaluation: 'evaluations', notification: 'notifications' };
   const organizationId = orgContextOf(req).organizationId;
+  if (kind === 'obligation') throw new Error('Obligations are listed through obligationRepository.');
   const records = (kind === 'contract' ? (await contractRepository.list(organizationId)).rows
     : kind === 'partner' ? (await partnerRepository.list(organizationId)).rows
     : await readBusinessRows(sql, tables[kind], organizationId)) as T[];

@@ -1,5 +1,5 @@
 /** The periodic passes added in Phase 3 (export, webhook delivery, approval SLA, digest). Started by server.ts init(), stopped by drain(). */
-import { sql } from './db';
+import { sql, withAdvisoryLock } from './db';
 import { createPeriodicJob, jobsEnabled } from './jobScheduler';
 import { EXPORT_LOCK_KEY, processExports } from './tenantExport';
 import { getStore } from './uploadStorage';
@@ -7,6 +7,7 @@ import { IS_TEST_MODE } from './runtimePaths';
 import { componentLog } from './logger';
 import { DIGEST_LOCK_KEY, runDigestPass, type DigestDeps } from './digest';
 import { APPROVAL_SLA_LOCK_KEY, deliverApprovalNotices, onApprovalNoticeQueued, runApprovalSlaPass, type ApprovalNoticeDeps } from './approvalNotifications';
+import { OBLIGATION_LOCK_KEY, deliverObligationNotices, onObligationNoticeQueued, runObligationPass, type ObligationNoticeDeps } from './obligationJobs';
 import { outboundPolicyFromEnv } from './ssrfGuard';
 import { WEBHOOK_LOCK_KEY, deliverDueWebhooks, onWebhookQueued, pruneDeliveries } from './webhooks';
 
@@ -60,7 +61,26 @@ export const digestJob = createPeriodicJob({
   run: async () => { await runDigestPass(sql, await digestDeps()); },
 });
 
-const jobs = [exportJob, webhookJob, approvalJob, digestJob];
+async function obligationDeps(): Promise<ObligationNoticeDeps> {
+  const { mailTemplates, sendSmtpEmail } = await import('./mailHelpers');
+  const { db: memory } = await import('./memoryDb');
+  const { getPublicBaseUrl } = await import('./installationSettings');
+  return {
+    smtpAvailable: () => Boolean(memory.googleConfig?.smtpEnabled),
+    send: async (input) => { const result = await sendSmtpEmail(input); return { success: Boolean(result?.success), error: result?.success ? undefined : String((result as { error?: unknown })?.error ?? '') }; },
+    render: (id, values, trusted) => mailTemplates.render(id, values, trusted),
+    publicUrl: () => getPublicBaseUrl() || process.env.PUBLIC_URL || '',
+  };
+}
+const obligationPass = async () => ({ pass: await runObligationPass(sql), delivery: await deliverObligationNotices(sql, await obligationDeps()) });
+/** Every 15 minutes: raise the due-soon / overdue events that have come due and deliver their reminders (also the retry of failed ones). */
+export const obligationJob = createPeriodicJob({
+  name: 'Obligation reminders', lockKey: OBLIGATION_LOCK_KEY, intervalMs: 15 * 60_000, startupDelayMs: 100_000, enabled, run: obligationPass,
+});
+/** The same pass on demand (POST /api/cron/trigger-check), under the same advisory lock. */
+export const runObligationReminders = () => withAdvisoryLock(OBLIGATION_LOCK_KEY, obligationPass);
+
+const jobs = [exportJob, webhookJob, approvalJob, digestJob, obligationJob];
 export const startBackgroundJobs = () => {
   const policy = outboundPolicyFromEnv();
   if (process.env.NODE_ENV === 'production' && (policy.allowHttp || policy.allowPrivateNetworks)) {
@@ -71,6 +91,7 @@ export const startBackgroundJobs = () => {
   if (enabled) {
     onWebhookQueued(() => { void webhookJob.runOnce(); });
     onApprovalNoticeQueued(() => { void approvalJob.runOnce(); });
+    onObligationNoticeQueued(() => { void obligationJob.runOnce(); });
   }
 };
-export const stopBackgroundJobs = async () => { onWebhookQueued(null); onApprovalNoticeQueued(null); await Promise.all(jobs.map((job) => job.stop())); };
+export const stopBackgroundJobs = async () => { onWebhookQueued(null); onApprovalNoticeQueued(null); onObligationNoticeQueued(null); await Promise.all(jobs.map((job) => job.stop())); };

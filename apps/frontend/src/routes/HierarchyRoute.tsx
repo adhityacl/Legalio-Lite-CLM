@@ -13,6 +13,7 @@ export default function HierarchyRoute() {
       error={workspaceError}
       onRetry={() => void loadAllData()}
       onOpenCalendarDocument={(kind, id) => setActiveTab(kind === 'contract' ? 'contracts' : 'ios', undefined, { recordId: id })}
+      onOpenCalendarObligation={(id) => setActiveTab('obligations', undefined, { recordId: id })}
       partners={partners}
       contracts={contracts}
       ios={ios}

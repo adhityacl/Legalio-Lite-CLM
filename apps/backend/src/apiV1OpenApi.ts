@@ -6,7 +6,7 @@ import { V1_OPERATIONS, V1_RESOURCES, type V1Operation, type V1Resource } from '
 
 const DENIED = ['fileData', 'fileName', 'accessToken', 'termination_document_file', 'invoice_file', 'billing_file', 'redline_analysis', 'redline_analyzed_at', 'dd_documents'];
 
-const BODIES: Record<V1Resource, { create: z.ZodType; update: z.ZodType }> = {
+const BODIES: Record<Exclude<V1Resource, 'obligations'>, { create: z.ZodType; update: z.ZodType }> = {
   contracts: { create: bodySchemas.contractCreateBody, update: bodySchemas.contractUpdateBody },
   partners: { create: bodySchemas.partnerCreateBody, update: bodySchemas.partnerUpdateBody },
   orders: { create: bodySchemas.ioCreateBody, update: bodySchemas.ioUpdateBody },
@@ -80,8 +80,9 @@ export function buildOpenApiDocument(serverBase = 'http://localhost:3000') {
   for (const spec of V1_RESOURCES) {
     schemas[`${spec.resource}Record`] = { type: 'object', description: `A stored ${spec.singular}. Lists add display fields (for example partner names and USD values).`,
       required: [spec.idField, 'version'], additionalProperties: true, properties: { [spec.idField]: { type: 'string' }, version: { type: 'integer', description: 'Send this back on update.' } } };
-    schemas[`${spec.resource}Create`] = bodySchema(BODIES[spec.resource].create);
-    schemas[`${spec.resource}Update`] = bodySchema(BODIES[spec.resource].update);
+    if (spec.readOnly) continue;
+    schemas[`${spec.resource}Create`] = bodySchema(BODIES[spec.resource as keyof typeof BODIES].create);
+    schemas[`${spec.resource}Update`] = bodySchema(BODIES[spec.resource as keyof typeof BODIES].update);
   }
   const paths: Record<string, Record<string, unknown>> = {
     '/openapi.json': { get: { operationId: 'openapi', summary: 'This document', tags: ['session'], security: [], responses: { '200': { description: 'The OpenAPI 3.1 document.' } } } },
@@ -89,7 +90,7 @@ export function buildOpenApiDocument(serverBase = 'http://localhost:3000') {
   for (const op of V1_OPERATIONS) (paths[op.openapi] ??= {})[op.method.toLowerCase()] = operationObject(op);
   return {
     openapi: '3.1.0',
-    info: { title: 'Legalio public API', version: '1.0.0', description: 'Organization-scoped access to contracts, partners, orders and spendings with API keys. See docs/API.md.' },
+    info: { title: 'Legalio public API', version: '1.0.0', description: 'Organization-scoped access to contracts, partners, orders and spendings (read and write) and obligations (read) with API keys. See docs/API.md.' },
     servers: [{ url: `${serverBase}/api/v1` }],
     security: [{ ApiKey: [] }],
     tags: [{ name: 'session' }, ...V1_RESOURCES.map((spec) => ({ name: spec.resource }))],

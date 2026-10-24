@@ -5,7 +5,7 @@ import { AlphabeticalSelect } from './ui/alphabetical-select';
 import { formatBusinessDate } from '../lib/displayDate';
 import { FilterSummary } from './ui/filter-summary';
 import { TableEmptyState } from './ui/table-empty-state';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useMemo, useEffect } from 'react';
 import { useServerList } from '../lib/useServerList';
 import { useRecordLookup, useRelatedRecords } from '../lib/useRecordLookup';
 import { useFacets } from '../features/aggregates/useAggregates';
@@ -39,6 +39,7 @@ import {
   ArrowUp,
   ArrowDown,
   X,
+  ListChecks,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -56,8 +57,10 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-compon
 import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { DialogHeader, DialogTitle } from '@legalio/ui-components/dialog';
+const ContractObligations = lazy(() => import('../features/obligations/ContractObligations'));
 import { Checkbox, CheckboxControl, CheckboxHiddenInput } from '@legalio/ui-components/checkbox';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 import { Text } from '@legalio/ui-components/text';
 /** A contract row as the list endpoint answers it: the partner's name comes with it. */
 type ContractRow = Contract & { partner_name?: string | null };
@@ -101,6 +104,8 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
   const selectedCategory = listState.filters.category ?? 'ALL';
   const selectedStatus = listState.filters.status ?? 'ALL';
   const [detailContract, setDetailContract] = useState<ContractRow | null>(null);
+  const [detailTab, setDetailTab] = useState<'overview' | 'obligations'>('overview');
+  useEffect(() => { setDetailTab('overview'); }, [detailContract?.contract_id]);
   const opened = useRecordLookup<ContractRow>('contracts', '/contracts', 'contract_id', openDocumentId);
   useEffect(() => {
     if (!openDocumentId) return;
@@ -595,6 +600,15 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
               </Button>
             </DialogHeader>
 
+            <Tabs value={detailTab} onValueChange={(details) => setDetailTab(details.value as 'overview' | 'obligations')} className="flex min-h-0 flex-1 flex-col gap-0">
+            <TabsList aria-label={t('contracts.record_sections', 'Contract record')} className="mx-g21 mt-g13 w-fit">
+              <TabsTrigger value="overview"><FileText aria-hidden="true" />{t('contracts.tab_overview', 'Overview')}</TabsTrigger>
+              <TabsTrigger value="obligations"><ListChecks aria-hidden="true" />{t('obligations.contract_tab', 'Obligations')}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="obligations" className="mt-0 min-h-0 flex-1 overflow-y-auto p-g21">
+              {detailTab === 'obligations' && <Suspense fallback={<Text size="sm" tone="muted" role="status">{t('common.loading', 'Loading…')}</Text>}><ContractObligations contractId={detailContract.contract_id} /></Suspense>}
+            </TabsContent>
+            <TabsContent value="overview" className="mt-0 flex min-h-0 flex-1 flex-col">
             <div className="p-g21 sm:p-g21 overflow-y-auto space-y-g13 text-xs flex-1">
               <ContractEndingSummary contract={detailContract} />
               <Card className="grid grid-cols-2 gap-g13 p-g13 bg-background">
@@ -784,6 +798,8 @@ export const ContractsView: React.FC<ContractsViewProps> = ({
                 )}
               </div>
             </div>
+            </TabsContent>
+            </Tabs>
 
             <div className="p-g13 sm:p-g21 bg-card border-t border-border flex justify-end shrink-0">
               <Button variant="ghost" size="sm"

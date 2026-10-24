@@ -10,7 +10,12 @@ import { RequestDenied, type Identity } from './identity';
 import type { OrgContext } from './rbac';
 
 export const API_RESOURCES = ['contracts', 'partners', 'orders', 'spendings'] as const;
-export const API_SCOPES = API_RESOURCES.flatMap((resource) => [`${resource}:read`, `${resource}:write`]);
+/** Resources a key can only read (no write scope exists for them). */
+export const API_READ_ONLY_RESOURCES = ['obligations'] as const;
+export const API_SCOPES = [
+  ...API_RESOURCES.flatMap((resource) => [`${resource}:read`, `${resource}:write`]),
+  ...API_READ_ONLY_RESOURCES.map((resource) => `${resource}:read`),
+];
 export type ApiScope = (typeof API_SCOPES)[number];
 export const MAX_ACTIVE_KEYS = 50;
 export const KEY_PATTERN = /^lgk_[0-9a-f]{8}_[A-Za-z0-9_-]{43}$/;

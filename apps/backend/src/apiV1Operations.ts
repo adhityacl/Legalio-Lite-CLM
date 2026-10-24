@@ -6,8 +6,10 @@ import { CONTRACT_SORTS } from './repositories/contractRepository';
 import { IO_SORTS } from './repositories/ioRepository';
 import { PARTNER_SORTS } from './repositories/partnerRepository';
 import { SPENDING_SORTS } from './repositories/spendingRepository';
+import { OBLIGATION_SORTS } from './repositories/obligationRepository';
+import { OBLIGATION_SOURCES, OBLIGATION_STATUSES, OBLIGATION_TYPES } from '@legalio/shared/obligations';
 
-export type V1Resource = 'contracts' | 'partners' | 'orders' | 'spendings';
+export type V1Resource = 'contracts' | 'partners' | 'orders' | 'spendings' | 'obligations';
 export interface V1Filter { name: string; description: string; enum?: readonly string[] }
 export interface V1ResourceSpec {
   resource: V1Resource;
@@ -19,6 +21,8 @@ export interface V1ResourceSpec {
   idField: string;
   sorts: readonly string[];
   filters: V1Filter[];
+  /** Only list and get exist (no create/update operations, no write scope). */
+  readOnly?: boolean;
 }
 
 const date = (name: string, description: string): V1Filter => ({ name, description });
@@ -44,6 +48,14 @@ export const V1_RESOURCES: V1ResourceSpec[] = [
     { name: 'vendor_name', description: 'Exact vendor name.' }, { name: 'currency', description: 'Comma-separated currency codes.' },
     { name: 'year', description: 'Invoice year (YYYY).' }, { name: 'month', description: 'Invoice month (MM).' },
   ] },
+  { resource: 'obligations', singular: 'obligation', legacy: '/api/obligations', responseKey: 'obligation', idField: 'id', sorts: OBLIGATION_SORTS, readOnly: true, filters: [
+    { name: 'status', description: `Comma-separated statuses (${OBLIGATION_STATUSES.join(', ')}); overdue is derived from open work whose due date has passed.` },
+    { name: 'type', description: `Comma-separated types (${OBLIGATION_TYPES.join(', ')}).` },
+    { name: 'contract_id', description: 'Obligations of one contract.' }, { name: 'io_id', description: 'Obligations of one order.' }, { name: 'partner_id', description: 'Obligations of one partner.' },
+    { name: 'responsible', description: 'Responsible user id.' }, { name: 'department', description: 'Responsible department name.' },
+    { name: 'source', description: 'manual or ai_extracted.', enum: OBLIGATION_SOURCES },
+    date('due_from', 'Due on or after (YYYY-MM-DD).'), date('due_to', 'Due on or before (YYYY-MM-DD).'),
+  ] },
 ];
 
 export type V1Kind = 'whoami' | 'list' | 'get' | 'create' | 'update';
@@ -64,7 +76,9 @@ export const V1_OPERATIONS: V1Operation[] = [
   ...V1_RESOURCES.flatMap((spec): V1Operation[] => [
     { method: 'GET', path: `/api/v1/${spec.resource}`, openapi: `/${spec.resource}`, scope: `${spec.resource}:read`, kind: 'list', spec, summary: `List ${spec.resource} (paged, filtered, sorted)` },
     { method: 'GET', path: `/api/v1/${spec.resource}/:id`, openapi: `/${spec.resource}/{id}`, scope: `${spec.resource}:read`, kind: 'get', spec, summary: `Get one ${spec.singular}` },
-    { method: 'POST', path: `/api/v1/${spec.resource}`, openapi: `/${spec.resource}`, scope: `${spec.resource}:write`, kind: 'create', spec, summary: `Create a ${spec.singular}` },
-    { method: 'PATCH', path: `/api/v1/${spec.resource}/:id`, openapi: `/${spec.resource}/{id}`, scope: `${spec.resource}:write`, kind: 'update', spec, summary: `Update a ${spec.singular} (partial; the current version is required)` },
+    ...(spec.readOnly ? [] : [
+      { method: 'POST', path: `/api/v1/${spec.resource}`, openapi: `/${spec.resource}`, scope: `${spec.resource}:write`, kind: 'create', spec, summary: `Create a ${spec.singular}` } as V1Operation,
+      { method: 'PATCH', path: `/api/v1/${spec.resource}/:id`, openapi: `/${spec.resource}/{id}`, scope: `${spec.resource}:write`, kind: 'update', spec, summary: `Update a ${spec.singular} (partial; the current version is required)` } as V1Operation,
+    ]),
   ]),
 ];

@@ -276,6 +276,11 @@ export const MAIL_CATALOG = {
     defaults: notice,
     sample: noticeSample('[Terlambat] Persetujuan kontrak vendor', 'SLA persetujuan terlewati', 'Persetujuan berikut melewati batas SLA.', 'Buka Persetujuan'), required: [],
   },
+  'obligation-reminder': {
+    name: 'Pengingat kewajiban', description: 'Dikirim ke penanggung jawab saat tenggat kewajiban kontrak sudah dekat atau terlewati.', recipient: 'Penanggung jawab kewajiban (atau admin organisasi bila belum ditentukan)',
+    defaults: notice,
+    sample: { ...noticeSample('[Kewajiban jatuh tempo] Pembayaran termin 2', 'Kewajiban segera jatuh tempo', 'Kewajiban berikut mendekati tenggat.', 'Buka kewajiban'), actionUrl: 'https://example.com/app?tab=obligations' }, required: [],
+  },
   digest: {
     name: 'Ringkasan berkala', description: 'Ringkasan harian atau mingguan: tenggat pemberitahuan, kontrak berakhir, persetujuan menunggu, dan item terlambat.', recipient: 'Pengguna yang berlangganan ringkasan',
     defaults: { subject: notice.subject, html: notice.html.replace('{{footer}}', '{{footer}}<br><a href="{{unsubscribeUrl}}" style="color:#64748b;">{{unsubscribeLabel}}</a>') },

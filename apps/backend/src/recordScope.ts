@@ -11,7 +11,7 @@
 import type { Sql } from './db';
 import { departmentScope, type OrgContext } from './rbac';
 
-export type RecordKind = 'partner' | 'contract' | 'io' | 'spending' | 'evaluation' | 'notification';
+export type RecordKind = 'partner' | 'contract' | 'io' | 'spending' | 'evaluation' | 'notification' | 'obligation';
 
 export const normalizeDepartmentName = (value: unknown): string =>
   String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -74,6 +74,16 @@ export function createOrganizationScope(teams: Team[], organizationId: string, c
         return partnerDepartment(partnerFor(record.vendor_id || record.partner_id, record.vendor_name || record.partner_name));
       case 'evaluation':
         return partnerDepartment(partnerFor(record.partner_id || record.supplier_id, record.supplier_name));
+      case 'obligation': {
+        // An obligation belongs to the record it is attached to (contract, then order, then partner); an unattached one to its department.
+        const contract = record.contract_id ? contractById.get(record.contract_id) : undefined;
+        if (contract) return contractDepartment(contract);
+        const io = record.io_id ? ioById.get(record.io_id) : undefined;
+        if (io) return departmentOf('io', io);
+        const partner = record.partner_id ? partnerById.get(record.partner_id) : undefined;
+        if (partner) return partnerDepartment(partner);
+        return teamOf(record.responsible_department);
+      }
       case 'notification': {
         const contract = record.parent_id ? contractById.get(record.parent_id) : undefined;
         if (contract) return contractDepartment(contract);

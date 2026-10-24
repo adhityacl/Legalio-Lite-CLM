@@ -19,8 +19,9 @@ import { migration as apiKeys } from './0018_api_keys';
 import { migration as webhooks } from './0019_webhooks';
 import { migration as approvalSlaNotices } from './0020_approval_sla_notices';
 import { migration as digest } from './0021_digest';
+import { migration as obligations } from './0022_obligations';
 import type { Migration } from './types';
 
 /** Append new migrations at the end with the next number. */
-export const MIGRATIONS: Migration[] = [baseline, reminderLedger, uploadOwners, aiUsage, auditImmutable, idSequences, contractVersions, searchTrigram, partnerVersions, orderVersions, spendingVersions, evaluationVersions, notificationVersions, templateVersions, driveBackupIndex, uploadOwnerTrigram, exportJobs, apiKeys, webhooks, approvalSlaNotices, digest];
+export const MIGRATIONS: Migration[] = [baseline, reminderLedger, uploadOwners, aiUsage, auditImmutable, idSequences, contractVersions, searchTrigram, partnerVersions, orderVersions, spendingVersions, evaluationVersions, notificationVersions, templateVersions, driveBackupIndex, uploadOwnerTrigram, exportJobs, apiKeys, webhooks, approvalSlaNotices, digest, obligations];
 export type { Migration };

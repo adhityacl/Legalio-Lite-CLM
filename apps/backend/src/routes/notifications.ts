@@ -3,6 +3,7 @@ import { notificationRepository } from '../repositories/notificationRepository';
 import { withAdvisoryLock } from '../db';
 import { REMINDER_LOCK_KEY } from '../reminders';
 import { runReminderPass } from '../reminderJobs';
+import { runObligationReminders } from '../backgroundJobs';
 import express from 'express';
 import { forwardAsyncRouteErrors } from '../asyncRoutes';
 export function createNotificationsRouter() {
@@ -37,7 +38,9 @@ app.post("/api/cron/trigger-check", async (req: express.Request, res: express.Re
   const outcome = await withAdvisoryLock(REMINDER_LOCK_KEY, runReminderPass);
   if (!outcome.ran) return res.status(202).json({ success: true, newNotificationsGenerated: 0, skipped: "another reminder pass is running" });
   const { queued, delivery } = outcome.value!;
-  res.json({ success: true, newNotificationsGenerated: queued, delivery });
+  // The obligation reminder pass (due soon / overdue) runs on demand too, under its own lock.
+  const obligations = await runObligationReminders();
+  res.json({ success: true, newNotificationsGenerated: queued, delivery, obligations: obligations.ran ? obligations.value : { skipped: 'another obligation pass is running' } });
 });
   return app;
 }

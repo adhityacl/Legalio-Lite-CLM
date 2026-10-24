@@ -201,6 +201,14 @@ async function buildArchive(db: Sql, job: ExportJob, zip: ReturnType<typeof crea
   }), approvals));
   counts.approvals = approvals.n;
 
+  // Obligations and key dates (the source quote of an AI-extracted one is kept: it is the evidence).
+  const obligations = { n: 0 };
+  await zip.addEntry('obligations.json', jsonArray(keyset(db, `
+    SELECT id, contract_id, io_id, partner_id, title, description, type, due_date, recurrence, recurrence_interval, recurrence_until, responsible_user_id, responsible_department,
+      status, lead_days, source, source_quote, source_page, source_confidence, confirmed_by, confirmed_at, completed_at, completed_by, completions, version, created_by, created_at, updated_at
+    FROM obligations WHERE organization_id = ? AND id > ? ORDER BY id LIMIT ?`, org, (rows) => rows), obligations));
+  counts.obligations = obligations.n;
+
   // Activity log (operational history), JSON and CSV.
   const activityQuery = `SELECT * FROM activity_logs WHERE organization_id = ? AND id > ? ORDER BY id LIMIT ?`;
   const activity = { n: 0 };

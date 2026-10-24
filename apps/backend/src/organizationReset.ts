@@ -5,6 +5,7 @@ import { createEntityRepository } from './repositories/entityRepository';
 
 /** Editor documents and approvals live in their own tables; each entry deletes one organization's rows. */
 const SQL_STEPS: Array<{ table: string; sql: string }> = [
+  { table: 'obligations', sql: 'DELETE FROM obligations WHERE organization_id = ?' },
   { table: 'contract_comments', sql: 'DELETE FROM contract_comments WHERE contract_id IN (SELECT id FROM contract_documents WHERE organization_id = ?)' },
   { table: 'contract_drafts', sql: 'DELETE FROM contract_drafts WHERE contract_id IN (SELECT id FROM contract_documents WHERE organization_id = ?)' },
   { table: 'document_metadata', sql: 'DELETE FROM document_metadata WHERE contract_id IN (SELECT id FROM contract_documents WHERE organization_id = ?)' },

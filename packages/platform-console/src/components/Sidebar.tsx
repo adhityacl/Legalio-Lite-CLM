@@ -19,6 +19,7 @@ import {
   Languages,
   ShieldAlert,
   Radio,
+  ListChecks,
 } from 'lucide-react';
 import { AiIcon } from './icons/AiIcon';
 import { useLanguage } from '../context/LanguageContext';
@@ -152,6 +153,7 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
     can('document.view') && { id: 'hierarchy', label: t('nav.hierarchy', 'Explore'), icon: GitFork, active: activeTab === 'hierarchy' },
     can('document.view') && { id: 'partners', label: t('nav.partners', 'Mitra Kerja'), icon: Building2, active: partnerChildren.some(c => c.active), children: partnerChildren },
     can('document.view') && { id: 'contracts', label: t('nav.contracts', 'Kontrak'), icon: FileText, active: activeTab === 'contracts', badge: expiringContractsCount },
+    can('document.view') && { id: 'obligations', label: t('nav.obligations', 'Obligations'), icon: ListChecks, active: activeTab === 'obligations' },
     can('document.view') && modules.commercialDocuments && { id: 'ios', label: t('nav.ios', '{docs}'), icon: FileSpreadsheet, active: activeTab === 'ios' },
     can('document.view') && { id: 'notifikasi', label: t('nav.notifications', 'Notifikasi'), icon: Bell, active: activeTab === 'notifikasi', badge: unresolvedNotifsCount },
   ].filter(Boolean) as NavEntry[];

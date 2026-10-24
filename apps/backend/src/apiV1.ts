@@ -17,6 +17,8 @@ import { contractRepository } from './repositories/contractRepository';
 import { ioRepository } from './repositories/ioRepository';
 import { partnerRepository } from './repositories/partnerRepository';
 import { spendingRepository } from './repositories/spendingRepository';
+import { obligationRepository, presentObligation } from './repositories/obligationRepository';
+import { createObligationsRouter, organizationToday } from './routes/obligations';
 import { V1_OPERATIONS, type V1Operation, type V1Resource } from './apiV1Operations';
 import { buildOpenApiDocument } from './apiV1OpenApi';
 
@@ -26,7 +28,7 @@ const DEFAULT_PAGE = 50;
 const MAX_PAGE = 200;
 
 const repositories: Record<V1Resource, { get: (organizationId: string, id: string) => Promise<any> }> = {
-  contracts: contractRepository, partners: partnerRepository, orders: ioRepository, spendings: spendingRepository,
+  contracts: contractRepository, partners: partnerRepository, orders: ioRepository, spendings: spendingRepository, obligations: obligationRepository,
 };
 
 const defaultCode = (status: number) => (status === 400 ? 'INVALID_REQUEST' : status === 401 ? 'UNAUTHENTICATED' : status === 403 ? 'INSUFFICIENT_PERMISSION' : status === 404 ? 'RESOURCE_NOT_FOUND' : status === 409 ? 'CONFLICT' : 'REQUEST_FAILED');
@@ -42,7 +44,7 @@ export function createApiV1Router() {
   const router = express.Router();
   forwardAsyncRouteErrors(router);
   const legacy = express.Router();
-  for (const factory of [createPartnersRouter, createContractsRouter, createIoRouter, createSpendingsRouter]) legacy.use(factory());
+  for (const factory of [createPartnersRouter, createContractsRouter, createIoRouter, createSpendingsRouter, createObligationsRouter]) legacy.use(factory());
 
   /** Runs the existing handler for `legacyPath` and reshapes its JSON answer. */
   const handOff = (req: express.Request, res: express.Response, next: express.NextFunction, legacyPath: string, shape: (status: number, body: any) => { status: number; body: unknown }, legacyMethod = req.method) => {
@@ -95,7 +97,8 @@ export function createApiV1Router() {
       register(operation, async (req, res) => {
         const record = await repositories[spec.resource].get(orgContextOf(req).organizationId, req.params.id);
         if (!record) return sendError(req, res, 404, 'RESOURCE_NOT_FOUND', 'Resource not found.');
-        res.json({ data: record });
+        const organizationId = orgContextOf(req).organizationId;
+        res.json({ data: spec.resource === 'obligations' ? presentObligation(record, organizationToday(organizationId)) : record });
       });
     } else if (spec && operation.kind === 'create') {
       register(operation, (req, res, next) => {

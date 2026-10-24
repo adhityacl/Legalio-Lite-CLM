@@ -135,6 +135,9 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['POST', '/api/v1/spendings', apiKey('spendings:write')],
   ['PATCH', '/api/v1/spendings/:id', apiKey('spendings:write', 'version required')],
 
+  ['GET', '/api/v1/obligations', apiKey('obligations:read')],
+  ['GET', '/api/v1/obligations/:id', apiKey('obligations:read')],
+
   /* ---------------- canonical tenant API ---------------- */
   ['*', '/api/organizations/:organizationId/*', router('path organization + membership/platform context')],
   ['GET', '/api/platform/configuration', router('platform.configuration.read')],
@@ -285,6 +288,16 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['GET', '/api/approvals/:id/file', tenant('document.create', 'same visibility as the detail')],
   ['DELETE', '/api/approvals/:id', tenant('document.create', 'requester only; checked in approvalRoutes')],
   ['POST', '/api/approvals/:id/decision', tenant('document.create', 'only the current step approver; checked in approvalRoutes')],
+  ['GET', '/api/obligations', tenant('document.view', 'obligations of permitted records only')],
+  ['GET', '/api/obligations/summary', tenant('document.view', 'SQL aggregate over permitted obligations only')],
+  ['GET', '/api/obligations/settings', tenant('document.view', 'reminder lead time of the organization')],
+  ['PUT', '/api/obligations/settings', tenant('tenant.settings.update', 'audited')],
+  ['GET', '/api/obligations/assignees', tenant('document.edit', 'active members who can be made responsible')],
+  ['GET', '/api/obligations/:id', tenant('document.view')],
+  ['POST', '/api/obligations', tenant('document.edit')],
+  ['PUT', '/api/obligations/:id', tenant('document.edit', 'version checked')],
+  ['POST', '/api/obligations/:id/complete', tenant('document.edit', 'rolls recurring obligations forward')],
+  ['DELETE', '/api/obligations/:id', tenant('document.delete')],
   ['GET', '/api/metadata-fields', tenant('document.view')],
   ['POST', '/api/metadata-fields', tenant('tenant.settings.update')],
   ['DELETE', '/api/metadata-fields/:fieldId', tenant('tenant.settings.update')],

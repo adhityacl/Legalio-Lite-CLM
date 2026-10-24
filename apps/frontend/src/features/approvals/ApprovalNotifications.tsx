@@ -7,6 +7,7 @@ import { Heading } from '@legalio/ui-components/heading';
 import { Text } from '@legalio/ui-components/text';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTenant } from '../../context/TenantContext';
+import { useNavigation } from '../../context/NavigationContext';
 import { approvalsApi } from './approvalsApi';
 
 /** Localizes one personal approval notification (the server stores the kind and the facts, not the sentence). */
@@ -21,32 +22,37 @@ function describe(t: (key: string, fallback?: string, vars?: Record<string, stri
     case 'approval.sla_breach': return p.audience === 'approver'
       ? t('approval.notif.sla_breach_own', '{code} "{title}" is past its SLA deadline and waits for you.', vars)
       : t('approval.notif.sla_breach', '{code} "{title}" is overdue; it was escalated to you.', vars);
+    case 'obligation.due_soon': return p.daysUntilDue === 0
+      ? t('obligations.notif.due_today', 'Obligation "{title}" is due today.', vars)
+      : t('obligations.notif.due_soon', 'Obligation "{title}" is due in {days} day(s).', { ...vars, days: String(p.daysUntilDue ?? '') });
+    case 'obligation.overdue': return t('obligations.notif.overdue', 'Obligation "{title}" is overdue by {days} day(s).', { ...vars, days: String(Math.abs(Number(p.daysUntilDue ?? 0))) });
     default: return `${vars.code} ${vars.title}`;
   }
 }
 
 /** The caller's own unread approval notifications (e-mail copies exist when the mail relay is on). Hidden when there is nothing to show. */
-export const ApprovalNotifications: React.FC<{ onOpen?: (id: string) => void }> = ({ onOpen }) => {
+export const ApprovalNotifications: React.FC<{ onOpen?: (id: string) => void; scope?: 'approval' | 'obligation' }> = ({ onOpen, scope = 'approval' }) => {
   const { t } = useLanguage();
   const { activeTenantId } = useTenant();
   const queryClient = useQueryClient();
+  const { setActiveTab } = useNavigation();
   const queryKey = ['approval-notifications', activeTenantId];
   const { data } = useQuery({
     queryKey, queryFn: () => approvalsApi.notifications(activeTenantId!), enabled: Boolean(activeTenantId), refetchInterval: 60_000,
   });
-  const unread = (data?.notifications ?? []).filter((entry) => !entry.isRead).slice(0, 5);
+  const unread = (data?.notifications ?? []).filter((entry) => !entry.isRead && entry.kind.startsWith(`${scope}.`)).slice(0, 5);
   if (!unread.length) return null;
-  const markAll = async () => { await approvalsApi.markNotificationsRead(activeTenantId!); await queryClient.invalidateQueries({ queryKey }); };
+  const markAll = async () => { await approvalsApi.markNotificationsRead(activeTenantId!, unread.map((entry) => entry.id)); await queryClient.invalidateQueries({ queryKey }); };
   return (
     <Card className="flex flex-col gap-g8 p-g13" aria-live="polite">
       <div className="flex flex-wrap items-center justify-between gap-g8">
-        <Heading as="h3" size="xs" weight="semibold" className="flex items-center gap-g8"><Bell className="size-g16" aria-hidden />{t('approval.notif.title', 'Notifications')} ({data!.unread})</Heading>
+        <Heading as="h3" size="xs" weight="semibold" className="flex items-center gap-g8"><Bell className="size-g16" aria-hidden />{t('approval.notif.title', 'Notifications')} ({unread.length})</Heading>
         <Button type="button" variant="ghost" size="sm" onClick={() => void markAll()}><CheckCheck aria-hidden />{t('approval.notif.mark_all', 'Mark all as read')}</Button>
       </div>
       <ul className="flex flex-col gap-g5">
         {unread.map((entry) => (
           <li key={entry.id}>
-            <Button type="button" variant="ghost" size="sm" className="h-auto w-full justify-start whitespace-normal text-left font-normal" onClick={() => entry.params.requestId && onOpen?.(String(entry.params.requestId))}>
+            <Button type="button" variant="ghost" size="sm" className="h-auto w-full justify-start whitespace-normal text-left font-normal" onClick={() => (entry.params.obligationId ? setActiveTab('obligations', undefined, { recordId: String(entry.params.obligationId) }) : entry.params.requestId && onOpen?.(String(entry.params.requestId)))}>
               <Text as="span" size="sm">{describe(t, entry.kind, entry.params)}</Text>
             </Button>
           </li>

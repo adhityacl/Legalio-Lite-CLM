@@ -27,6 +27,6 @@ export const approvalsApi = {
   fileUrl: (id: string) => `/api/approvals/${id}/file`,
   notifications: (organizationId: string) =>
     request<{ notifications: Array<{ id: string; kind: string; params: Record<string, any>; isRead: boolean; createdAt: string }>; unread: number }>(`/api/organizations/${encodeURIComponent(organizationId)}/my-notifications`),
-  markNotificationsRead: (organizationId: string) =>
-    request<{ updated: number }>(`/api/organizations/${encodeURIComponent(organizationId)}/my-notifications/read`, { method: 'POST', body: { all: true } }),
+  markNotificationsRead: (organizationId: string, ids?: string[]) =>
+    request<{ updated: number }>(`/api/organizations/${encodeURIComponent(organizationId)}/my-notifications/read`, { method: 'POST', body: ids ? { ids } : { all: true } }),
 };

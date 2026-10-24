@@ -113,6 +113,8 @@ interface HierarchyTreemapViewProps {
   error?: boolean;
   onRetry?: () => void;
   onOpenCalendarDocument: (kind: 'contract' | 'io', id: string) => void;
+  /** Opens an obligation shown on the calendar. */
+  onOpenCalendarObligation?: (id: string) => void;
   onOpenAddPartner: () => void;
   onOpenAddContract: (partnerId?: string) => void;
   onOpenAddIO: (contractId?: string, partnerId?: string) => void;
@@ -146,6 +148,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
   error,
   onRetry,
   onOpenCalendarDocument,
+  onOpenCalendarObligation,
   onOpenAddPartner,
   onOpenAddContract,
   onOpenAddIO,
@@ -203,7 +206,7 @@ export const HierarchyTreemapView: React.FC<HierarchyTreemapViewProps> = ({
 
       <TabsContent value={viewMode} className="mt-0">
       {viewMode === 'calendar' && <WorkspaceDocumentCalendar contracts={contracts} ios={ios} partners={partners}
-        loading={loading} error={error} onRetry={onRetry} onOpenDocument={onOpenCalendarDocument} />}
+        loading={loading} error={error} onRetry={onRetry} onOpenDocument={onOpenCalendarDocument} onOpenObligation={onOpenCalendarObligation} />}
 
       {viewMode === 'treemap' && <HierarchyTreeView partners={partners} contracts={contracts} ios={ios} searchQuery={searchQuery}
         loading={loading} error={error} onRetry={onRetry} onSelectPartner={onSelectPartner} onSelectContract={onSelectContract} onSelectIO={onSelectIO}

@@ -31,3 +31,10 @@ export async function emitContractEvents(db: Sql, before: any | null, after: any
     }
   });
 }
+
+/** An obligation as integrations see it: business identifiers and dates, not internal notes or source quotes. */
+export const obligationSummary = (o: any) => ({
+  obligationId: o.id, title: o.title, type: o.type, status: o.status, dueDate: o.due_date ?? null, recurrence: o.recurrence,
+  contractId: o.contract_id ?? null, orderId: o.io_id ?? null, partnerId: o.partner_id ?? null,
+  responsibleUserId: o.responsible_user_id ?? null, responsibleDepartment: o.responsible_department || null, source: o.source, version: o.version ?? null,
+});

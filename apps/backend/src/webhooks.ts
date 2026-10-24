@@ -20,6 +20,7 @@ export const API_VERSION = '2026-10-01';
 export const WEBHOOK_EVENTS = [
   'contract.created', 'contract.updated', 'contract.status_changed', 'contract.terminated',
   'reminder.sent', 'approval.requested', 'approval.decided', 'document.exported', 'signature.completed',
+  'obligation.created', 'obligation.due_soon', 'obligation.overdue', 'obligation.completed',
 ] as const;
 export type WebhookEventType = (typeof WEBHOOK_EVENTS)[number];
 export const MAX_ENDPOINTS_PER_ORGANIZATION = 20;
