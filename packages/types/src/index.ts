@@ -328,17 +328,8 @@ export interface UserSession {
   platformRole?: 'user' | 'superuser';
 }
 
-export interface GoogleSheetsConfig {
-  spreadsheetId?: string;
-  masterSpreadsheetId?: string;
-  masterSpreadsheetUrl?: string;
-  driveFolderId: string;
-  isConnected: boolean;
-  lastSyncTime?: string;
-  autoSync: boolean;
-  accessToken?: string;
-  refreshToken?: string;
-  isLocked?: boolean;
+/** The platform provider settings an administrator edits: notification recipients, AI model and SMTP relay. */
+export interface PlatformProviderConfig {
   notificationEmails?: string;
   legalNotificationEmail?: string;
   financeNotificationEmail?: string;

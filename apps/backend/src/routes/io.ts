@@ -7,7 +7,7 @@ import { hasOrganizationScope } from '../rbac';
 import { contractRepository } from '../repositories/contractRepository';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity, orgContextOf, scopeOf } from '../recordAccess';
-import { db, countryNameForPrompt, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { db, countryNameForPrompt } from '../memoryDb';
 import { normalizeCurrencyCode, convertToUsdWithFallback, getDefaultUsdRate } from '@legalio/shared/currencyUtils';
 import { tenantDefaultCurrency, aiPolicyContext, getTenantSettings, findTenant, computeLifecycle } from '../tenantPolicy';
 import { upload } from '../uploadMiddleware';
@@ -19,7 +19,6 @@ import { normalizeParsedDate, computeContractEndDateFromDuration } from '../docu
 import { sendRouteError } from '../apiErrors';
 import { generateRedlineAnalysis } from '../redlineAnalysis';
 import { validateBody } from '../validation';
-import { resolveActiveGoogleToken } from '../googleDrive';
 import { getHistoricalExchangeRate } from '@legalio/shared/currencyRates';
 import { formatIOFileName } from '@legalio/shared/fileNaming';
 import { saveUpload } from '../uploadStorage';
@@ -351,9 +350,6 @@ app.post("/api/ios", validateBody(bodySchemas.ioCreateBody, { requiredMessage: "
   const partner = await partnerRepository.get(targetOrgId, String(partner_id ?? ""));
   if (!partner) return res.status(400).json({ error: "Partner tidak ditemukan." });
   const contract = contract_id ? await contractRepository.get(targetOrgId, contract_id) : undefined;
-  const token = await resolveActiveGoogleToken(
-    req.headers["x-google-access-token"] || req.body.accessToken,
-  );
   const cur = normalizeCurrencyCode(currency, tenantDefaultCurrency(targetOrgId));
   const amt = Number(io_value) || 0;
   let total_usd = req_usd;
@@ -363,14 +359,7 @@ app.post("/api/ios", validateBody(bodySchemas.ioCreateBody, { requiredMessage: "
     } else {
       let rate = getDefaultUsdRate(cur);
       try {
-        const sheetId =
-          targetTenant?.spreadsheetId || db.googleConfig?.spreadsheetId;
-        rate = await getHistoricalExchangeRate(
-          sheetId,
-          token,
-          cur,
-          start_date,
-        );
+        rate = await getHistoricalExchangeRate(cur, start_date);
       } catch (e) {
         log.error("Failed fetching historical rate for IO:", e);
       }
@@ -398,7 +387,7 @@ app.post("/api/ios", validateBody(bodySchemas.ioCreateBody, { requiredMessage: "
         fileData,
         targetTenant?.id,
       );
-      await logActivity(req, "UPLOAD_SUCCESS", "IO", `File IO '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
+      await logActivity(req, "UPLOAD_SUCCESS", "IO", `File IO '${targetFileName}' disimpan di penyimpanan file aplikasi`);
     }
   }
   const { status, daysRemaining: diffDays } = computeLifecycle(targetOrgId, end_date, "Active", false);
@@ -439,7 +428,6 @@ app.post("/api/ios", validateBody(bodySchemas.ioCreateBody, { requiredMessage: "
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   const stored = await ioRepository.insert(newIO);
   await logActivity(req, "CREATE", "IO", `Membuat dokumen komersial baru '${io_number}' (${io_title}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`);
-  await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
   res.json({ success: true, io: stored });
 });
 app.put("/api/ios/:id", validateBody(bodySchemas.ioUpdateBody), async (req: express.Request, res: express.Response) => {
@@ -471,16 +459,8 @@ app.put("/api/ios/:id", validateBody(bodySchemas.ioUpdateBody), async (req: expr
     } else {
       let rate = getDefaultUsdRate(cur);
       try {
-        const token = await resolveActiveGoogleToken(
-          req.headers["x-google-access-token"] || req.body.accessToken,
-        );
         const startDate = updated.start_date || existing.start_date;
-        rate = await getHistoricalExchangeRate(
-          db.googleConfig.spreadsheetId,
-          token,
-          cur,
-          startDate,
-        );
+        rate = await getHistoricalExchangeRate(cur, startDate);
       } catch (e) {
         log.error("Failed fetching rate for edit IO:", e);
       }
@@ -505,9 +485,6 @@ app.put("/api/ios/:id", validateBody(bodySchemas.ioUpdateBody), async (req: expr
       rawFileName:
         uploadedName || updated.fileName || `${updated.io_number}.pdf`,
     });
-    const token = await resolveActiveGoogleToken(
-      req.headers["x-google-access-token"] || req.body.accessToken,
-    );
     let io_file_link = "";
     if (!io_file_link) {
       io_file_link = await saveUpload(
@@ -517,7 +494,7 @@ app.put("/api/ios/:id", validateBody(bodySchemas.ioUpdateBody), async (req: expr
         fileData,
         existing.organizationId,
       );
-      await logActivity(req, "UPLOAD_SUCCESS", "IO", `File IO '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
+      await logActivity(req, "UPLOAD_SUCCESS", "IO", `File IO '${targetFileName}' disimpan di penyimpanan file aplikasi`);
     }
     updated.io_file_link = io_file_link;
     updated.fileName = targetFileName;
@@ -549,7 +526,6 @@ app.put("/api/ios/:id", validateBody(bodySchemas.ioUpdateBody), async (req: expr
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   const stored = await ioRepository.update(updated, expectedVersion);
   await logActivity(req, "UPDATE", "IO", `Memperbarui data Insertion Order '${updated.io_number}'`);
-  await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, io: stored });
 });
 app.delete("/api/ios/:id", async (req: express.Request, res: express.Response) => {
@@ -560,7 +536,6 @@ app.delete("/api/ios/:id", async (req: express.Request, res: express.Response) =
   if (tenantDenial) return res.status(tenantDenial.status).json(tenantDenial.body);
   await ioRepository.remove(item.organizationId, id);
   await logActivity(req, "DELETE", "IO", `Menghapus Insertion Order '${item.io_number}' (${item.io_title})`);
-  await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });
 });
   return app;

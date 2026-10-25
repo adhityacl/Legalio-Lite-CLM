@@ -11,10 +11,10 @@ A fresh install has no administrator, and the first visitor creates it on the se
 | Setting | Where | Notes |
 | --- | --- | --- |
 | `POSTGRES_PASSWORD` | root `.env` or shell | Required; Compose fails with a clear message without it. Only applied when the volume is first created. |
-| `BETTER_AUTH_SECRET` | `apps/backend/.env` | Created by `npm run setup`. **Also encrypts the stored COS and Google credentials.** |
+| `BETTER_AUTH_SECRET` | `apps/backend/.env` | Created by `npm run setup`. **Also encrypts the stored COS credentials.** |
 | `FRONTEND_BIND`, `FRONTEND_PORT` | root `.env` | Default `0.0.0.0:8080`. Use `127.0.0.1` behind a host reverse proxy. |
 | `TRUST_PROXY` | root `.env` | Which hops may set `X-Forwarded-*` for the backend. Default: loopback and private ranges (the Docker network). A number means that many hops. |
-| `RATE_LIMIT_AUTH_MAX`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_DISABLED` | backend env | Limits on sign-in, Google sign-in, setup and cron endpoints (default 30 writes per client per 60 s). nginx adds its own 30 requests/min limit on the same paths. |
+| `RATE_LIMIT_AUTH_MAX`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_DISABLED` | backend env | Limits on sign-in, setup and cron endpoints (default 30 writes per client per 60 s). nginx adds its own 30 requests/min limit on the same paths. |
 
 ### Phase 1 settings (backend env)
 
@@ -44,17 +44,16 @@ Upgrade notes: schema changes are versioned migrations (see POSTGRES_STORAGE.md)
   evaluations, notifications and templates (templates keep their own `version`; empty ones become 1). Existing rows are adopted in place: nothing is
   copied or re-imported. The migrations are additive, so rolling the *code* back is safe (the old release ignores the columns and keeps working on the
   same tables), but never run an old and a current release against one database at the same time.
-- Migration `0015_drive_backup_index` creates the shared Drive backup index; the first backup pass imports and renames `APP_DATA_DIR/drive-backup.json`.
 - The legacy `spd-...` spending ids of the earliest releases are renumbered from the id sequence at start (once; the old release renumbered them from 1).
 - Writes are committed row by row; a second editor saving a stale copy gets HTTP 409 `VERSION_CONFLICT` (reload and re-apply). Deleting a partner is
   one transaction (its contracts, orders and notifications go; invoices and evaluations keep their record without the partner link).
 - No business record is loaded into memory at boot; startup time and memory no longer grow with the amount of data.
 - **Several backend instances can share one database** (behind a load balancer; keep `REMINDER_SCHEDULER_ENABLED` as is, the advisory lock picks one).
-  Start them in any order, also together. Configuration changes (branding, Google/SMTP/AI settings, organization policy, credentials) reach the other
+  Start them in any order, also together. Configuration changes (branding, SMTP/AI settings, organization policy, credentials) reach the other
   instances within a moment through `NOTIFY` and at the latest after `SHARED_STATE_POLL_MS` (default 30000, `0` turns the periodic reload off;
   `SHARED_STATE_SYNC=false` turns the whole mechanism off, e.g. for a single instance behind a restricted connection pooler). `NOTIFY` / `LISTEN` needs a
   session connection to PostgreSQL (not transaction-mode pgbouncer). Per-instance limits: rate limiters count per process (N instances = up to N times
-  the configured rate), and the file-upload debounce queue of the Drive backup is lost on restart (the next full backup pass catches up).
+  the configured rate).
 
 ### Paged lists and search (Phase 2B)
 
@@ -155,7 +154,7 @@ What has to be backed up, and where:
 
 1. **PostgreSQL** (all application data): `scripts/backup.sh`.
 2. **Uploaded files** (Tencent COS): enable **bucket versioning** (and ideally cross-region replication or a lifecycle rule for old versions) in the COS console. The app does not back these up. The optional Google Drive backup copies uploaded files only, not the database.
-3. **`BETTER_AUTH_SECRET`** (`apps/backend/.env`): store it **separately from the database dump**, in a password manager or secrets vault. It encrypts the COS and Google credentials stored in the database. A restored database with a different secret works, but the COS and Google credentials can no longer be decrypted and a superuser must enter them again in `/sys`. Do not store the secret next to the dumps.
+3. **`BETTER_AUTH_SECRET`** (`apps/backend/.env`): store it **separately from the database dump**, in a password manager or secrets vault. It encrypts the COS credentials stored in the database. A restored database with a different secret works, but the COS and Google credentials can no longer be decrypted and a superuser must enter them again in `/sys`. Do not store the secret next to the dumps.
 
 ### Taking a backup
 

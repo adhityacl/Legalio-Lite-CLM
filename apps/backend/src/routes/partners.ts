@@ -11,7 +11,7 @@ import { hasOrganizationScope } from '../rbac';
 import { generateRedlineAnalysis } from '../redlineAnalysis';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity, orgContextOf, scopeOf } from '../recordAccess';
-import { db, sanitizePartnerTags, sanitizeCountryCode, countryNameForPrompt, sanitizeIdentifiers, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { db, sanitizePartnerTags, sanitizeCountryCode, countryNameForPrompt, sanitizeIdentifiers } from '../memoryDb';
 import { upload } from '../uploadMiddleware';
 import { ensureAiAvailable, getValidAiModel, generateContentWithRetryAndFallback, withDocumentTranscriptField, extractAndCacheDocumentTranscript } from '../aiClient';
 import { computeInputSha256, globalOcrCache, buildCheapOcrContents } from '../lib/cheapOcrPipeline';
@@ -20,9 +20,6 @@ import { Type } from '@google/genai';
 import { sendRouteError } from '../apiErrors';
 import { validateBody } from '../validation';
 import { requestedVersion } from '../requestVersion';
-import { resolveActiveGoogleToken, getOrgFolderId } from '../googleDrive';
-import { hasServiceAccountCredentials } from '../lib/googleServiceAccountAuth';
-import { getOrCreateDriveFolder } from '../lib/googleDriveSync';
 import { formatDueDiligenceFileName } from '@legalio/shared/fileNaming';
 import { saveUpload } from '../uploadStorage';
 import { daysUntilForTenant } from '../mailHelpers';
@@ -278,41 +275,6 @@ app.post("/api/partners", validateBody(bodySchemas.partnerCreateBody, { required
     return res.status(400).json({ error: "Nama Partner wajib diisi." });
   }
   const targetOrgId = getRequestTenantId(req);
-  const token = await resolveActiveGoogleToken(
-    req.headers["x-google-access-token"] ||
-      req.body.accessToken ||
-      db.googleConfig.accessToken,
-  );
-  let driveFolderLink = `https://drive.google.com/drive/folders/Folder_${partner_name.replace(/\s+/g, "_")}`;
-  if (token || hasServiceAccountCredentials()) {
-    try {
-      const orgFolder = await getOrgFolderId(targetOrgId, token);
-      const parentFolderId = orgFolder.id || db.googleConfig.driveFolderId;
-      const vendorFolder = await getOrCreateDriveFolder(
-        partner_name,
-        parentFolderId,
-        token,
-      );
-      driveFolderLink =
-        vendorFolder.webViewLink ||
-        `https://drive.google.com/drive/folders/${vendorFolder.id}`;
-      if (vendorFolder.id) {
-        await getOrCreateDriveFolder("Folder Contract", vendorFolder.id, token);
-        await getOrCreateDriveFolder(
-          "Folder Invoice & Billing",
-          vendorFolder.id,
-          token,
-        );
-        await getOrCreateDriveFolder("Folder IO", vendorFolder.id, token);
-        await getOrCreateDriveFolder("Folder DD", vendorFolder.id, token);
-      }
-    } catch (err) {
-      log.warn(
-        `[Drive Hierarchical] Error creating folders for partner '${partner_name}':`,
-        err?.message || err,
-      );
-    }
-  }
   const partnerCountry = sanitizeCountryCode(country);
   const defaultDD = normalizePartnerDocuments({ organizationId: targetOrgId, country: partnerCountry, dd_documents: [] });
   const newPartner = {
@@ -333,7 +295,7 @@ app.post("/api/partners", validateBody(bodySchemas.partnerCreateBody, { required
       (pic_email && pic_phone ? `${pic_email} / ${pic_phone}` : ""),
     internal_pic: internal_pic || "",
     status_dd: computeDueDiligenceStatus(defaultDD),
-    dd_folder_link: driveFolderLink,
+    dd_folder_link: "",
     dd_documents: defaultDD,
     notes: notes || "",
     tags: sanitizePartnerTags(tags),
@@ -347,7 +309,6 @@ app.post("/api/partners", validateBody(bodySchemas.partnerCreateBody, { required
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   const stored = await partnerRepository.insert(newPartner);
   await logActivity(req, "CREATE", "PARTNER", `Menambahkan Partner baru: ${partner_name}${partnerCountry ? ` (${partnerCountry})` : ""}`);
-  await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
   res.json({ success: true, partner: stored });
 });
 app.put("/api/partners/:id", validateBody(bodySchemas.partnerUpdateBody), async (req: express.Request, res: express.Response) => {
@@ -419,7 +380,6 @@ app.put("/api/partners/:id", validateBody(bodySchemas.partnerUpdateBody), async 
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   const stored = await partnerRepository.update(updatedPartner, expectedVersion);
   await logActivity(req, "DD_UPDATE", "PARTNER", `Memperbarui profil & status DD Partner ${updatedPartner.partner_name} menjadi '${status_dd}'`);
-  await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, partner: stored });
 });
 app.delete("/api/partners/:id", async (req: express.Request, res: express.Response) => {
@@ -445,7 +405,6 @@ app.delete("/api/partners/:id", async (req: express.Request, res: express.Respon
     return { contractIds, ioIds };
   });
   await logActivity(req, "DELETE", "PARTNER", `Menghapus Partner '${partner.partner_name}' beserta ${contractIds.length} Kontrak dan ${ioIds.length} Insertion Order pendukung.`);
-  await triggerAutoPushToGoogleSheet(req);
   res.json({
     success: true,
     deletedContractsCount: contractIds.length,
@@ -467,9 +426,6 @@ app.post("/api/partners/:id/upload-dd", validateBody(bodySchemas.partnerUploadDd
   }
   const uploadDenial = assertRecordAccess(req, "partner", partner);
   if (uploadDenial) return res.status(uploadDenial.status).json(uploadDenial.body);
-  const token = await resolveActiveGoogleToken(
-    req.headers["x-google-access-token"] || req.body.accessToken,
-  );
   const docObj = (partner.dd_documents || []).find((d) => d.name === docName);
   const currentFilesCount = (docObj?.files || []).length;
   const finalFileName =
@@ -494,7 +450,7 @@ app.post("/api/partners/:id/upload-dd", validateBody(bodySchemas.partnerUploadDd
       fileData,
       partner.organizationId,
     );
-    await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `Dokumen DD '${finalFileName}' untuk vendor '${partner.partner_name}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
+    await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `Dokumen DD '${finalFileName}' untuk vendor '${partner.partner_name}' disimpan di penyimpanan file aplikasi`);
   }
   // Row-locked edit of the partner as it is now: concurrent uploads to different documents (or a form save) all land.
   const stored = await partnerRepository.mutate(partner.organizationId, id, (partner) => {
@@ -560,7 +516,6 @@ app.post("/api/partners/:id/upload-dd", validateBody(bodySchemas.partnerUploadDd
   partner.updated_at = new Date().toISOString();
   });
   await logActivity(req, "DD_UPDATE", "PARTNER", `Mengunggah dokumen DD '${docName}' untuk partner ${partner.partner_name}`);
-  void triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, partner: stored ?? partner });
 });
 app.delete("/api/partners/:id/dd-file", validateBody(bodySchemas.partnerDdFileDeleteBody), async (req: express.Request, res: express.Response) => {

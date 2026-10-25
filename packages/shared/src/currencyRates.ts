@@ -48,8 +48,6 @@ export async function getUsdRate(currency: string): Promise<{ rate: number; isFa
 }
 
 export async function getHistoricalExchangeRatesBatch(
-  _spreadsheetId: string,
-  _token: string,
   items: { currency: string; invoice_date?: string }[],
 ): Promise<Record<string, number>> {
   const map: Record<string, number> = {};
@@ -61,17 +59,15 @@ export async function getHistoricalExchangeRatesBatch(
 }
 
 export async function getHistoricalExchangeRate(
-  spreadsheetId: string,
-  token: string,
   currency: string,
   invoiceDateStr?: string,
 ): Promise<number> {
   const code = normalizeCurrencyCode(currency);
-  const map = await getHistoricalExchangeRatesBatch(spreadsheetId, token, [{ currency: code, invoice_date: invoiceDateStr }]);
+  const map = await getHistoricalExchangeRatesBatch([{ currency: code, invoice_date: invoiceDateStr }]);
   return map[`${code}_${invoiceDateStr || ''}`] || getDefaultUsdRate(code);
 }
 
-export async function getExchangeRates(_spreadsheetId: string, _token: string, currencies: string[]): Promise<Record<string, number>> {
+export async function getExchangeRates(currencies: string[]): Promise<Record<string, number>> {
   const result: Record<string, number> = {};
   for (const cur of Array.from(new Set(currencies.map((c) => normalizeCurrencyCode(c)).filter((c) => c !== 'USD')))) {
     result[cur] = (await getUsdRate(cur)).rate;

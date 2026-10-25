@@ -228,14 +228,6 @@ export function validateNotificationsPatch(input: unknown, current: Organization
   return { notifications: next, changed: Object.keys(patch).map((k) => `notifications.${k}`) };
 }
 
-export function validateResourceId(value: unknown, label: string): string | null {
-  if (value === null || value === '') return null;
-  if (typeof value !== 'string' || !RESOURCE_ID.test(value.trim()) || value.startsWith('Folder_')) {
-    throw invalid(`${label} is not a valid Google resource ID.`);
-  }
-  return value.trim();
-}
-
 /* ------------------------------------------------------------------ */
 /* Settings read/write                                                  */
 /* ------------------------------------------------------------------ */
@@ -348,76 +340,6 @@ export async function patchOrganizationSettings(db: DB, organizationId: string, 
 }
 
 /* ------------------------------------------------------------------ */
-/* Integrations                                                         */
-/* ------------------------------------------------------------------ */
-
-export interface IntegrationRow {
-  organizationId: string;
-  driveFolderId: string | null;
-  spreadsheetId: string | null;
-  legacyAutoSync: number;
-  version: number;
-}
-
-export async function readIntegration(db: DB, organizationId: string): Promise<IntegrationRow> {
-  if (!await organizationExists(db, organizationId)) throw new ApiError(404, 'RESOURCE_NOT_FOUND', 'Resource not found.');
-  const row = await db.get(`SELECT "organizationId", "driveFolderId", "spreadsheetId", "legacyAutoSync", version FROM organization_integrations WHERE "organizationId" = ?`, organizationId) as IntegrationRow | undefined;
-  return row || { organizationId, driveFolderId: null, spreadsheetId: null, legacyAutoSync: 0, version: 0 };
-}
-
-export function integrationDto(row: IntegrationRow, providerConfigured: boolean) {
-  return {
-    organizationId: row.organizationId,
-    driveFolderId: row.driveFolderId,
-    spreadsheetId: row.spreadsheetId,
-    providerConfigured,
-    mappingConfigured: Boolean(row.driveFolderId || row.spreadsheetId),
-    syncSupported: false as const,
-    effectiveAutoSync: false as const,
-    version: row.version,
-  };
-}
-
-export async function writeIntegrationRow(db: DB, row: IntegrationRow, actorId: string | null) {
-  await db.run(`
-    INSERT INTO organization_integrations ("organizationId", "driveFolderId", "spreadsheetId", "legacyAutoSync", version, "updatedAt", "updatedBy")
-    VALUES (@organizationId, @driveFolderId, @spreadsheetId, @legacyAutoSync, @version, @updatedAt, @updatedBy)
-    ON CONFLICT ("organizationId") DO UPDATE SET "driveFolderId" = excluded."driveFolderId", "spreadsheetId" = excluded."spreadsheetId",
-      "legacyAutoSync" = excluded."legacyAutoSync", version = excluded.version, "updatedAt" = excluded."updatedAt", "updatedBy" = excluded."updatedBy"
-  `, { ...row, updatedAt: new Date().toISOString(), updatedBy: actorId });
-}
-
-export async function patchIntegration(db: DB, organizationId: string, body: unknown, actor: AuditActor): Promise<IntegrationRow> {
-  const patch = onlyKeys(body, ['expectedVersion', 'driveFolderId', 'spreadsheetId'], 'body');
-  const expectedVersion = expectVersion(patch.expectedVersion);
-  if (!('driveFolderId' in patch) && !('spreadsheetId' in patch)) throw invalid('Nothing to update.');
-  const drive = 'driveFolderId' in patch ? validateResourceId(patch.driveFolderId, 'Drive folder ID') : undefined;
-  const sheet = 'spreadsheetId' in patch ? validateResourceId(patch.spreadsheetId, 'Spreadsheet ID') : undefined;
-  return db.tx(async () => {
-    await lockOrganization(db, organizationId);
-    const current = await readIntegration(db, organizationId);
-    if (current.version !== expectedVersion) throw new ApiError(409, 'VERSION_CONFLICT', 'The integration was changed by someone else. Reload to continue.');
-    const claimed = async (column: 'driveFolderId' | 'spreadsheetId', value: string | null | undefined) =>
-      value && await db.get(`SELECT 1 FROM organization_integrations WHERE "${column}" = ? AND "organizationId" <> ?`, value, organizationId);
-    // Another organization's resource is rejected without disclosing whose it is.
-    if (await claimed('driveFolderId', drive) || await claimed('spreadsheetId', sheet)) throw invalid('This resource cannot be used for this organization.');
-    const next: IntegrationRow = {
-      ...current,
-      driveFolderId: drive === undefined ? current.driveFolderId : drive,
-      spreadsheetId: sheet === undefined ? current.spreadsheetId : sheet,
-      version: current.version + 1,
-    };
-    await writeIntegrationRow(db, next, actor.actorId);
-    await appendAudit(db, actor, {
-      organizationId, action: 'organization.integration.update', targetType: 'organization', targetId: organizationId,
-      outcome: 'success',
-      changedFields: [...(drive !== undefined ? ['driveFolderId'] : []), ...(sheet !== undefined ? ['spreadsheetId'] : [])],
-    });
-    return readIntegration(db, organizationId);
-  });
-}
-
-/* ------------------------------------------------------------------ */
 /* Audit (§12)                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -499,7 +421,6 @@ export async function buildTenantProjection(db: DB): Promise<any[]> {
   for (const [index, org] of orgs.entries()) {
     let settings: OrganizationSettingsDto;
     try { settings = await readOrganizationSettings(db, org.id); } catch { settings = { organizationId: org.id, name: org.name, slug: org.slug, version: 0, ...defaultSettingsPayload() }; }
-    const integration = await readIntegration(db, org.id);
     tenants.push({
       id: org.id,
       name: org.name,
@@ -513,10 +434,6 @@ export async function buildTenantProjection(db: DB): Promise<any[]> {
       notifications: settings.notifications,
       domainSlug: org.slug || '',
       isDefault: index === 0,
-      driveFolderId: integration.driveFolderId || undefined,
-      driveFolderLink: integration.driveFolderId ? `https://drive.google.com/drive/folders/${integration.driveFolderId}` : undefined,
-      spreadsheetId: integration.spreadsheetId || undefined,
-      spreadsheetUrl: integration.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${integration.spreadsheetId}/edit` : undefined,
       created_at: org.createdAt,
     });
   }

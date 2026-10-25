@@ -11,8 +11,6 @@ import { adminAc, defaultStatements, memberAc } from "better-auth/plugins/organi
 import { getPublicBaseUrl, loadInstallationSettings } from '../installationSettings';
 import { pool, sql } from '../db';
 
-const googleClientId = (process.env.GOOGLE_CLIENT_ID || "").trim();
-const googleClientSecret = (process.env.GOOGLE_CLIENT_SECRET || "").trim();
 
 /*
  * First-run onboarding stores the public URL in the installation database.
@@ -166,10 +164,6 @@ export const authOptions = (database: BetterAuthOptions["database"]) => ({
     enabled: true,
     autoSignIn: false,
   },
-  // Google sign-in is optional and only enabled when credentials exist.
-  socialProviders: googleClientId && googleClientSecret
-    ? { google: { clientId: googleClientId, clientSecret: googleClientSecret } }
-    : {},
   emailVerification: {
     // Delivery uses the platform mailer (set by server.ts). Failure never
     // marks an account verified; the user can request another email.

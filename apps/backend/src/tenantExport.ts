@@ -13,7 +13,7 @@ import type { Sql } from './db';
 import { componentLog } from './logger';
 import { ENTITIES, entityFor } from './normalizedSchema';
 import { createEntityRepository } from './repositories/entityRepository';
-import { readIntegration, readOrganizationSettings } from './organizationSettingsStore';
+import { readOrganizationSettings } from './organizationSettingsStore';
 import type { ObjectStore } from './objectStore';
 import { createZipWriter, ZipLimitError } from './zipWriter';
 import { emitWebhookEvent } from './webhooks';
@@ -147,15 +147,13 @@ async function buildArchive(db: Sql, job: ExportJob, zip: ReturnType<typeof crea
     notes: 'Secrets (API keys, webhook secrets, provider and SMTP credentials) and approval attachments are not part of this archive.',
   });
 
-  // Settings without secrets: the organization policy, its integration mapping, departments and members.
+  // Settings without secrets: the organization policy, departments and members.
   const departments = await db.all(`SELECT id, name, "createdAt" FROM team WHERE "organizationId" = ? ORDER BY name`, org);
   const members = await db.all(`
     SELECT m.id, m."userId", u.name, u.email, m.role, m.status, m."createdAt" FROM member m JOIN "user" u ON u.id = m."userId"
     WHERE m."organizationId" = ? ORDER BY lower(u.email)`, org);
-  const integration = await readIntegration(db, org);
   await jsonEntry('settings.json', {
     settings: await readOrganizationSettings(db, org),
-    integration: { driveFolderId: integration.driveFolderId, spreadsheetId: integration.spreadsheetId, version: integration.version },
     departments, members,
   });
   counts.departments = departments.length;

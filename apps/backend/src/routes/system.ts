@@ -10,9 +10,9 @@ import { sql } from '../db';
 import { verifyPassword, hashPassword } from 'better-auth/crypto';
 import { getPublicBaseUrl, normalizePublicUrl, saveInstallationPublicUrl } from '../installationSettings';
 import { IS_TEST_MODE } from '../runtimePaths';
-import { checkCosInput } from '../googleCredentials';
+import { checkCosInput } from '../storageCredentials';
 import { CosConfig } from '../objectStore';
-import { googleCredentials } from '../googleCredentialStore';
+import { storageCredentials } from '../storageCredentialStore';
 import { ApiError, appendAudit } from '../organizationSettingsStore';
 import { RequestDenied, identityOf } from '../identity';
 import { reloadAuthConfiguration } from '../lib/auth';
@@ -36,7 +36,7 @@ app.get("/api/exchange-rates", async (req: express.Request, res: express.Respons
         ...(await ioRepository.currencies()),
       ].filter(Boolean).map((c) => normalizeCurrencyCode(c))),
     );
-    const rates = await getExchangeRates("", "", currencies);
+    const rates = await getExchangeRates(currencies);
     res.json({ USD: 1, ...rates });
   } catch (err) {
     sendRouteError(req, res, err, "request failed", "Could not load exchange rates.", { status: 500 });
@@ -144,7 +144,7 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
         VALUES (?, ?, 'credential', ?, ?, ?, ?)
       `, `acc_${id}`, id, id, hashed, now, now);
       await saveInstallationPublicUrl(sql, publicUrl);
-      if (storage) await googleCredentials.saveCos(storage, id);
+      if (storage) await storageCredentials.saveCos(storage, id);
       return true;
     });
     if (!created) {
@@ -152,7 +152,7 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
     }
   } catch (err: any) {
     // saveCos already updated the in-memory credentials; after a rollback the table is the truth again.
-    if (storage) await googleCredentials.init().catch((reloadErr) => log.error("[setup] credential reload failed:", reloadErr));
+    if (storage) await storageCredentials.init().catch((reloadErr) => log.error("[setup] credential reload failed:", reloadErr));
     const known = err instanceof ApiError || err instanceof RequestDenied;
     if (!known) log.error("[setup] failed:", err);
     return sendApiError(req, res, known ? err.status : 500, "SETUP_FAILED", known ? err.message : "Setup failed.", { error: "SETUP_FAILED" });
@@ -170,12 +170,11 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
 app.get("/api/system/status", async (req: express.Request, res: express.Response) => {
   const identity = identityOf(req);
   const isSuperuser = identity.platformRole === "superuser";
-  const google = isSuperuser ? googleCredentials.status() : null;
   res.json({
     isSuperuser,
     defaultAdminPasswordActive: isSuperuser ? await isBootstrapPasswordActive() : false,
-    // Drives the "finish setup: connect Google" banner for a fresh install's admin.
-    googleSetupIncomplete: Boolean(google && (!google.serviceAccount.source || !google.oauthClient.source)),
+    // Drives the "finish setup: connect file storage" banner for a fresh install's admin.
+    storageSetupIncomplete: isSuperuser && !storageCredentials.storageStatus().configured,
     tenantCount: isSuperuser ? (db.tenants || []).length : undefined,
   });
 });

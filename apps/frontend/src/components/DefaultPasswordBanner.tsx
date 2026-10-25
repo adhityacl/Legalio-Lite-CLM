@@ -9,18 +9,19 @@ import { Collapsible, CollapsibleBody, CollapsibleContent, CollapsibleIndicator,
 import {
   Dialog, DialogBackdrop, DialogBody, DialogCloseIcon, DialogCloseTrigger, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPositioner, DialogTitle, DialogTrigger,
 } from '@legalio/ui-components/dialog';
-import { GoogleCredentialsDialog } from './settings/GoogleCredentialsDialog';
 import { voidHandler } from '@legalio/shared/voidHandler';
 interface DefaultPasswordBannerProps {
   /** Opens the user administration screen, for changing other accounts. */
   onOpenSecurity: () => void;
+  /** Opens the Storage page of the System Console, where the file storage is connected. */
+  onOpenStorage: () => void;
   /**
-   * Whether the Google setup reminder belongs on the current page. It is a
+   * Whether the file storage reminder belongs on the current page. It is a
    * one-time setup task, so it only shows where it is acted on (dashboard and
    * settings) instead of costing vertical space on every list. The default
    * password warning ignores this and always shows.
    */
-  showGoogleSetup?: boolean;
+  showStorageSetup?: boolean;
 }
 
 type SaveState =
@@ -32,14 +33,14 @@ type SaveState =
 const MIN_PASSWORD_LENGTH = 8;
 
 /**
- * First-run guidance for a superuser: shown while the Google credential files
- * aren't uploaded yet, or while an install upgraded from an older release still
+ * First-run guidance for a superuser: shown while file storage (Tencent COS)
+ * isn't connected yet, or while an install upgraded from an older release still
  * uses the old shipped admin password. Hidden for everyone else.
  */
-export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ onOpenSecurity, showGoogleSetup = true }) => {
+export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ onOpenSecurity, onOpenStorage, showStorageSetup = true }) => {
   const { t } = useLanguage();
   const [passwordActive, setPasswordActive] = useState(false);
-  const [googleIncomplete, setGoogleIncomplete] = useState(false);
+  const [storageIncomplete, setStorageIncomplete] = useState(false);
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -54,7 +55,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
     accountApi.systemStatus()
       .then((data) => {
         setPasswordActive(Boolean(data?.defaultAdminPasswordActive));
-        setGoogleIncomplete(Boolean(data?.googleSetupIncomplete));
+        setStorageIncomplete(Boolean(data?.storageSetupIncomplete));
       })
       .catch(() => undefined);
 
@@ -62,7 +63,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
     void refresh();
   }, []);
 
-  if (!passwordActive && !(googleIncomplete && showGoogleSetup)) return null;
+  if (!passwordActive && !(storageIncomplete && showStorageSetup)) return null;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -102,13 +103,13 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
         ) : (
           <Collapsible>
             <CollapsibleTrigger className="font-semibold">
-              {t('google_setup.summary', 'Penyiapan Google')}
+              {t('storage_setup.summary', 'File storage setup')}
               <CollapsibleIndicator />
             </CollapsibleTrigger>
             <CollapsibleContent>
               <CollapsibleBody>
                 <AlertDescription>
-                  {t('google_setup.finish_setup', 'Finish setup: upload your Google Service Account and OAuth Client JSON files to enable Drive, Sheets and Google sign-in.')}
+                  {t('storage_setup.finish_setup', 'Finish setup: connect Tencent COS so uploaded files can be stored.')}
                 </AlertDescription>
               </CollapsibleBody>
             </CollapsibleContent>
@@ -165,9 +166,7 @@ export const DefaultPasswordBanner: React.FC<DefaultPasswordBannerProps> = ({ on
           </Dialog>
         )}
         {passwordActive && <Button size="sm" variant="outline" onClick={onOpenSecurity}>{t('security.manage_users', 'Manage users')}</Button>}
-        {googleIncomplete && showGoogleSetup && (
-          <GoogleCredentialsDialog onClose={voidHandler(refresh)} trigger={<Button size="sm">{t('google_setup.button', 'Hubungkan Google')}</Button>} />
-        )}
+        {storageIncomplete && showStorageSetup && <Button size="sm" onClick={onOpenStorage}>{t('storage_setup.button', 'Connect storage')}</Button>}
       </AlertActions>
     </Alert>
   );

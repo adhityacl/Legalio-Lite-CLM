@@ -7,7 +7,7 @@ import { LANGUAGE_OPTIONS, useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useTenant } from '../context/TenantContext';
-import { NotificationLog, GoogleSheetsConfig } from '@legalio/types';
+import { NotificationLog } from '@legalio/types';
 import { Bell, ChevronDown, Search, LogOut, Menu as MenuIcon, Moon, Sun, UserRound } from 'lucide-react';
 import { Button } from '@legalio/ui-components/button';
 import { Badge } from '@legalio/ui-components/badge';
@@ -25,7 +25,6 @@ import { CommandPaletteTrigger } from '@legalio/ui-components/command-palette';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
 interface HeaderProps {
   notifications: NotificationLog[];
-  googleConfig?: GoogleSheetsConfig;
   onRefreshData: () => void | Promise<void>;
   onNavigateToTab: (tab: string) => void;
   onOpenMobileMenu?: () => void;

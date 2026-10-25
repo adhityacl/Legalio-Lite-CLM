@@ -303,12 +303,12 @@ export const UploadDDModal: React.FC<UploadDDModalProps> = ({
               {isUploading ? (
                 <>
                   <Spinner size="sm" decorative />
-                  <span>{t('partners.uploading_to_drive', 'Mengunggah ke Drive...')}</span>
+                  <span>{t('partners.uploading_to_drive', 'Mengunggah...')}</span>
                 </>
               ) : (
                 <>
                   <Upload className="w-g13 h-g13" />
-                  <span>{t('partners.upload_to_drive_btn', 'Upload ke Google Drive')}</span>
+                  <span>{t('partners.upload_to_drive_btn', 'Upload file')}</span>
                 </>
               )}
             </Button>

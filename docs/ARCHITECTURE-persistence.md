@@ -5,12 +5,12 @@ configuration and derived caches. Several backend instances can therefore run ag
 
 ## What the process keeps in memory
 
-`db` in `memoryDb.ts` holds: `branding`, `googleConfig` (Google/SMTP/AI settings; secrets are sealed at rest), `newsTicker` and `tenants` (a
+`db` in `memoryDb.ts` holds: `branding`, `googleConfig` (SMTP/AI settings, kept under this historical name; secrets are sealed at rest), `newsTicker` and `tenants` (a
 read-only projection of the organizations' policy, rebuilt from `organization` / `organization_settings` / `organization_integrations`).
 `db.partners`, `db.contracts`, `db.ios`, `db.spendings`, `db.evaluations`, `db.notifications` and `db.templates` throw on access. The
-credentials store (`googleCredentialStore.ts`) mirrors `integration_credentials` for the same reason (synchronous reads). Everything else
+credentials store (`storageCredentialStore.ts`) mirrors `integration_credentials` for the same reason (synchronous reads). Everything else
 -- partners, contracts, orders, spendings, evaluations, notifications, templates, the legacy allowlist (`allowed_users`), activity,
-audit, reminders, AI usage, mail templates, the Drive backup index -- is read from and written to PostgreSQL per request.
+audit, reminders, AI usage, mail templates -- is read from and written to PostgreSQL per request.
 
 The core saver (`coreDataStore.ts`) persists only `branding`, `google_config` and `news_ticker`: three single rows, written with
 `IS DISTINCT FROM`, serialized per process (`saveDb`). It never touches a business table and deletes nothing.
@@ -48,7 +48,7 @@ The core saver (`coreDataStore.ts`) persists only `branding`, `google_config` an
 * **Version**: the API returns `version` on every record. `PUT` accepts `version` in the body or `If-Match`; a stale value is a 409. A client that
   sends none is protected for the duration of its own request (the version read at the start is the expected one). Templates are saved with
   `POST /api/templates` (+ `id`, optional `version`).
-* **Server-side derived writes** (AI review results, lifecycle/status refresh, Drive folder links, due-diligence uploads, legacy normalization) use
+* **Server-side derived writes** (AI review results, lifecycle/status refresh, due-diligence uploads, legacy normalization) use
   `mutate`: the row is locked and edited as it is *now*, so they neither fail on nor overwrite a user's concurrent edit. A pure display refresh
   (status, days_remaining) keeps the version.
 * **Cascades are transactions**: deleting a partner (partner row locked first) removes its contracts, orders and notifications and detaches
@@ -82,7 +82,6 @@ What makes it safe:
 * ids come from PostgreSQL sequences; uniqueness rules (contract / order number, allowlist e-mail) take advisory locks inside the write transaction;
 * reminders: one pass at a time (`pg_try_advisory_lock`), ledger `ON CONFLICT DO NOTHING`, notification inserted in the same transaction;
 * startup: migrations, then the seeding and one-time data repairs under a startup advisory lock (a second instance waits, then finds nothing to do);
-* Drive backup: one pass at a time (advisory lock) and the "already mirrored" index in `drive_backup_index` instead of a local file;
 * the in-memory parts above are registered in `sharedState.ts`: a change calls `pg_notify('legalio_shared_state', ...)`, the other instances reload
   that part immediately (a dedicated `LISTEN` connection), and every `SHARED_STATE_POLL_MS` (30 s) they reload anyway. A configuration reload never
   replaces a copy that has an unsaved local change in flight.
@@ -95,7 +94,6 @@ What is still per process (exact list):
   instances allow up to N times the configured rate (the AI *daily* budget is in the database and exact);
 * a few caches are refreshed by TTL only: `lifecyclesFreshUntil` (status refresh at most once a minute per instance, harmless) and the public URL
   (`installation_settings`, changed only during first-run setup, needs a restart elsewhere);
-* the debounce queue of the Drive backup (`pendingDriveBackups`) lives in memory: a restart loses the queued keys, the next full pass mirrors them;
 * the process-wide `saveDb` lock serializes configuration saves inside one process only (it does not guard the database across processes);
 * the pool keeps one connection for the shared-state listener (`DB_POOL_MAX` is shared with requests).
 

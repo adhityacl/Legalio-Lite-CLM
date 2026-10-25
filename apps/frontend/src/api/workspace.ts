@@ -10,7 +10,7 @@ export interface WorkspaceSnapshot {
   notifications: NotificationLog[];
   evaluations: PartnerEvaluation[];
   spendings: PartnerSpending[];
-  services: { aiAvailable: boolean; googleUploadsAvailable: boolean };
+  services: { aiAvailable: boolean };
   timestamp: number;
 }
 

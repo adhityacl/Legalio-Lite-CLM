@@ -17,7 +17,7 @@ export async function orgApi<T = any>(path: string, init: { method?: string; bod
     return await apiRequest<T>(path, { method, body: init.body, signal: init.signal, cache: 'no-store' });
   } catch (error) {
     if (!isApiError(error)) throw error;
-    if (error.status === 404 && method === 'GET' && /^\/api\/organizations\/[^/]+\/[a-z-]+(\/google)?(\?|$)/.test(path)) {
+    if (error.status === 404 && method === 'GET' && /^\/api\/organizations\/[^/]+\/[a-z-]+(\?|$)/.test(path)) {
       // Membership revoked/suspended while the page was open: drop this organization's context.
       const organizationId = decodeURIComponent(path.split('/')[3] || '');
       window.dispatchEvent(new CustomEvent('organization-access-lost', { detail: organizationId }));

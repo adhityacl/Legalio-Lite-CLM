@@ -37,10 +37,9 @@ export function rateLimitOptions(env: NodeJS.ProcessEnv = process.env): RateLimi
   };
 }
 
-/** Sensitive public write endpoints: sign-in/sign-up (Better Auth), Google sign-in, first-run setup/database step, cron trigger. */
+/** Sensitive public write endpoints: sign-in/sign-up (Better Auth), first-run setup/database step, cron trigger. */
 export const RATE_LIMITED_PATHS = [
   /^\/api\/auth(\/|$)/,
-  /^\/api\/google-auth(\/|$)/,
   /^\/api\/system\/(setup|database)\/?$/,
   /^\/api\/cron(\/|$)/,
 ];

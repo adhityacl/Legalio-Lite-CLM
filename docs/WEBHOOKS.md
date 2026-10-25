@@ -15,7 +15,7 @@ same key as the other stored credentials; rotate it to get a new one).
 | `reminder.sent` | a renewal/notice reminder e-mail was delivered |
 | `approval.requested` | a document is submitted for approval |
 | `approval.decided` | an approver approves or rejects a step (`data.finished`, `data.requestStatus`) |
-| `document.exported` | a Google Docs export or a tenant data export finished (`data.kind`) |
+| `document.exported` | a tenant data export finished (`data.kind`) |
 | `obligation.created` | an obligation is created (UI, review-queue acceptance) |
 | `obligation.due_soon` | an open obligation came within its reminder lead time (once per due date) |
 | `obligation.overdue` | an open obligation passed its due date (once per due date) |

@@ -51,8 +51,6 @@ export const db: any = {
   newsTicker: { items: [] as string[], lastGeneratedAt: null as string | null },
   branding: DEFAULT_BRANDING,
   googleConfig: {
-    spreadsheetId: "",
-    driveFolderId: "",
     isConnected: false,
     lastSyncTime: "",
     autoSync: false,
@@ -93,7 +91,7 @@ export async function refreshTenantProjection() {
 registerSharedState('tenants', loadTenantProjection);
 
 /**
- * The installation configuration (branding, Google/SMTP/AI settings, news ticker) is read synchronously all over the code, so each
+ * The installation configuration (branding, SMTP/AI settings, news ticker) is read synchronously all over the code, so each
  * process keeps a copy. `configSeen` is that part as last read from or written to the database: a reload (after another instance
  * saved) replaces the copy only when it still equals it, i.e. when this process has no unsaved change in flight.
  */
@@ -295,7 +293,4 @@ export async function saveDb(alongside?: () => Promise<unknown>) {
     if (isConstraintViolation(err)) (err as any).status = 409;
     throw err;
   }
-}
-export function triggerAutoPushToGoogleSheet(_req?: any, _options?: any): Promise<void> {
-  return Promise.resolve();
 }

@@ -3,7 +3,6 @@ import { OrgContext, buildMatrix as buildRbacMatrix, can, hasOrganizationScope }
 import { sql } from '../db';
 import { capabilitiesOf, identityResponse } from '../organizationAdminRoutes';
 import { orgContextOf, addActivityLog } from '../recordAccess';
-import { triggerAutoPushToGoogleSheet } from '../memoryDb';
 import { randomBytes } from 'node:crypto';
 import { allowedUserRepository, withAdderNames, LastAdminError } from '../repositories/allowedUserRepository';
 import { RecordNotFoundError, RepositoryError } from '../repositories/errors';
@@ -136,7 +135,6 @@ app.post("/api/user/allowed-users", async (req: express.Request, res: express.Re
     `Menambahkan email '${email}' (${name} - ${role}) ke whitelist akses`,
     req,
   );
-  await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, user: newUser });
 });
 app.put("/api/user/allowed-users/:id", async (req: express.Request, res: express.Response) => {
@@ -170,7 +168,6 @@ app.put("/api/user/allowed-users/:id", async (req: express.Request, res: express
     `Memperbarui hak akses/role pengguna '${user.email}' (${user.name}) menjadi '${user.role}'`,
     req,
   );
-  await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, user });
 });
 app.delete("/api/user/allowed-users/:id", async (req: express.Request, res: express.Response) => {
@@ -203,7 +200,6 @@ app.delete("/api/user/allowed-users/:id", async (req: express.Request, res: expr
     `Mencabut akses email '${user.email}' (${user.name}) dari whitelist`,
     req,
   );
-  await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });
 });
 app.post("/api/user/reset-password", async (req: express.Request, res: express.Response) => {

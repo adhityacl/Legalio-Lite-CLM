@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import COS from 'cos-nodejs-sdk-v5';
 
-/** Upload storage. Buffers, not streams: uploads are capped at 30 MB and the Drive backup needs the bytes anyway. */
+/** Upload storage. Buffers, not streams: uploads are capped at 30 MB. */
 export interface ObjectStore {
   put(key: string, body: Buffer, contentType?: string): Promise<void>;
   get(key: string): Promise<{ body: Buffer; contentType?: string } | null>;

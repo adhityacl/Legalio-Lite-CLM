@@ -1,8 +1,7 @@
 import { ModalFrame } from '../ui/modal-frame';
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleSheetsConfig, Tenant } from '@legalio/types';
+import { PlatformProviderConfig, Tenant } from '@legalio/types';
 import { useAuth } from '../../context/AuthContext';
-import { GoogleCredentialsForm } from '../settings/GoogleCredentialsDialog';
 import { CosStorageForm } from '../settings/CosStorageForm';
 import { useLanguage } from '../../context/LanguageContext';
 import { useConfirm } from '../../context/ConfirmDialogContext';
@@ -48,21 +47,6 @@ import {
   Layers,
   HardDrive,
 } from 'lucide-react';
-import {
-  signInWithGoogle,
-  logoutGoogle,
-  createNewSpreadsheet,
-  createNewDriveFolder,
-  fetchUserSpreadsheets,
-  fetchUserFolders,
-  getSavedGoogleUser,
-  onGoogleAuthStateChange,
-  isGoogleTokenValid,
-  invalidateGoogleToken,
-  silentRefreshGoogleToken,
-  DriveFileItem,
-  getCachedAccessToken,
-} from '../../lib/googleAuthService';
 import { cn } from '@legalio/ui-components/utils';
 import { Button } from '@legalio/ui-components/button';
 import { Badge, BadgeDot } from '@legalio/ui-components/badge';
@@ -92,11 +76,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components
 import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
 export type PlatformConfigurationSection = 'storage' | 'ai' | 'notifications' | 'language' | 'security';
 
-const EMPTY_CONFIG: GoogleSheetsConfig = { driveFolderId: '', spreadsheetId: '', isConnected: false, autoSync: false };
+const EMPTY_CONFIG: PlatformProviderConfig = {};
 
 /**
- * System Admin configuration pages (PRD §6.6): deployment-wide Google
- * credentials and master resources, AI provider/model, SMTP relay, the
+ * System Admin configuration pages (PRD §6.6): deployment-wide file storage,
+ * AI provider/model, SMTP relay, the
  * browser-local UI text tool and the application-wide
  * reset. Platform-only; secrets are write-only and never prefilled.
  * Organization-specific settings live in each organization's Settings.
@@ -108,26 +92,22 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
   const isSuperuser = true;
   const { language, t, exportToCSV, importFromCSV, resetCustomTranslations, translationsBusy, translationsError } = useLanguage();
   const confirmDialog = useConfirm();
-  const [config, setConfig] = useState<GoogleSheetsConfig>(EMPTY_CONFIG);
+  const [config, setConfig] = useState<PlatformProviderConfig>(EMPTY_CONFIG);
 
   const loadConfig = async () => {
-    const data = await api.get<Partial<GoogleSheetsConfig>>('/google-integration', { cache: 'no-store' }).catch(() => null);
+    const data = await api.get<Partial<PlatformProviderConfig>>('/platform-settings', { cache: 'no-store' }).catch(() => null);
     if (data) setConfig({ ...EMPTY_CONFIG, ...data });
   };
   useEffect(() => { void loadConfig(); }, []);
 
   /** Platform fields only; organization recipients/mappings are not part of this payload. */
   const onSaveConfig = async (
-    spreadsheetId: string,
-    driveFolderId: string,
-    _autoSync: boolean,
-    _isLocked?: boolean,
-    extraConfig: Partial<GoogleSheetsConfig> = {},
+    extraConfig: Partial<PlatformProviderConfig> = {},
   ) => {
-    const allowed = ['masterSpreadsheetId', 'aiModel', 'geminiApiKey', 'smtpEnabled', 'smtpHost', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPassword', 'smtpFromEmail', 'smtpFromName'];
+    const allowed = ['aiModel', 'geminiApiKey', 'smtpEnabled', 'smtpHost', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPassword', 'smtpFromEmail', 'smtpFromName'];
     const extras = Object.fromEntries(Object.entries(extraConfig).filter(([key, value]) => allowed.includes(key) && value !== undefined));
     try {
-      await api.post('/google-integration', { spreadsheetId: spreadsheetId || null, driveFolderId: driveFolderId || null, ...extras });
+      await api.post('/platform-settings', extras);
     } catch (error) {
       throw new Error(errorMessage(error, t('app.gagal_menyimpan_konfigurasi', 'Gagal menyimpan konfigurasi.')));
     }
@@ -137,17 +117,6 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
   // Organization projections refresh after platform provisioning changes.
   const refreshTenants = async () => { window.dispatchEvent(new CustomEvent('organization-updated')); };
 
-  /** Google synchronization is a placeholder in this release (PRD §6.5). */
-  const onSyncNow = async (_mode?: 'fetch' | 'push') => {
-    throw new Error(t('tb.sync_unavailable_short', 'Google synchronization is not available in this release.'));
-  };
-
-  // Form State
-  const [spreadsheetId, setSpreadsheetId] = useState(config.spreadsheetId || '');
-  const [masterSpreadsheetId, setMasterSpreadsheetId] = useState(config.masterSpreadsheetId || '');
-  const [driveFolderId, setDriveFolderId] = useState(config.driveFolderId || '');
-  const [autoSync, setAutoSync] = useState(config.autoSync ?? true);
-  const [isLocked, setIsLocked] = useState<boolean>(config.isLocked ?? true);
   const [notificationEmails, setNotificationEmails] = useState(
     config.notificationEmails || ''
   );
@@ -182,17 +151,6 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
   const [testSmtpRecipient, setTestSmtpRecipient] = useState<string>('');
   const [smtpTestResult, setSmtpTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Google Option Mode State
-  const [selectedOptionTab, setSelectedOptionTab] = useState<'auto' | 'picker' | 'manual'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('google_connection_mode');
-      if (saved === 'auto' || saved === 'picker' || saved === 'manual') {
-        return saved as 'auto' | 'picker' | 'manual';
-      }
-    }
-    return 'manual';
-  });
-
   const [saving, setSaving] = useState(false);
   const [savingNotifEmails, setSavingNotifEmails] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -200,27 +158,10 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
   const [resettingData, setResettingData] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetConfirmationText, setResetConfirmationText] = useState('');
-  const [showEditConfirmModal, setShowEditConfirmModal] = useState(false);
-  const [isEditUnlocked, setIsEditUnlocked] = useState(false);
-  const [isOrgEditUnlocked, setIsOrgEditUnlocked] = useState(false);
   const [showUITextModal, setShowUITextModal] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-
-  const [backupState, setBackupState] = useState<{ running: boolean; message: string }>({ running: false, message: '' });
-  const handleBackupNow = async () => {
-    setBackupState({ running: true, message: '' });
-    try {
-      const data = await api.post<any>('/google-integration/backup').catch((error) => { throw new Error(errorMessage(error, 'Backup gagal.')); });
-      if (data.skipped === 'not_connected') throw new Error('Akun Google belum terhubung. Hubungkan akun Google (OAuth) agar backup bisa berjalan.');
-      if (data.skipped === 'no_root_folder') throw new Error('Root Folder Drive belum diatur.');
-      if (data.busy) throw new Error('Backup sedang berjalan, coba lagi sebentar.');
-      setBackupState({ running: false, message: `${data.backedUpCount} file baru dicadangkan${data.alreadyBackedUpCount ? `, ${data.alreadyBackedUpCount} sudah ada di Drive` : ''}${data.failedCount ? `, ${data.failedCount} gagal` : ''}.` });
-    } catch (err: any) {
-      setBackupState({ running: false, message: err?.message || 'Backup gagal.' });
-    }
-  };
 
   const handleCopyLink = (text: string, key: string) => {
     if (!text) return;
@@ -231,27 +172,6 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     }, 2000);
   };
 
-  const handleComprehensiveSyncAll = async () => {
-    setSyncing(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    try {
-      // Platform service authority: every organization's folder, then partner category folders.
-      const headers: Record<string, string> = {};
-      if (accessToken) headers['x-google-access-token'] = accessToken;
-      // Best effort, as before: a refused provisioning step is logged and the sync carries on.
-      await api.post('/tenants/auto-provision-folders', undefined, { headers }).catch((e) => console.warn('Folder provision warning:', e));
-      await api.post('/google-integration/provision-folders', undefined, { headers }).catch((e) => console.warn('Category provision warning:', e));
-      window.dispatchEvent(new CustomEvent('organization-updated'));
-      setSuccessMsg(t('settings.berhasil_menyinkronkan_seluruh_data_sheet_folder', 'Berhasil menyinkronkan seluruh data sheet, folder organisasi, dan file ke Master Root!'));
-      setTimeout(() => setSuccessMsg(null), 6000);
-    } catch (err: any) {
-      setErrorMsg(err.message || t('settings.gagal_menyinkronkan_data_dan_folder', 'Gagal menyinkronkan data dan folder.'));
-    } finally {
-      setSyncing(false);
-    }
-  };
-
 
 
   // Track previous config to prevent overwriting user input during polling
@@ -260,11 +180,6 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
   // Sync internal states when config updates from server
   useEffect(() => {
     const prev = prevConfigRef.current;
-    if (config.spreadsheetId !== prev.spreadsheetId && config.spreadsheetId !== undefined) setSpreadsheetId(config.spreadsheetId);
-    if (config.masterSpreadsheetId !== prev.masterSpreadsheetId && config.masterSpreadsheetId !== undefined) setMasterSpreadsheetId(config.masterSpreadsheetId);
-    if (config.driveFolderId !== prev.driveFolderId && config.driveFolderId !== undefined) setDriveFolderId(config.driveFolderId);
-    if (config.autoSync !== prev.autoSync && config.autoSync !== undefined) setAutoSync(config.autoSync);
-    if (config.isLocked !== prev.isLocked && config.isLocked !== undefined) setIsLocked(config.isLocked);
     if (config.notificationEmails !== prev.notificationEmails && config.notificationEmails !== undefined) setNotificationEmails(config.notificationEmails);
     if (config.legalNotificationEmail !== prev.legalNotificationEmail && config.legalNotificationEmail !== undefined) setLegalNotificationEmail(config.legalNotificationEmail);
     if (config.financeNotificationEmail !== prev.financeNotificationEmail && config.financeNotificationEmail !== undefined) setFinanceNotificationEmail(config.financeNotificationEmail);
@@ -282,269 +197,6 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     prevConfigRef.current = config;
   }, [config]);
 
-  // Google OAuth & Auto Connect State
-  const [googleUser, setGoogleUser] = useState<{ email: string; name: string; photoURL?: string } | null>(
-    getSavedGoogleUser()
-  );
-  const [accessToken, setAccessToken] = useState<string | null>(
-    typeof window !== 'undefined' ? localStorage.getItem('google_access_token') : null
-  );
-  const [connectingAuth, setConnectingAuth] = useState(false);
-  const [autoCreating, setAutoCreating] = useState(false);
-
-  // Auto-restore Google Login Session
-  useEffect(() => {
-    const unsubscribe = onGoogleAuthStateChange((profile, token) => {
-      if (profile) setGoogleUser(profile);
-      if (token) setAccessToken(token);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Drive Picker Modal State
-  const [showPickerModal, setShowPickerModal] = useState(false);
-  const [pickerType, setPickerType] = useState<'spreadsheet' | 'folder'>('spreadsheet');
-  const [driveItems, setDriveItems] = useState<DriveFileItem[]>([]);
-  const [loadingPickerItems, setLoadingPickerItems] = useState(false);
-  const [pickerSearch, setPickerSearch] = useState('');
-
-  const isTokenActive =
-    Boolean(googleUser) && Boolean(accessToken) && isGoogleTokenValid();
-
-  const handleGoogleConnect = async () => {
-    setConnectingAuth(true);
-    setErrorMsg(null);
-    try {
-      const { profile, accessToken: token } = await signInWithGoogle();
-      setGoogleUser(profile);
-      setAccessToken(token);
-
-      // Sinkronisasi otomatis status isConnected dan token ke konfigurasi server
-      try {
-        const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('google_refresh_token') : null;
-        await api.post('/google-integration/connect', { accessToken: token, refreshToken, googleUser: profile }, { headers: token ? { 'x-google-access-token': token } : {} });
-      } catch (syncErr) {
-        console.warn('[Google Connect] Gagal menyinkronkan token ke server:', syncErr);
-      }
-
-      setSuccessMsg(t('settings.berhasil_terhubung_secara_otomatis_dengan_akun', 'Berhasil terhubung secara otomatis dengan akun Google: {email}', { email: profile.email }));
-      setTimeout(() => setSuccessMsg(null), 4000);
-    } catch (err: any) {
-      setErrorMsg(err.message || t('settings.gagal_menghubungkan_akun_google', 'Gagal menghubungkan akun Google.'));
-    } finally {
-      setConnectingAuth(false);
-    }
-  };
-
-  const handleGoogleDisconnect = async () => {
-    try {
-      // Pemutusan akun yang bersih: update server database
-      try {
-        await api.post('/google-integration/disconnect');
-      } catch (discErr) {
-        console.warn('[Google Disconnect] Gagal mengirim permintaan disconnect ke server:', discErr);
-      }
-
-      await logoutGoogle();
-      invalidateGoogleToken();
-      setGoogleUser(null);
-      setAccessToken(null);
-      setSuccessMsg(t('settings.akun_google_berhasil_diputuskan', 'Akun Google berhasil diputuskan.'));
-      setTimeout(() => setSuccessMsg(null), 3000);
-    } catch (err: any) {
-      setErrorMsg(err.message || t('settings.gagal_memutuskan_akun_google', 'Gagal memutuskan akun Google.'));
-    }
-  };
-
-  const handleGoogleRefresh = async () => {
-    setConnectingAuth(true);
-    setErrorMsg(null);
-    try {
-      const { profile, accessToken: token } = await silentRefreshGoogleToken();
-      setGoogleUser(profile);
-      setAccessToken(token);
-
-      // Sinkronisasi otomatis token hasil refresh ke server
-      try {
-        const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('google_refresh_token') : null;
-        await api.post('/google-integration/connect', { accessToken: token, refreshToken, googleUser: profile }, { headers: token ? { 'x-google-access-token': token } : {} });
-      } catch (syncErr) {
-        console.warn('[Google Refresh] Gagal menyinkronkan token ke server:', syncErr);
-      }
-
-      setSuccessMsg(t('settings.sesi_google_berhasil_diperbarui_untuk', 'Sesi Google berhasil diperbarui untuk {email}', { email: profile.email }));
-      setTimeout(() => setSuccessMsg(null), 3000);
-    } catch (err: any) {
-      setErrorMsg(err.message || t('settings.gagal_memperbarui_sesi_google', 'Gagal memperbarui sesi Google.'));
-    } finally {
-      setConnectingAuth(false);
-    }
-  };
-
-  const handleAutoProvisionMaster = async () => {
-    if (!isAdmin) return;
-    const token = getCachedAccessToken();
-    if (!token && !isGoogleTokenValid()) {
-      setErrorMsg(t('settings.sesi_google_belum_aktif_hubungkan_akun', 'Sesi Google belum aktif. Hubungkan akun Google terlebih dahulu.'));
-      return;
-    }
-    setSaving(true);
-    setErrorMsg(null);
-    try {
-      const data = await api.post<any>('/google-integration/auto-provision-master', { accessToken: token }, { headers: token ? { 'x-google-access-token': token } : {} }).catch((error) => {
-        if (!isApiError(error) || error.status === 0) throw error;
-        if (error.status === 403) throw new Error(t('settings.akses_ditolak_hanya_admin_superuser_yang', 'Akses ditolak: Hanya Admin/Superuser yang berhak membuat Master Root.'));
-        throw new Error(/^HTTP \d+$/.test(error.message)
-          ? t('settings.gagal_memproses_permintaan_http', 'Gagal memproses permintaan (HTTP {status}): {value}', { status: error.status, value: 'Server error' })
-          : error.message || t('settings.gagal_membuat_master_root_secara_otomatis', 'Gagal membuat Master Root secara otomatis.'));
-      });
-      if (!data.success) {
-        throw new Error(data.error || t('settings.gagal_membuat_master_root_secara_otomatis', 'Gagal membuat Master Root secara otomatis.'));
-      }
-
-      setDriveFolderId(data.driveFolderId);
-      setSpreadsheetId(data.spreadsheetId);
-      if (data.masterSpreadsheetId) setMasterSpreadsheetId(data.masterSpreadsheetId);
-      setIsEditUnlocked(false);
-      setSuccessMsg(data.message || t('settings.master_root_berhasil_dibuat', 'Master Root berhasil dibuat!'));
-
-      // Trigger parent update
-      await onSaveConfig(data.spreadsheetId, data.driveFolderId, autoSync, isLocked, {});
-
-    } catch (err: any) {
-      setErrorMsg(err.message || t('settings.terjadi_kesalahan_saat_memproses_pembuatan_maste', 'Terjadi kesalahan saat memproses pembuatan Master Root.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveOption2Picker = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isAdmin) {
-      setErrorMsg(t('settings.hanya_pengguna_dengan_role_admin_yang', 'Hanya pengguna dengan role Admin yang berhak menyimpan konfigurasi.'));
-      return;
-    }
-    const targetFolderId = driveFolderId || config.driveFolderId || '';
-    const targetMasterSheetId = masterSpreadsheetId || config.masterSpreadsheetId || '';
-    const targetSheetId = spreadsheetId || config.spreadsheetId || '';
-    if (!targetFolderId) {
-      setErrorMsg(t('settings.silakan_pilih_folder_storage_dari_google', 'Silakan pilih Folder Storage dari Google Drive terlebih dahulu.'));
-      return;
-    }
-    setSaving(true);
-    setSuccessMsg(null);
-    setErrorMsg(null);
-    try {
-      await onSaveConfig(targetSheetId, targetFolderId, autoSync, isLocked, {
-        notificationEmails,
-        legalNotificationEmail,
-        financeNotificationEmail,
-        aiModel,
-        forceNewOrgResources: true,
-        masterSpreadsheetId: targetMasterSheetId,
-      } as any);
-      setSelectedOptionTab('picker');
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('google_connection_mode', 'picker');
-      }
-      setIsEditUnlocked(false);
-      await refreshTenants();
-      setSuccessMsg(t('settings.save_config_success_provisioned', 'Konfigurasi Master Root tersimpan, Folder Organisasi & Spreadsheet Database berhasil dibuat di Google Drive!'));
-      setTimeout(() => setSuccessMsg(null), 4000);
-    } catch (err: any) {
-      setErrorMsg(err.message || t('settings.gagal_menyimpan_konfigurasi', 'Gagal menyimpan konfigurasi.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveOption3Manual = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isAdmin) {
-      setErrorMsg(t('settings.hanya_pengguna_dengan_role_admin_yang', 'Hanya pengguna dengan role Admin yang berhak menyimpan konfigurasi.'));
-      return;
-    }
-    const targetFolderId = driveFolderId || config.driveFolderId || '';
-    const targetSheetId = spreadsheetId || config.spreadsheetId || '';
-    if (!targetFolderId) {
-      setErrorMsg(t('settings.silakan_isi_id_folder_storage_google', 'Silakan isi ID Folder Storage Google Drive.'));
-      return;
-    }
-    setSaving(true);
-    setSuccessMsg(null);
-    setErrorMsg(null);
-    try {
-      await onSaveConfig(targetSheetId, targetFolderId, autoSync, isLocked, {
-        notificationEmails,
-        legalNotificationEmail,
-        financeNotificationEmail,
-        aiModel,
-        forceNewOrgResources: true,
-      } as any);
-      setSelectedOptionTab('manual');
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('google_connection_mode', 'manual');
-      }
-      setIsEditUnlocked(false);
-      await refreshTenants();
-      setSuccessMsg(t('settings.save_config_success_provisioned', 'Konfigurasi Master Root tersimpan, Folder Organisasi & Spreadsheet Database berhasil dibuat di Google Drive!'));
-      setTimeout(() => setSuccessMsg(null), 4000);
-    } catch (err: any) {
-      setErrorMsg(err.message || t('settings.gagal_menyimpan_konfigurasi', 'Gagal menyimpan konfigurasi.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleOpenDrivePicker = async (type: 'spreadsheet' | 'folder') => {
-    if (!isAdmin) {
-      setErrorMsg(t('settings.hanya_admin_yang_berhak_memilih_file', 'Hanya Admin yang berhak memilih file/folder dari Google Drive.'));
-      return;
-    }
-    if (!accessToken || !isGoogleTokenValid()) {
-      setErrorMsg(
-        t('settings.sesi_akun_google_belum_terhubung_atau', 'Sesi akun Google belum terhubung atau telah kadaluarsa. Silakan hubungkan akun Google terlebih dahulu.')
-      );
-      return;
-    }
-
-    setPickerType(type);
-    setShowPickerModal(true);
-    setLoadingPickerItems(true);
-    setErrorMsg(null);
-
-    try {
-      if (type === 'spreadsheet') {
-        const sheets = await fetchUserSpreadsheets(accessToken);
-        setDriveItems(sheets);
-      } else {
-        const folders = await fetchUserFolders(accessToken);
-        setDriveItems(folders);
-      }
-    } catch (err: any) {
-      const msg = err.message || 'Gagal memuat item dari Google Drive.';
-      setErrorMsg(msg);
-      setShowPickerModal(false);
-      if (err.status === 401 || err.status === 403 || msg.includes('401')) {
-        setAccessToken(null);
-      }
-    } finally {
-      setLoadingPickerItems(false);
-    }
-  };
-
-  const handleSelectItem = (item: DriveFileItem) => {
-    if (pickerType === 'spreadsheet') {
-      setMasterSpreadsheetId(item.id);
-      setSuccessMsg(t('settings.spreadsheet_dipilih', 'Spreadsheet \'{name}\' dipilih.', { name: item.name }));
-    } else {
-      setDriveFolderId(item.id);
-      setSuccessMsg(t('settings.folder_dipilih', 'Folder \'{name}\' dipilih.', { name: item.name }));
-    }
-    setShowPickerModal(false);
-    setTimeout(() => setSuccessMsg(null), 3000);
-  };
-
   const handleSaveNotificationEmails = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAdmin) {
@@ -555,7 +207,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     setSuccessMsg(null);
     setErrorMsg(null);
     try {
-      await onSaveConfig(spreadsheetId, driveFolderId, autoSync, isLocked, {
+      await onSaveConfig({
         notificationEmails,
         legalNotificationEmail,
         financeNotificationEmail,
@@ -580,7 +232,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      await onSaveConfig(spreadsheetId, driveFolderId, autoSync, isLocked, {
+      await onSaveConfig({
         notificationEmails,
         legalNotificationEmail,
         financeNotificationEmail,
@@ -646,7 +298,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     setSuccessMsg(null);
     try {
       setAiModel(newModel);
-      await onSaveConfig(spreadsheetId, driveFolderId, autoSync, isLocked, {
+      await onSaveConfig({
         notificationEmails,
         legalNotificationEmail,
         financeNotificationEmail,
@@ -673,7 +325,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     setSuccessMsg(null);
     setApiTestResult(null);
     try {
-      await onSaveConfig(spreadsheetId, driveFolderId, autoSync, isLocked, {
+      await onSaveConfig({
         notificationEmails,
         legalNotificationEmail,
         financeNotificationEmail,
@@ -709,60 +361,6 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     }
   };
 
-  const handleProvisionFolders = async () => {
-    if (!isAdmin) {
-      setErrorMsg(t('settings.hanya_admin_yang_berhak_menjalankan_sinkronisasi', 'Hanya Admin yang berhak menjalankan sinkronisasi folder kategori.'));
-      return;
-    }
-    setProvisioning(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    try {
-      const token = getCachedAccessToken();
-      const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('auth_session_token') : null;
-      const headers: Record<string, string> = {};
-      if (token) headers['x-google-access-token'] = token;
-      if (sessionToken) {
-        headers['Authorization'] = `Bearer ${sessionToken}`;
-        headers['x-session-token'] = sessionToken;
-      }
-
-      await api.post('/google-integration/provision-folders', undefined, { headers }).catch((error) => {
-        throw new Error(isApiError(error) && error.status > 0 && !/^HTTP \d+$/.test(error.message)
-          ? error.message
-          : t('settings.gagal_sinkronisasi_folder_status', 'Gagal sinkronisasi folder (Status {status})', { status: isApiError(error) ? error.status : 0 }));
-      });
-
-      setSuccessMsg(
-        t('settings.4_subfolder_kategori_contract_invoice_billing', '4 Subfolder Kategori (Contract, Invoice/Billing, IO, DD) berhasil dibuat/diperbarui untuk seluruh Partner!')
-      );
-      setTimeout(() => setSuccessMsg(null), 6000);
-    } catch (err: any) {
-      setErrorMsg(err.message || t('settings.gagal_membuat_folder_kategori', 'Gagal membuat folder kategori.'));
-    } finally {
-      setProvisioning(false);
-    }
-  };
-
-  const handleSync = async (mode: 'fetch' | 'push' = 'fetch') => {
-    setSyncing(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    try {
-      await onSyncNow(mode);
-      setSuccessMsg(
-        mode === 'push'
-          ? t('settings.sync_push_success', 'Berhasil menyimpan data ke Google Sheet!')
-          : t('settings.sync_fetch_success', 'Berhasil menarik data dari Google Sheet!')
-      );
-      setTimeout(() => setSuccessMsg(null), 6000);
-    } catch (err: any) {
-      setErrorMsg(err.message || t('settings.gagal_sinkronisasi_dengan_google_sheet', 'Gagal sinkronisasi dengan Google Sheet.'));
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const handleOpenResetModal = () => {
     if (!isSuperuser) {
       setErrorMsg(t('settings.reset_superuser_only', 'Only a superuser can reset the workspace.'));
@@ -790,10 +388,6 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     };
     reader.readAsText(file, 'UTF-8');
   };
-
-  const filteredDriveItems = driveItems.filter((i) =>
-    i.name.toLowerCase().includes(pickerSearch.toLowerCase())
-  );
 
   const sections: Array<{ id: PlatformConfigurationSection; label: string }> = [
     { id: 'storage', label: t('storage.title', 'Storage') },
@@ -1310,128 +904,6 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
           setTimeout(() => window.location.reload(), 1200);
         }}
       />
-
-      {/* Confirmation Modal for Editing Database Configuration */}
-      {showEditConfirmModal && (
-        <ModalFrame onClose={() => setShowEditConfirmModal(false)} className="max-w-g377 w-full overflow-hidden">
-
-            <div className="p-g21 border-b border-border flex items-center gap-g13">
-              <Avatar size="md" className="shrink-0 rounded-md border bg-status-warning-soft text-status-warning border border-status-warning-border"><AvatarFallback className="bg-transparent text-inherit"><AlertCircle className="w-g21 h-g21" /></AvatarFallback></Avatar>
-              <div>
-                <DialogTitle className="flex items-center gap-g8">
-                  {t('settings.edit_confirm_title', 'Ubah Konfigurasi Database')}
-                </DialogTitle>
-              </div>
-            </div>
-
-            <div className="p-g21 text-xs text-muted-foreground leading-relaxed">
-              {t(
-                'settings.edit_confirm_desc',
-                'Mengubah Spreadsheet ID atau Folder Storage akan mengalihkan sinkronisasi ke berkas baru. Pastikan ID sheet tujuan valid.'
-              )}
-            </div>
-
-            <div className="p-g13 bg-muted border-t border-border flex items-center justify-end gap-g8">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowEditConfirmModal(false)}
-              >
-                {t('settings.edit_confirm_cancel', 'Batal')}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  setShowEditConfirmModal(false);
-                  setIsEditUnlocked(true);
-                }}
-              >
-                {t('settings.edit_confirm_proceed', 'Lanjutkan Edit')}
-              </Button>
-            </div>
-
-        </ModalFrame>
-      )}
-
-      {/* Google Drive Picker Modal */}
-      {showPickerModal && (
-        <ModalFrame onClose={() => setShowPickerModal(false)} className="max-w-g610 w-full flex flex-col overflow-hidden">
-
-            <DialogHeader className="flex items-center justify-between gap-g13 border-b border-border px-g21 py-g13">
-              <div className="flex items-center gap-g8">
-                {pickerType === 'spreadsheet' ? (
-                  <FileSpreadsheet className="w-g21 h-g21 text-accent-foreground" />
-                ) : (
-                  <Folder className="w-g21 h-g21 text-accent-foreground" />
-                )}
-                <div>
-                  <DialogTitle className="flex items-center gap-g8">
-                    {pickerType === 'spreadsheet'
-                      ? t('settings.pilih_spreadsheet_dari_google_drive', 'Pilih Spreadsheet dari Google Drive')
-                      : t('settings.pilih_folder_storage_dari_google_drive', 'Pilih Folder Storage dari Google Drive')}
-                  </DialogTitle>
-                  <Text size="xs" tone="muted">{t('settings.akun', 'Akun: {email}', { email: googleUser?.email ?? '' })}</Text>
-                </div>
-              </div>
-              <Button variant="secondary" size="icon-sm" aria-label={t('common.close', 'Tutup')}
-                type="button"
-                onClick={() => setShowPickerModal(false)}
-              >
-                <X className="w-g21 h-g21" />
-              </Button>
-            </DialogHeader>
-
-            <div className="p-g21 sm:p-g21 overflow-y-auto space-y-g13 text-xs flex-1">
-              <InputGroup className="relative">
-                <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
-                <InputGroupInput aria-label={t('settings.cari_nama', 'Cari nama {pickerType}...', { pickerType: pickerType === 'spreadsheet' ? t('settings.picker_spreadsheet', 'spreadsheet') : t('settings.picker_folder', 'folder') })}
-                  type="text"
-                  placeholder={t('settings.cari_nama', 'Cari nama {pickerType}...', { pickerType: pickerType === 'spreadsheet' ? t('settings.picker_spreadsheet', 'spreadsheet') : t('settings.picker_folder', 'folder') })}
-                  value={pickerSearch}
-                  onChange={(e) => setPickerSearch(e.target.value)}
-                />
-              </InputGroup>
-
-              <Card className="max-h-g233 overflow-y-auto divide-y divide-border">
-                {loadingPickerItems ? (
-                  <Text size="sm" tone="muted" role="status" className="flex items-center justify-center gap-g8 p-g21"><Spinner size="sm" decorative />{t('settings.memuat_item_dari_google_drive', 'Memuat item dari Google Drive...')}</Text>
-                ) : filteredDriveItems.length === 0 ? (
-                  <Empty className="border-0"><EmptyContent><EmptyDescription>{t('settings.tidak_ada_yang_ditemukan', 'Tidak ada {pickerType} yang ditemukan.', { pickerType: pickerType === 'spreadsheet' ? t('settings.picker_spreadsheet', 'spreadsheet') : t('settings.picker_folder', 'folder') })}</EmptyDescription></EmptyContent></Empty>
-                ) : (
-                  filteredDriveItems.map((item) => (
-                    <Button variant="ghost"
-                      key={item.id}
-                      onClick={() => handleSelectItem(item)}
-                      className="h-auto w-full justify-between rounded-none py-g13 text-start"
-                    >
-                      <div className="flex items-center gap-g8 min-w-0">
-                        {pickerType === 'spreadsheet' ? (
-                          <FileSpreadsheet className="w-g16 h-g16 text-accent-foreground shrink-0" />
-                        ) : (
-                          <Folder className="w-g16 h-g16 text-status-warning shrink-0" />
-                        )}
-                        <span className="truncate font-semibold text-foreground">{item.name}</span>
-                      </div>
-                      <Text as="span" size="xs" tone="muted" className="font-mono shrink-0 ml-g8">
-                        {item.id.slice(0, 8)}...
-                      </Text>
-                    </Button>
-                  ))
-                )}
-              </Card>
-            </div>
-
-            <div className="p-g13 sm:p-g21 bg-background border-t border-border flex justify-end shrink-0">
-              <Button variant="ghost" size="sm"
-                type="button"
-                onClick={() => setShowPickerModal(false)}
-              >
-                {t('eval.btn_cancel', 'Batal')}
-              </Button>
-            </div>
-
-        </ModalFrame>
-      )}
 
       {/* UI Text Manager Modal */}
       {showUITextModal && <UITextManagerModal isOpen={showUITextModal} onClose={() => setShowUITextModal(false)} />}

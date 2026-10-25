@@ -57,7 +57,7 @@ sign-in link. The sign-in page shows **Continue with SSO** when a match exists; 
 
 ## SSO required and break-glass administrators
 
-With **Require SSO** on, members of the organization can no longer start a password (or Google/social) session; Better Auth answers `403 SSO_REQUIRED`.
+With **Require SSO** on, members of the organization can no longer start a password session; Better Auth answers `403 SSO_REQUIRED`.
 Exceptions: platform superusers, and the organization's **break-glass administrators** (1-5 explicitly chosen active admins, required to turn the option on; the
 exemption lasts only while the person is still an active administrator). The rule applies if the user is a member of *any* organization that requires SSO.
 Sessions that already exist when the option is switched on are not revoked; revoke them in the platform console if needed.

@@ -38,7 +38,6 @@ import { ActionMenu } from './ui/action-menu';
 import { TablePagination } from './ui/TablePagination';
 import { Badge, statusTone } from '@legalio/ui-components/badge';
 import { getSavedColumnPreferences, saveColumnPreferences, useRowsPerPage } from '../lib/tablePreferences';
-import { getCachedAccessToken } from '../lib/googleAuthService';
 import { useLanguage } from '../context/LanguageContext';
 import { useConfirm } from '../context/ConfirmDialogContext';
 import { useAlertToast } from '../context/AlertToastContext';

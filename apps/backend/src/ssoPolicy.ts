@@ -1,5 +1,5 @@
 /**
- * "SSO required" enforcement, kept free of protocol code so the sign-in paths (Better Auth session hook, Google sync-session) can import it.
+ * "SSO required" enforcement, kept free of protocol code so the sign-in paths (the Better Auth session hook) can import it.
  *
  * A member of an organization that requires SSO may not start a password (or social) session, with two exceptions: a platform superuser,
  * and a break-glass administrator of that organization (an active organization admin the organization listed explicitly). SSO sessions

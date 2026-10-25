@@ -234,9 +234,3 @@ export const ioReviewBody = z.object({ io: optional(openRecord), model: optional
 export const contractReviewBody = z.object({
   contract: optional(openRecord), customClauseText: optional(s(20_000)), force: optional(z.boolean()), model: optional(s(100)),
 });
-export const exportGoogleDocsBody = z.object({
-  title: optional(s(500)), docTitle: optional(s(500)),
-  contentHtml: optional(z.string()), htmlContent: optional(z.string()), html: optional(z.string()),
-  partnerName: optional(s(500)), partner_name: optional(s(500)), partnerId: optional(s(200)),
-  accessToken,
-});

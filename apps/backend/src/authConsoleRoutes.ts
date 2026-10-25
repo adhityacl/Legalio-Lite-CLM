@@ -106,7 +106,6 @@ authConsoleRouter.get('/overview', async (req: Request, res: Response) => {
     // Total accounts & providers
     const totalAccounts = (await sql.get('SELECT COUNT(*) as count FROM account') as any)?.count || 0;
     const credentialAccounts = (await sql.get(`SELECT COUNT(*) as count FROM account WHERE "providerId" = 'credential'`) as any)?.count || 0;
-    const googleAccounts = (await sql.get(`SELECT COUNT(*) as count FROM account WHERE "providerId" = 'google'`) as any)?.count || 0;
 
     // Organizations & Teams
     const totalOrgs = (await sql.get('SELECT COUNT(*) as count FROM organization') as any)?.count || 0;
@@ -148,7 +147,6 @@ authConsoleRouter.get('/overview', async (req: Request, res: Response) => {
           activeSessions,
           totalAccounts,
           credentialAccounts,
-          googleAccounts,
           totalOrgs,
           totalTeams,
           pendingInvitations,
@@ -157,8 +155,7 @@ authConsoleRouter.get('/overview', async (req: Request, res: Response) => {
         roleDistribution,
         providerDistribution: {
           credential: credentialAccounts,
-          google: googleAccounts,
-          other: Math.max(0, totalAccounts - credentialAccounts - googleAccounts),
+          other: Math.max(0, totalAccounts - credentialAccounts),
         },
         recentUsers,
         recentSessions,

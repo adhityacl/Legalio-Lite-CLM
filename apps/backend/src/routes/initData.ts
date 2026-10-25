@@ -1,10 +1,7 @@
 import { refreshContractLifecycles } from '../reminderJobs';
 import { getRequestTenantId, scopedRecords } from '../recordAccess';
 import { getTenantSettings } from '../tenantPolicy';
-import { db } from '../memoryDb';
 import { aiProviderAvailable } from '../aiClient';
-import { sanitizeParentFolderId } from '../lib/googleDriveSync';
-import { hasServiceAccountCredentials } from '../lib/googleServiceAccountAuth';
 import express from 'express';
 import { forwardAsyncRouteErrors } from '../asyncRoutes';
 export function createInitDataRouter() {
@@ -26,8 +23,6 @@ app.get("/api/init-data", async (req: express.Request, res: express.Response) =>
     spendings: await scopedRecords(req, "spending"),
     services: {
       aiAvailable: aiProviderAvailable() && settings.modules.aiAssistant,
-      googleUploadsAvailable: Boolean(sanitizeParentFolderId(db.googleConfig?.driveFolderId)) &&
-        Boolean(db.googleConfig?.accessToken || db.googleConfig?.refreshToken || hasServiceAccountCredentials()),
     },
     timestamp: Date.now(),
   });

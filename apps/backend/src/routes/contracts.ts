@@ -1,7 +1,6 @@
 import { nextEntityId } from '../ids';
 import * as bodySchemas from '../schemas';
-import { resolveActiveGoogleToken, getOrgFolderId, getPartnerCategoryFolderId } from '../googleDrive';
-import { db, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { db } from '../memoryDb';
 import { contractRepository, CONTRACT_SORTS, type ContractQuery } from '../repositories/contractRepository';
 import { partnerRepository } from '../repositories/partnerRepository';
 import { ioRepository } from '../repositories/ioRepository';
@@ -9,7 +8,6 @@ import { notificationRepository } from '../repositories/notificationRepository';
 import { recordVisible } from '../recordScope';
 import { hasOrganizationScope } from '../rbac';
 import { getRequestTenantId, scopedRecords, addActivityLog, assertRecordAccess, assertRecordWritable, isMatchingOrg, logActivity, orgContextOf, scopeOf } from '../recordAccess';
-import { createGoogleDocInFolder } from '../lib/googleDriveSync';
 import { sendRouteError } from '../apiErrors';
 import { refreshContractLifecycles, rollForwardAutoRenewal } from '../reminderJobs';
 import { normalizeCurrencyCode, convertToUsdWithFallback, getDefaultUsdRate } from '@legalio/shared/currencyUtils';
@@ -47,71 +45,6 @@ export function createContractsRouter() {
   const app = express.Router();
   forwardAsyncRouteErrors(app);
 
-
-app.post("/api/contracts/export-google-docs", async (req: express.Request, res: express.Response) => {
-  try {
-    const title = req.body.title || req.body.docTitle || "Partnership Agreement";
-    const contentHtml = req.body.contentHtml || req.body.htmlContent || req.body.html;
-    const partnerName = req.body.partnerName || req.body.partner_name || req.body.partnerId;
-
-    if (!title || !contentHtml) {
-      return res.status(400).json({ error: "Title dan contentHtml wajib diisi." });
-    }
-    const token = await resolveActiveGoogleToken(
-      req.headers["x-google-access-token"] ||
-      req.body.accessToken ||
-      db.googleConfig?.accessToken
-    );
-    const targetOrgId = getRequestTenantId(req);
-
-    // Only this organization's folder tree — never the platform master root.
-    let targetFolderId = (await getOrgFolderId(targetOrgId, token)).id;
-    if (partnerName) {
-      try {
-        const partner = (await scopedRecords(req, "partner")).find(
-          (p: any) => p.partner_name?.toLowerCase() === String(partnerName).toLowerCase() || p.partner_id === partnerName
-        );
-        if (partner) {
-          targetFolderId = await getPartnerCategoryFolderId(
-            partner,
-            "Folder Kontrak",
-            token,
-            targetOrgId
-          );
-        }
-      } catch (fErr) {
-        log.warn("Folder resolve fallback:", fErr);
-      }
-    }
-
-    if (!targetFolderId) {
-      return res.status(409).json({ error: "GOOGLE_FOLDER_UNAVAILABLE", message: "This organization has no Google Drive folder mapping." });
-    }
-    const docResult = await createGoogleDocInFolder(
-      title,
-      contentHtml,
-      targetFolderId,
-      token
-    );
-
-    await addActivityLog("", "", "", "DOCUMENT_EXPORT", "DOCUMENTS", `Exported '${title}' to Google Docs`, req, undefined, { documentId: docResult.id }).catch((err) => log.warn("Could not record export activity:", err));
-    await emitWebhookEvent(sql, targetOrgId, "document.exported", { kind: "google_doc", title: String(title).slice(0, 300), documentId: docResult.id, documentUrl: docResult.documentUrl });
-    res.json({
-      success: true,
-      documentId: docResult.id,
-      documentUrl: docResult.documentUrl,
-      webViewLink: docResult.documentUrl,
-      data: {
-        documentId: docResult.id,
-        documentUrl: docResult.documentUrl,
-        webViewLink: docResult.documentUrl,
-      },
-    });
-  } catch (error: any) {
-    log.error("Error creating Google Doc:", error);
-    sendRouteError(req, res, error, "request failed", "Gagal membuat dokumen Google Docs.", { status: 500 });
-  }
-});
 
 /** Contract as the API presents it: normalized currency and a USD value. */
 function presentContract(c: any) {
@@ -644,9 +577,6 @@ app.post("/api/contracts", validateBody(bodySchemas.contractCreateBody, { requir
   const targetTenant = findTenant(targetOrgId);
   const partner = await partnerRepository.get(targetOrgId, String(partner_id ?? ""));
   if (!partner) return res.status(400).json({ error: "Partner tidak ditemukan." });
-  const token = await resolveActiveGoogleToken(
-    req.headers["x-google-access-token"] || req.body.accessToken,
-  );
   const cur = normalizeCurrencyCode(currency, tenantDefaultCurrency(targetOrgId));
   const amt = Number(contract_value) || 0;
   let total_usd = req_usd;
@@ -656,14 +586,7 @@ app.post("/api/contracts", validateBody(bodySchemas.contractCreateBody, { requir
     } else {
       let rate = getDefaultUsdRate(cur);
       try {
-        const sheetId =
-          targetTenant?.spreadsheetId || db.googleConfig?.spreadsheetId;
-        rate = await getHistoricalExchangeRate(
-          sheetId,
-          token,
-          cur,
-          start_date,
-        );
+        rate = await getHistoricalExchangeRate(cur, start_date);
       } catch (e) {
         log.error("Failed fetching historical rate for contract:", e);
       }
@@ -691,7 +614,7 @@ app.post("/api/contracts", validateBody(bodySchemas.contractCreateBody, { requir
         fileData,
         targetTenant?.id,
       );
-      await logActivity(req, "UPLOAD_SUCCESS", "CONTRACT", `File Kontrak '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
+      await logActivity(req, "UPLOAD_SUCCESS", "CONTRACT", `File Kontrak '${targetFileName}' disimpan di penyimpanan file aplikasi`);
     }
   }
   const lifecycleDraft: any = {
@@ -757,7 +680,6 @@ app.post("/api/contracts", validateBody(bodySchemas.contractCreateBody, { requir
     return row;
   });
   await logActivity(req, "CREATE", "CONTRACT", `Membuat Kontrak Baru '${contract_number}' (${contract_title}) senilai ${formatAmountForTenant(amt, cur, targetOrgId)}`);
-  await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
   res.json({ success: true, contract: stored });
 });
 app.put("/api/contracts/:id", validateBody(bodySchemas.contractUpdateBody), async (req: express.Request, res: express.Response) => {
@@ -802,16 +724,8 @@ app.put("/api/contracts/:id", validateBody(bodySchemas.contractUpdateBody), asyn
     } else {
       let rate = getDefaultUsdRate(cur);
       try {
-        const token = await resolveActiveGoogleToken(
-          req.headers["x-google-access-token"] || req.body.accessToken,
-        );
         const startDate = updated.start_date || existing.start_date;
-        rate = await getHistoricalExchangeRate(
-          db.googleConfig.spreadsheetId,
-          token,
-          cur,
-          startDate,
-        );
+        rate = await getHistoricalExchangeRate(cur, startDate);
       } catch (e) {
         log.error("Failed fetching rate for edit contract:", e);
       }
@@ -854,9 +768,6 @@ app.put("/api/contracts/:id", validateBody(bodySchemas.contractUpdateBody), asyn
       rawFileName:
         fileName || updated.fileName || `${updated.contract_number}.pdf`,
     });
-    const token = await resolveActiveGoogleToken(
-      req.headers["x-google-access-token"] || req.body.accessToken,
-    );
     let contract_file_link = "";
     if (!contract_file_link) {
       contract_file_link = await saveUpload(
@@ -866,7 +777,7 @@ app.put("/api/contracts/:id", validateBody(bodySchemas.contractUpdateBody), asyn
         fileData,
         existing.organizationId,
       );
-      await logActivity(req, "UPLOAD_SUCCESS", "CONTRACT", `File Kontrak '${targetFileName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
+      await logActivity(req, "UPLOAD_SUCCESS", "CONTRACT", `File Kontrak '${targetFileName}' disimpan di penyimpanan file aplikasi`);
     }
     updated.contract_file_link = contract_file_link;
     updated.fileName = targetFileName;
@@ -887,7 +798,6 @@ app.put("/api/contracts/:id", validateBody(bodySchemas.contractUpdateBody), asyn
     return row;
   });
   await logActivity(req, "UPDATE", "CONTRACT", `Memperbarui data Kontrak '${updated.contract_number}'`);
-  await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, contract: stored });
 });
 app.delete("/api/contracts/:id", async (req: express.Request, res: express.Response) => {
@@ -903,7 +813,6 @@ app.delete("/api/contracts/:id", async (req: express.Request, res: express.Respo
     await contractRepository.removeWithChildren(ctr.organizationId, id);
   });
   await logActivity(req, "DELETE", "CONTRACT", `Menghapus Kontrak '${ctr.contract_number}' (${ctr.contract_title})`);
-  await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });
 });
   return app;

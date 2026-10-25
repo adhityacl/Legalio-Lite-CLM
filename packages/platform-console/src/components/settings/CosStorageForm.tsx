@@ -82,7 +82,7 @@ export const CosStorageForm: React.FC = () => {
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-g8 gap-y-g3">
               <CardTitle id="cos-storage-title" className="text-base">{t('cos_setup.title', 'File storage (Tencent COS)')}</CardTitle>
               <Badge className="shrink-0 whitespace-nowrap" tone={data.configured ? 'success' : 'warning'}>
-                {data.configured ? t('cos_setup.configured', 'Configured') : t('google_setup.source_none', 'Belum dikonfigurasi')}
+                {data.configured ? t('cos_setup.configured', 'Configured') : t('cos_setup.source_none', 'Belum dikonfigurasi')}
               </Badge>
             </div>
             <CardDescription>{t('cos_setup.purpose', 'Uploaded files are stored in this bucket. Saving tests the credentials first.')}</CardDescription>
@@ -96,7 +96,7 @@ export const CosStorageForm: React.FC = () => {
             <div className="min-w-0 space-y-g3"><dt>Region</dt><dd className="font-mono text-foreground wrap-anywhere">{data.region}</dd></div>
             <div className="min-w-0 space-y-g3"><dt>{t('cos_setup.prefix', 'Prefix (optional)')}</dt><dd className="font-mono text-foreground wrap-anywhere">{data.prefix || '—'}</dd></div>
             <div className="min-w-0 space-y-g3"><dt>SecretId</dt><dd className="font-mono text-foreground">••••{data.secretIdLast4}</dd></div>
-            <div className="space-y-g3"><dt>{t('google_setup.updated_at', 'Terakhir diperbarui')}</dt><dd className="text-foreground"><RelativeTime iso={data.updated_at} /></dd></div>
+            <div className="space-y-g3"><dt>{t('cos_setup.updated_at', 'Terakhir diperbarui')}</dt><dd className="text-foreground"><RelativeTime iso={data.updated_at} /></dd></div>
           </dl>
         )}
         <form className="grid gap-g8 sm:grid-cols-2" onSubmit={(event) => void save(event)}>

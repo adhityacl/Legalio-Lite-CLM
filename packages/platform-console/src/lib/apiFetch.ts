@@ -1,4 +1,3 @@
-import { getCachedAccessToken } from './googleAuthService';
 import { getSelectedOrganizationId } from './organizationSelection';
 
 const readSessionToken = (): string | null => {
@@ -24,12 +23,10 @@ const NO_SELECTOR = [
   /^\/api\/system\//,
   /^\/api\/user\//,
   /^\/api\/tenants(\/switch)?\/?$/,
-  /^\/api\/tenants\/[^/]+\/(setup|sync)-google$/,
   /^\/api\/branding$/,
   /^\/api\/policy-packs$/,
-  /^\/api\/google-integration(\/(connect|disconnect|auto-provision-master|provision-folders))?$/,
-  /^\/api\/integrations\/google\/credentials(\/|$)/,
-  /^\/api\/google-service-account\//,
+  /^\/api\/platform-settings$/,
+  /^\/api\/integrations\/storage\//,
   /^\/api\/(smtp|ai|mailer)\//,
   /^\/api\/admin\//,
   /^\/api\/rbac\/(matrix|roles)$/,
@@ -48,8 +45,6 @@ export const needsOrganizationSelector = (pathname: string): boolean =>
  */
 export const getAuthHeaders = (organizationId: string | null = getSelectedOrganizationId()) => {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const googleToken = getCachedAccessToken();
-  if (googleToken) headers['x-google-access-token'] = googleToken;
   const sessionToken = readSessionToken();
   if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`;
   if (organizationId) headers['x-organization-id'] = organizationId;

@@ -108,7 +108,7 @@ const WorkspaceShell: React.FC<{ user: SignedInUser; gate: Gate; isPlatformAdmin
   const modules = policy.settings.modules;
   const workspace = useWorkspace();
   // The editors and the amendment dialog pick from every partner/contract/order: the workspace snapshot is loaded while one is open.
-  const { contracts, ios, partners, googleConfig, loadAllData, workspaceError, snapshotLoaded, editor, closeEditor, amendmentOpen, amendmentParent, closeAmendment, actions } = workspace;
+  const { contracts, ios, partners, loadAllData, workspaceError, snapshotLoaded, editor, closeEditor, amendmentOpen, amendmentParent, closeAmendment, actions } = workspace;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Search palette, navigation badges and the bell come from the server (search, aggregates, notification list), not from a snapshot.
@@ -219,7 +219,6 @@ const WorkspaceShell: React.FC<{ user: SignedInUser; gate: Gate; isPlatformAdmin
         header={
           <Header
             notifications={notifications}
-            googleConfig={googleConfig}
             onRefreshData={loadAllData}
             onNavigateToTab={setActiveTab}
             onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
@@ -235,7 +234,8 @@ const WorkspaceShell: React.FC<{ user: SignedInUser; gate: Gate; isPlatformAdmin
           {isPlatformAdmin && (
             <DefaultPasswordBanner
               onOpenSecurity={() => setActiveTab('admin-system-users')}
-              showGoogleSetup={activeTab === 'admin-system-dashboard' || [
+              onOpenStorage={() => setActiveTab('admin-system-storage')}
+              showStorageSetup={activeTab === 'admin-system-dashboard' || [
                 'admin-system-storage',
                 'admin-system-ai',
                 'admin-system-smtp',

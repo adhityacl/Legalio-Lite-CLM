@@ -6,7 +6,6 @@ import { db, DEFAULT_BRANDING } from '../memoryDb';
 import { auditActorFor } from '../organizationAdminRoutes';
 import { ApiError, appendAudit, readOrganizationSettings, patchOrganizationSettings } from '../organizationSettingsStore';
 import { IS_TEST_MODE } from '../runtimePaths';
-import { autoEnsureTenantGoogleResources } from '../googleDrive';
 import { mailTemplates } from '../mailHelpers';
 import { sql } from '../db';
 import { smtpTlsOptions } from '../smtpTls';
@@ -25,12 +24,12 @@ export function createSystemSettingsRouter() {
 app.get('/api/system/ui-texts', (_req, res) => {
   res.set('Cache-Control', 'no-store').json(readPlatformConfiguration().uiTexts);
 });
-app.get("/api/google-integration", (_req: express.Request, res: express.Response) => {
+app.get("/api/platform-settings", (_req: express.Request, res: express.Response) => {
   const config = readPlatformConfiguration();
-  res.json({ ...config.google, ...config.ai, ...config.smtp });
+  res.json({ ...config.ai, ...config.smtp });
 });
 /** Legacy platform write adapter: splits a flat body into strict sections. Tenant fields are rejected. */
-app.post("/api/google-integration", async (req: express.Request, res: express.Response) => {
+app.post("/api/platform-settings", async (req: express.Request, res: express.Response) => {
   const identity = identityOf(req);
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const sections: Record<string, Record<string, unknown>> = {};
@@ -40,18 +39,14 @@ app.post("/api/google-integration", async (req: express.Request, res: express.Re
     if ((key === "geminiApiKey" || key === "smtpPassword") && (value === "" || isMaskedSecret(value))) continue;
     (sections[section] ||= {})[key] = value;
   }
-  const previousFolder = db.googleConfig?.driveFolderId;
   try {
     for (const [section, values] of Object.entries(sections)) await applyPlatformConfiguration(section, values, auditActorFor(req, identity));
   } catch (err: any) {
     if (err instanceof ApiError) return sendError(req, res, err.status, err.error, err.message);
     throw err;
   }
-  if (!IS_TEST_MODE && db.googleConfig?.driveFolderId && db.googleConfig.driveFolderId !== previousFolder) {
-    autoEnsureTenantGoogleResources(db.googleConfig.accessToken, true).catch((e) => log.warn("[Google Integration Save]", e?.message));
-  }
   const config = readPlatformConfiguration();
-  res.json({ success: true, config: { ...config.google, ...config.ai, ...config.smtp } });
+  res.json({ success: true, config: { ...config.ai, ...config.smtp } });
 });
 app.get('/api/mailer/templates', async (_req, res) => res.json({ templates: await mailTemplates.list() }));
 app.put('/api/mailer/templates/:id', async (req, res) => {

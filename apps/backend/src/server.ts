@@ -16,13 +16,11 @@ import { demoAdminEmail, demoAdminPassword, shouldSeedDemoAdmin } from "./demoAd
 import { createSensitiveRateLimiter, trustProxySetting } from "./edgeConfig";
 import { createDocumentRouter } from "./documentRoutes";
 import { createApprovalRouter } from "./approvalRoutes";
-import { createGoogleCredentialsRouter } from "./googleCredentials";
-import { googleCredentials } from "./googleCredentialStore";
-import { ensureAllPartnersFolders, getFreshGoogleAccessToken, resolveActiveGoogleToken } from "./googleDrive";
+import { createStorageCredentialsRouter } from "./storageCredentials";
+import { storageCredentials } from "./storageCredentialStore";
 import { RequestDenied, resolveIdentity, sendError } from "./identity";
 import { getPublicBaseUrl } from "./installationSettings";
 import { auth as betterAuthInstance, loadCoreData, reloadAuthConfiguration } from "./lib/auth";
-import { hasServiceAccountCredentials } from "./lib/googleServiceAccountAuth";
 import { componentLog, errorResponder, requestLogging } from "./logger";
 import { mailTemplates, sendPlatformMail } from "./mailHelpers";
 import { syncIdSequences } from "./ids";
@@ -50,8 +48,6 @@ import { createOrgApprovalsRouter } from "./routes/orgApprovals";
 import { createOrgDigestRouter } from "./routes/orgDigest";
 import { createApiV1Router } from "./apiV1";
 import { createEvaluationsRouter } from "./routes/evaluations";
-import { createGoogleAuthRouter } from "./routes/googleAuth";
-import { createGoogleIntegrationRouter } from "./routes/googleIntegration";
 import { createInitDataRouter } from "./routes/initData";
 import { createIoRouter } from "./routes/io";
 import { createNotificationsRouter } from "./routes/notifications";
@@ -115,7 +111,6 @@ app.use("/api", localizeApiMessages);
  * operation passes the declared route policy (server/routePolicies.ts).
  */
 app.all(["/api/auth", "/api/auth/*"], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (req.path.startsWith("/api/auth/google/")) return next();
   const path = req.path.replace(/\/$/, "");
   if (!isBetterAuthPathAllowed(path)) return sendError(req, res, 404, "RESOURCE_NOT_FOUND");
   if (BETTER_AUTH_ALLOWED[path] === "self") {
@@ -141,7 +136,7 @@ export async function init() {
   startPdfWorkers();
   await ensureSchema();
   await reloadAuthConfiguration();
-  await googleCredentials.init();
+  await storageCredentials.init();
   // Seeding the demo workspace and the one-time data repairs run in one instance at a time; an instance that starts meanwhile waits,
   // then finds nothing left to do (every step is idempotent).
   await withAdvisoryLockWait(STARTUP_LOCK_KEY, prepareData);
@@ -222,9 +217,6 @@ async function prepareData() {
   });
   if (!IS_TEST_MODE) {
     await ensureUserAccountsExist();
-    ensureAllPartnersFolders().catch((err) =>
-      log.error("Startup category folder provisioning error:", err),
-    );
   }
   await saveDb();
   await syncIdSequences();
@@ -232,7 +224,7 @@ async function prepareData() {
   await seedReminderLedger();
 }
 
-app.use("/api", createGoogleCredentialsRouter(googleCredentials));
+app.use("/api", createStorageCredentialsRouter(storageCredentials));
 
 // Create Contract documents: explorer, draft versions, metadata, comments/redlines.
 app.use("/api", createDocumentRouter({
@@ -247,7 +239,6 @@ app.use("/api", createApprovalRouter({ db: sql, tenantOf: getRequestTenantId }))
 app.use("/api", createOrganizationAdminRouter({
   db: sql,
   policyView: (organizationId: string) => tenantSettingsPayload(organizationId),
-  providerConfigured: () => hasServiceAccountCredentials() || Boolean(db.googleConfig?.accessToken || db.googleConfig?.refreshToken),
   onOrganizationChanged,
   departmentReferenced: async (organizationId: string, department: { id: string; name: string }) => {
     const key = normalizeDepartmentName(department.name);
@@ -295,8 +286,6 @@ app.use(createAggregatesRouter());
 app.use(createActivityLogsRouter());
 app.use(createInitDataRouter());
 app.use(createSystemSettingsRouter());
-app.use(createGoogleIntegrationRouter());
-app.use(createGoogleAuthRouter());
 app.use(createTenantsRouter());
 app.use(createBulkImportRouter());
 app.use(createAiRouter());
@@ -316,5 +305,4 @@ export async function drain() {
   await stopPdfWorkers();
   await coreSaver.idle();
 }
-export { app, getFreshGoogleAccessToken, isMatchingOrg, resolveActiveGoogleToken };
-export { setGoogleTokenVerifier } from "./googleTokenVerifier";
+export { app, isMatchingOrg };

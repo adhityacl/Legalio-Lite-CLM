@@ -11,7 +11,7 @@ import type { Sql } from './db';
 import crypto from 'crypto';
 import { legacyMembershipRole, type PlatformRole, type TenantRole } from './rbac';
 import { normalizeDepartmentName } from './recordScope';
-import { defaultSettingsPayload, writeIntegrationRow, writeSettingsRow } from './organizationSettingsStore';
+import { defaultSettingsPayload, writeSettingsRow } from './organizationSettingsStore';
 
 type DB = Sql;
 
@@ -45,7 +45,6 @@ export async function createOrganizationRecord(db: DB, seed: OrganizationSeed, a
   });
   await db.run(`INSERT INTO organization (id, name, slug, logo, "createdAt", metadata) VALUES (?, ?, ?, ?, ?, NULL)`, id, name, await uniqueSlug(db, name, seed.slug), payload.profile.logoUrl || null, seed.createdAt || new Date().toISOString());
   await writeSettingsRow(db, id, payload, 1, actorId);
-  await writeIntegrationRow(db, { organizationId: id, driveFolderId: null, spreadsheetId: null, legacyAutoSync: 0, version: 1 }, actorId);
   return id;
 }
 

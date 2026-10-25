@@ -73,7 +73,6 @@ import {
   canCreateContract,
   canDeletePartner,
 } from '../lib/rbacScoping';
-import { getCachedAccessToken } from '../lib/googleAuthService';
 import { SUPPORTED_CURRENCIES, currencyMinorUnits, currencyLabel, formatMoney, getDefaultUsdRate, getHistoricalUsdRate, fetchHistoricalRate, getActiveFormattingLocale } from '@legalio/shared/currencyUtils';
 import { formatInvoiceFileName, formatBillingFileName } from '@legalio/shared/fileNaming';
 import { DateInput } from './DateInput';
@@ -452,10 +451,7 @@ export const PartnerSpendingView: React.FC<PartnerSpendingViewProps> = ({
   useEffect(() => {
     const fetchRates = async () => {
       try {
-        const token = getCachedAccessToken();
-        const headers: Record<string, string> = {};
-        if (token) headers['x-google-access-token'] = token;
-        setExchangeRates(await spendingsApi.exchangeRates(headers));
+        setExchangeRates(await spendingsApi.exchangeRates());
       } catch (err) {
         console.error("Failed to fetch exchange rates:", err);
       }

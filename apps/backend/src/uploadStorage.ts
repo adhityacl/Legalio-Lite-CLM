@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { CosConfig, ObjectStore, cosStore, memoryStore, keyFromLink } from './objectStore';
-import { googleCredentials } from './googleCredentialStore';
+import { storageCredentials } from './storageCredentialStore';
 import { IS_TEST_MODE } from './runtimePaths';
 import { ApiError } from './organizationSettingsStore';
 import { RecordKind, createOrganizationScope, teamsOf, recordVisible } from './recordScope';
@@ -19,13 +19,10 @@ const log = componentLog('uploadStorage');
 
 /** Upload storage (Tencent COS, in-memory under APP_TEST_MODE), server-written ownership, and the private /uploads authorization. */
 
-/** Called with the storage key after every stored upload (the optional Google Drive backup subscribes). */
-const uploadStoredListeners: Array<(key: string) => void> = [];
-export function onUploadStored(listener: (key: string) => void) { uploadStoredListeners.push(listener); }
 let storageCache: { config: CosConfig | null; store: ObjectStore } | null = null;
 /** Upload storage: Tencent COS from the saved credentials (rebuilt after every save); in-memory only for APP_TEST_MODE. */
 export function getStore(): ObjectStore {
-  const config = googleCredentials.getCos();
+  const config = storageCredentials.getCos();
   if (!storageCache || storageCache.config !== config) {
     if (!config && !IS_TEST_MODE) throw new ApiError(503, "STORAGE_NOT_CONFIGURED", "File storage (Tencent COS) is not configured.");
     storageCache = { config, store: config ? cosStore(config) : memoryStore() };
@@ -180,7 +177,6 @@ export async function saveUpload(
     : base64Data;
   await getStore().put(key, Buffer.from(cleanContent, "base64"));
   await recordUploadOwner(sql, key, organizationId);
-  for (const listener of uploadStoredListeners) listener(key);
   return link;
 }
 export function getMimeType(fileName) {

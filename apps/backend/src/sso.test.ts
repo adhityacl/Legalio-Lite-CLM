@@ -370,7 +370,7 @@ test('SSO required: members cannot use a password, break-glass administrators an
   const viaSso = await login();
   assert.equal(viaSso.error, null);
   assert.equal((await me(viaSso.session)).status, 200);
-  // Social/Google-style sessions are covered by the same rule.
+  // Social sign-in is not available at all.
   const social = await h.request('POST', '/api/auth/sign-in/social', { headers: { origin: ORIGIN }, body: { provider: 'google' } });
   assert.notEqual(social.status, 200);
   // Turning it off restores passwords.

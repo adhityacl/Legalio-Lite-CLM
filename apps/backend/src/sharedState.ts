@@ -1,7 +1,7 @@
 /**
  * Several instances can run against one database. Business records live in PostgreSQL and are read on demand; the few things a process
  * keeps in memory because code reads them synchronously (installation configuration, the organizations' policy projection, the
- * Google/COS credentials) are registered here by name. A change made by any instance is announced with `NOTIFY legalio_shared_state`,
+ * COS credentials) are registered here by name. A change made by any instance is announced with `NOTIFY legalio_shared_state`,
  * every other instance reloads that part at once, and a periodic reload (SHARED_STATE_POLL_MS, default 30 s, 0 disables) covers a
  * missed notification or a dropped listener connection.
  */

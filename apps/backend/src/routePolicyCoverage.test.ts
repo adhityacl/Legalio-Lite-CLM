@@ -82,12 +82,10 @@ test('the set of unauthenticated (public) routes is explicit and reviewed', () =
   const publicRoutes = ROUTE_POLICIES.filter(([, , policy]) => policy.kind === 'public').map(([method, pattern]) => `${method} ${pattern}`).sort();
   assert.deepEqual(publicRoutes, [
     'GET /api/auth-console/invitations/verify',
-    'GET /api/auth/google/client-id',
     'GET /api/branding',
     'GET /api/digest/unsubscribe',
     'GET /api/exchange-rate-historical',
     'GET /api/exchange-rates',
-    'GET /api/google-auth/client-id',
     'GET /api/health',
     'GET /api/health/ready',
     'GET /api/invitations/:token/preview',
@@ -97,11 +95,7 @@ test('the set of unauthenticated (public) routes is explicit and reviewed', () =
     'GET /api/system/public-status',
     'GET /api/system/ui-texts',
     'GET /api/v1/openapi.json',
-    'POST /api/auth/google/exchange-code',
-    'POST /api/auth/google/sync-session',
     'POST /api/digest/unsubscribe',
-    'POST /api/google-auth/exchange-code',
-    'POST /api/google-auth/sync-session',
     'POST /api/signatures/webhook/:endpointId',
     'POST /api/system/setup',
   ]);

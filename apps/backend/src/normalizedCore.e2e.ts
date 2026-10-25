@@ -6,7 +6,6 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { generateKeyPairSync } from 'node:crypto';
 import { chromium, expect } from '@playwright/test';
 import { hashPassword } from 'better-auth/crypto';
 import { buildDemoDataset } from '@legalio/shared/data/demoDataset';
@@ -158,9 +157,6 @@ try{
  assert.ok(invitedMembership);
  assert.equal((await call(`/api/organizations/${organization.id}/members/${invitedMembership.id}`,{method:'PATCH',org:organization.id,body:{tenantRole:'viewer',departmentIds:[department.id]}})).tenantRole,'viewer');
  await call(`/api/organizations/${organization.id}/members/${invitedMembership.id}`,{method:'DELETE',org:organization.id,status:204});
- const integration=await call(`/api/organizations/${organization.id}/integrations/google`,{org:organization.id});
- const integrationUpdated=await call(`/api/organizations/${organization.id}/integrations/google`,{method:'PATCH',org:organization.id,body:{expectedVersion:integration.version,driveFolderId:'E2EFolder123'}});
- assert.equal(integrationUpdated.driveFolderId,'E2EFolder123');
  const settings=await call(`/api/organizations/${organization.id}/settings`,{org:organization.id});
  const settingsUpdated=await call(`/api/organizations/${organization.id}/settings`,{method:'PATCH',org:organization.id,body:{expectedVersion:settings.version,profile:{tagline:'E2E updated'}}});
  assert.equal(settingsUpdated.profile.tagline,'E2E updated');
@@ -179,12 +175,6 @@ try{
  await call('/api/platform/configuration',{method:'PATCH',body:{section:'branding',values:{appName:'Legalio E2E'}}});
  assert.equal((await call('/api/platform/configuration')).branding.appName,'Legalio E2E');
  await call('/api/platform/configuration',{method:'PATCH',body:{section:'branding',values:{appName:platformConfig.branding.appName}}});
- const {privateKey}=generateKeyPairSync('rsa',{modulusLength:2048,privateKeyEncoding:{type:'pkcs8',format:'pem'},publicKeyEncoding:{type:'spki',format:'pem'}});
- const serviceAccount={type:'service_account',project_id:'e2e-project',client_email:'e2e-service@e2e-project.iam.gserviceaccount.com',private_key:privateKey};
- await call('/api/integrations/google/credentials/service-account',{method:'PUT',body:{file:serviceAccount}});
- assert.equal((await call('/api/integrations/google/credentials')).serviceAccount.source,'upload');
- await call('/api/integrations/google/credentials/service-account',{method:'DELETE'});
- assert.equal((await call('/api/integrations/google/credentials')).serviceAccount.source,null);
  // Tencent COS: test mode runs on in-memory storage; bad input never reaches the network, only a superuser may set it.
  assert.deepEqual(await call('/api/integrations/storage/cos'),{configured:false});
  const cosInput={secretId:'AKIDe2e',secretKey:'e2e-secret',bucket:'legalio-1250000000',region:'ap-jakarta',prefix:''};
@@ -192,7 +182,7 @@ try{
  await call('/api/integrations/storage/cos',{method:'PUT',body:cosInput,token:mailerUserToken,status:403});
  await call('/api/integrations/storage/cos',{method:'PUT',body:cosInput,token:'',status:401});
  await call('/api/integrations/storage/cos',{method:'DELETE',status:404});
- checks.push('Sys API key, platform configuration, Google credential lifecycle and COS storage validation');
+ checks.push('Sys API key, platform configuration and COS storage validation');
 
  await call(`/api/auth-console/users/${invitedUser.id}`,{method:'DELETE'});
  await call(`/api/auth-console/users/${managedUser.id}`,{method:'DELETE'});
@@ -218,10 +208,8 @@ try{
  assert.equal(servedUpload.headers.get('content-type'),'application/pdf');assert.equal(servedUpload.headers.get('x-content-type-options'),'nosniff');assert.equal(servedUpload.headers.get('content-security-policy'),'sandbox');assert.match(servedUpload.headers.get('cache-control')||'',/no-store/);
  const initContract=(await call('/api/init-data',{org})).contracts.find((c:any)=>c.contract_id===uploaded.contract_id);
  assert.equal('partner_name' in initContract,false);assert.equal(initContract.partner_id,partner.partner_id);
- const driveBackup=await call('/api/google-integration/backup',{method:'POST',org});assert.equal(driveBackup.success,true);assert.equal(driveBackup.backedUpCount,0);
- await call('/api/google-integration/backup',{method:'POST',org,token:'',status:401});
  assert.equal((await sql.get("SELECT COUNT(*) AS n FROM pg_indexes WHERE indexname LIKE 'idx\\_v5\\_%'")).n,3);
- checks.push('upload stored and served privately by its link, no partner_name alias, Drive backup endpoint authorization, status indexes');
+ checks.push('upload stored and served privately by its link, no partner_name alias, status indexes');
  // Six soon-to-expire contracts: the dashboard must show only the five nearest, with partner names.
  const extraContractIds=[uploaded.contract_id];
  for(let i=1;i<=6;i++) extraContractIds.push((await call('/api/contracts',{method:'POST',org,body:{partner_id:partner.partner_id,contract_number:`E2E-EXP-${i}`,contract_title:`E2E Expiring ${i}`,start_date:'2026-01-01',end_date:new Date(Date.now()+(5+i)*86400000).toISOString().slice(0,10),currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,internal_pic:owner.name}})).contract.contract_id);
@@ -500,7 +488,7 @@ try{
  checks.push('deletion/detachment');
  // Reset runs only against this test's throwaway database and in-memory uploads.
  const resetSql=fixtureSql;
- await call('/api/google-integration',{method:'POST',body:{geminiApiKey:'synthetic-reset-ai-key',smtpHost:'smtp.example.com',smtpUser:'fixture-user',smtpPassword:'synthetic-reset-smtp-password',smtpEnabled:false}});
+ await call('/api/platform-settings',{method:'POST',body:{geminiApiKey:'synthetic-reset-ai-key',smtpHost:'smtp.example.com',smtpUser:'fixture-user',smtpPassword:'synthetic-reset-smtp-password',smtpEnabled:false}});
  await call('/api/documents',{method:'POST',org,status:201,body:{name:'Reset regression document',content:'<p>fixture</p>',type:'contract'}});
  await resetSql.run('INSERT INTO ai_ocr_cache(cache_key,payload,"createdAt") VALUES(?,?,?)','reset-fixture',JSON.stringify({text:'Cached private text'}),now);
  const fixtureUpload=(await call('/api/contracts',{method:'POST',org,body:{partner_id:csvPartner.partner_id,contract_number:'E2E-RESET-FIXTURE',contract_title:'Reset fixture',start_date:'2026-01-01',end_date:'2099-12-31',currency:'USD',contract_value:1,status_approval:'Signed',auto_renewal:false,fileName:'reset-fixture.pdf',fileData:'data:application/pdf;base64,'+Buffer.from('reset fixture').toString('base64')}})).contract.contract_file_link;

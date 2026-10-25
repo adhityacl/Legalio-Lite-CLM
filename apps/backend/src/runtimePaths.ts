@@ -1,11 +1,11 @@
 /**
  * Single source for mutable runtime locations (tenant-boundaries PRD §15).
  *
- * - APP_DATA_DIR: absolute directory for database.json and the Drive backup index;
+ * - APP_DATA_DIR: absolute directory for database.json;
  *   development default is the working directory.
  * - APP_TEST_MODE=1: the path must be explicit, absolute and inside the OS
- *   temp directory, and startup side effects (demo reseeding, Google
- *   provisioning, SMTP/AI/Google calls, periodic jobs) are disabled.
+ *   temp directory, and startup side effects (demo reseeding,
+ *   SMTP/AI calls, periodic jobs) are disabled.
  */
 import os from 'os';
 import path from 'path';

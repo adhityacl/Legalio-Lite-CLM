@@ -24,11 +24,9 @@ Upload links keep the `/uploads/...` form. Each link maps to the object key `<pr
 
 An application reset deletes every object under the prefix, one request per object. Use a dedicated bucket or prefix for each installation.
 
-The Google Drive backup index (which stored objects were already mirrored, by ETag) is the table `drive_backup_index`. An existing `APP_DATA_DIR/drive-backup.json` is imported into it by the first backup pass and renamed to `drive-backup.json.imported`. The old `uploads.drive-backup.json` is no longer used.
-
 ## Credential encryption
 
-Rows in `integration_credentials` (Google and COS) are encrypted with AES-256-GCM. The key is derived from `BETTER_AUTH_SECRET`. If that secret changes, the stored Google and COS credentials can no longer be read: startup logs the failure, and a superuser must enter them again in `/sys`. The COS `secretKey` is never returned by the API.
+Rows in `integration_credentials` (Tencent COS) are encrypted with AES-256-GCM. The key is derived from `BETTER_AUTH_SECRET`. If that secret changes, the stored COS credentials can no longer be read: startup logs the failure, and a superuser must enter them again in `/sys`. The COS `secretKey` is never returned by the API.
 
 ## Operations
 

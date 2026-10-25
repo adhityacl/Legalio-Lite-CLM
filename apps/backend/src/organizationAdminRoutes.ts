@@ -21,8 +21,8 @@ import {
   resolveOrganizationContext, sendError, type Identity,
 } from './identity';
 import {
-  ApiError, appendAudit, integrationDto, invalid, listAudit, normalizeEmail, patchIntegration,
-  patchOrganizationSettings, readIntegration, readOrganizationSettings, defaultSettingsPayload, validateProfilePatch, validatePolicyPatch, type AuditActor,
+  ApiError, appendAudit, invalid, listAudit, normalizeEmail,
+  patchOrganizationSettings, readOrganizationSettings, defaultSettingsPayload, validateProfilePatch, validatePolicyPatch, type AuditActor,
 } from './organizationSettingsStore';
 
 import { addMembershipRecord, createOrganizationRecord } from './organizationProvisioning';
@@ -606,7 +606,6 @@ export interface OrganizationAdminRouterOptions extends InvitationHooks, Departm
   db: DB;
   /** Non-secret runtime policy view (`TenantPolicyView`). */
   policyView: (organizationId: string) => unknown;
-  providerConfigured: () => boolean;
   /** Called after a committed organization-scoped change so server projections can refresh. */
   onOrganizationChanged: (organizationId: string) => Promise<void>;
   platformConfiguration: {
@@ -760,19 +759,6 @@ export function createOrganizationAdminRouter(options: OrganizationAdminRouterOp
   router.post('/invitations/:token/accept', handle(async (req, res) => {
     const membership = await acceptInvitation(db, identityOf(req), req.params.token, req);
     res.status(201).json(membership);
-  }));
-
-  router.get(`${org}/integrations/google`, handle(async (req, res) => {
-    const { ctx } = await contextOf(req);
-    requirePermission(ctx, 'tenant.integration.read');
-    res.json(integrationDto(await readIntegration(db, ctx.organizationId), options.providerConfigured()));
-  }));
-  router.patch(`${org}/integrations/google`, handle(async (req, res) => {
-    const { ctx, actor } = await contextOf(req);
-    requirePermission(ctx, 'tenant.integration.update');
-    const row = await patchIntegration(db, ctx.organizationId, req.body, actor);
-    await changed(ctx.organizationId);
-    res.json(integrationDto(row, options.providerConfigured()));
   }));
 
   router.get(`${org}/audit`, handle(async (req, res) => {

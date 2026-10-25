@@ -12,8 +12,7 @@
 * `userEmail` / `userName` / `userRole` are never sent: the server takes the actor from the session.
 * The client itself lives in `packages/shared/src/apiClient.ts` (`@legalio/shared/apiClient`); `apps/frontend/src/api/client.ts` re-exports it. The
   platform console and `packages/shared` use the same client (shared is the lowest layer both depend on, so there is no cycle). Raw `fetch(` is
-  an ESLint error (`no-restricted-globals`) in browser code; the only remaining uses are third parties: the Google Drive/Sheets calls in
-  `platform-console/src/lib/googleAuthService.ts` and the exchange-rate provider in `shared/src/currencyRates.ts` (server side).
+  an ESLint error (`no-restricted-globals`) in browser code; the only remaining use is a third party: the exchange-rate provider in `shared/src/currencyRates.ts` (server side).
 * `api/aggregates.ts` and `api/search.ts` type the SQL aggregate endpoints and `/api/search`.
 
 ## Workspace data and mutations (`features/workspace`)

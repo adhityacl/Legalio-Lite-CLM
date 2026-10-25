@@ -4,7 +4,7 @@ import { sql } from './db';
 import { ensureSchema } from './schema';
 import { createTestDatabase } from './testDatabase';
 import { open, seal } from './secretBox';
-import { createGoogleCredentialStore } from './googleCredentials';
+import { createStorageCredentialStore } from './storageCredentials';
 
 let database: Awaited<ReturnType<typeof createTestDatabase>>;
 before(async () => { database = await createTestDatabase(); await ensureSchema(); });
@@ -43,7 +43,7 @@ test('open rejects tampering, a different secret and unknown formats', () => {
 
 test('credential rows are sealed at rest, legacy plain rows still load, and storage status hides the secret', async () => {
   {
-    const store = createGoogleCredentialStore(sql);
+    const store = createStorageCredentialStore(sql);
     await store.init();
     const cos = { secretId: 'AKIDabcdWXYZ', secretKey: 'very-secret-key', bucket: 'legalio-1250000000', region: 'ap-jakarta', prefix: 'p/' };
     await store.saveCos(cos, 'root');
@@ -56,13 +56,10 @@ test('credential rows are sealed at rest, legacy plain rows still load, and stor
     assert.equal(JSON.stringify(status).includes('AKIDabcd'), false);
     assert.deepEqual({ ...status, updated_at: undefined }, { configured: true, bucket: cos.bucket, region: cos.region, prefix: cos.prefix, secretIdLast4: 'WXYZ', updated_at: undefined });
 
-    await sql.run("INSERT INTO integration_credentials (id, payload, updated_at) VALUES ('google_oauth_client', ?, '2026-01-01')",
-      JSON.stringify({ client_id: 'legacy.apps.googleusercontent.com', client_secret: 's', project_id: 'p', javascript_origins: [], redirect_uris: [] }));
-    await sql.run("INSERT INTO integration_credentials (id, payload, updated_at) VALUES ('google_service_account', 'v1:AAAA', '2026-01-01')");
-    const reloaded = createGoogleCredentialStore(sql);
+    // A row of a removed integration that cannot be read must not break startup or hide the storage row.
+    await sql.run("INSERT INTO integration_credentials (id, payload, updated_at) VALUES ('legacy_unreadable', 'v1:AAAA', '2026-01-01')");
+    const reloaded = createStorageCredentialStore(sql);
     await reloaded.init();
-    assert.equal(reloaded.getOAuthClient().clientId, 'legacy.apps.googleusercontent.com');
     assert.deepEqual(reloaded.getCos(), cos);
-    assert.equal(reloaded.getServiceAccount(), null, 'an unreadable row counts as not configured instead of breaking startup');
   }
 });

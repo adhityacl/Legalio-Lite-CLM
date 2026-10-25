@@ -7,7 +7,6 @@ import { usePermissions } from '../../lib/permissions';
 import { ApiError, isApiError } from '../../api/client';
 import { workspaceApi, type WorkspaceSnapshot } from '../../api/workspace';
 import { SERVER_QUERY_ROOTS } from './workspaceCache';
-import type { GoogleSheetsConfig } from '@legalio/types';
 
 type WorkspaceData = WorkspaceSnapshot;
 
@@ -15,7 +14,7 @@ type WorkspaceData = WorkspaceSnapshot;
 export const EMPTY_WORKSPACE: WorkspaceData = {
   organizationId: '',
   contracts: [], ios: [], partners: [], notifications: [], evaluations: [], spendings: [],
-  services: { aiAvailable: false, googleUploadsAvailable: false },
+  services: { aiAvailable: false },
   timestamp: 0,
 };
 
@@ -86,11 +85,7 @@ export function useWorkspaceData(options: { enabled?: boolean } = {}) {
   }, [queryClient, queryKey]);
 
   const data = query.data || EMPTY_WORKSPACE;
-  // Legacy prop shape for views that only show upload availability; no IDs, no secrets.
-  const googleConfig = useMemo<GoogleSheetsConfig>(() => ({
-    driveFolderId: '', spreadsheetId: '', isConnected: data.services.googleUploadsAvailable, autoSync: false,
-  }), [data.services.googleUploadsAvailable]);
 
-  return { ...data, googleConfig, queryKey, updateData, cancelPendingLoad, loadAllData,
+  return { ...data, queryKey, updateData, cancelPendingLoad, loadAllData,
     workspaceLoading: query.isFetching && !query.data, snapshotLoaded: Boolean(query.data), workspaceError: query.isError };
 }

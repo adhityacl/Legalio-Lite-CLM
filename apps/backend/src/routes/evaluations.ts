@@ -7,7 +7,7 @@ import { evaluationRepository, EVALUATION_SORTS, type EvaluationQuery } from '..
 import { requestedVersion } from '../requestVersion';
 import { recordVisible } from '../recordScope';
 import { hasOrganizationScope } from '../rbac';
-import { countryNameForPrompt, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { countryNameForPrompt } from '../memoryDb';
 import { ensureAiAvailable } from '../aiClient';
 import { aiPolicyContext } from '../tenantPolicy';
 import { generateRedlineAnalysis } from '../redlineAnalysis';
@@ -198,7 +198,6 @@ app.post("/api/partner-evaluations", validateBody(bodySchemas.evaluationCreateBo
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   const stored = await evaluationRepository.insert(newEval);
   await logActivity(req, "CREATE", "PARTNER", `Membuat Evaluasi Tahunan Vendor untuk '${newEval.supplier_name}' dengan hasil '${newEval.final_evaluation}' (Skor: ${calculated_score}/100)`);
-  await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
   res.json({ success: true, evaluation: stored });
 });
 app.put("/api/partner-evaluations/:id", validateBody(bodySchemas.evaluationUpdateBody), async (req: express.Request, res: express.Response) => {

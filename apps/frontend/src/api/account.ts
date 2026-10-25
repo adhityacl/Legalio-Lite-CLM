@@ -6,5 +6,5 @@ export const accountApi = {
   acceptInvitation: (code: string) => api.post<{ success?: boolean }>(`/invitations/${encodeURIComponent(code)}/accept`),
   changePassword: (input: { currentPassword: string; newPassword: string; revokeOtherSessions?: boolean }) =>
     api.post<{ status?: boolean }>('/auth/change-password', input),
-  systemStatus: () => api.get<{ defaultAdminPasswordActive?: boolean; googleSetupIncomplete?: boolean }>('/system/status', { cache: 'no-store' }),
+  systemStatus: () => api.get<{ defaultAdminPasswordActive?: boolean; storageSetupIncomplete?: boolean }>('/system/status', { cache: 'no-store' }),
 };

@@ -9,7 +9,7 @@ import { contractRepository } from '../repositories/contractRepository';
 import { normalizeSpendingMonths } from '../spendingMonths';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity, orgContextOf, scopeOf } from '../recordAccess';
-import { db, countryNameForPrompt, triggerAutoPushToGoogleSheet } from '../memoryDb';
+import { db, countryNameForPrompt } from '../memoryDb';
 import { normalizeCurrencyCode, convertToUsdWithFallback, getDefaultUsdRate } from '@legalio/shared/currencyUtils';
 import { tenantDefaultCurrency, aiPolicyContext, findTenant } from '../tenantPolicy';
 import { upload } from '../uploadMiddleware';
@@ -21,7 +21,6 @@ import { sendRouteError } from '../apiErrors';
 import { generateRedlineAnalysis } from '../redlineAnalysis';
 import { validateBody } from '../validation';
 import { validateSpendingAllocations, allocationInvoiceMonths } from '@legalio/shared/spendingAllocations';
-import { resolveActiveGoogleToken } from '../googleDrive';
 import { getHistoricalExchangeRate } from '@legalio/shared/currencyRates';
 import { formatInvoiceFileName, formatBillingFileName } from '@legalio/shared/fileNaming';
 import { saveUpload } from '../uploadStorage';
@@ -292,9 +291,6 @@ app.post("/api/partner-spendings", validateBody(bodySchemas.spendingCreateBody, 
   let invoice_file_name = "";
   let billing_file_url = "";
   let billing_file_name = "";
-  const token = await resolveActiveGoogleToken(
-    req.headers["x-google-access-token"] || req.body.accessToken,
-  );
   let total_amount_usd = req_usd;
   if (
     total_amount_usd === void 0 ||
@@ -308,14 +304,7 @@ app.post("/api/partner-spendings", validateBody(bodySchemas.spendingCreateBody, 
     } else {
       let rate = getDefaultUsdRate(cur);
       try {
-        const sheetId =
-          targetTenant?.spreadsheetId || db.googleConfig?.spreadsheetId;
-        rate = await getHistoricalExchangeRate(
-          sheetId,
-          token,
-          cur,
-          invoice_date,
-        );
+        rate = await getHistoricalExchangeRate(cur, invoice_date);
       } catch (e) {}
       total_amount_usd = Math.round(amt * rate * 100) / 100;
     }
@@ -341,7 +330,7 @@ app.post("/api/partner-spendings", validateBody(bodySchemas.spendingCreateBody, 
         invoice_file.fileData,
         targetTenant?.id,
       );
-      await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `File Invoice '${targetInvoiceName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
+      await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `File Invoice '${targetInvoiceName}' disimpan di penyimpanan file aplikasi`);
     }
   }
   if (billing_file && billing_file.fileData) {
@@ -361,7 +350,7 @@ app.post("/api/partner-spendings", validateBody(bodySchemas.spendingCreateBody, 
         billing_file.fileData,
         targetTenant?.id,
       );
-      await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `File Billing '${targetBillingName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
+      await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `File Billing '${targetBillingName}' disimpan di penyimpanan file aplikasi`);
     }
   }
   const newSpending = {
@@ -398,7 +387,6 @@ app.post("/api/partner-spendings", validateBody(bodySchemas.spendingCreateBody, 
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   const stored = await spendingRepository.insert(newSpending);
   await logActivity(req, "CREATE", "PARTNER", `Menambahkan Catatan Partner Spending untuk '${vendor_name}' (Invoice #${invoice_number}) senilai ${formatAmountForTenant(total_amount, normalizeCurrencyCode(currency, tenantDefaultCurrency(targetOrgId)), targetOrgId)}`);
-  await triggerAutoPushToGoogleSheet(req, { tenantId: targetOrgId });
   res.json({ success: true, spending: presentSpending(stored) });
 });
 app.put("/api/partner-spendings/:id", validateBody(bodySchemas.spendingUpdateBody), async (req: express.Request, res: express.Response) => {
@@ -444,15 +432,7 @@ app.put("/api/partner-spendings/:id", validateBody(bodySchemas.spendingUpdateBod
     } else {
       let rate = getDefaultUsdRate(cur);
       try {
-        const token2 = await resolveActiveGoogleToken(
-          req.headers["x-google-access-token"],
-        );
-        rate = await getHistoricalExchangeRate(
-          db.googleConfig.spreadsheetId,
-          token2,
-          cur,
-          invDate,
-        );
+        rate = await getHistoricalExchangeRate(cur, invDate);
       } catch (e) {}
       updates.total_amount_usd = Math.round(amt * rate * 100) / 100;
     }
@@ -468,9 +448,6 @@ app.put("/api/partner-spendings/:id", validateBody(bodySchemas.spendingUpdateBod
     updated_at: new Date().toISOString(),
   };
   const partner = await partnerRepository.findByIdOrName(existing.organizationId, updated.vendor_id, updated.vendor_name);
-  const token = await resolveActiveGoogleToken(
-    req.headers["x-google-access-token"] || req.body.accessToken,
-  );
   if (updated.invoice_month) {
     updated.invoice_month = normalizeSpendingMonths(updated.invoice_month);
   }
@@ -494,7 +471,7 @@ app.put("/api/partner-spendings/:id", validateBody(bodySchemas.spendingUpdateBod
         invoice_file.fileData,
         existing.organizationId,
       );
-      await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `File Invoice '${targetInvoiceName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
+      await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `File Invoice '${targetInvoiceName}' disimpan di penyimpanan file aplikasi`);
     }
     updated.invoice_file_url = invoice_file_url;
   }
@@ -517,7 +494,7 @@ app.put("/api/partner-spendings/:id", validateBody(bodySchemas.spendingUpdateBod
         billing_file.fileData,
         existing.organizationId,
       );
-      await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `File Billing '${targetBillingName}' disimpan di server lokal aplikasi (dicadangkan ke Google Drive otomatis jika terhubung)`);
+      await logActivity(req, "UPLOAD_SUCCESS", "PARTNER", `File Billing '${targetBillingName}' disimpan di penyimpanan file aplikasi`);
     }
     updated.billing_file_url = billing_file_url;
   }
@@ -526,7 +503,6 @@ app.put("/api/partner-spendings/:id", validateBody(bodySchemas.spendingUpdateBod
   if (writeDenial) return res.status(writeDenial.status).json(writeDenial.body);
   const stored = await spendingRepository.update(updated, expectedVersion);
   await logActivity(req, "UPDATE", "PARTNER", `Memperbarui Catatan Partner Spending untuk '${updated.vendor_name}' (Invoice #${updated.invoice_number})`);
-  await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true, spending: presentSpending(stored) });
 });
 app.delete("/api/partner-spendings/:id", async (req: express.Request, res: express.Response) => {
@@ -539,7 +515,6 @@ app.delete("/api/partner-spendings/:id", async (req: express.Request, res: expre
   if (accessDenial) return res.status(accessDenial.status).json(accessDenial.body);
   await spendingRepository.remove(removed.organizationId, id);
   await logActivity(req, "DELETE", "PARTNER", `Menghapus Catatan Partner Spending '${removed.vendor_name}' (Invoice #${removed.invoice_number})`);
-  await triggerAutoPushToGoogleSheet(req);
   res.json({ success: true });
 });
   return app;

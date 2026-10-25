@@ -663,7 +663,7 @@ export const IOView: React.FC<IOViewProps> = ({
                     className="w-full"
                   >
                     <ExternalLink className="w-g16 h-g16" />
-                    <span>{t('io.detail_open_drive', 'Buka Berkas IO di Google Drive')}</span>
+                    <span>{t('io.detail_open_drive', 'Buka Berkas IO')}</span>
                   </Button>
                 </div>
               )}

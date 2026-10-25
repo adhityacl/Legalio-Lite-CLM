@@ -2,12 +2,11 @@ import { ApiError, appendAudit } from './organizationSettingsStore';
 import { db, DEFAULT_BRANDING, coreSaver, normalizeStoredPartners, refreshTenantProjection, saveDb } from './memoryDb';
 import { withCurrentUiTextKeys } from './uiTextKeys';
 import { UITextOverrides } from '@legalio/types/uiTexts';
-import { hasServiceAccountCredentials } from './lib/googleServiceAccountAuth';
 import { getEffectiveGeminiApiKey, getValidAiModel } from './aiClient';
 import { auditActorFor } from './organizationAdminRoutes';
 import { sql } from './db';
 import { recalculateStatuses } from './reminderJobs';
-/** Platform configuration (SMTP, AI, Google) read/written through strict sections, provider-secret masking, and organization-change projections. */
+/** Platform configuration (SMTP, AI) read/written through strict sections, provider-secret masking, and organization-change projections. */
 
 /*
  * Provider secrets never leave the server (PRD §5.1). Clients receive a
@@ -31,16 +30,14 @@ export function redactProviderConfig(config: any) {
     hasGeminiApiKey: Boolean(geminiApiKey),
     smtpPassword: maskSecret(smtpPassword),
     hasSmtpPassword: Boolean(smtpPassword),
-    hasGoogleSession: Boolean(accessToken || refreshToken),
   };
 }
 /*
  * Platform configuration (PRD §7.1, §7.5, §9.4): deployment branding, the
- * master Google resources, AI provider/model and SMTP relay. Platform-only;
+ * AI provider/model and SMTP relay. Platform-only;
  * tenant settings never read this. Secrets are write-only: omitted keeps the
  * stored value, a non-empty string replaces it, explicit null clears it.
  */
-export const GOOGLE_RESOURCE_ID = /^[A-Za-z0-9_-]{10,200}$/;
 export function platformConfigError(message: string): never {
   throw new ApiError(400, "INVALID_INPUT", message);
 }
@@ -50,16 +47,6 @@ export function readPlatformConfiguration() {
   return {
     uiTexts: { overrides: withCurrentUiTextKeys(g.uiTextOverrides || { ID: {}, EN: {}, ZH: {} }) as UITextOverrides },
     branding: { appName: b.appName, logoUrl: b.logoUrl, primaryColor: b.primaryColor, footerText: b.footerText, loginHeadline: b.loginHeadline },
-    google: {
-      driveFolderId: g.driveFolderId || "",
-      spreadsheetId: g.spreadsheetId || "",
-      masterSpreadsheetId: g.masterSpreadsheetId || "",
-      masterSpreadsheetUrl: g.masterSpreadsheetId ? `https://docs.google.com/spreadsheets/d/${g.masterSpreadsheetId}/edit` : "",
-      isConnected: Boolean(g.isConnected && (g.accessToken || g.refreshToken)),
-      hasGoogleSession: Boolean(g.accessToken || g.refreshToken),
-      serviceAccountConfigured: hasServiceAccountCredentials(),
-      lastSyncTime: g.lastSyncTime || "",
-    },
     ai: { aiModel: g.aiModel || "gemini-3.8-flash", hasGeminiApiKey: Boolean(getEffectiveGeminiApiKey()) },
     smtp: {
       smtpEnabled: Boolean(g.smtpEnabled), smtpHost: g.smtpHost || "", smtpPort: g.smtpPort ?? null,
@@ -71,7 +58,6 @@ export function readPlatformConfiguration() {
 export const PLATFORM_SECTIONS: Record<string, string[]> = {
   uiTexts: ['overrides', 'reset'],
   branding: ["appName", "logoUrl", "primaryColor", "footerText", "loginHeadline"],
-  google: ["driveFolderId", "spreadsheetId", "masterSpreadsheetId"],
   ai: ["aiModel", "geminiApiKey"],
   smtp: ["smtpEnabled", "smtpHost", "smtpPort", "smtpSecure", "smtpAllowSelfSigned", "smtpUser", "smtpPassword", "smtpFromEmail", "smtpFromName"],
 };
@@ -111,11 +97,6 @@ export function validatePlatformValue(section: string, key: string, value: unkno
       if (/[<>"'\s]/.test(v)) platformConfigError("logoUrl is invalid.");
       return v;
     }
-    case "google.driveFolderId": case "google.spreadsheetId": case "google.masterSpreadsheetId": {
-      if (value === null || value === "") return "";
-      if (typeof value !== "string" || !GOOGLE_RESOURCE_ID.test(value)) platformConfigError(`${key} is not a valid Google resource ID.`);
-      return value;
-    }
     case "ai.aiModel": return getValidAiModel(str(100));
     case "smtp.smtpEnabled": case "smtp.smtpSecure": case "smtp.smtpAllowSelfSigned":
       if (typeof value !== "boolean") platformConfigError(`${key} must be true or false.`);
@@ -134,7 +115,7 @@ export function validatePlatformValue(section: string, key: string, value: unkno
   platformConfigError(`Unknown field: ${section}.${key}`);
 }
 export async function applyPlatformConfiguration(section: unknown, values: unknown, actor: ReturnType<typeof auditActorFor>) {
-  if (typeof section !== "string" || !Object.hasOwn(PLATFORM_SECTIONS, section)) platformConfigError("section must be branding, google, ai, smtp or uiTexts.");
+  if (typeof section !== "string" || !Object.hasOwn(PLATFORM_SECTIONS, section)) platformConfigError("section must be branding, ai, smtp or uiTexts.");
   if (!values || typeof values !== "object" || Array.isArray(values)) platformConfigError("values must be an object.");
   const allowed = PLATFORM_SECTIONS[section as string];
   const input = values as Record<string, unknown>;
@@ -165,7 +146,7 @@ export async function applyPlatformConfiguration(section: unknown, values: unkno
     db.googleConfig = { ...(db.googleConfig || {}), uiTextOverrides: overrides };
   }
   else if (section === "branding") db.branding = { ...DEFAULT_BRANDING, ...(db.branding || {}), ...next };
-  else db.googleConfig = { ...(db.googleConfig || {}), ...next, ...(section === "google" && next.masterSpreadsheetId !== undefined ? { masterSpreadsheetUrl: "" } : {}) };
+  else db.googleConfig = { ...(db.googleConfig || {}), ...next };
   if (section === "ai" && next.geminiApiKey !== undefined) process.env.GEMINI_API_KEY = String(next.geminiApiKey);
   try {
     await coreSaver.save(() => appendAudit(sql, actor, {

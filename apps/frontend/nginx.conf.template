@@ -53,12 +53,6 @@ server {
         limit_req zone=legalio_sensitive burst=20 nodelay;
         proxy_pass ${API_UPSTREAM};
     }
-    location /api/google-auth/ {
-        include /etc/nginx/snippets/proxy-headers.conf;
-        include /etc/nginx/snippets/security-headers.conf;
-        limit_req zone=legalio_sensitive burst=20 nodelay;
-        proxy_pass ${API_UPSTREAM};
-    }
     location /api/system/ {
         include /etc/nginx/snippets/proxy-headers.conf;
         include /etc/nginx/snippets/security-headers.conf;

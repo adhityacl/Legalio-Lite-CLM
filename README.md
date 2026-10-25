@@ -20,7 +20,7 @@
 - **Workspace search**: search a vendor name to find related contracts, service orders/IOs, spending invoices and partner evaluations within your access. Select a result to open its details or the matching spending list.
 - **Multi-tenant with role-based access**: organizations, departments and roles (admin, manager, editor, viewer), enforced on the server.
 - **AI assistance**: Google Gemini reads contracts, partner documents and invoices, drafts due diligence notes and generates templates.
-- **Standalone system console** (`/sys`) for superusers: accounts, organizations, Google credentials, Tencent COS file storage, AI model, SMTP and UI texts.
+- **Standalone system console** (`/sys`) for superusers: accounts, organizations, Tencent COS file storage, AI model, SMTP and UI texts.
 - **English, Bahasa Indonesia and Simplified Chinese** out of the box.
 
 
@@ -89,7 +89,7 @@ npm install
 npm run dev
 ```
 
-`npm install` also creates `apps/backend/.env` with a random `BETTER_AUTH_SECRET`. Keep that secret: it also encrypts the stored Google and COS credentials. The database connection is entered on the first visit, or set with `DATABASE_URL` in `apps/backend/.env`. The Gemini key, SMTP and Google credentials are set later from the system console.
+`npm install` also creates `apps/backend/.env` with a random `BETTER_AUTH_SECRET`. Keep that secret: it also encrypts the stored COS credentials. The database connection is entered on the first visit, or set with `DATABASE_URL` in `apps/backend/.env`. The Gemini key, SMTP and Google credentials are set later from the system console.
 
 For production, the quickest route is Docker. The workspace is served on **http://localhost:8080**. PostgreSQL runs as the `postgres` service and its data lives in the `legalio-pg` volume. **`POSTGRES_PASSWORD` is required**: Compose refuses to start without it. Copy `.env.example` to `.env` in the repository root and set a strong value (`openssl rand -base64 24`), or export it in your shell, before the first start. (An existing install that started with the old default must set `POSTGRES_PASSWORD=legalio` to keep its current database.) `FRONTEND_BIND` / `FRONTEND_PORT` choose the published address (default `0.0.0.0:8080`; use `127.0.0.1` behind a host reverse proxy):
 
