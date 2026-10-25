@@ -80,10 +80,8 @@ export const TERMS_CONTENT: LegalCatalog = {
         ],
       },
       {
-        title: 'Google Workspace and Third-Party Integrations',
+        title: 'Third-Party Services',
         clauses: [
-          'The Platform offers optional Google OAuth 2.0 integration for Google Drive and Google Sheets. Authorizations are limited to archiving contract documents into structured partner folders and maintaining backups.',
-          'All integrations adhere to the Google API Services User Data Policy, including Limited Use requirements, and to our Privacy Policy. You may revoke access at any time in Settings or in your Google Account.',
           'Third-party services are governed by their own terms, and we are not responsible for their availability or conduct.',
         ],
       },
@@ -204,10 +202,8 @@ export const TERMS_CONTENT: LegalCatalog = {
         ],
       },
       {
-        title: 'Google Workspace dan Integrasi Pihak Ketiga',
+        title: 'Layanan Pihak Ketiga',
         clauses: [
-          'Platform menyediakan integrasi opsional Google OAuth 2.0 untuk Google Drive dan Google Sheets. Otorisasi dibatasi pada pengarsipan dokumen kontrak ke folder mitra terstruktur dan pemeliharaan cadangan.',
-          'Seluruh integrasi mematuhi Kebijakan Data Pengguna Layanan Google API, termasuk persyaratan Penggunaan Terbatas, serta Kebijakan Privasi kami. Anda dapat mencabut akses kapan saja di Pengaturan atau Akun Google Anda.',
           'Layanan pihak ketiga diatur oleh ketentuannya sendiri, dan kami tidak bertanggung jawab atas ketersediaan atau tindakan mereka.',
         ],
       },
@@ -328,10 +324,8 @@ export const TERMS_CONTENT: LegalCatalog = {
         ],
       },
       {
-        title: 'Google Workspace 与第三方集成',
+        title: '第三方服务',
         clauses: [
-          '平台提供可选的 Google OAuth 2.0 集成，用于 Google Drive 和 Google Sheets。授权仅限于将合同文档归档至结构化的合作伙伴文件夹及维护备份。',
-          '所有集成均遵守 Google API 服务用户数据政策（包括有限使用要求）及我们的《隐私政策》。您可随时在“设置”或 Google 账户中撤销访问权限。',
           '第三方服务受其自身条款约束，我们对其可用性或行为不承担责任。',
         ],
       },

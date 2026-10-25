@@ -30,8 +30,7 @@ export const PRIVACY_CONTENT: LegalCatalog = {
               'Account information: full name, corporate email address, hashed credentials, role and permission level, team or organization, and account status;',
               'Contract and commercial information: contract numbers, agreement titles, partner names, start and end dates, commercial values, duration, auto-renewal terms, amendments and Insertion Orders;',
               'Due diligence documents: Business Identification Number (NIB), Tax ID (NPWP), Articles of Incorporation, director identification (KTP/Passport), bank account details and Non-Disclosure Agreements (NDA);',
-              'Usage and audit information: timestamps of actions, document uploads and edits, session identifiers, IP address, browser and device information, and reminder dispatch records;',
-              'Integration information: temporary OAuth 2.0 access tokens that you grant so the Platform can write to Google Drive and Google Sheets on your behalf.',
+              'Usage and audit information: timestamps of actions, document uploads and edits, session identifiers, IP address, browser and device information, and reminder dispatch records.',
             ],
           },
           'We collect this information when you register, when you or your administrator enter or upload data, when you use the Platform, and automatically through the Platform\'s logging systems.',
@@ -52,8 +51,6 @@ export const PRIVACY_CONTENT: LegalCatalog = {
             items: [
               'to create and manage your account, verify your identity and apply role-based permissions;',
               'to track the contract lifecycle, including active dates, amendments and notice-period deadlines;',
-              'to organize contract and compliance documents into structured partner folders in Google Drive;',
-              'to maintain synchronized backups in authorized Google Sheets;',
               'to send expiry, renewal and approval reminders and system notifications;',
               'to maintain audit trails for governance, accountability and dispute resolution;',
               'to detect, prevent and investigate fraud, unauthorized access and security incidents;',
@@ -65,21 +62,6 @@ export const PRIVACY_CONTENT: LegalCatalog = {
         ],
       },
       {
-        title: 'Google API Services Disclosure',
-        clauses: [
-          'Legalio\'s use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.',
-          {
-            text: 'In particular, with respect to Google Drive and Google Sheets integration:',
-            items: [
-              'we never sell, lease or monetize Google user data or uploaded files;',
-              'Google API data is never used for advertising, retargeting or behavioral profiling;',
-              'Google Drive access is limited to saving and organizing contract and compliance documents in designated partner folders, and Google Sheets access is limited to authorized backup spreadsheets;',
-              'you may revoke Google permissions at any time through Settings in the Platform or the security page of your Google Account.',
-            ],
-          },
-        ],
-      },
-      {
         title: 'Disclosure of Personal Data',
         clauses: [
           'We do not sell Personal Data. We keep information confidential and disclose it only as described in this section.',
@@ -87,7 +69,7 @@ export const PRIVACY_CONTENT: LegalCatalog = {
             text: 'Personal Data may be disclosed to:',
             items: [
               'other authorized users of your organization, according to their assigned roles;',
-              'service providers that host, store, back up or help us operate the Platform, including Google where you enable the integration, who may process data only on our instructions;',
+              'service providers that host, store, back up or help us operate the Platform, who may process data only on our instructions;',
               'professional advisers such as auditors and legal counsel, under duties of confidentiality;',
               'courts, regulators, law enforcement or other authorities where required by law or legal process;',
               'a successor entity in a merger, acquisition or restructuring, subject to this Privacy Policy.',
@@ -121,7 +103,7 @@ export const PRIVACY_CONTENT: LegalCatalog = {
       {
         title: 'International Transfers',
         clauses: [
-          'Some service providers, including Google, may store or process data on servers outside Indonesia. Where Personal Data is transferred abroad, we take steps to ensure it receives a level of protection consistent with the PDP Law.',
+          'Some service providers, may store or process data on servers outside Indonesia. Where Personal Data is transferred abroad, we take steps to ensure it receives a level of protection consistent with the PDP Law.',
         ],
       },
       {
@@ -139,7 +121,7 @@ export const PRIVACY_CONTENT: LegalCatalog = {
               'access and obtain a copy of your Personal Data we hold;',
               'request correction of inaccurate or outdated Personal Data;',
               'request deletion or restriction of processing, subject to our legal retention obligations;',
-              'withdraw consent, including revoking Google OAuth permissions at any time;',
+              'withdraw consent at any time;',
               'export your data in standard tabular formats (Excel/CSV);',
               'lodge a complaint with us or the competent authority.',
             ],
@@ -190,8 +172,7 @@ export const PRIVACY_CONTENT: LegalCatalog = {
               'Informasi akun: nama lengkap, email korporat, kredensial ter-hash, peran dan tingkat izin, tim atau organisasi, serta status akun;',
               'Informasi kontrak dan komersial: nomor kontrak, judul perjanjian, nama mitra, tanggal mulai dan berakhir, nilai komersial, durasi, ketentuan perpanjangan otomatis, amendemen, dan Insertion Order;',
               'Dokumen uji tuntas: Nomor Induk Berusaha (NIB), NPWP, Akta Pendirian, identitas direksi (KTP/Paspor), rekening bank, dan Perjanjian Kerahasiaan (NDA);',
-              'Informasi penggunaan dan audit: waktu tindakan, pengunggahan dan perubahan dokumen, ID sesi, alamat IP, informasi peramban dan perangkat, serta catatan pengiriman pengingat;',
-              'Informasi integrasi: token akses OAuth 2.0 sementara yang Anda berikan agar Platform dapat menulis ke Google Drive dan Google Sheets atas nama Anda.',
+              'Informasi penggunaan dan audit: waktu tindakan, pengunggahan dan perubahan dokumen, ID sesi, alamat IP, informasi peramban dan perangkat, serta catatan pengiriman pengingat.',
             ],
           },
           'Kami mengumpulkan informasi ini saat Anda mendaftar, saat Anda atau administrator memasukkan atau mengunggah data, saat Anda menggunakan Platform, dan secara otomatis melalui sistem pencatatan Platform.',
@@ -212,8 +193,6 @@ export const PRIVACY_CONTENT: LegalCatalog = {
             items: [
               'membuat dan mengelola akun Anda, memverifikasi identitas, dan menerapkan izin berbasis peran;',
               'melacak siklus hidup kontrak, termasuk tanggal berlaku, amendemen, dan tenggat masa pemberitahuan;',
-              'menata dokumen kontrak dan kepatuhan ke dalam folder mitra terstruktur di Google Drive;',
-              'menjaga cadangan tersinkronisasi di Google Sheets yang diizinkan;',
               'mengirim pengingat kedaluwarsa, perpanjangan, dan persetujuan serta notifikasi sistem;',
               'memelihara jejak audit untuk tata kelola, akuntabilitas, dan penyelesaian sengketa;',
               'mendeteksi, mencegah, dan menyelidiki penipuan, akses tidak sah, dan insiden keamanan;',
@@ -225,21 +204,6 @@ export const PRIVACY_CONTENT: LegalCatalog = {
         ],
       },
       {
-        title: 'Pengungkapan Layanan Google API',
-        clauses: [
-          'Penggunaan dan pengalihan informasi yang diterima dari Google API oleh Legalio ke aplikasi lain akan mematuhi Kebijakan Data Pengguna Layanan Google API, termasuk persyaratan Penggunaan Terbatas (Limited Use).',
-          {
-            text: 'Khusus untuk integrasi Google Drive dan Google Sheets:',
-            items: [
-              'kami tidak pernah menjual, menyewakan, atau memonetisasi data pengguna Google maupun berkas yang diunggah;',
-              'data Google API tidak pernah digunakan untuk iklan, retargeting, atau pembuatan profil perilaku;',
-              'akses Google Drive terbatas pada penyimpanan dan penataan dokumen kontrak dan kepatuhan di folder mitra yang ditentukan, dan akses Google Sheets terbatas pada spreadsheet cadangan yang diizinkan;',
-              'Anda dapat mencabut izin Google kapan saja melalui Pengaturan di Platform atau halaman keamanan Akun Google Anda.',
-            ],
-          },
-        ],
-      },
-      {
         title: 'Pengungkapan Data Pribadi',
         clauses: [
           'Kami tidak menjual Data Pribadi. Kami menjaga kerahasiaan informasi dan hanya mengungkapkannya sebagaimana diuraikan pada bagian ini.',
@@ -247,7 +211,7 @@ export const PRIVACY_CONTENT: LegalCatalog = {
             text: 'Data Pribadi dapat diungkapkan kepada:',
             items: [
               'pengguna berwenang lain di organisasi Anda sesuai peran yang diberikan;',
-              'penyedia layanan yang menghosting, menyimpan, mencadangkan, atau membantu operasional Platform, termasuk Google bila Anda mengaktifkan integrasi, yang hanya boleh memproses data sesuai instruksi kami;',
+              'penyedia layanan yang menghosting, menyimpan, mencadangkan, atau membantu operasional Platform, yang hanya boleh memproses data sesuai instruksi kami;',
               'penasihat profesional seperti auditor dan penasihat hukum, dengan kewajiban menjaga kerahasiaan;',
               'pengadilan, regulator, penegak hukum, atau otoritas lain bila diwajibkan oleh hukum atau proses hukum;',
               'pihak penerus dalam merger, akuisisi, atau restrukturisasi, dengan tetap tunduk pada Kebijakan Privasi ini.',
@@ -281,7 +245,7 @@ export const PRIVACY_CONTENT: LegalCatalog = {
       {
         title: 'Transfer Internasional',
         clauses: [
-          'Beberapa penyedia layanan, termasuk Google, dapat menyimpan atau memproses data di server di luar Indonesia. Bila Data Pribadi ditransfer ke luar negeri, kami mengupayakan tingkat pelindungan yang sejalan dengan UU PDP.',
+          'Beberapa penyedia layanan dapat menyimpan atau memproses data di server di luar Indonesia. Bila Data Pribadi ditransfer ke luar negeri, kami mengupayakan tingkat pelindungan yang sejalan dengan UU PDP.',
         ],
       },
       {
@@ -299,7 +263,7 @@ export const PRIVACY_CONTENT: LegalCatalog = {
               'mengakses dan memperoleh salinan Data Pribadi Anda yang kami simpan;',
               'meminta perbaikan Data Pribadi yang tidak akurat atau usang;',
               'meminta penghapusan atau pembatasan pemrosesan, dengan tunduk pada kewajiban retensi hukum kami;',
-              'menarik persetujuan, termasuk mencabut izin Google OAuth kapan saja;',
+              'menarik persetujuan kapan saja;',
               'mengekspor data Anda dalam format tabular standar (Excel/CSV);',
               'mengajukan keluhan kepada kami atau otoritas yang berwenang.',
             ],
@@ -350,8 +314,7 @@ export const PRIVACY_CONTENT: LegalCatalog = {
               '账户信息：姓名、公司邮箱、哈希凭证、角色与权限级别、团队或组织、账户状态；',
               '合同与商业信息：合同编号、协议标题、合作伙伴名称、起止日期、商业金额、期限、自动续约条款、补充协议及插单；',
               '尽职调查文件：营业识别号（NIB）、税号（NPWP）、公司章程、董事身份证明（KTP/护照）、银行账户及保密协议（NDA）；',
-              '使用与审计信息：操作时间戳、文档上传与编辑、会话标识、IP 地址、浏览器与设备信息及提醒发送记录；',
-              '集成信息：您授予的临时 OAuth 2.0 访问令牌，使平台能代表您写入 Google Drive 和 Google Sheets。',
+              '使用与审计信息：操作时间戳、文档上传与编辑、会话标识、IP 地址、浏览器与设备信息及提醒发送记录。',
             ],
           },
           '我们在您注册、您或管理员录入或上传数据、您使用平台时收集这些信息，并通过平台日志系统自动收集。',
@@ -372,8 +335,6 @@ export const PRIVACY_CONTENT: LegalCatalog = {
             items: [
               '创建和管理您的账户、验证身份并应用基于角色的权限；',
               '跟踪合同生命周期，包括生效日期、补充协议和通知期限；',
-              '将合同和合规文档整理到 Google Drive 中结构化的合作伙伴文件夹；',
-              '在获授权的 Google Sheets 中维护同步备份；',
               '发送到期、续约和审批提醒及系统通知；',
               '维护审计轨迹，用于治理、问责和争议解决；',
               '检测、防止和调查欺诈、未经授权的访问及安全事件；',
@@ -385,21 +346,6 @@ export const PRIVACY_CONTENT: LegalCatalog = {
         ],
       },
       {
-        title: 'Google API 服务披露',
-        clauses: [
-          'Legalio 对从 Google API 获得的信息的使用及向任何其他应用的转移，将遵守 Google API 服务用户数据政策，包括有限使用（Limited Use）要求。',
-          {
-            text: '就 Google Drive 和 Google Sheets 集成而言：',
-            items: [
-              '我们绝不出售、出租或变现 Google 用户数据或上传的文件；',
-              'Google API 数据绝不用于广告、再营销或行为画像；',
-              'Google Drive 访问仅限于将合同和合规文档保存并整理到指定的合作伙伴文件夹，Google Sheets 访问仅限于获授权的备份电子表格；',
-              '您可随时通过平台“设置”或 Google 账户安全页面撤销 Google 权限。',
-            ],
-          },
-        ],
-      },
-      {
         title: '个人数据的披露',
         clauses: [
           '我们不出售个人数据。我们对信息保密，仅按本节所述披露。',
@@ -407,7 +353,7 @@ export const PRIVACY_CONTENT: LegalCatalog = {
             text: '个人数据可能披露给：',
             items: [
               '您所在组织中其他获授权用户，依其被分配的角色而定；',
-              '托管、存储、备份或协助运营平台的服务提供商（包括您启用集成时的 Google），其仅可按我们的指示处理数据；',
+              '托管、存储、备份或协助运营平台的服务提供商，其仅可按我们的指示处理数据；',
               '审计师、法律顾问等负有保密义务的专业顾问；',
               '依法律或法律程序要求的法院、监管机构、执法机关或其他主管机关；',
               '合并、收购或重组中的继受实体，其仍受本隐私政策约束。',
@@ -441,7 +387,7 @@ export const PRIVACY_CONTENT: LegalCatalog = {
       {
         title: '跨境传输',
         clauses: [
-          '部分服务提供商（包括 Google）可能在印度尼西亚境外的服务器上存储或处理数据。个人数据被转移至境外时，我们会采取措施确保其获得与 PDP 法相符的保护水平。',
+          '部分服务提供商可能在印度尼西亚境外的服务器上存储或处理数据。个人数据被转移至境外时，我们会采取措施确保其获得与 PDP 法相符的保护水平。',
         ],
       },
       {
@@ -459,7 +405,7 @@ export const PRIVACY_CONTENT: LegalCatalog = {
               '访问并获取我们持有的您的个人数据副本；',
               '要求更正不准确或过时的个人数据；',
               '要求删除或限制处理，但须遵守我们的法定保存义务；',
-              '撤回同意，包括随时撤销 Google OAuth 权限；',
+              '随时撤回同意；',
               '以标准表格格式（Excel/CSV）导出您的数据；',
               '向我们或主管机关投诉。',
             ],
