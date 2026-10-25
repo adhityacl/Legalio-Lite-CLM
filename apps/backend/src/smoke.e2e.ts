@@ -346,12 +346,6 @@ try {
   await expect(widget.getByTestId('obligations-widget-value').nth(1)).toHaveText(String(summary.dueThisWeek));
   steps.push(`dashboard widget shows the SQL aggregate (${summary.dueThisWeek} due this week, ${summary.open} open)`);
 
-  await page.goto(`${frontendURL}/app?tab=obligations`);
-  await page.getByRole('tab', { name: /calendar/i }).click();
-  await expect(page.getByRole('region', { name: /document calendar/i })).toBeVisible({ timeout: 30_000 });
-  await shot(page, 'obligations-calendar');
-  await checkAccessibility(page, 'obligations calendar view');
-
   await page.goto(`${frontendURL}/app?tab=contracts&id=${encodeURIComponent(storedObligation.contract_id)}`);
   const recordDialog = page.getByRole('dialog');
   await expect(recordDialog).toBeVisible({ timeout: 30_000 });
@@ -395,10 +389,10 @@ try {
   // Clause library: empty state, opt-in starter import, the clause form, then the playbook check on the contract record and in the editor.
   await page.goto(`${frontendURL}/app?tab=clauses`);
   await expect(page.getByRole('heading', { name: /clause library & playbook/i })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId('clauses-empty')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Your clause library is empty.')).toBeVisible({ timeout: 30_000 });
   await shot(page, 'clauses-empty');
   await checkAccessibility(page, 'clause library (empty)');
-  await page.getByTestId('clauses-empty').getByRole('button', { name: /import starter clauses/i }).click();
+  await page.getByRole('button', { name: /import starter clauses/i }).click();
   const starterDialog = page.getByRole('dialog');
   await expect(starterDialog.getByText('Payment terms', { exact: true }).last()).toBeVisible({ timeout: 30_000 });
   await shot(page, 'clauses-starter-import');

@@ -10,6 +10,7 @@ import { setCachedTranscript } from './lib/cheapOcrPipeline';
 import { componentLog } from './logger';
 import { IS_TEST_MODE } from './runtimePaths';
 import { fakeAiGenerator, fakeProviderEnabled } from './aiFake';
+import { AiHttpError, DEFAULT_AI_MODELS, formatProviderError, generateWithProvider, isAiProvider, type AiProvider, type AiRuntimeConfig } from './aiProviders';
 const log = componentLog('aiClient');
 
 /** The Gemini client wrapper: key and model selection, retry/fallback chain with curated errors, per-organization budgets. */
@@ -20,6 +21,31 @@ export function getEffectiveGeminiApiKey() {
     process.env.GEMINI_API_KEY ||
     ""
   ).trim();
+}
+/** The provider every AI feature calls: Gemini unless the platform administrator chose another one. */
+export function getAiProvider(): AiProvider {
+  const chosen = db.googleConfig?.aiProvider;
+  return isAiProvider(chosen) ? chosen : "gemini";
+}
+/** Provider, model, key and base URL as configured in System Console > AI Model (keys fall back to OPENAI_API_KEY / ANTHROPIC_API_KEY). */
+export function resolveAiConfig(): AiRuntimeConfig {
+  return resolveAiConfigOf(getAiProvider());
+}
+/** Configuration of a provider the administrator is still editing: typed values win, saved ones fill the rest. */
+export function configForProvider(provider: AiProvider, typed: { apiKey?: unknown; baseUrl?: unknown; model?: unknown } = {}): AiRuntimeConfig {
+  const saved = resolveAiConfigOf(provider);
+  const apiKey = typeof typed.apiKey === "string" && typed.apiKey.trim() && !typed.apiKey.includes("•") ? typed.apiKey.trim() : saved.apiKey;
+  const baseUrl = typeof typed.baseUrl === "string" && typed.baseUrl.trim() ? typed.baseUrl.trim() : saved.baseUrl;
+  const model = typeof typed.model === "string" && typed.model.trim() ? typed.model.trim() : saved.model;
+  return { provider, apiKey, baseUrl, model };
+}
+function resolveAiConfigOf(provider: AiProvider): AiRuntimeConfig {
+  const g = db.googleConfig || {};
+  const apiKey = String(provider === "gemini" ? getEffectiveGeminiApiKey()
+    : provider === "openai" ? g.openaiApiKey || process.env.OPENAI_API_KEY
+    : provider === "anthropic" ? g.anthropicApiKey || process.env.ANTHROPIC_API_KEY
+    : g.customApiKey || "").trim();
+  return { provider, apiKey, baseUrl: provider === "custom" ? String(g.aiBaseUrl || "") : "", model: getAiProvider() === provider ? String(g.aiModel || DEFAULT_AI_MODELS[provider]) : DEFAULT_AI_MODELS[provider] };
 }
 export function getGenAIClient(apiKey?: string) {
   const effectiveKey = (apiKey || getEffectiveGeminiApiKey()).trim();
@@ -36,6 +62,8 @@ export function getGenAIClient(apiKey?: string) {
   });
 }
 export function getValidAiModel(requestedModel) {
+  // Other providers have no fixed list: the configured model id is the model.
+  if (getAiProvider() !== "gemini") return String(db.googleConfig?.aiModel || DEFAULT_AI_MODELS[getAiProvider()]);
   const allowed = [
     "gemini-3.8-flash",
     "gemini-3.7-flash",
@@ -47,10 +75,12 @@ export function getValidAiModel(requestedModel) {
   ];
   if (requestedModel === "gemini-2.0-flash" || requestedModel === "gemini-1.5-flash") return "gemini-3.8-flash";
   if (requestedModel === "gemini-3.5-flash-lite") return "gemini-3.5-flash";
-  if (requestedModel && allowed.includes(requestedModel)) {
+  // A model typed in by hand (a release newer than this list) is accepted once it is the saved one.
+  const known = (model) => allowed.includes(model) || (model === db.googleConfig?.aiModel && /^gemini-[w.-]+$/.test(model));
+  if (requestedModel && known(requestedModel)) {
     return requestedModel;
   }
-  if (db.googleConfig?.aiModel && allowed.includes(db.googleConfig.aiModel)) {
+  if (db.googleConfig?.aiModel && known(db.googleConfig.aiModel)) {
     return db.googleConfig.aiModel;
   }
   return "gemini-3.8-flash";
@@ -109,18 +139,25 @@ export function setAiGenerator(generator: AiGenerator | null) {
 }
 const activeGenerator = (): AiGenerator | null => generatorOverride ?? (fakeProviderEnabled(IS_TEST_MODE) ? fakeAiGenerator : null);
 /** True when a provider key is configured or a (test) generator stands in for it. */
-export const aiProviderAvailable = () => Boolean(activeGenerator()) || Boolean(getEffectiveGeminiApiKey());
+export const aiProviderAvailable = () => {
+  if (activeGenerator()) return true;
+  const cfg = resolveAiConfig();
+  return cfg.provider === "custom" ? Boolean(cfg.baseUrl && cfg.model) : Boolean(cfg.apiKey);
+};
+/** A readable message for an AI failure of whichever provider is active. */
+export const formatAiError = (err: any) => (getAiProvider() === "gemini" ? formatGeminiError(err) : formatProviderError(err, getAiProvider()));
 export async function generateContentWithRetryAndFallback(params: any) {
   const generator = activeGenerator();
-  const apiKey = getEffectiveGeminiApiKey();
-  if (!generator && !apiKey) {
+  const provider = resolveAiConfig();
+  const apiKey = provider.apiKey;
+  if (!generator && !aiProviderAvailable()) {
     throw new PublicError(
-      "Missing GEMINI_API_KEY. Silakan masukkan Gemini API Key di menu Pengaturan (Settings) > Model AI & Parser.",
+      provider.provider === "gemini" ? "Missing GEMINI_API_KEY. Silakan masukkan Gemini API Key di menu Pengaturan (Settings) > Model AI & Parser." : "The AI provider is not configured. Set it in System Console > AI Model.",
       500,
       "AI_NOT_CONFIGURED",
     );
   }
-  const aiClient = generator ? null : getGenAIClient(apiKey);
+  const aiClient = generator || provider.provider !== "gemini" ? null : getGenAIClient(apiKey);
   const primaryModel = getValidAiModel(params.model);
   const candidateFallbacks = [
     "gemini-3.1-flash-lite",
@@ -130,7 +167,8 @@ export async function generateContentWithRetryAndFallback(params: any) {
     "gemini-3.5-flash",
   ];
   // At most aiLimits.maxAttempts (3) models are tried: the primary and the first fallbacks.
-  const models = [primaryModel, ...candidateFallbacks.filter((m) => m !== primaryModel)];
+  // Gemini falls back to sibling models; other providers have no known siblings, so the one model is retried once.
+  const models = provider.provider === "gemini" || generator ? [primaryModel, ...candidateFallbacks.filter((m) => m !== primaryModel)] : [primaryModel, primaryModel];
   try {
     const response = await runModelChain({
       models,
@@ -139,6 +177,7 @@ export async function generateContentWithRetryAndFallback(params: any) {
         log.info(`[Gemini API] Processing request with model=${model}...`);
         // abortSignal cancels the HTTP request itself when the attempt times out.
         if (generator) return generator({ model, params, signal });
+        if (provider.provider !== "gemini") return generateWithProvider(provider, { model, params, signal });
         return aiClient!.models.generateContent({ ...params, model, config: { ...(params.config || {}), abortSignal: signal } });
       },
       onAttemptFailed: (model, err, attempt) =>
@@ -149,7 +188,7 @@ export async function generateContentWithRetryAndFallback(params: any) {
       .catch((err) => log.warn("Could not record AI token usage:", err));
     return response;
   } catch (lastError) {
-    throw new PublicError(formatGeminiError(lastError), 500, "AI_PROVIDER_ERROR");
+    throw new PublicError(formatAiError(lastError), lastError instanceof AiHttpError && lastError.status === 422 ? 422 : 500, "AI_PROVIDER_ERROR");
   }
 }
 /**

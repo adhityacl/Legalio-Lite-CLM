@@ -1,7 +1,7 @@
-import { CalendarSearch } from 'lucide-react';
+import { CalendarSearch, Search } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '@legalio/ui-components/button';
-import { Input } from '@legalio/ui-components/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
 import { Fieldset, FieldsetLegend } from '@legalio/ui-components/fieldset';
 import { Checkbox, CheckboxControl, CheckboxGroup, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
@@ -34,7 +34,10 @@ export function EventFilterPopover({ enabled, onToggle, search, onSearch, onRese
           <PopoverBody className="grid gap-g13">
             <Field>
               <FieldLabel>{t('calendar.search_documents')}</FieldLabel>
-              <Input type="search" value={search} onChange={event => onSearch(event.target.value)} placeholder={t('calendar.search_placeholder')} />
+              <InputGroup>
+                <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
+                <InputGroupInput type="search" value={search} onChange={event => onSearch(event.target.value)} placeholder={t('calendar.search_placeholder')} />
+              </InputGroup>
             </Field>
             <Fieldset>
               <FieldsetLegend>{t('calendar.event_types')}</FieldsetLegend>

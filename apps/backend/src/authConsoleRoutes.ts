@@ -21,9 +21,12 @@ import { isDemoAccountEmail } from './demoAccounts';
 import { ApiError, appendAudit, patchOrganizationSettings, readOrganizationSettings } from './organizationSettingsStore';
 import { assertAdminsRemainWithout, assertSuperusersRemainWithout, auditActorFor, previewInvitation, acceptInvitation } from './organizationAdminRoutes';
 import { addMembershipRecord, createIdentityRecord, createOrganizationRecord } from './organizationProvisioning';
+import { pgReportsRouter } from './pgReportsRoutes';
+import { MONTHLY_TOKEN_OPTIONS, aiLimitsFromEnv, monthStartOf } from './aiLimits';
 
 export const authConsoleRouter = Router();
 forwardAsyncRouteErrors(authConsoleRouter);
+authConsoleRouter.use('/pg-reports', pgReportsRouter);
 
 let organizationChangedRef: ((organizationId?: string) => Promise<void>) | null = null;
 let storeRef: (() => ObjectStore) | null = null;
@@ -662,4 +665,37 @@ authConsoleRouter.delete('/api-keys/:id', async (req: Request, res: Response) =>
 
 authConsoleRouter.get('/rbac-matrix', platformHandler(async (_req, res) => {
   res.json({ success: true, matrix: buildMatrix() });
+}));
+
+/** AI token limits per organization: the monthly limit each one may use, and what it has used (UTC month and today). */
+authConsoleRouter.get('/ai-limits', platformHandler(async (_req, res) => {
+  const now = new Date();
+  const defaultMonthlyTokens = aiLimitsFromEnv().monthlyTokens;
+  const rows = await sql.all(`
+    SELECT o.id, o.name, o.slug, l.monthly_tokens AS "limit",
+      COALESCE((SELECT SUM(tokens) FROM ai_usage WHERE organization_id = o.id AND day >= ?), 0) AS "usedMonth",
+      COALESCE((SELECT SUM(tokens) FROM ai_usage WHERE organization_id = o.id AND day = ?), 0) AS "usedToday"
+    FROM organization o LEFT JOIN ai_org_limits l ON l.organization_id = o.id ORDER BY lower(o.name), o.id`, monthStartOf(now), now.toISOString().slice(0, 10)) as any[];
+  res.json({
+    success: true, month: monthStartOf(now).slice(0, 7), options: MONTHLY_TOKEN_OPTIONS, defaultMonthlyTokens,
+    organizations: rows.map((row) => ({
+      id: row.id, name: row.name, slug: row.slug, usedMonth: Number(row.usedMonth), usedToday: Number(row.usedToday),
+      monthlyTokens: row.limit === null ? defaultMonthlyTokens : Number(row.limit), isDefault: row.limit === null,
+    })),
+  });
+}));
+/** Body `{ monthlyTokens }` is one of the offered options (0 = unlimited); `null` goes back to the platform default. */
+authConsoleRouter.put('/ai-limits/:organizationId', platformHandler(async (req, res, identity) => {
+  const organizationId = String(req.params.organizationId);
+  const value = req.body?.monthlyTokens;
+  if (value !== null && !(MONTHLY_TOKEN_OPTIONS as readonly number[]).includes(value)) throw bad(`monthlyTokens must be null or one of ${MONTHLY_TOKEN_OPTIONS.join(', ')}.`);
+  if (!await sql.get('SELECT 1 FROM organization WHERE id = ?', organizationId)) throw new ApiError(404, 'NOT_FOUND', 'Organization not found.');
+  if (value === null) await sql.run('DELETE FROM ai_org_limits WHERE organization_id = ?', organizationId);
+  else {
+    await sql.run(`INSERT INTO ai_org_limits (organization_id, monthly_tokens, updated_at, updated_by) VALUES (?, ?, ?, ?)
+      ON CONFLICT (organization_id) DO UPDATE SET monthly_tokens = excluded.monthly_tokens, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+    organizationId, value, new Date().toISOString(), identity.userId);
+  }
+  await platformAudit(req, identity, 'platform.ai_limit.update', 'organization', organizationId, ['monthlyTokens']);
+  res.json({ success: true, organizationId, monthlyTokens: value === null ? aiLimitsFromEnv().monthlyTokens : value, isDefault: value === null });
 }));

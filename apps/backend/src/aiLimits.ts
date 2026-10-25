@@ -11,6 +11,8 @@ export interface AiLimits {
   /** Calls and tokens per organization per UTC day (persisted in ai_usage). 0 disables a budget. */
   dailyCalls: number;
   dailyTokens: number;
+  /** Default tokens per organization per UTC month when a platform administrator has not chosen one (ai_org_limits). 0 is unlimited. */
+  monthlyTokens: number;
   /** Model attempts per request, including the primary model. */
   maxAttempts: number;
   timeoutMs: number;
@@ -26,6 +28,7 @@ export function aiLimitsFromEnv(env: NodeJS.ProcessEnv = process.env): AiLimits 
     perMinute: int('AI_ORG_CALLS_PER_MINUTE', 30),
     dailyCalls: int('AI_ORG_DAILY_CALLS', 1000),
     dailyTokens: int('AI_ORG_DAILY_TOKENS', 3_000_000),
+    monthlyTokens: int('AI_ORG_MONTHLY_TOKENS', 0),
     maxAttempts: Math.max(1, Math.min(3, int('AI_MAX_MODEL_ATTEMPTS', 3, 1))),
     timeoutMs: Math.max(1000, int('AI_ATTEMPT_TIMEOUT_MS', 35_000)),
     baseBackoffMs: int('AI_BACKOFF_BASE_MS', 1000),
@@ -37,7 +40,7 @@ export function aiLimitsFromEnv(env: NodeJS.ProcessEnv = process.env): AiLimits 
 
 export class AiLimitError extends Error {
   readonly status = 429;
-  constructor(readonly code: 'AI_RATE_LIMITED' | 'AI_DAILY_BUDGET', message: string, readonly retryAfterSeconds: number) { super(message); }
+  constructor(readonly code: 'AI_RATE_LIMITED' | 'AI_DAILY_BUDGET' | 'AI_MONTHLY_BUDGET', message: string, readonly retryAfterSeconds: number) { super(message); }
 }
 
 /** Sliding one-minute window per key. */
@@ -58,10 +61,34 @@ export class AiRateLimiter {
 const dayOf = (now: Date) => now.toISOString().slice(0, 10);
 const secondsToUtcMidnight = (now: Date) => Math.max(1, Math.ceil((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) - now.getTime()) / 1000));
 
-/** Counts one call against the organization's rate limit and daily budget, or throws AiLimitError (HTTP 429). */
+/** Monthly token limits a platform administrator can choose for an organization (0 = unlimited). */
+export const MONTHLY_TOKEN_OPTIONS = [100_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 0] as const;
+export const monthStartOf = (now: Date) => `${now.toISOString().slice(0, 7)}-01`;
+const secondsToNextUtcMonth = (now: Date) => Math.max(1, Math.ceil((Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1) - now.getTime()) / 1000));
+
+/** The organization's monthly token limit: its own choice, else the platform default. 0 is unlimited. */
+export async function monthlyTokenLimit(db: Sql, organizationId: string, fallback: number): Promise<number> {
+  const row = await db.get<{ monthly_tokens: string | number }>('SELECT monthly_tokens FROM ai_org_limits WHERE organization_id = ?', organizationId);
+  return row ? Number(row.monthly_tokens) : fallback;
+}
+
+/** Tokens the organization has used since the first of the (UTC) month. */
+export async function monthTokensUsed(db: Sql, organizationId: string, now = new Date()): Promise<number> {
+  const row = await db.get<{ used: string | number }>('SELECT COALESCE(SUM(tokens), 0) AS used FROM ai_usage WHERE organization_id = ? AND day >= ?', organizationId, monthStartOf(now));
+  return Number(row?.used ?? 0);
+}
+
+/** Counts one call against the organization's rate limit, monthly token limit and daily budget, or throws AiLimitError (HTTP 429). */
 export async function reserveAiCall(db: Sql, organizationId: string | null, limits: AiLimits, limiter: AiRateLimiter, now = new Date()) {
   const key = organizationId ?? 'platform';
   limiter.hit(key, limits.perMinute, now.getTime());
+  // Tokens are counted after each answer, so one call can overshoot the limit; the next one is refused.
+  if (organizationId) {
+    const monthly = await monthlyTokenLimit(db, organizationId, limits.monthlyTokens);
+    if (monthly > 0 && await monthTokensUsed(db, organizationId, now) >= monthly) {
+      throw new AiLimitError('AI_MONTHLY_BUDGET', 'This organization has used its monthly AI token limit. It resets on the first day of next month (UTC), or a platform administrator can raise it.', secondsToNextUtcMonth(now));
+    }
+  }
   const updated = await db.get(`
     INSERT INTO ai_usage (organization_id, day, calls, tokens) VALUES (@key, @day, 1, 0)
     ON CONFLICT (organization_id, day) DO UPDATE SET calls = ai_usage.calls + 1

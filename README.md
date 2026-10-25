@@ -19,8 +19,8 @@
 - **Document calendar**: contract starts, cancellation notices, ends, renewals and terminations on a yearly calendar.
 - **Workspace search**: search a vendor name to find related contracts, service orders/IOs, spending invoices and partner evaluations within your access. Select a result to open its details or the matching spending list.
 - **Multi-tenant with role-based access**: organizations, departments and roles (admin, manager, editor, viewer), enforced on the server.
-- **AI assistance**: Google Gemini reads contracts, partner documents and invoices, drafts due diligence notes and generates templates.
-- **Standalone system console** (`/sys`) for superusers: accounts, organizations, Tencent COS file storage, AI model, SMTP and UI texts.
+- **AI assistance**: an AI model reads contracts, partner documents and invoices, drafts due diligence notes and generates templates. Bring your own key for Google Gemini, OpenAI, Anthropic or any OpenAI-compatible service (Groq, OpenRouter, Ollama, vLLM), chosen in `/sys` → AI Model, with a monthly token limit per organization.
+- **Standalone system console** (`/sys`) for superusers: accounts, organizations, file storage (Amazon S3, Cloudflare R2, Backblaze B2, Google Cloud Storage, MinIO or Tencent COS), PgReport (PostgreSQL monitoring), AI model, SMTP and UI texts.
 - **English, Bahasa Indonesia and Simplified Chinese** out of the box.
 
 
@@ -28,7 +28,7 @@
 
 Legalio is a contract lifecycle management (CLM) application for legal, procurement and finance teams who track many partners at once. It keeps every partner, contract, service order, invoice and evaluation in one place. It reminds you before notice periods run out and gives each organization its own workspace, branding and access rules.
 
-The app runs as a single Node.js server backed by PostgreSQL, with uploaded files stored in Tencent COS. The Docker setup includes PostgreSQL, so it can be self-hosted on one machine. See [POSTGRES_STORAGE.md](POSTGRES_STORAGE.md) for storage and backup details. The interface is built with React 19 and a design system based on [Moduix](https://moduix.dev) (Ark UI) components, sized on a golden-ratio scale.
+The app runs as a single Node.js server backed by PostgreSQL, with uploaded files stored in an S3-compatible bucket or Tencent COS. The Docker setup includes PostgreSQL, so it can be self-hosted on one machine. See [POSTGRES_STORAGE.md](POSTGRES_STORAGE.md) for storage and backup details. The interface is built with React 19 and a design system based on [Moduix](https://moduix.dev) (Ark UI) components, sized on a golden-ratio scale.
 
 
 ![Legalio dashboard](assets/screenshots/dashboard.png)
@@ -53,8 +53,12 @@ On the first visit, onboarding takes two steps:
    is skipped when `DATABASE_URL` is set, as in Docker. The app creates its
    schema and starts without a restart.
 2. **Confirm the website's public URL, create the superuser account and enter
-   the Tencent COS bucket** (SecretId, SecretKey, bucket, region and optional
-   prefix) used for uploaded files. The bucket is tested before it is saved.
+   a file storage bucket** (provider, access key, secret key, bucket, region or
+   endpoint, and optional prefix) used for uploaded files. Amazon S3, Cloudflare R2,
+   Backblaze B2, Google Cloud Storage (HMAC keys), MinIO and Tencent COS are
+   supported. The bucket is tested before it is saved. More than one provider can
+   stay configured: the active one receives new files, and every file is read
+   from the provider it was written to.
 
 The URL starts with the address you opened; include `http://` or `https://` and
 the public port if needed. Setup saves it in the installation database and

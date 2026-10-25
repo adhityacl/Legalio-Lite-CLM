@@ -59,8 +59,9 @@ export function buildDocumentCalendarEvents(
     const documentId = contract ? contract.contract_id : io!.io_id;
     if (!documentId) return;
     const title = (contract ? contract.contract_title || contract.contract_number : io!.io_title || io!.io_number) || documentId;
+    const partnerName = partners.find(partner => partner.partner_id === record.partner_id)?.partner_name || (contract as { partner_name?: string } | undefined)?.partner_name || undefined;
     const add = (type: EventType, date: Date | null, projected = false) => {
-      if (date) events.push({ id: `${documentKind}:${documentId}:${type}`, type, date: calendarDateKey(date), title, documentId, documentKind, projected });
+      if (date) events.push({ id: `${documentKind}:${documentId}:${type}`, type, date: calendarDateKey(date), title, partnerName, documentId, documentKind, projected });
     };
     add('contract_start', parseCalendarDate(record.start_date));
     const end = parseCalendarDate(record.end_date || record.completion_date);

@@ -119,15 +119,12 @@ export function HierarchyTreeView(props: Props) {
   const treeBadge = (status?: string) => <Badge tone={statusTone(status || '')}>{statusLabel(status)}</Badge>;
   const rowProps = (node: Selection) => ({ selected: isSelected(node), onSelect: () => select(node) });
   const toggleLabel = (title: string, open: boolean) => `${t(open ? 'nav.tutup_submenu' : 'nav.buka_submenu')}: ${title}`;
-  const fileRows = (kind: OwnerKind, id: string) => filesFor(kind, id).map(item => <li key={item.key}><TreeRow title={item.name} icon={FileText} badge={<span className="text-xs text-muted-foreground">{statusLabel(item.status)}</span>} {...rowProps({ kind: 'file', owner: kind, id, fileKey: item.key })} /></li>);
   const branchClass = 'ml-g13 space-y-g3 border-l border-border pl-g8 sm:ml-g21 sm:pl-g13';
-  const renderIO = (item: InsertionOrder) => {
-    const key = `io:${item.io_id}`, open = isOpen(key);
-    return <li key={key}>
-      <TreeRow title={item.io_number} subtitle={`${t('hierarchy.insertion_order_badge')} · ${period(item)}`} icon={open ? FolderOpen : Folder} badge={treeBadge(item.status)} controls={`${prefix}-${key}`} expanded={open} onToggle={() => toggle(key)} toggleLabel={toggleLabel(item.io_number, open)} {...rowProps({ kind: 'io', id: item.io_id })} />
-      {open && <ul id={`${prefix}-${key}`} className={branchClass}>{fileRows('io', item.io_id)}{!filesFor('io', item.io_id).length && <li className="px-g8 py-g8 text-xs text-muted-foreground">{t('hierarchy.no_document')}</li>}</ul>}
-    </li>;
-  };
+  const renderIO = (item: InsertionOrder) => (
+    <li key={`io:${item.io_id}`}>
+      <TreeRow title={item.io_number} subtitle={`${t('hierarchy.insertion_order_badge')} · ${period(item)}`} icon={Folder} badge={treeBadge(item.status)} {...rowProps({ kind: 'io', id: item.io_id })} />
+    </li>
+  );
   const detailField = (label: string, value: React.ReactNode) => <div className="min-w-0"><dt className="mb-g5 text-xs text-muted-foreground">{label}</dt><dd className="m-0 text-sm text-foreground wrap-anywhere">{value || '—'}</dd></div>;
   const detailTitle = file?.name || (ownerKind === 'partner' ? partner?.partner_name : ownerKind === 'io' ? io?.io_number : contract?.contract_number);
   const edit = () => { if (ownerKind === 'partner' && partner) props.onSelectPartner(partner); else if (ownerKind === 'io' && io) props.onSelectIO(io); else if (contract) props.onSelectContract(contract); };
@@ -151,10 +148,12 @@ export function HierarchyTreeView(props: Props) {
             <TreeRow title={item.partner_name} subtitle={`${item.partner_type || t('tree.partner')} · ${item.tags?.join(', ') || '—'}`} icon={open ? FolderOpen : Folder} badge={treeBadge(activeVendor ? 'Active' : 'Review')} expanded={open} controls={`${prefix}-${key}`} onToggle={() => toggle(key, index === 0)} toggleLabel={toggleLabel(item.partner_name, open)} {...rowProps({ kind: 'partner', id: item.partner_id })} />
             {open && <ul id={`${prefix}-${key}`} className={branchClass}>
               {linkedContracts.map(itemContract => {
-                const contractKey = `contract:${itemContract.contract_id}`, contractOpen = isOpen(contractKey);
+                const contractKey = `contract:${itemContract.contract_id}`, childIOs = contractIOs(itemContract.contract_id);
+                const contractOpen = childIOs.length > 0 && isOpen(contractKey);
                 return <li key={contractKey}>
-                  <TreeRow title={itemContract.contract_number} subtitle={`${t('tree.contract')} · ${period(itemContract)}`} icon={contractOpen ? FolderOpen : Folder} badge={treeBadge(itemContract.status)} expanded={contractOpen} controls={`${prefix}-${contractKey}`} onToggle={() => toggle(contractKey)} toggleLabel={toggleLabel(itemContract.contract_number, contractOpen)} {...rowProps({ kind: 'contract', id: itemContract.contract_id })} />
-                  {contractOpen && <ul id={`${prefix}-${contractKey}`} className={branchClass}>{fileRows('contract', itemContract.contract_id)}{contractIOs(itemContract.contract_id).map(renderIO)}</ul>}
+                  <TreeRow title={itemContract.contract_number} subtitle={`${t('tree.contract')} · ${period(itemContract)}`} icon={contractOpen ? FolderOpen : Folder} badge={treeBadge(itemContract.status)} {...rowProps({ kind: 'contract', id: itemContract.contract_id })}
+                    {...(childIOs.length ? { expanded: contractOpen, controls: `${prefix}-${contractKey}`, onToggle: () => toggle(contractKey), toggleLabel: toggleLabel(itemContract.contract_number, contractOpen) } : {})} />
+                  {contractOpen && <ul id={`${prefix}-${contractKey}`} className={branchClass}>{childIOs.map(renderIO)}</ul>}
                 </li>;
               })}
               {partnerIOs(item.partner_id).filter(itemIO => !linkedContracts.some(c => c.contract_id === itemIO.contract_id)).map(renderIO)}

@@ -16,9 +16,13 @@ The schema is managed by versioned migrations (`apps/backend/src/migrate.ts`, `a
 
 Workspace search uses `ILIKE` over the `search_records` table. It does not fold accents and does not use an index, which is enough for vendor names; the upgrade path is `pg_trgm` or `tsvector`.
 
-## File storage (Tencent COS)
+## File storage
 
-The bucket, region, optional prefix and keys are entered during setup or later in `/sys`. Before saving, the app writes, reads back and deletes a probe object `<prefix>.legalio-probe-<uuid>`.
+Supported providers: Amazon S3, Cloudflare R2, Backblaze B2, Google Cloud Storage (HMAC interoperability keys), MinIO / any S3-compatible service (these use `@aws-sdk/client-s3`) and Tencent COS (its own SDK). The provider, bucket, region or endpoint, optional prefix and keys are entered during setup or later in `/sys` → Storage.
+
+Several providers can stay configured. New files go to the **active** provider; the table `object_locations` records which provider holds each file, so switching the active provider never strands old files. A file with no record predates multi-provider storage and is read from Tencent COS (if configured) or the active provider. Switching does not copy existing files.
+
+Before saving, the app writes, reads back and deletes a probe object `<prefix>.legalio-probe-<uuid>`.
 
 Upload links keep the `/uploads/...` form. Each link maps to the object key `<prefix><Org>/<Partner>/<Folder…>/<file>`. Files are served only through the backend, after the same permission checks as before.
 
@@ -26,7 +30,7 @@ An application reset deletes every object under the prefix, one request per obje
 
 ## Credential encryption
 
-Rows in `integration_credentials` (Tencent COS) are encrypted with AES-256-GCM. The key is derived from `BETTER_AUTH_SECRET`. If that secret changes, the stored COS credentials can no longer be read: startup logs the failure, and a superuser must enter them again in `/sys`. The COS `secretKey` is never returned by the API.
+Rows in `integration_credentials` (one per storage provider) are encrypted with AES-256-GCM. The key is derived from `BETTER_AUTH_SECRET`. If that secret changes, the stored COS credentials can no longer be read: startup logs the failure, and a superuser must enter them again in `/sys`. The COS `secretKey` is never returned by the API.
 
 ## Operations
 

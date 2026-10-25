@@ -3,7 +3,7 @@ export const SUGGESTION_TRANSLATIONS = {
   "EN": {
     "obligations.view.review": "AI review",
     "suggestions.title": "AI review queue",
-    "suggestions.intro": "AI suggestions are advisory. Check the quote, edit what is wrong, then accept: only accepted suggestions become records.",
+    "suggestions.intro": "AI suggestions are advisory.",
     "suggestions.page_unknown": "Page unknown",
     "suggestions.quote_found": "Quote found in the document",
     "suggestions.quote_missing": "Quote not found in the document: check it",
@@ -55,7 +55,7 @@ export const SUGGESTION_TRANSLATIONS = {
   "ID": {
     "obligations.view.review": "Tinjauan AI",
     "suggestions.title": "Antrean tinjauan AI",
-    "suggestions.intro": "Saran AI bersifat penasihat. Periksa kutipan, perbaiki yang salah, lalu setujui: hanya saran yang disetujui yang menjadi data.",
+    "suggestions.intro": "Saran AI bersifat penasihat.",
     "suggestions.page_unknown": "Halaman tidak diketahui",
     "suggestions.quote_found": "Kutipan ditemukan di dokumen",
     "suggestions.quote_missing": "Kutipan tidak ditemukan di dokumen: periksa",
@@ -107,7 +107,7 @@ export const SUGGESTION_TRANSLATIONS = {
   "ZH": {
     "obligations.view.review": "AI 审核",
     "suggestions.title": "AI 审核队列",
-    "suggestions.intro": "AI 建议仅供参考。请核对引文，修改有误之处，然后接受：只有被接受的建议才会成为记录。",
+    "suggestions.intro": "AI 建议仅供参考。",
     "suggestions.page_unknown": "页码未知",
     "suggestions.quote_found": "在文档中找到引文",
     "suggestions.quote_missing": "在文档中未找到引文：请核对",

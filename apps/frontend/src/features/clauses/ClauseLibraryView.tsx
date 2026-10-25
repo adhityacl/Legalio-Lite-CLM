@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, ArrowUpDown, BookMarked, Download, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { PAGE_SIZES } from '@legalio/types/documents';
 import { Badge } from '@legalio/ui-components/badge';
 import { Button } from '@legalio/ui-components/button';
 import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
-import { Input } from '@legalio/ui-components/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { NativeSelect } from '@legalio/ui-components/native-select';
 import { Skeleton } from '@legalio/ui-components/skeleton';
 import { Table, TableBody, TableCell, TableColumnHeader, TableHeader, TableRow, TableScrollArea } from '@legalio/ui-components/table';
@@ -93,7 +93,6 @@ export const ClauseLibraryView: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-g13">
         <div>
           <Heading as="h2" size="md" weight="semibold" id="clauses-heading">{t('clauses.title', 'Clause library & playbook')}</Heading>
-          <Text size="sm" tone="muted">{t('clauses.subtitle', 'Approved wording, fallbacks and the rules your contracts are checked against. Run the check from the contract editor.')}</Text>
         </div>
         <div className="flex items-center gap-g8">
           <Button variant="outline" size="icon-md" type="button" onClick={() => void refreshAll()} loading={list.isFetching} aria-label={t('approval.refresh', 'Refresh')}><RefreshCw className="size-g16" aria-hidden /></Button>
@@ -104,11 +103,11 @@ export const ClauseLibraryView: React.FC = () => {
 
       <Card className="p-g13">
         <div className="flex w-full flex-wrap items-center gap-g13">
-          <div className="relative min-w-g233 flex-1">
-            <Search className="absolute left-g13 top-1/2 h-g16 w-g16 -translate-y-1/2 text-muted-foreground" aria-hidden />
-            <Input type="search" value={list.searchInput} onChange={(e) => list.setSearch(e.target.value)} className="w-full pl-g34 pr-g13"
+          <InputGroup className="min-w-g233 flex-1">
+            <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
+            <InputGroupInput type="search" value={list.searchInput} onChange={(e) => list.setSearch(e.target.value)}
               aria-label={t('clauses.search_label', 'Search clauses')} placeholder={t('clauses.search_placeholder', 'Search title, wording or tags…')} />
-          </div>
+          </InputGroup>
           <NativeSelect aria-label={t('clauses.filter.category', 'Category')} value={list.state.filters.category ?? 'ALL'} onChange={(e) => list.setFilter('category', e.target.value)} controlProps={{ className: 'min-w-g144 flex-1' }}>
             <option value="ALL">{t('clauses.filter.category_all', 'All categories')}</option>
             {(facets.data?.categories ?? []).map((c) => <option key={c} value={c}>{c}</option>)}
@@ -142,18 +141,7 @@ export const ClauseLibraryView: React.FC = () => {
             <Button variant="ghost" type="button" onClick={() => void list.refetch()}><RefreshCw className="h-g13 w-g13" aria-hidden />{t('common.retry', 'Retry')}</Button>
           </div>
         )}
-        {emptyLibrary && (
-          <div className="flex flex-col items-center gap-g13 p-g34 text-center" data-testid="clauses-empty">
-            <BookMarked className="size-g34 text-muted-foreground" aria-hidden />
-            <Text size="sm" weight="semibold">{t('clauses.empty_library', 'Your clause library is empty.')}</Text>
-            <Text size="sm" tone="muted" className="max-w-prose">{t('clauses.empty_hint', 'Start with the starter set (common clauses with wording, fallbacks and rules) or add your own clauses.')}</Text>
-            <div className="flex gap-g8">
-              {canImport && <Button type="button" onClick={() => setImportOpen(true)}><Download aria-hidden />{t('clauses.starter.title', 'Import starter clauses')}</Button>}
-              {canEdit && <Button type="button" variant="outline" onClick={() => setDialog({ clause: null })}><Plus aria-hidden />{t('clauses.add', 'Add clause')}</Button>}
-            </div>
-          </div>
-        )}
-        {!list.isLoading && !list.error && !emptyLibrary && (
+        {!list.isLoading && !list.error && (
           <>
             <TableScrollArea role="region" tabIndex={0} aria-label={t('ui.scroll_table')}>
               <Table>
@@ -170,7 +158,7 @@ export const ClauseLibraryView: React.FC = () => {
                 </TableHeader>
                 <TableBody>
                   {list.items.length === 0 ? (
-                    <TableEmptyState colSpan={6} message={t('clauses.empty', 'No clauses match.')} />
+                    <TableEmptyState colSpan={6} message={emptyLibrary ? t('clauses.empty_library', 'Your clause library is empty.') : t('clauses.empty', 'No clauses match.')} />
                   ) : list.items.map((c) => (
                     <TableRow key={c.id} data-testid="clause-row">
                       <TableCell className="max-w-g377">

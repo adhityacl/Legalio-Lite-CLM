@@ -6,7 +6,7 @@ import { PAGE_SIZES } from '@legalio/types/documents';
 import { Button } from '@legalio/ui-components/button';
 import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
-import { Input } from '@legalio/ui-components/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { Text } from '@legalio/ui-components/text';
 import { Badge } from '@legalio/ui-components/badge';
 import { Skeleton } from '@legalio/ui-components/skeleton';
@@ -152,11 +152,11 @@ export const ApprovalInbox: React.FC<Props> = ({ onOpen, onCreate }) => {
 
         <Card className="p-g13">
           <div className="flex w-full flex-wrap items-center gap-g13">
-            <div className="relative min-w-g233 flex-1 sm:min-w-g233">
-              <Search className="absolute left-g13 top-1/2 h-g16 w-g16 -translate-y-1/2 text-muted-foreground" aria-hidden />
-              <Input type="search" id="approval-search" value={searchInput} onChange={e => setSearchInput(e.target.value)} className="w-full pl-g34 pr-g13"
+            <InputGroup className="min-w-g233 flex-1 sm:min-w-g233">
+              <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
+              <InputGroupInput type="search" id="approval-search" value={searchInput} onChange={e => setSearchInput(e.target.value)}
                 aria-label={t('approval.search_label', 'Search approvals')} placeholder={t('approval.search_placeholder', 'Search document or requester…')} />
-            </div>
+            </InputGroup>
             <AlphabeticalSelect aria-label={t('approval.box_label', 'Show')} id="approval-box-filter" value={box}
               onChange={e => { setBox(e.target.value as ApprovalBox); setPage(1); }}
               className="w-full" controlProps={{ className: 'min-w-g144 flex-1' }}>

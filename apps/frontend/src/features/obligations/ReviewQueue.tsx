@@ -116,17 +116,17 @@ export const ReviewQueue: React.FC<{ onExtract?: () => void }> = ({ onExtract })
   const statusId = useId();
   return (
     <section className="space-y-g13" aria-label={t('suggestions.title', 'AI review queue')} aria-busy={query.isFetching}>
-      <Card className="flex flex-row flex-wrap items-center justify-between gap-g13 p-g13">
-        <div className="flex items-center gap-g8">
-          <ShieldCheck className="size-g16 text-status-success" aria-hidden />
-          <Text size="sm">{t('suggestions.intro', 'AI suggestions are advisory. Check the quote, edit what is wrong, then accept: only accepted suggestions become records.')}</Text>
+      <Card className="flex flex-row items-center justify-between gap-g13 p-g13 max-sm:flex-wrap">
+        <div className="flex min-w-0 flex-1 items-center gap-g8">
+          <ShieldCheck className="size-g16 shrink-0 text-status-success" aria-hidden />
+          <Text size="sm" className="truncate">{t('suggestions.intro', 'AI suggestions are advisory.')}</Text>
         </div>
-        <div className="flex flex-wrap items-center gap-g8">
+        <div className="flex shrink-0 items-center gap-g8">
           <label htmlFor={statusId} className="sr-only">{t('obligations.filter.status', 'Status')}</label>
-          <NativeSelect id={statusId} value={status} onChange={(e) => { setStatus(e.target.value as typeof status); setPage(1); }}>
+          <NativeSelect id={statusId} className="w-32" value={status} onChange={(e) => { setStatus(e.target.value as typeof status); setPage(1); }}>
             {STATUSES.map((s) => <option key={s} value={s}>{t(`suggestions.status.${s}`, s)}</option>)}
           </NativeSelect>
-          {onExtract && <Button type="button" onClick={onExtract}><Sparkles aria-hidden />{t('suggestions.extract.title', 'Extract obligations with AI')}</Button>}
+          {onExtract && <Button type="button" className="shrink-0 whitespace-nowrap" onClick={onExtract}><Sparkles aria-hidden />{t('suggestions.extract.title', 'Extract obligations with AI')}</Button>}
         </div>
       </Card>
       {query.isLoading && <div role="status" className="space-y-g8"><span className="sr-only">{t('common.loading', 'Loading…')}</span><Skeleton className="h-g144 w-full" /><Skeleton className="h-g144 w-full" /></div>}

@@ -139,3 +139,30 @@ test('OCR/transcript caches are keyed by organization', async () => {
   await globalOcrCache.set('h', 'contracts:org-a', { x: 1 });
   assert.equal(await globalOcrCache.get('h', 'contracts:org-b'), null);
 });
+
+test('monthly token limit: the organization choice beats the platform default, tokens add up over the month, the next month starts clean', async () => {
+  const limiter = new ai.AiRateLimiter();
+  const wide = { ...limits, perMinute: 100, dailyCalls: 0, dailyTokens: 0, monthlyTokens: 0 };
+  const mid = new Date('2026-11-10T12:00:00Z');
+  // No limit anywhere: never refused.
+  await ai.recordAiTokens(sql, 'org-m', 5_000_000, mid);
+  await ai.reserveAiCall(sql, 'org-m', wide, limiter, mid);
+  // The platform default applies until the organization has its own choice.
+  await assert.rejects(ai.reserveAiCall(sql, 'org-m', { ...wide, monthlyTokens: 1_000_000 }, limiter, mid), (e: any) => e.code === 'AI_MONTHLY_BUDGET' && e.status === 429 && e.retryAfterSeconds > 0);
+  await sql.run(`INSERT INTO ai_org_limits (organization_id, monthly_tokens, updated_at) VALUES ('org-m', 10000000, 'now')`);
+  await ai.reserveAiCall(sql, 'org-m', { ...wide, monthlyTokens: 1_000_000 }, limiter, mid); // own limit 10M > 5M used
+  await sql.run(`UPDATE ai_org_limits SET monthly_tokens = 5000000 WHERE organization_id = 'org-m'`);
+  await assert.rejects(ai.reserveAiCall(sql, 'org-m', wide, limiter, mid), (e: any) => e.code === 'AI_MONTHLY_BUDGET');
+  assert.equal(await ai.monthlyTokenLimit(sql, 'org-m', 7), 5_000_000);
+  assert.equal(await ai.monthlyTokenLimit(sql, 'org-none', 7), 7);
+  // Usage from earlier days of the month counts, usage from the previous month does not, other organizations are unaffected.
+  await ai.recordAiTokens(sql, 'org-m', 1, new Date('2026-11-01T00:00:01Z'));
+  assert.equal(await ai.monthTokensUsed(sql, 'org-m', mid), 5_000_001);
+  assert.equal(await ai.monthTokensUsed(sql, 'org-m', new Date('2026-12-02T00:00:00Z')), 0);
+  await ai.reserveAiCall(sql, 'org-m', wide, limiter, new Date('2026-12-02T00:00:00Z'));
+  await ai.reserveAiCall(sql, 'org-other', wide, limiter, mid);
+  // 0 chosen for the organization means unlimited even when the default is set.
+  await sql.run(`UPDATE ai_org_limits SET monthly_tokens = 0 WHERE organization_id = 'org-m'`);
+  await ai.reserveAiCall(sql, 'org-m', { ...wide, monthlyTokens: 1 }, limiter, mid);
+  assert.deepEqual(ai.MONTHLY_TOKEN_OPTIONS, [100_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 0]);
+});

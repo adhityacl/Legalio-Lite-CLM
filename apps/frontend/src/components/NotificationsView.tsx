@@ -22,7 +22,6 @@ import { useConfirm } from '../context/ConfirmDialogContext';
 import { Badge, statusTone } from '@legalio/ui-components/badge';
 import { TablePagination } from './ui/TablePagination';
 import { TableEmptyState } from './ui/table-empty-state';
-import { DigestPreferences } from '../features/notifications/DigestPreferences';
 
 import { Button } from '@legalio/ui-components/button';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
@@ -252,8 +251,6 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           </Button>
         </div>
       </div>
-
-      <DigestPreferences />
 
       {/* 2. Standard Filter Bar with 3 Dropdowns and View Column Toggle - Justified Responsive Grid/Flex */}
       <Card className="p-g13">

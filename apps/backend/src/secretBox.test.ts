@@ -51,10 +51,11 @@ test('credential rows are sealed at rest, legacy plain rows still load, and stor
     assert.match(payload, /^v1:/);
     assert.equal(payload.includes('very-secret-key'), false);
     assert.deepEqual(JSON.parse(open(payload)), cos);
-    const status = store.storageStatus();
+    const status = store.providerStatus('tencent');
     assert.equal(JSON.stringify(status).includes('very-secret-key'), false);
     assert.equal(JSON.stringify(status).includes('AKIDabcd'), false);
-    assert.deepEqual({ ...status, updated_at: undefined }, { configured: true, bucket: cos.bucket, region: cos.region, prefix: cos.prefix, secretIdLast4: 'WXYZ', updated_at: undefined });
+    assert.deepEqual({ ...status, updated_at: undefined }, { configured: true, bucket: cos.bucket, region: cos.region, prefix: cos.prefix, secretIdLast4: 'WXYZ', accessKeyLast4: 'WXYZ', updated_at: undefined });
+    assert.equal(store.storageStatus().active, 'tencent', 'the first provider saved becomes the active one');
 
     // A row of a removed integration that cannot be read must not break startup or hide the storage row.
     await sql.run("INSERT INTO integration_credentials (id, payload, updated_at) VALUES ('legacy_unreadable', 'v1:AAAA', '2026-01-01')");

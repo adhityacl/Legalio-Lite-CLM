@@ -172,8 +172,12 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['PUT', '/api/mailer/templates/:id', platform('platform.configuration.update')],
   ['POST', '/api/smtp/test', platform('platform.configuration.update')],
   ['POST', '/api/ai/test-key', platform('platform.configuration.update')],
+  ['POST', '/api/ai/models', platform('platform.configuration.update', 'reads the model list of the provider; the key is sent upstream only')],
   ['GET', '/api/integrations/storage/cos', platform('platform.configuration.read')],
   ['PUT', '/api/integrations/storage/cos', platform('platform.configuration.update')],
+  ['GET', '/api/integrations/storage', platform('platform.configuration.read')],
+  ['PUT', '/api/integrations/storage/active', platform('platform.configuration.update')],
+  ['PUT', '/api/integrations/storage/providers/:provider', platform('platform.configuration.update')],
   ['POST', '/api/admin/reset-database', platform('platform.application.reset', 'explicit confirmation retained')],
   ['POST', '/api/cron/trigger-check', platform('platform.database.optimize', 'all-organization system job')],
   ['GET', '/api/user/allowed-users', platform('platform.user.read', 'onboarding allowlist')],
@@ -205,6 +209,9 @@ export const ROUTE_POLICIES: PolicyEntry[] = [
   ['POST', '/api/auth-console/api-keys/:id/revoke', platform('platform.apikey.revoke')],
   ['DELETE', '/api/auth-console/api-keys/:id', platform('platform.apikey.delete')],
   ['GET', '/api/auth-console/rbac-matrix', platform('platform.policy.read')],
+  ['GET', '/api/auth-console/ai-limits', platform('platform.configuration.read')],
+  ['PUT', '/api/auth-console/ai-limits/:organizationId', platform('platform.configuration.update', 'monthly AI token limit of one organization; audited')],
+  ['GET', '/api/auth-console/pg-reports/:report', platform('platform.database.read', 'read-only PostgreSQL catalog and statistics reports')],
 
   /* ---------------- legacy tenant operations ---------------- */
   ['GET', '/api/init-data', tenant('document.view')],

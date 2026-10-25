@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CalendarClock, CalendarDays, CheckCircle2, ClipboardCheck, Clock, ListChecks, Pencil, Plus, RefreshCw, Search, Settings2, Sparkles, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CalendarClock, CheckCircle2, ClipboardCheck, Clock, ListChecks, Pencil, Plus, RefreshCw, Search, Settings2, Sparkles, Trash2 } from 'lucide-react';
 import { PAGE_SIZES } from '@legalio/types/documents';
 import { Badge } from '@legalio/ui-components/badge';
 import { Button } from '@legalio/ui-components/button';
 import { Card } from '@legalio/ui-components/card';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
 import { Heading } from '@legalio/ui-components/heading';
-import { Input } from '@legalio/ui-components/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { NativeSelect } from '@legalio/ui-components/native-select';
 import { Skeleton } from '@legalio/ui-components/skeleton';
 import { Table, TableBody, TableCell, TableColumnHeader, TableHeader, TableRow, TableScrollArea } from '@legalio/ui-components/table';
@@ -26,8 +26,6 @@ import { obligationsApi, type Obligation } from '../../api/obligations';
 import { ActionMenu, type ActionMenuItem } from '../../components/ui/action-menu';
 import { TableEmptyState } from '../../components/ui/table-empty-state';
 import { TablePagination } from '../../components/ui/TablePagination';
-import { useSnapshotDemand, useWorkspace } from '../workspace/WorkspaceContext';
-import { WorkspaceDocumentCalendar } from '../calendar/WorkspaceDocumentCalendar';
 import { ApprovalNotifications } from '../approvals/ApprovalNotifications';
 import { ObligationDialog } from './ObligationDialog';
 import { ObligationSettingsDialog } from './ObligationSettingsDialog';
@@ -43,11 +41,11 @@ type SortField = (typeof SORTABLE)[number];
 /** Status filter choices: the stored statuses, the derived overdue, and "active" (all open work). */
 const STATUS_FILTERS = ['active', 'overdue', 'open', 'in_progress', 'done', 'waived'] as const;
 
-/** Obligations and key dates: server-paged list and the document calendar with the organization's deadlines. */
+/** Obligations and key dates: the server-paged list and the AI review queue. */
 export const ObligationsView: React.FC = () => {
   const { t } = useLanguage();
   const { activeTenantId } = useTenant();
-  const { recordId, clearRecordId, setActiveTab } = useNavigation();
+  const { recordId, clearRecordId } = useNavigation();
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('document.edit');
   const canDelete = hasPermission('document.delete');
@@ -55,7 +53,7 @@ export const ObligationsView: React.FC = () => {
   const confirmDialog = useConfirm();
   const showAlert = useAlertToast();
   const queryClient = useQueryClient();
-  const [view, setView] = useState<'list' | 'calendar' | 'review'>(() => { const requested = obligationsViewRequest.view; obligationsViewRequest.view = null; return requested ?? 'list'; });
+  const [view, setView] = useState<'list' | 'review'>(() => { const requested = obligationsViewRequest.view; obligationsViewRequest.view = null; return requested ?? 'list'; });
   const [extractOpen, setExtractOpen] = useState(false);
   const [rows, setRows] = useState(PAGE_SIZES[1] as number);
   const [dialog, setDialog] = useState<{ obligation: Obligation | null } | null>(null);
@@ -69,9 +67,6 @@ export const ObligationsView: React.FC = () => {
   const pendingReview = useQuery({ queryKey: ['obligations', activeTenantId, 'suggestions-summary'], queryFn: ({ signal }) => suggestionsApi.summary({ signal }), enabled: Boolean(activeTenantId) && canEdit, staleTime: 15_000 });
   const summary = useQuery({ queryKey: ['obligations', activeTenantId, 'summary'], queryFn: ({ signal }) => obligationsApi.summary({ signal }), enabled: Boolean(activeTenantId), staleTime: 15_000 });
 
-  // The calendar cross-references contracts and orders; the picker lists contracts to link to (up to the API's page maximum).
-  useSnapshotDemand(view === 'calendar');
-  const { contracts, ios, partners, workspaceLoading, workspaceError, loadAllData } = useWorkspace();
   const contractChoices = useQuery({
     queryKey: ['obligations', activeTenantId, 'contract-choices'], enabled: Boolean(activeTenantId) && (dialog !== null || extractOpen),
     queryFn: async () => (await contractsApi.page({ limit: 500, sort: 'contract_number', dir: 'asc' })).items.map((c) => ({ id: c.contract_id, label: `${c.contract_number} · ${c.contract_title}` })),
@@ -133,12 +128,10 @@ export const ObligationsView: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-g13">
         <div>
           <Heading as="h2" size="md" weight="semibold" id="obligations-heading">{t('obligations.title', 'Obligations & key dates')}</Heading>
-          <Text size="sm" tone="muted">{t('obligations.subtitle', 'Deadlines and duties that come out of your contracts, with reminders for the people responsible.')}</Text>
         </div>
         <div className="flex items-center gap-g8">
           <Button variant="outline" size="icon-md" type="button" onClick={() => void refreshAll()} loading={list.isFetching} aria-label={t('approval.refresh', 'Refresh')}><RefreshCw className="size-g16" aria-hidden /></Button>
           {canConfigure && <Button variant="outline" type="button" onClick={() => setSettingsOpen(true)}><Settings2 className="size-g16" aria-hidden /><span>{t('obligations.reminder_settings', 'Reminders')}</span></Button>}
-          {canEdit && <Button variant="outline" type="button" onClick={() => setExtractOpen(true)}><Sparkles className="size-g16" aria-hidden /><span>{t('suggestions.extract.title', 'Extract obligations with AI')}</span></Button>}
           {canEdit && <Button type="button" onClick={() => setDialog({ obligation: null })}><Plus className="size-g16" aria-hidden /><span>{t('obligations.add', 'Add obligation')}</span></Button>}
         </div>
       </div>
@@ -157,21 +150,22 @@ export const ObligationsView: React.FC = () => {
         ))}
       </div>
 
-      <Tabs value={view} onValueChange={(details) => setView(details.value as 'list' | 'calendar' | 'review')} className="flex flex-col gap-g13">
-        <TabsList aria-label={t('obligations.title', 'Obligations & key dates')} className="w-full sm:w-auto">
-          <TabsTrigger value="list"><ListChecks aria-hidden="true" />{t('obligations.view.list', 'List')}</TabsTrigger>
-          <TabsTrigger value="calendar"><CalendarDays aria-hidden="true" />{t('obligations.view.calendar', 'Calendar')}</TabsTrigger>
-          {canEdit && <TabsTrigger value="review"><ClipboardCheck aria-hidden="true" />{t('obligations.view.review', 'AI review')}{pendingReview.data?.total ? <Badge tone="warning" className="ms-g5" data-testid="review-count">{pendingReview.data.total}</Badge> : null}</TabsTrigger>}
-        </TabsList>
+      <Tabs value={view} onValueChange={(details) => setView(details.value as 'list' | 'review')} className="flex flex-col gap-g13">
+        <Card className="flex-row flex-wrap items-center gap-g13 p-g13">
+          <TabsList aria-label={t('obligations.title', 'Obligations & key dates')} className="w-full sm:w-auto">
+            <TabsTrigger value="list"><ListChecks aria-hidden="true" />{t('obligations.view.list', 'List')}</TabsTrigger>
+            {canEdit && <TabsTrigger value="review"><ClipboardCheck aria-hidden="true" />{t('obligations.view.review', 'AI review')}{pendingReview.data?.total ? <Badge tone="warning" className="ms-g5" data-testid="review-count">{pendingReview.data.total}</Badge> : null}</TabsTrigger>}
+          </TabsList>
+        </Card>
 
         <TabsContent value="list" className="mt-0 space-y-g13">
           <Card className="p-g13">
             <div className="flex w-full flex-wrap items-center gap-g13">
-              <div className="relative min-w-g233 flex-1">
-                <Search className="absolute left-g13 top-1/2 h-g16 w-g16 -translate-y-1/2 text-muted-foreground" aria-hidden />
-                <Input type="search" value={list.searchInput} onChange={(e) => list.setSearch(e.target.value)} className="w-full pl-g34 pr-g13"
+              <InputGroup className="min-w-g233 flex-1">
+                <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
+                <InputGroupInput type="search" value={list.searchInput} onChange={(e) => list.setSearch(e.target.value)}
                   aria-label={t('obligations.search_label', 'Search obligations')} placeholder={t('obligations.search_placeholder', 'Search title, contract or counterparty…')} />
-              </div>
+              </InputGroup>
               <NativeSelect aria-label={t('obligations.filter.status', 'Status')} value={statusValue} onChange={(e) => list.setFilter('status', e.target.value)} controlProps={{ className: 'min-w-g144 flex-1' }}>
                 <option value="ALL">{t('obligations.filter.status_all', 'All statuses')}</option>
                 {STATUS_FILTERS.map((value) => <option key={value} value={value}>{value === 'active' ? t('obligations.status.active', 'Active (open work)') : t(...STATUS_KEYS[value])}</option>)}
@@ -216,8 +210,7 @@ export const ObligationsView: React.FC = () => {
                     </TableHeader>
                     <TableBody>
                       {list.items.length === 0 ? (
-                        <TableEmptyState colSpan={6} message={t('obligations.empty', 'No obligations match.')}
-                          action={canEdit ? <Button type="button" onClick={() => setDialog({ obligation: null })}><Plus aria-hidden />{t('obligations.add', 'Add obligation')}</Button> : undefined} />
+                        <TableEmptyState colSpan={6} message={t('obligations.empty', 'No obligations match.')} />
                       ) : list.items.map((o) => (
                         <TableRow key={o.id} data-testid="obligation-row">
                           <TableCell className="max-w-g377">
@@ -246,11 +239,6 @@ export const ObligationsView: React.FC = () => {
 
         {canEdit && <TabsContent value="review" className="mt-0">{view === 'review' && <ReviewQueue onExtract={() => setExtractOpen(true)} />}</TabsContent>}
 
-        <TabsContent value="calendar" className="mt-0">
-          {view === 'calendar' && <WorkspaceDocumentCalendar contracts={contracts} ios={ios} partners={partners} loading={workspaceLoading} error={workspaceError} onRetry={() => void loadAllData()}
-            onOpenDocument={(kind, id) => setActiveTab(kind === 'contract' ? 'contracts' : 'ios', undefined, { recordId: id })}
-            onOpenObligation={(id) => { void obligationsApi.get(id).then((o) => setDialog({ obligation: o })).catch((err) => failed(err)); }} />}
-        </TabsContent>
       </Tabs>
 
       {dialog && <ObligationDialog obligation={dialog.obligation} contracts={contractChoices.data ?? []} readOnly={!canEdit} onClose={() => setDialog(null)}

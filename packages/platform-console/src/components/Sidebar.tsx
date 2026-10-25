@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '@legalio/shared/apiClient';
 import {
   HardDrive,
+  DatabaseZap,
   LayoutDashboard,
   Building2,
   ClipboardCheck,
@@ -139,6 +140,7 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
     systemLeaf('mailer', t('mailer.nav', 'Mailer'), Mail),
     systemLeaf('smtp', t('tb.config_smtp', 'SMTP relay'), Mail),
     systemLeaf('ui-texts', t('tb.config_texts_short', 'UI texts'), Languages),
+    systemLeaf('pgreport', t('pgr.nav', 'PgReport'), DatabaseZap),
     systemLeaf('reset', t('sys.nav_reset', 'System reset'), ShieldAlert),
   ];
   if (showSystemAdmin && hasPlatformPermission('platform.access')) {
@@ -151,12 +153,12 @@ function useNavigation({ showSystemAdmin = false, activeTab, unresolvedNotifsCou
     can('document.view') && { id: 'partners', label: t('nav.partners', 'Mitra Kerja'), icon: Building2, active: partnerChildren.some(c => c.active), children: partnerChildren },
     can('document.view') && { id: 'contracts', label: t('nav.contracts', 'Kontrak'), icon: FileText, active: activeTab === 'contracts', badge: expiringContractsCount },
     can('document.view') && modules.commercialDocuments && { id: 'ios', label: t('nav.ios', '{docs}'), icon: FileSpreadsheet, active: activeTab === 'ios' },
+    can('document.view') && { id: 'obligations', label: t('nav.obligations', 'Obligations'), icon: ListChecks, active: activeTab === 'obligations' },
     can('document.view') && { id: 'notifikasi', label: t('nav.notifications', 'Notifikasi'), icon: Bell, active: activeTab === 'notifikasi', badge: unresolvedNotifsCount },
   ].filter(Boolean) as NavEntry[];
   const documents: NavEntry[] = [
     can('document.create') && { id: 'create-contract', label: t('nav.create_contract', 'Dokumen Saya'), icon: FileSignature, active: activeTab === 'create-contract' },
     can('document.create') && { id: 'document-approval', label: t('nav.document_approval', 'My Approval'), icon: ClipboardCheck, active: activeTab === 'document-approval', badge: approvalInboxCount },
-    can('document.view') && { id: 'obligations', label: t('nav.obligations', 'Obligations'), icon: ListChecks, active: activeTab === 'obligations' },
     can('document.view') && { id: 'clauses', label: t('nav.clauses', 'Clause library'), icon: BookMarked, active: activeTab === 'clauses' },
   ].filter(Boolean) as NavEntry[];
   /* Administration (PRD §6.1): System Admin only in the standalone console for platform administrators,

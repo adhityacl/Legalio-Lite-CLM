@@ -68,7 +68,6 @@ export const SettingsView: React.FC<{ tab: SettingsTabId }> = ({ tab }) => {
   return (
     <Tabs value={tab} onValueChange={details => void go(details.value as SettingsTabId)} lazyMount unmountOnExit id="settings" className="min-w-0 gap-g21">
       <ContextHeader
-        icon={<Building2 />}
         title={t('tb.settings_title', 'Settings / {org}', { org: orgName })}
         description={accessMode !== 'platform' ? t('tb.role_in_org', 'Role in this organization: {role}', { role: roleLabel }) : undefined}
         actions={accessMode === 'platform' && (

@@ -2,7 +2,8 @@ import { ModalFrame } from '../ui/modal-frame';
 import React, { useState, useEffect, useRef } from 'react';
 import { PlatformProviderConfig, Tenant } from '@legalio/types';
 import { useAuth } from '../../context/AuthContext';
-import { CosStorageForm } from '../settings/CosStorageForm';
+import { StorageForm } from '../settings/StorageForm';
+import { AiModelSettings } from '../settings/AiModelSettings';
 import { useLanguage } from '../../context/LanguageContext';
 import { useConfirm } from '../../context/ConfirmDialogContext';
 import { api, errorMessage, isApiError } from '@legalio/shared/apiClient';
@@ -127,14 +128,9 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     config.financeNotificationEmail || ''
   );
   const [aiModel, setAiModel] = useState<string>(config.aiModel || 'gemini-3.8-flash');
-  const [savingAiModel, setSavingAiModel] = useState(false);
   const [geminiApiKey, setGeminiApiKey] = useState<string>(config.geminiApiKey || '');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [savingApiKey, setSavingApiKey] = useState(false);
   // Remounting the CSV import clears zag's accepted files so the same file can be imported again.
   const [csvImportKey, setCsvImportKey] = useState(0);
-  const [testingApiKey, setTestingApiKey] = useState(false);
-  const [apiTestResult, setApiTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // SMTP Relay State
   const [smtpEnabled, setSmtpEnabled] = useState<boolean>(config.smtpEnabled ?? false);
@@ -288,79 +284,6 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
     }
   };
 
-  const handleSaveAiModel = async (newModel: string) => {
-    if (!isAdmin) {
-      setErrorMsg(t('settings.hanya_admin_yang_berhak_mengubah_model', 'Hanya Admin yang berhak mengubah model AI default.'));
-      return;
-    }
-    setSavingAiModel(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    try {
-      setAiModel(newModel);
-      await onSaveConfig({
-        notificationEmails,
-        legalNotificationEmail,
-        financeNotificationEmail,
-        aiModel: newModel,
-      });
-      setSuccessMsg(t('settings.model_ai_sistem_berhasil_diperbarui_ke', 'Model AI sistem berhasil diperbarui ke \'{newModel}\'!', { newModel }));
-      setTimeout(() => setSuccessMsg(null), 4000);
-    } catch (err: any) {
-      setErrorMsg(err.message || t('settings.gagal_menyimpan_model_ai', 'Gagal menyimpan model AI.'));
-    } finally {
-      setSavingAiModel(false);
-    }
-  };
-
-  const handleSaveApiKey = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!isAdmin) {
-      setErrorMsg(t('settings.hanya_admin_yang_berhak_mengubah_gemini', 'Hanya Admin yang berhak mengubah Gemini API Key.'));
-      return;
-    }
-    const cleanKey = geminiApiKey.trim();
-    setSavingApiKey(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    setApiTestResult(null);
-    try {
-      await onSaveConfig({
-        notificationEmails,
-        legalNotificationEmail,
-        financeNotificationEmail,
-        aiModel,
-        geminiApiKey: cleanKey,
-      });
-      setSuccessMsg(t('settings.google_gemini_api_key_berhasil_disimpan', 'Google Gemini API Key berhasil disimpan dan diaktifkan!'));
-      setTimeout(() => setSuccessMsg(null), 5000);
-    } catch (err: any) {
-      setErrorMsg(err.message || t('settings.gagal_menyimpan_gemini_api_key', 'Gagal menyimpan Gemini API Key.'));
-    } finally {
-      setSavingApiKey(false);
-    }
-  };
-
-  const handleTestApiKey = async () => {
-    const keyToTest = geminiApiKey.trim();
-    if (!keyToTest) {
-      setErrorMsg(t('settings.masukkan_google_gemini_api_key_terlebih', 'Masukkan Google Gemini API Key terlebih dahulu untuk melakukan pengujian koneksi.'));
-      return;
-    }
-    setTestingApiKey(true);
-    setApiTestResult(null);
-    setErrorMsg(null);
-    try {
-      const data = await api.post<any>('/ai/test-key', { apiKey: keyToTest, model: aiModel || 'gemini-3.6-flash' })
-        .catch((error) => { throw new Error(errorMessage(error, t('settings.gagal_terhubung_ke_google_gemini_api', 'Gagal terhubung ke Google Gemini API.'))); });
-      setApiTestResult({ success: true, message: data.message || t('settings.koneksi_ke_google_gemini_api_berhasil', 'Koneksi ke Google Gemini API berhasil!') });
-    } catch (err: any) {
-      setApiTestResult({ success: false, message: err.message || t('settings.gagal_terhubung_ke_google_gemini_api', 'Gagal terhubung ke Google Gemini API.') });
-    } finally {
-      setTestingApiKey(false);
-    }
-  };
-
   const handleOpenResetModal = () => {
     if (!isSuperuser) {
       setErrorMsg(t('settings.reset_superuser_only', 'Only a superuser can reset the workspace.'));
@@ -421,170 +344,13 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
       {/* Full-width Content Layout */}
       <div className="w-full space-y-g21">
           {activeSection === 'storage' && isSuperuser && (
-            <section className="max-w-6xl space-y-g13" aria-label={t('storage.title', 'Storage')}>
-              <CosStorageForm />
+            <section className="w-full space-y-g13" aria-label={t('storage.title', 'Storage')}>
+              <StorageForm />
             </section>
           )}
 
           {/* GROUP 2: AI & SMART AUTOMATION */}
-          {activeSection === 'ai' && (
-            <div className="space-y-g21">
-              {/* CARD 1: GOOGLE GEMINI API KEY */}
-              <Card className="overflow-hidden">
-                <CardHeader className="flex flex-row items-start justify-between gap-g13">
-                  <div className="space-y-g3">
-                    <CardTitle className="flex items-center gap-g8">
-                      <Key className="w-g21 h-g21 text-accent-foreground" />
-                      <span>{t('settings.gemini_api_key_title', 'Google Gemini API Key')}</span>
-                    </CardTitle>
-                  </div>
-                  <div>
-                    {geminiApiKey ? (
-                      <Badge tone="success" className="gap-g5">
-                        <BadgeDot className="size-g8 text-status-success animate-pulse" />
-                        <span>{t('settings.api_key_active', 'API Key Aktif')}</span>
-                      </Badge>
-                    ) : (
-                      <Badge tone="warning" className="gap-g5">
-                        <AlertCircle className="size-g13 text-status-warning" />
-                        <span>{t('settings.api_key_empty', 'Belum Diatur')}</span>
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardBody className="space-y-g13">
-                  <form onSubmit={(event) => void handleSaveApiKey(event)} className="space-y-g13">
-                    <div className="space-y-g5">
-                      <FieldLabel htmlFor="settingsview-field-3" className="w-full justify-between">
-                        <span>{t('settings.gemini_api_key_label', 'Gemini API Key (AI Studio)')}</span>
-                        <Button asChild variant="link"><a href="https://aistudio.google.com/app/apikey"
-                          target="_blank"
-                          rel="noreferrer"
-                          
-                        >
-                          <span>{t('settings.get_api_key_link', 'Dapatkan API Key di Google AI Studio')}</span>
-                          <ExternalLink className="size-g13" />
-                        </a></Button>
-                      </FieldLabel>
-                      <div className="relative flex items-center">
-                        <Input id="settingsview-field-3"
-                          type={showApiKey ? 'text' : 'password'}
-                          value={geminiApiKey}
-                          onChange={(e) => setGeminiApiKey(e.target.value)}
-                          placeholder={t('settings.gemini_api_key_ph', 'Masukkan Google Gemini API Key (misal: AIzaSy...)')}
-                          className="w-full pl-g13 pr-g34"
-                        />
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon-md"
-                          type="button"
-                          onClick={() => setShowApiKey(!showApiKey)}
-                          className="absolute right-g13"
-                        >
-                          {showApiKey ? <EyeOff className="size-g16" /> : <Eye className="size-g16" />}
-                        </Button></TooltipTrigger><TooltipBody>{showApiKey ? t('settings.sembunyikan', 'Sembunyikan') : t('settings.tampilkan', 'Tampilkan')}</TooltipBody></Tooltip>
-                      </div>
-                    </div>
-
-                    {/* Test Result Alert Box */}
-                    {apiTestResult && (
-                      <div
-                        className={cn(
-                          'p-g13 rounded-xl border text-xs flex items-center gap-g8 animate-in fade-in',
- apiTestResult.success
- ? 'bg-status-success-soft border-status-success-border text-status-success '
- : 'bg-status-danger-soft border-status-danger-border text-status-danger '
- )}
- >
- {apiTestResult.success ? (
- <CheckCircle2 className="size-g16 text-status-success shrink-0" />
-                        ) : (
-                          <AlertCircle className="size-g16 text-status-danger shrink-0" />
-                        )}
-                        <span>{apiTestResult.message}</span>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap items-center gap-g8 pt-g3">
-                      <Button
-                        type="submit"
-                        disabled={savingApiKey || !isAdmin}
-                      >
-                        <Save className="w-g13 h-g13" />
-                        <span>{savingApiKey ? t('eval.btn_saving', 'Menyimpan...') : t('settings.save_api_key_btn', 'Simpan API Key')}</span>
-                      </Button>
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => void handleTestApiKey()}
-                        disabled={testingApiKey || !geminiApiKey.trim()}
-                      >
-                        {testingApiKey ? <Spinner size="sm" decorative /> : <AiIcon aria-hidden="true" />}
- <span>{testingApiKey ? t('admin.test_connection_testing', 'Menguji Koneksi...') : t('settings.test_api_key_btn', 'Uji Koneksi API')}</span>
- </Button>
- </div>
- </form>
- </CardBody>
- </Card>
-
- {/* CARD 2: MODEL AI SELECTION */}
- <Card className="overflow-hidden">
-                <CardHeader >
-                  <CardTitle className="flex items-center gap-g8">
-                    <AiIcon className="w-g21 h-g21 text-accent-foreground" />
-                    <span>{t('settings.ai_config_title', 'Pilihan Model Google Gemini')}</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardBody className="space-y-g13">
-                  <RadioGroup aria-label={t('settings.ai_config_title', 'Pilihan Model Google Gemini')} value={aiModel} onValueChange={details => { if (details.value) void handleSaveAiModel(details.value); }} className="grid w-full grid-cols-1 gap-g13 md:grid-cols-2">
-                    {[
-                      {
-                        id: 'gemini-3.8-flash',
-                        title: t('settings.gemini_3_8_flash_default_rekomendasi', 'Gemini 3.8 Flash (Default Rekomendasi)'),
-                        desc: t('settings.ekstraksi_dokumen_berkecepatan_tinggi_akurasi_ti', 'Ekstraksi dokumen berkecepatan tinggi, akurasi tinggi untuk tabel dan klausul legal.'),
-                        badge: t('settings.tercepat_paling_akurat', 'Tercepat & Paling Akurat'),
-                      },
-                      {
-                        id: 'gemini-3.7-flash',
-                        title: t('settings.gemini_3_7_flash', 'Gemini 3.7 Flash'),
-                        desc: t('settings.generasi_terbaru_multimodal_untuk_analisis_klaus', 'Generasi terbaru multimodal untuk analisis klausul legal berlembar-lembar.'),
-                        badge: t('settings.generasi_terbaru', 'Generasi Terbaru'),
-                      },
-                      {
-                        id: 'gemini-3.6-flash',
-                        title: t('settings.gemini_3_6_flash', 'Gemini 3.6 Flash'),
-                        desc: t('settings.performa_ekstraksi_stabil_dan_seimbang_untuk', 'Performa ekstraksi stabil dan seimbang untuk parsing kontrak standar.'),
-                        badge: t('settings.stabil_efisien', 'Stabil & Efisien'),
-                      },
-                      {
-                        id: 'gemini-3.5-flash',
-                        title: t('settings.gemini_3_5_flash', 'Gemini 3.5 Flash'),
-                        desc: t('settings.model_cepat_dan_hemat_token_untuk', 'Model cepat dan hemat token untuk pemrosesan volume dokumen tinggi.'),
-                        badge: t('settings.cepat_hemat_kuota', 'Cepat & Hemat Kuota'),
-                      },
-                      {
-                        id: 'gemini-3.1-flash-lite',
-                        title: t('settings.gemini_3_1_flash_lite', 'Gemini 3.1 Flash Lite'),
-                        desc: t('settings.model_ultra_ringan_dengan_latensi_pemrosesan', 'Model ultra-ringan dengan latensi pemrosesan instan dan hemat kuota.'),
-                        badge: t('settings.ringan_instan', 'Ringan & Instan'),
-                      },
-                    ].map((model) => (
-                      <RadioGroupItem key={model.id} value={model.id} className="relative h-full w-full min-w-0 items-start justify-between gap-g13 rounded-lg border border-border p-g13 data-[state=checked]:border-primary data-[state=checked]:bg-accent">
-                        <span className="grid min-w-0 flex-1 gap-g3">
-                          <span className="flex flex-wrap items-center gap-g8">
-                            <RadioGroupItemText className="text-sm font-semibold">{model.title}</RadioGroupItemText>
-                            <Badge>{model.badge}</Badge>
-                          </span>
-                          <Text as="span" size="xs" tone="muted">{model.desc}</Text>
-                        </span>
-                        <RadioGroupItemControl className="shrink-0" />
-                        <RadioGroupItemHiddenInput />
-                      </RadioGroupItem>
-                    ))}
-                  </RadioGroup>
-                </CardBody>
-              </Card>
-            </div>
-          )}
+          {activeSection === 'ai' && <AiModelSettings />}
 
           {/* GROUP 3: NOTIFICATIONS & NOTICE PERIOD ALERTS */}
           {activeSection === 'notifications' && (
@@ -593,8 +359,8 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
               <Card className="overflow-hidden">
                 <CardHeader className="flex flex-row items-start justify-between gap-g13">
                   <div className="space-y-g3">
-                    <CardTitle className="flex items-center gap-g8">
-                      <Mail className="w-g21 h-g21 text-accent-foreground" />
+                    <CardTitle className="flex items-center gap-g13">
+                      <span className="flex size-g34 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Mail className="size-g16" aria-hidden="true" /></span>
                       <span>{t('settings.smtp_card_title', 'Konfigurasi SMTP Relay Server (Email Nyata)')}</span>
                     </CardTitle>
                   </div>
@@ -784,8 +550,8 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
           {activeSection === 'language' && (
             <Card className="overflow-hidden">
               <CardHeader >
-                <CardTitle className="flex items-center gap-g8">
-                  <Languages className="w-g21 h-g21 text-accent-foreground" />
+                <CardTitle className="flex items-center gap-g13">
+                  <span className="flex size-g34 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Languages className="size-g16" aria-hidden="true" /></span>
                   <span>{t('settings.ui_customization_title', 'Kustomisasi Teks UI & Kamus Antarmuka')}</span>
                 </CardTitle>
               </CardHeader>
@@ -863,8 +629,8 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
               {/* Danger Zone: Reset Database */}
               <Card className="overflow-hidden">
                 <CardHeader >
-                  <CardTitle className="flex items-center gap-g8">
-                    <ShieldAlert className="w-g21 h-g21 text-status-danger" />
+                  <CardTitle className="flex items-center gap-g13">
+                    <span className="flex size-g34 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><ShieldAlert className="size-g16" aria-hidden="true" /></span>
                     <span>{t('settings.danger_zone_title', 'Danger Zone: Reset Database Sistem')}</span>
                   </CardTitle>
                   <CardDescription >

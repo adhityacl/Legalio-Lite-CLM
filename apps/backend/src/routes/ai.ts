@@ -1,6 +1,7 @@
 import { getTenantSettings, aiPolicyContext } from '../tenantPolicy';
 import { getIndustryPack, todayInTimezone } from '@legalio/shared/policy';
-import { generateContentWithRetryAndFallback, getEffectiveGeminiApiKey, getValidAiModel, formatGeminiError, ensureAiAvailable, aiLimits } from '../aiClient';
+import { generateContentWithRetryAndFallback, getEffectiveGeminiApiKey, getValidAiModel, formatGeminiError, ensureAiAvailable, aiLimits, configForProvider } from '../aiClient';
+import { AI_PROVIDERS, discoverModels, formatProviderError, generateWithProvider, isAiProvider, validateBaseUrl } from '../aiProviders';
 import { getRequestTenantId, scopeOf, orgContextOf, scopeCollectionsOf } from '../recordAccess';
 import { hasOrganizationScope } from '../rbac';
 import { db, saveDb } from '../memoryDb';
@@ -113,8 +114,42 @@ app.get("/api/dashboard/news-ticker", async (req: express.Request, res: express.
     sendRouteError(req, res, err, "request failed", "Failed to load the news ticker.", { status: 500 });
   }
 });
+/** The models an API key can use, read from the provider (key and base URL as typed, else the saved ones). */
+app.post("/api/ai/models", async (req: express.Request, res: express.Response) => {
+  const provider = req.body?.provider;
+  if (!isAiProvider(provider)) return res.status(400).json({ error: "INVALID_INPUT", message: `provider must be one of ${AI_PROVIDERS.join(", ")}.` });
+  let cfg;
+  try {
+    cfg = configForProvider(provider, req.body);
+    if (provider === "custom") cfg.baseUrl = validateBaseUrl(cfg.baseUrl);
+  } catch (err: any) {
+    return res.status(400).json({ error: "INVALID_INPUT", message: err.message });
+  }
+  if (provider !== "custom" && !cfg.apiKey) return res.status(400).json({ error: "AI_KEY_REQUIRED", message: "Enter the API key first." });
+  try {
+    res.json({ success: true, models: await discoverModels(cfg) });
+  } catch (err: any) {
+    log.warn(`Model discovery failed for ${provider}:`, err?.status || err?.message);
+    res.status(400).json({ error: "AI_PROVIDER_ERROR", message: formatProviderError(err, provider) });
+  }
+});
 app.post("/api/ai/test-key", async (req: express.Request, res: express.Response) => {
   const { apiKey, model } = req.body;
+  if (req.body?.provider !== undefined && req.body.provider !== "gemini") {
+    if (!isAiProvider(req.body.provider)) return res.status(400).json({ error: "provider must be gemini, openai, anthropic or custom." });
+    try {
+      const cfg = configForProvider(req.body.provider, req.body);
+      if (cfg.provider === "custom") cfg.baseUrl = validateBaseUrl(cfg.baseUrl);
+      if (!cfg.model) return res.status(400).json({ error: "Choose a model first." });
+      if (cfg.provider !== "custom" && !cfg.apiKey) return res.status(400).json({ error: "Enter the API key first." });
+      const result = await generateWithProvider(cfg, { model: cfg.model, params: { contents: "Say OK", config: { temperature: 0 } }, signal: AbortSignal.timeout(20_000) });
+      if (!result.text) throw new Error("The model returned an empty answer.");
+      return res.json({ success: true, message: `Connection successful (model: ${cfg.model}).`, model: cfg.model });
+    } catch (err: any) {
+      log.warn("Test API Key error:", err?.status || err?.message);
+      return res.status(400).json({ error: formatProviderError(err, req.body.provider) });
+    }
+  }
   const keyToTest = (apiKey && !isMaskedSecret(apiKey) ? String(apiKey) : getEffectiveGeminiApiKey()).trim();
   if (!keyToTest) {
     return res

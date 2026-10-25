@@ -18,7 +18,7 @@ export function useObligationEvents(range: { start: Date; end: Date } | null, en
     staleTime: 30_000,
   });
   const events = useMemo<CalendarEvent[]>(() => (query.data?.items ?? []).filter((o: Obligation) => o.due_date).map((o) => ({
-    id: `obligation:${o.id}`, type: 'obligation' as const, date: o.due_date!, title: o.title, documentId: o.id, documentKind: 'obligation' as const,
+    id: `obligation:${o.id}`, type: 'obligation' as const, date: o.due_date!, title: o.title, partnerName: o.partner_name || undefined, documentId: o.id, documentKind: 'obligation' as const,
   })), [query.data]);
   return { events, isLoading: query.isLoading, isError: query.isError, truncated: (query.data?.total ?? 0) > 500 };
 }

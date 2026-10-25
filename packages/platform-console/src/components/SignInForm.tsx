@@ -8,6 +8,7 @@ import { Spinner } from '@legalio/ui-components/spinner';
 import { Button } from '@legalio/ui-components/button';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
 import { Card, CardDescription, CardTitle } from '@legalio/ui-components/card';
+import { EMPTY_STORAGE, StorageFields, type StorageValues } from './settings/StorageFields';
 import { Checkbox, CheckboxControl, CheckboxHiddenInput, CheckboxLabel } from '@legalio/ui-components/checkbox';
 import { Input } from '@legalio/ui-components/input';
 import { Field, FieldLabel } from '@legalio/ui-components/field';
@@ -57,9 +58,8 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
   // First step of a brand-new install: no DATABASE_URL and no saved connection yet.
   const [needsDatabase, setNeedsDatabase] = useState(false);
   const [database, setDatabase] = useState({ host: '', port: '5432', user: '', password: '', database: '', ssl: false });
-  const [storage, setStorage] = useState({ secretId: '', secretKey: '', bucket: '', region: '', prefix: '' });
+  const [storage, setStorage] = useState<StorageValues>(EMPTY_STORAGE);
   const setDb = (key: keyof typeof database) => (e: React.ChangeEvent<HTMLInputElement>) => setDatabase(prev => ({ ...prev, [key]: e.target.value }));
-  const setCos = (key: keyof typeof storage) => (e: React.ChangeEvent<HTMLInputElement>) => setStorage(prev => ({ ...prev, [key]: e.target.value }));
 
   // Single sign-on: the per-organization link (/sso/<slug>), or organizations found for the typed e-mail domain.
   const [ssoSlug] = useState(ssoSlugFromPath);
@@ -404,32 +404,10 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onOpenPrivacyPolicy, onO
         {setupMode && (
           <fieldset aria-labelledby="setup-cos-title" className="mt-g8 flex min-w-0 flex-col gap-[11px] border-t border-border pt-g21">
             <div className="flex flex-col gap-g5">
-              <p id="setup-cos-title" className="text-sm font-semibold">{t('cos_setup.title', 'File storage (Tencent COS)')}</p>
+              <p id="setup-cos-title" className="text-sm font-semibold">{t('storage.setup_title', 'File storage')}</p>
               <Text size="xs" tone="muted">{t('cos_setup.purpose', 'Uploaded files are stored in this bucket. Saving tests the credentials first.')}</Text>
             </div>
-            <Field required>
-              <FieldLabel htmlFor="setup-cos-secret-id">SecretId</FieldLabel>
-              <Input id="setup-cos-secret-id" required autoComplete="off" spellCheck={false} value={storage.secretId} onChange={setCos('secretId')} />
-            </Field>
-            <PasswordInput ids={{ input: 'setup-cos-secret-key' }} autoComplete="new-password">
-              <PasswordInputLabel>SecretKey</PasswordInputLabel>
-              <PasswordInputControl>
-                <PasswordInputInput required value={storage.secretKey} onChange={setCos('secretKey')} />
-                <PasswordInputVisibilityTrigger><PasswordInputIndicator /></PasswordInputVisibilityTrigger>
-              </PasswordInputControl>
-            </PasswordInput>
-            <Field required>
-              <FieldLabel htmlFor="setup-cos-bucket">Bucket</FieldLabel>
-              <Input id="setup-cos-bucket" required spellCheck={false} placeholder="legalio-1250000000" value={storage.bucket} onChange={setCos('bucket')} />
-            </Field>
-            <Field required>
-              <FieldLabel htmlFor="setup-cos-region">Region</FieldLabel>
-              <Input id="setup-cos-region" required spellCheck={false} placeholder="ap-jakarta" value={storage.region} onChange={setCos('region')} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="setup-cos-prefix">{t('cos_setup.prefix', 'Prefix (optional)')}</FieldLabel>
-              <Input id="setup-cos-prefix" spellCheck={false} placeholder="legalio/" value={storage.prefix} onChange={setCos('prefix')} />
-            </Field>
+            <StorageFields idPrefix="setup-storage" values={storage} onChange={patch => setStorage(prev => ({ ...prev, ...patch }))} />
           </fieldset>
         )}
         {!isRegister && !setupMode && (

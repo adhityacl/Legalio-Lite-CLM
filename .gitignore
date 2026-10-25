@@ -160,3 +160,5 @@ playwright*.config.ts
 handover.md
 skills-lock.json
 apps/frontend/src/features/calendar/DocumentCalendar.example.tsx
+HANDOVER_POSTGRESQL_COS.md
+POSTGRES_STORAGE.md

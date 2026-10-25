@@ -1,6 +1,6 @@
 import { checkIsAdmin } from '../adminCheck';
 import nodemailer from 'nodemailer';
-import { readPlatformConfiguration, PLATFORM_SECTIONS, isMaskedSecret, applyPlatformConfiguration, onOrganizationChanged } from '../platformSettings';
+import { readPlatformConfiguration, PLATFORM_SECTIONS, isMaskedSecret, isPlatformSecretKey, applyPlatformConfiguration, onOrganizationChanged } from '../platformSettings';
 import { identityOf, sendError } from '../identity';
 import { db, DEFAULT_BRANDING } from '../memoryDb';
 import { auditActorFor } from '../organizationAdminRoutes';
@@ -36,7 +36,7 @@ app.post("/api/platform-settings", async (req: express.Request, res: express.Res
   for (const [key, value] of Object.entries(body)) {
     const section = Object.keys(PLATFORM_SECTIONS).find((name) => name !== "branding" && PLATFORM_SECTIONS[name].includes(key));
     if (!section) return sendError(req, res, 400, "INVALID_INPUT", `Unknown or tenant-owned field: ${key}`);
-    if ((key === "geminiApiKey" || key === "smtpPassword") && (value === "" || isMaskedSecret(value))) continue;
+    if (isPlatformSecretKey(key) && (value === "" || isMaskedSecret(value))) continue;
     (sections[section] ||= {})[key] = value;
   }
   try {

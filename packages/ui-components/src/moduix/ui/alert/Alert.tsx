@@ -92,7 +92,7 @@ const AlertTitle = forwardRef<ComponentRef<typeof ark.p>, HTMLArkProps<'p'>>(fun
   return (
     <ark.p
       ref={ref}
-      className={cn('m-0 min-w-0 text-md font-semibold [overflow-wrap:anywhere]', className)}
+      className={cn('m-0 min-w-0 text-sm font-semibold [overflow-wrap:anywhere]', className)}
       {...props}
       data-scope="alert"
       data-part="title"
@@ -107,7 +107,7 @@ const AlertDescription = forwardRef<ComponentRef<typeof ark.div>, HTMLArkProps<'
       <ark.div
         ref={ref}
         className={cn(
-          'min-w-0 text-md [overflow-wrap:anywhere] text-muted-foreground [&>:first-child]:mt-0 [&>:last-child]:mb-0',
+          'min-w-0 text-sm [overflow-wrap:anywhere] text-muted-foreground [&>:first-child]:mt-0 [&>:last-child]:mb-0',
           className,
         )}
         {...props}

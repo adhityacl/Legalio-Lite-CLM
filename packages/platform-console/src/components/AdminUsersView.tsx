@@ -21,6 +21,7 @@ import { Alert, AlertActions, AlertContent, AlertDescription, AlertIndicator } f
 import { Spinner } from '@legalio/ui-components/spinner';
 import { Card } from '@legalio/ui-components/card';
 import { List, ListItem } from '@legalio/ui-components/list';
+const LazyPgReport = lazy(() => import('./admin/PgReportTab').then(m => ({ default: m.PgReportTab })));
 const LazyMailer = lazy(() => import('./admin/MailerPanel').then(m => ({ default: m.MailerPanel })));
 const LazyPlatformConfigurationPanel = lazy(() => import('./admin/PlatformConfigurationPanel').then((m) => ({ default: m.PlatformConfigurationPanel })));
 
@@ -125,7 +126,7 @@ export const AdminUsersView: React.FC<{ initialTab?: SystemSubmenu; onManageOrga
   return (
     <div className="flex w-full flex-col space-y-g21 text-foreground">
 
-      {!configurationSection && activeTab !== 'mailer' && (
+      {!configurationSection && activeTab !== 'mailer' && activeTab !== 'pgreport' && (
         <AdminConsoleHeader
           activeTab={activeTab}
           onRefresh={() => loadConsoleData(true)}
@@ -134,7 +135,9 @@ export const AdminUsersView: React.FC<{ initialTab?: SystemSubmenu; onManageOrga
       )}
 
       <div id={`admin-system-${activeTab}-panel`} role="region" aria-label={activeTab} className="w-full">
-        {activeTab === 'mailer' ? (
+        {activeTab === 'pgreport' ? (
+          <Suspense fallback={<div role="status" className="flex min-h-g233 items-center justify-center text-sm text-muted-foreground"><Spinner size="sm" decorative /></div>}><LazyPgReport /></Suspense>
+        ) : activeTab === 'mailer' ? (
           <Suspense fallback={<p role="status">Memuat Mailer…</p>}><LazyMailer /></Suspense>
         ) : configurationSection ? (
           <Suspense fallback={<div role="status" className="flex min-h-g233 items-center justify-center text-sm text-muted-foreground"><Spinner size="sm" decorative /></div>}>

@@ -10,8 +10,8 @@ import { sql } from '../db';
 import { verifyPassword, hashPassword } from 'better-auth/crypto';
 import { getPublicBaseUrl, normalizePublicUrl, saveInstallationPublicUrl } from '../installationSettings';
 import { IS_TEST_MODE } from '../runtimePaths';
-import { checkCosInput } from '../storageCredentials';
-import { CosConfig } from '../objectStore';
+import { checkStorageInput } from '../storageCredentials';
+import type { StorageConfig } from '../storageProviders';
 import { storageCredentials } from '../storageCredentialStore';
 import { ApiError, appendAudit } from '../organizationSettingsStore';
 import { RequestDenied, identityOf } from '../identity';
@@ -119,10 +119,10 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
   if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8) {
     return res.status(400).json({ error: "INVALID_SETUP", message: "Enter your name, a valid email, and a password of at least 8 characters." });
   }
-  // Uploads have no local fallback, so outside test mode the first admin also connects Tencent COS; tested before the transaction.
-  const checked = req.body?.storage || !IS_TEST_MODE ? await checkCosInput(req.body?.storage) : null;
+  // Uploads have no local fallback, so outside test mode the first admin also connects file storage (any supported provider); tested before the transaction.
+  const checked = req.body?.storage || !IS_TEST_MODE ? await checkStorageInput(req.body?.storage?.provider, req.body?.storage) : null;
   if (checked && "error" in checked) return res.status(400).json(checked);
-  const storage = checked as CosConfig | null; // the tsconfig is not strict, so `checked &&` above does not narrow
+  const storage = checked as StorageConfig | null; // the tsconfig is not strict, so `checked &&` above does not narrow
   const hashed = await hashPassword(password);
   const id = `usr_${crypto.randomUUID()}`;
   const now = new Date().toISOString();
@@ -144,7 +144,7 @@ app.post("/api/system/setup", async (req: express.Request, res: express.Response
         VALUES (?, ?, 'credential', ?, ?, ?, ?)
       `, `acc_${id}`, id, id, hashed, now, now);
       await saveInstallationPublicUrl(sql, publicUrl);
-      if (storage) await storageCredentials.saveCos(storage, id);
+      if (storage) await storageCredentials.saveConfig(storage, id, true);
       return true;
     });
     if (!created) {

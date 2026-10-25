@@ -2,7 +2,8 @@ import { ApiError, appendAudit } from './organizationSettingsStore';
 import { db, DEFAULT_BRANDING, coreSaver, normalizeStoredPartners, refreshTenantProjection, saveDb } from './memoryDb';
 import { withCurrentUiTextKeys } from './uiTextKeys';
 import { UITextOverrides } from '@legalio/types/uiTexts';
-import { getEffectiveGeminiApiKey, getValidAiModel } from './aiClient';
+import { getAiProvider, getEffectiveGeminiApiKey, resolveAiConfig } from './aiClient';
+import { isAiProvider, validateBaseUrl, validateModelId } from './aiProviders';
 import { auditActorFor } from './organizationAdminRoutes';
 import { sql } from './db';
 import { recalculateStatuses } from './reminderJobs';
@@ -23,11 +24,14 @@ export function isMaskedSecret(value: unknown): boolean {
   return text.includes(SECRET_MASK_CHAR) || /^\*{4,}$/.test(text);
 }
 export function redactProviderConfig(config: any) {
-  const { accessToken, refreshToken, smtpPassword, geminiApiKey, ...rest } = config || {};
+  const { accessToken, refreshToken, smtpPassword, geminiApiKey, openaiApiKey, anthropicApiKey, customApiKey, ...rest } = config || {};
   return {
     ...rest,
     geminiApiKey: maskSecret(geminiApiKey),
     hasGeminiApiKey: Boolean(geminiApiKey),
+    hasOpenaiApiKey: Boolean(openaiApiKey),
+    hasAnthropicApiKey: Boolean(anthropicApiKey),
+    hasCustomApiKey: Boolean(customApiKey),
     smtpPassword: maskSecret(smtpPassword),
     hasSmtpPassword: Boolean(smtpPassword),
   };
@@ -38,6 +42,8 @@ export function redactProviderConfig(config: any) {
  * tenant settings never read this. Secrets are write-only: omitted keeps the
  * stored value, a non-empty string replaces it, explicit null clears it.
  */
+const SECRET_KEYS = ["geminiApiKey", "openaiApiKey", "anthropicApiKey", "customApiKey", "smtpPassword"];
+export const isPlatformSecretKey = (key: string) => SECRET_KEYS.includes(key);
 export function platformConfigError(message: string): never {
   throw new ApiError(400, "INVALID_INPUT", message);
 }
@@ -47,7 +53,11 @@ export function readPlatformConfiguration() {
   return {
     uiTexts: { overrides: withCurrentUiTextKeys(g.uiTextOverrides || { ID: {}, EN: {}, ZH: {} }) as UITextOverrides },
     branding: { appName: b.appName, logoUrl: b.logoUrl, primaryColor: b.primaryColor, footerText: b.footerText, loginHeadline: b.loginHeadline },
-    ai: { aiModel: g.aiModel || "gemini-3.8-flash", hasGeminiApiKey: Boolean(getEffectiveGeminiApiKey()) },
+    ai: {
+      aiProvider: getAiProvider(), aiModel: resolveAiConfig().model, aiBaseUrl: g.aiBaseUrl || "",
+      hasGeminiApiKey: Boolean(getEffectiveGeminiApiKey()), hasOpenaiApiKey: Boolean(g.openaiApiKey || process.env.OPENAI_API_KEY),
+      hasAnthropicApiKey: Boolean(g.anthropicApiKey || process.env.ANTHROPIC_API_KEY), hasCustomApiKey: Boolean(g.customApiKey),
+    },
     smtp: {
       smtpEnabled: Boolean(g.smtpEnabled), smtpHost: g.smtpHost || "", smtpPort: g.smtpPort ?? null,
       smtpSecure: Boolean(g.smtpSecure), smtpAllowSelfSigned: Boolean(g.smtpAllowSelfSigned), smtpUser: g.smtpUser || "", smtpFromEmail: g.smtpFromEmail || "",
@@ -58,7 +68,7 @@ export function readPlatformConfiguration() {
 export const PLATFORM_SECTIONS: Record<string, string[]> = {
   uiTexts: ['overrides', 'reset'],
   branding: ["appName", "logoUrl", "primaryColor", "footerText", "loginHeadline"],
-  ai: ["aiModel", "geminiApiKey"],
+  ai: ["aiProvider", "aiModel", "aiBaseUrl", "geminiApiKey", "openaiApiKey", "anthropicApiKey", "customApiKey"],
   smtp: ["smtpEnabled", "smtpHost", "smtpPort", "smtpSecure", "smtpAllowSelfSigned", "smtpUser", "smtpPassword", "smtpFromEmail", "smtpFromName"],
 };
 export function validatePlatformValue(section: string, key: string, value: unknown): unknown {
@@ -97,7 +107,21 @@ export function validatePlatformValue(section: string, key: string, value: unkno
       if (/[<>"'\s]/.test(v)) platformConfigError("logoUrl is invalid.");
       return v;
     }
-    case "ai.aiModel": return getValidAiModel(str(100));
+    case "ai.aiProvider":
+      if (!isAiProvider(value)) platformConfigError("aiProvider must be gemini, openai, anthropic or custom.");
+      return value;
+    case "ai.aiModel": {
+      // Retired Gemini ids keep mapping to their successors; any other id is a model the provider's own list or the administrator named.
+      const v = str(120);
+      if (v === "gemini-2.0-flash" || v === "gemini-1.5-flash") return "gemini-3.8-flash";
+      if (v === "gemini-3.5-flash-lite") return "gemini-3.5-flash";
+      try { return validateModelId(v); } catch (err) { return platformConfigError((err as Error).message); }
+    }
+    case "ai.aiBaseUrl": {
+      const v = str(300);
+      if (!v) return "";
+      try { return validateBaseUrl(v); } catch (err) { return platformConfigError((err as Error).message); }
+    }
     case "smtp.smtpEnabled": case "smtp.smtpSecure": case "smtp.smtpAllowSelfSigned":
       if (typeof value !== "boolean") platformConfigError(`${key} must be true or false.`);
       return value;
@@ -123,7 +147,7 @@ export async function applyPlatformConfiguration(section: unknown, values: unkno
   const next: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(input)) {
     if (!allowed.includes(key)) platformConfigError(`Unknown field: ${section}.${key}`);
-    if (key === "geminiApiKey" || key === "smtpPassword") {
+    if (SECRET_KEYS.includes(key)) {
       if (value === undefined) continue;
       if (value === null) { next[key] = ""; continue; }
       if (typeof value !== "string" || !value.trim() || value.length > 512) platformConfigError(`${key} must be a non-empty string or null.`);

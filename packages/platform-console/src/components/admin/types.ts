@@ -11,8 +11,11 @@ export type ConsoleDashboardTab =
 /** Configuration pages exposed directly in the System Admin sidebar. */
 export type ConsoleConfigurationSection = 'storage' | 'ai' | 'smtp' | 'ui-texts' | 'reset';
 
+/** Read-only PostgreSQL monitoring page (PgReport). */
+export type ConsolePgReportSection = 'pgreport';
+
 /** System Admin console sections (platform-only, PRD §6.6). */
-export type ConsoleSubmenu = ConsoleDashboardTab | ConsoleConfigurationSection | 'accounts';
+export type ConsoleSubmenu = ConsoleDashboardTab | ConsoleConfigurationSection | ConsolePgReportSection | 'accounts';
 
 export interface ConsoleUser {
   id: string;

@@ -24,9 +24,13 @@ export function EventItem({ event, chip = false, onEventClick }: {
  const locale = getActiveFormattingLocale();
  const done = event.type === 'task' && event.status === 'done';
  // The accessible name starts with the visible text (the day number and the title in a list, the title in a chip), so it contains it.
- const visibleText = chip ? event.title : `${date.getDate()} ${event.title}`;
- const label = [visibleText, t(EVENT_TYPE_CONFIG[event.type].labelKey), new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(date),
- done ? t('calendar.done') : '', event.projected ? t('calendar.projected') : ''].filter(Boolean).join(' · ');
+ const shown = event.partnerName || event.title;
+ const visibleText = chip ? shown : `${date.getDate()} ${shown}`;
+ // What is not in the cell (the document title when the partner is shown) and the rest of the details come on hover and in the accessible name.
+ const details = [event.partnerName ? event.title : '', t(EVENT_TYPE_CONFIG[event.type].labelKey), new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(date),
+ done ? t('calendar.done') : '', event.projected ? t('calendar.projected') : ''].filter(Boolean);
+ const label = [visibleText, ...details].join(' · ');
+ const tip = <span className="flex flex-col gap-g3"><span className="font-semibold">{shown}</span>{details.map((line, index) => <span key={index}>{line}</span>)}</span>;
  const className = cn('w-full min-w-0 justify-start gap-g8 rounded-md px-g3 py-g2 text-xs font-medium text-foreground',
  chip ? EVENT_TYPE_CONFIG[event.type].chip : 'hover:bg-muted');
  const content = <>
@@ -34,10 +38,10 @@ export function EventItem({ event, chip = false, onEventClick }: {
  {/* A real space between the parts, so the visible text reads "1 Title" and the accessible name can contain it. */}
  {!chip && ' '}
  <EventIndicator type={event.type} done={done} />
-    <span className={cn('truncate', done && 'line-through', chip && 'hidden sm:inline')}>{event.title}</span>
+    <span className={cn('truncate', done && 'line-through', chip && 'hidden sm:inline')}>{shown}</span>
  {chip && <span className="truncate sm:hidden" aria-hidden="true">{date.getDate()}</span>}
   </>;
   return onEventClick
-    ? <Tooltip><TooltipTrigger asChild><Button type="button" variant="ghost" data-calendar-event className={className} aria-label={label} onClick={() => onEventClick(event)}>{content}</Button></TooltipTrigger><TooltipBody>{label}</TooltipBody></Tooltip>
-    : <Tooltip><TooltipTrigger asChild><div className={cn('flex items-center', className)} aria-label={label}>{content}</div></TooltipTrigger><TooltipBody>{label}</TooltipBody></Tooltip>;
+    ? <Tooltip><TooltipTrigger asChild><Button type="button" variant="ghost" data-calendar-event className={className} aria-label={label} onClick={() => onEventClick(event)}>{content}</Button></TooltipTrigger><TooltipBody>{tip}</TooltipBody></Tooltip>
+    : <Tooltip><TooltipTrigger asChild><div className={cn('flex items-center', className)} aria-label={label}>{content}</div></TooltipTrigger><TooltipBody>{tip}</TooltipBody></Tooltip>;
 }

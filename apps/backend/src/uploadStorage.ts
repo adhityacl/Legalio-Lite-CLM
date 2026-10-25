@@ -1,6 +1,8 @@
 import express from 'express';
 import path from 'path';
-import { CosConfig, ObjectStore, cosStore, memoryStore, keyFromLink } from './objectStore';
+import { ObjectStore, memoryStore, keyFromLink } from './objectStore';
+import { createRoutingStore } from './objectLocations';
+import { buildStore } from './storageProviders';
 import { storageCredentials } from './storageCredentialStore';
 import { IS_TEST_MODE } from './runtimePaths';
 import { ApiError } from './organizationSettingsStore';
@@ -17,17 +19,17 @@ import { addActivityLog } from './recordAccess';
 import { componentLog } from './logger';
 const log = componentLog('uploadStorage');
 
-/** Upload storage (Tencent COS, in-memory under APP_TEST_MODE), server-written ownership, and the private /uploads authorization. */
+/** Upload storage (S3-compatible or Tencent COS, in-memory under APP_TEST_MODE), server-written ownership, and the private /uploads authorization. */
 
-let storageCache: { config: CosConfig | null; store: ObjectStore } | null = null;
-/** Upload storage: Tencent COS from the saved credentials (rebuilt after every save); in-memory only for APP_TEST_MODE. */
+let routingStore: ObjectStore | null = null;
+let testStore: ObjectStore | null = null;
+/**
+ * Upload storage: every configured provider behind one store (objectLocations.ts). New files go to the active provider, reads follow
+ * where each file was written. In-memory only for APP_TEST_MODE without credentials.
+ */
 export function getStore(): ObjectStore {
-  const config = storageCredentials.getCos();
-  if (!storageCache || storageCache.config !== config) {
-    if (!config && !IS_TEST_MODE) throw new ApiError(503, "STORAGE_NOT_CONFIGURED", "File storage (Tencent COS) is not configured.");
-    storageCache = { config, store: config ? cosStore(config) : memoryStore() };
-  }
-  return storageCache.store;
+  if (IS_TEST_MODE && !storageCredentials.getActive()) return testStore ??= memoryStore();
+  return routingStore ??= createRoutingStore(sql, storageCredentials, buildStore);
 }
 /*
  * Uploaded evidence is private (PRD §11.5). A file is served only when it

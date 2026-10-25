@@ -39,6 +39,7 @@ import { statusBadgeTone, statusLabel, typeBadgeTone, typeLabel } from './docume
 import { TableColumnHeader, Table, TableHeader, TableRow, TableBody, TableCell, TableScrollArea } from '@legalio/ui-components/table';
 import { Button } from '@legalio/ui-components/button';
 import { Input } from '@legalio/ui-components/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@legalio/ui-components/input-group';
 import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { Tooltip, TooltipBody, TooltipTrigger } from '@legalio/ui-components/tooltip';
@@ -246,17 +247,16 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({ canEdit, can
 
         <Card className="p-g13">
           <div className="flex w-full flex-wrap items-center gap-g13">
-            <div className="relative flex-1 min-w-g233 sm:min-w-g233">
-              <Search className="w-g16 h-g16 text-muted-foreground absolute left-g13 top-1/2 -translate-y-1/2" aria-hidden />
-              <Input aria-label={t('documents.explorer.search_label', 'Search Document')}
+            <InputGroup className="flex-1 min-w-g233 sm:min-w-g233">
+              <InputGroupAddon><Search className="size-g16" aria-hidden="true" /></InputGroupAddon>
+              <InputGroupInput aria-label={t('documents.explorer.search_label', 'Search Document')}
                 id="document-search"
                 type="search"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder={t('documents.explorer.search_placeholder', 'Search Documents…')}
-                className="w-full pl-g34 pr-g13"
               />
-            </div>
+            </InputGroup>
             <AlphabeticalSelect aria-label={t('documents.filter.status_label', 'Document Status')}
               id="document-status-filter"
               value={filters.status}

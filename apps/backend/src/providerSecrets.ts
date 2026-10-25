@@ -4,7 +4,7 @@ import { componentLog } from './logger';
 const log = componentLog('secrets');
 
 /** Fields of the provider configuration (app_settings 'google_config') that are encrypted at rest. */
-export const SEALED_PROVIDER_FIELDS = ['smtpPassword', 'geminiApiKey', 'accessToken', 'refreshToken'] as const;
+export const SEALED_PROVIDER_FIELDS = ['smtpPassword', 'geminiApiKey', 'openaiApiKey', 'anthropicApiKey', 'customApiKey', 'accessToken', 'refreshToken'] as const;
 
 const isSealed = (value: unknown): value is string => typeof value === 'string' && value.startsWith('v1:');
 
