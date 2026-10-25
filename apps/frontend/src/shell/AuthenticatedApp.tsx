@@ -236,7 +236,7 @@ const WorkspaceShell: React.FC<{ user: SignedInUser; gate: Gate; isPlatformAdmin
             <DefaultPasswordBanner
               onOpenSecurity={() => setActiveTab('admin-system-users')}
               showGoogleSetup={activeTab === 'admin-system-dashboard' || [
-                'admin-system-google',
+                'admin-system-storage',
                 'admin-system-ai',
                 'admin-system-smtp',
                 'admin-system-ui-texts',

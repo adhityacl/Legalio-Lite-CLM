@@ -25,9 +25,7 @@ const LazyMailer = lazy(() => import('./admin/MailerPanel').then(m => ({ default
 const LazyPlatformConfigurationPanel = lazy(() => import('./admin/PlatformConfigurationPanel').then((m) => ({ default: m.PlatformConfigurationPanel })));
 
 const CONFIGURATION_SECTIONS: Record<ConsoleConfigurationSection, PlatformConfigurationSection> = {
-  google: 'google',
-  'google-drive': 'google-drive',
-  'google-credentials': 'google-credentials',
+  storage: 'storage',
   ai: 'ai',
   smtp: 'notifications',
   'ui-texts': 'language',

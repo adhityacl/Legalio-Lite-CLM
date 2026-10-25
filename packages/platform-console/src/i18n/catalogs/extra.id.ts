@@ -395,6 +395,8 @@ export const EXTRA_ID: Record<string, string> = {
   'google_setup.source_none': 'Belum dikonfigurasi',
   'google_setup.source_upload': 'File terunggah',
   'google_setup.title': 'Hubungkan Google',
+  'storage.title': 'Penyimpanan',
+
   'cos_setup.title': 'Penyimpanan file (Tencent COS)',
   'cos_setup.configured': 'Terkonfigurasi',
   'cos_setup.purpose': 'File yang diunggah disimpan di bucket ini. Kredensial diuji dulu sebelum disimpan.',

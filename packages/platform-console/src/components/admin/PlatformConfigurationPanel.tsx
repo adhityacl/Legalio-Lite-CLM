@@ -90,7 +90,7 @@ import { NumberInput, NumberInputControl, NumberInputDecrementTrigger, NumberInp
 import { CloseButton } from '@legalio/ui-components/close-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@legalio/ui-components/tabs';
 import { Avatar, AvatarFallback } from '@legalio/ui-components/avatar';
-export type PlatformConfigurationSection = 'google' | 'google-drive' | 'google-credentials' | 'ai' | 'notifications' | 'language' | 'security';
+export type PlatformConfigurationSection = 'storage' | 'ai' | 'notifications' | 'language' | 'security';
 
 const EMPTY_CONFIG: GoogleSheetsConfig = { driveFolderId: '', spreadsheetId: '', isConnected: false, autoSync: false };
 
@@ -101,7 +101,7 @@ const EMPTY_CONFIG: GoogleSheetsConfig = { driveFolderId: '', spreadsheetId: '',
  * reset. Platform-only; secrets are write-only and never prefilled.
  * Organization-specific settings live in each organization's Settings.
  */
-export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConfigurationSection }> = ({ activeSection = 'google' }) => {
+export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConfigurationSection }> = ({ activeSection = 'storage' }) => {
   const { user } = useAuth();
   // Mounted only inside System Admin for platform administrators; the server enforces it too.
   const isAdmin = true;
@@ -796,9 +796,7 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
   );
 
   const sections: Array<{ id: PlatformConfigurationSection; label: string }> = [
-    { id: 'google', label: t('settings.google_auth_title', 'Google Workspace Account Authentication') },
-    { id: 'google-drive', label: t('settings.penyimpanan_file_dokumen_google_drive', 'Document Backup (Google Drive)') },
-    { id: 'google-credentials', label: t('google_setup.settings_title', 'Google Cloud Credentials') },
+    { id: 'storage', label: t('storage.title', 'Storage') },
     { id: 'ai', label: t('sys.nav_ai', 'AI Model') },
     { id: 'notifications', label: t('tb.config_smtp', 'SMTP relay') },
     { id: 'language', label: t('tb.config_texts_short', 'UI texts') },
@@ -828,292 +826,10 @@ export const PlatformConfigurationPanel: React.FC<{ activeSection?: PlatformConf
 
       {/* Full-width Content Layout */}
       <div className="w-full space-y-g21">
-        {/* GROUP 1: GOOGLE INTEGRATION & DATABASE */}
-
-          {(['google', 'google-drive', 'google-credentials'] as PlatformConfigurationSection[]).includes(activeSection) && (
-            <div className="space-y-g21">
-              {/* Google OAuth Account Card */}
-              {activeSection === 'google' && <Card className="overflow-hidden">
-                <CardHeader >
-                  <CardTitle className="flex flex-wrap items-center justify-between gap-g8">
-                    <span>{t('settings.google_auth_title', 'Autentikasi Akun Google Workspace')}</span>
-                    {isTokenActive ? (
-                      <Badge className="shrink-0">
-                        {t('settings.oauth_active', 'OAuth Aktif')}
-                      </Badge>
-                    ) : (
-                      <Badge className="shrink-0">
-                        {t('settings.oauth_inactive', 'Belum Terhubung')}
-                      </Badge>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardBody className="space-y-g13">
-                  <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-g13 p-g13">
-                    <div className="flex items-center gap-g13">
-                      <Avatar size="md" className="bg-primary/10 text-accent-foreground shrink-0"><AvatarFallback className="bg-transparent text-inherit">{googleUser?.name?.charAt(0) || 'G'}</AvatarFallback></Avatar>
-                      <div>
-                        <Text size="sm" weight="semibold">
-                          {googleUser ? googleUser.name : t('settings.no_google_connected', 'Belum Ada Akun Google Terhubung')}
-                        </Text>
-                        {googleUser?.email && (
-                          <Text size="xs" tone="muted" className="font-mono">
-                            {googleUser.email}
-                          </Text>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-g8 shrink-0">
-                      {isTokenActive ? (
-                        <>
-                          <Button
-                            variant="outline"
-                            onClick={() => void handleGoogleRefresh()}
-                            disabled={connectingAuth}
-                          >
-                            {connectingAuth ? <Spinner size="sm" decorative /> : <RefreshCw aria-hidden="true" />}
- <span>{t('settings.refresh_session', 'Refresh Sesi')}</span>
- </Button>
- <Button
- variant="destructive-outline"
-                            onClick={() => void handleGoogleDisconnect()}
-                          >
-                            <LogOut className="w-g13 h-g13" />
-                            <span>{t('settings.disconnect', 'Putuskan')}</span>
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          onClick={() => void handleGoogleConnect()}
-                          disabled={connectingAuth}
-                        >
-                          <Zap className="w-g13 h-g13" />
-                          <span>{t('settings.connect_google_btn', 'Hubungkan Akun Google')}</span>
-                        </Button>
-                      )}
-                    </div>
-                  </Card>
-                </CardBody>
-              </Card>}
-
-              {/* Master Google Drive Storage Card (File Attachment Storage) */}
-              {activeSection === 'google-drive' && isAdmin && (
-                <Card id="card-master-drive-org-database" className="overflow-hidden">
-                  <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-g13">
-                    <div className="space-y-g3">
-                      <CardTitle className="flex items-center gap-g8">
-                        <Folder className="w-g21 h-g21 text-accent-foreground" />
-                        <span>{t('settings.penyimpanan_file_dokumen_google_drive', 'Backup Dokumen (Google Drive)')}</span>
-                      </CardTitle>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-g8 shrink-0">
-                      {driveFolderId ? (
-                        <Badge tone="success" className="gap-g5">
-                          <BadgeDot className="size-g8 text-primary animate-pulse" />
-                          <span>{t('settings.folder_drive_terhubung', 'Folder Drive Terhubung')}</span>
-                        </Badge>
-                      ) : (
-                        <Badge tone="warning" className="gap-g5">
-                          <AlertCircle className="size-g13 text-status-warning" />
-                          <span>{t('settings.not_configured', 'Belum Dikonfigurasi')}</span>
-                        </Badge>
-                      )}
-                      {isAdmin && driveFolderId && (
-                        <Button
-                          id="btn-backup-now"
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={backupState.running}
-                          onClick={() => void handleBackupNow()}
-                          className="shrink-0"
-                        >
-                          <span>{backupState.running ? 'Mencadangkan...' : backupState.message || 'Backup Sekarang'}</span>
-                        </Button>
-                      )}
-                      {isAdmin && !isEditUnlocked && (
-                        <Button
-                          id="btn-edit-master-root"
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowEditConfirmModal(true)}
-                          className="shrink-0"
-                        >
-                          <Lock className="w-g13 h-g13 text-accent-foreground" />
-                          <span>{t('settings.edit_config_btn', 'Ubah Konfigurasi')}</span>
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardBody className="space-y-g21">
-                    <div className="space-y-g13">
-                      <Card
-                        id="master-storage-root-card"
-                        className="p-g13 transition-all space-y-g13"
-                      >
-                        {/* Master Storage Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-g8 pb-g13 border-b border-border ">
-                          <div className="flex items-center gap-g13 min-w-0">
-                            <Avatar size="md" className="rounded-md shrink-0 bg-primary text-primary-foreground"><AvatarFallback className="bg-transparent text-inherit"><Folder className="size-g16" aria-hidden="true" /></AvatarFallback></Avatar>
-                            <div className="min-w-0 space-y-g2">
-                              <div className="flex items-center gap-g8">
-                                <Heading as="h4" size="xs" weight="bold" className="truncate">
-                                  {t('settings.root_folder_title', 'Root Folder')}
-                                </Heading>
-                                <Badge>
-                                  {t('settings.root_drive', 'Root Drive')}
-                                </Badge>
-                              </div>
-                              <Text size="xs" tone="muted" truncate>
-                                {t('settings.id', 'ID:')} <code className="font-mono text-xs text-muted-foreground">{driveFolderId || '-'}</code>
-                              </Text>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Read-Only or Edit Mode */}
-                        {!isEditUnlocked ? (
-                          <Card className="p-g13 flex flex-row items-center justify-between gap-g8">
-                            <div className="min-w-0 flex-1 space-y-g3">
-                              <Text as="span" size="xs" weight="bold" className="flex items-center gap-g5">
-                                <Folder className="w-g13 h-g13 text-accent-foreground shrink-0" />
-                                <span className="truncate">{t('settings.master_root_id_label', 'Master Google Drive Storage Root Folder ID')}</span>
-                              </Text>
-                              <Text size="xs" tone="muted" truncate className="font-mono select-all">
-                                {driveFolderId || '-'}
-                              </Text>
-                            </div>
-                            {driveFolderId && (
-                              <div className="flex items-center gap-g3 shrink-0">
-                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm"
-                                  type="button"
-                                  onClick={() => handleCopyLink(`https://drive.google.com/drive/folders/${driveFolderId}`, 'master-root')}
-                                >
-                                  {copiedKey === 'master-root' ? <Check className="w-g13 h-g13 text-accent-foreground" /> : <Copy className="w-g13 h-g13" />}
-                                </Button></TooltipTrigger><TooltipBody>{t('common.copy_link', 'Salin Link')}</TooltipBody></Tooltip>
-                                <Button asChild variant="ghost" size="icon-sm">
-                                  <a href={`https://drive.google.com/drive/folders/${driveFolderId}`} target="_blank" rel="noopener noreferrer" aria-label="Google Drive"><ExternalLink aria-hidden="true" /></a>
-                                </Button>
-                              </div>
-                            )}
-                          </Card>
-                        ) : (
-                          /* Edit Mode View */
-                          <div className="space-y-g13 pt-g3 animate-in fade-in duration-200">
-                            <Tabs value={selectedOptionTab} onValueChange={details => setSelectedOptionTab(details.value as 'picker' | 'manual')} className="gap-g13">
-                            <TabsList aria-label={t('settings.folder_google_drive_id', 'Folder Google Drive ID')}>
-                              <TabsTrigger value="picker"><Folder aria-hidden="true" />{t('settings.picker_tab', 'Pilih dari Google Drive')}</TabsTrigger>
-                              <TabsTrigger value="manual"><Folder aria-hidden="true" />{t('settings.manual_tab', 'Input Manual ID')}</TabsTrigger>
-                            </TabsList>
-
-                            <TabsContent value="picker">
-                              <form onSubmit={(event) => void handleSaveOption2Picker(event)} className="space-y-g13">
-                                <Card className="p-g13 space-y-g8">
-                                  <FieldLabel htmlFor="settingsview-field-1">
-                                    {t('settings.folder_google_drive_id', 'Folder Google Drive ID')}
-                                  </FieldLabel>
-                                  <div className="flex items-center gap-g8">
-                                    <Input id="settingsview-field-1"
-                                      type="text"
-                                      readOnly
-                                      value={driveFolderId || t('settings.no_folder_selected', 'Belum dipilih')}
-                                      placeholder={t('settings.id_folder_drive', 'ID Folder Drive...')}
-                                      className="flex-1"
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      onClick={() => void handleOpenDrivePicker('folder')}
-                                      disabled={!isTokenActive}
-                                      className="shrink-0"
-                                    >
-                                      {t('settings.pick_folder_btn', 'Pilih Folder')}
-                                    </Button>
-                                  </div>
-                                </Card>
-
-                                <div className="flex justify-end gap-g8">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setDriveFolderId(config.driveFolderId || '');
-                                      setIsEditUnlocked(false);
-                                    }}
-                                  >
-                                    {t('settings.cancel_edit_btn', 'Batal')}
-                                  </Button>
-                                  <Button
-                                    type="submit"
-                                    disabled={saving || !driveFolderId}
-                                  >
-                                    <Save className="w-g13 h-g13" />
-                                    <span>{saving ? t('settings.saving_and_provisioning', 'Menyimpan...') : t('settings.save_config_btn', 'Simpan Konfigurasi')}</span>
-                                  </Button>
-                                </div>
-                              </form>
-                            </TabsContent>
-
-                            <TabsContent value="manual">
-                              <form onSubmit={(event) => void handleSaveOption3Manual(event)} className="space-y-g13">
-                                <Field>
-                                  <FieldLabel htmlFor="settingsview-field-2">
-                                    {t('settings.master_root_id_label', 'Folder ID Google Drive')}
-                                  </FieldLabel>
-                                  <Input id="settingsview-field-2"
-                                    type="text"
-                                    value={driveFolderId}
-                                    onChange={(e) => setDriveFolderId(e.target.value)}
-                                    placeholder={t('settings.contoh_1xifivgwddtyezl7ioqvd9d_nas7xcfyp', 'Contoh: 1xiFIvgWdDtYEzL7IoqVD9d-NaS7XcfYp')}
-                                    className="w-full"
-                                    required
-                                  />
-                                </Field>
-
-                                <div className="flex justify-end gap-g8">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setDriveFolderId(config.driveFolderId || '');
-                                      setIsEditUnlocked(false);
-                                    }}
-                                  >
-                                    {t('settings.cancel_edit_btn', 'Batal')}
-                                  </Button>
-                                  <Button
-                                    type="submit"
-                                    disabled={saving}
-                                  >
-                                    <Save className="w-g13 h-g13" />
-                                    <span>{saving ? t('settings.saving_and_provisioning', 'Menyimpan...') : t('settings.save_config_btn', 'Simpan Konfigurasi')}</span>
-                                  </Button>
-                                </div>
-                              </form>
-                            </TabsContent>
-                            </Tabs>
-                          </div>
-                        )}
-                      </Card>
-                    </div>
-
-                  </CardBody>
-                </Card>
-              )}
-
-              {/* Google Cloud Credentials */}
-              {activeSection === 'google-credentials' && isSuperuser && (
-                <section className="max-w-6xl space-y-g13" aria-label={t('google_setup.settings_title', 'Kredensial Google Cloud')}>
-                  <Text size="sm" tone="muted" className="max-w-prose leading-relaxed">
-                    {t('google_setup.description', 'Unggah dua file JSON yang diekspor dari Google Cloud Console. File disimpan di server, menggantikan variabel GOOGLE_* di .env, dan isinya yang rahasia tidak pernah ditampilkan lagi.')}
-                  </Text>
-                  <GoogleCredentialsForm />
-                  <CosStorageForm />
-                </section>
-              )}
-            </div>
+          {activeSection === 'storage' && isSuperuser && (
+            <section className="max-w-6xl space-y-g13" aria-label={t('storage.title', 'Storage')}>
+              <CosStorageForm />
+            </section>
           )}
 
           {/* GROUP 2: AI & SMART AUTOMATION */}

@@ -91,8 +91,12 @@ export function resolveRoute(tab: string, ctx: RouteContext): RouteDecision {
     case 'admin-system-backups':
     case 'settings-security':
       return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-dashboard' } : { kind: 'denied' };
+    // The Google pages were removed; file storage (Tencent COS) now lives under Storage.
+    case 'admin-system-google':
+    case 'admin-system-google-drive':
+    case 'admin-system-google-credentials':
     case 'admin-system-settings':
-      return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-google' } : { kind: 'denied' };
+      return ctx.isPlatformAdmin ? { kind: 'redirect', tab: 'admin-system-storage' } : { kind: 'denied' };
     case 'admin-organization-dashboard':
     case 'admin-organization-users':
     case 'admin-organization-teams':

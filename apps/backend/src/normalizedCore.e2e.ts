@@ -42,7 +42,7 @@ await fixtureSql.run(`INSERT INTO "teamMember"(id,"teamId","userId","createdAt")
 let server:ChildProcess|undefined;let frontend:ChildProcess|undefined;let browser:Awaited<ReturnType<typeof chromium.launch>>|undefined;
 const logs:string[]=[];const checks:string[]=[];
 const appTabs=['dashboard','hierarchy','partners','contracts','create-contract','ios','partner-spending','partner-evaluation','notifikasi','settings-organization','settings-access'];
-const systemTabs=['dashboard','users','accounts','sessions','organizations','apikeys','google','google-drive','google-credentials','ai','smtp','mailer','ui-texts','reset'];
+const systemTabs=['dashboard','users','accounts','sessions','organizations','apikeys','storage','ai','smtp','mailer','ui-texts','reset'];
 const run=(args:string[],cwd=repository,env=process.env)=>{const child=spawn('node',args,{cwd,env,stdio:['ignore','pipe','pipe']});child.stdout?.on('data',c=>logs.push(String(c)));child.stderr?.on('data',c=>logs.push(String(c)));return child;};
 const waitFor=async(url:string,child:ChildProcess)=>{const deadline=Date.now()+60000;while(Date.now()<deadline){if(child.exitCode!==null)throw new Error(`Server exited ${child.exitCode}`);try{if((await fetch(url)).ok)return;}catch{}await new Promise(r=>setTimeout(r,200));}throw new Error(`Timed out ${url}`);};
 const stop=async(child?:ChildProcess)=>{if(!child||child.exitCode!==null)return;child.kill('SIGTERM');await Promise.race([once(child,'exit'),new Promise(r=>setTimeout(r,5000))]);if(child.exitCode===null)child.kill('SIGKILL');};
@@ -455,9 +455,9 @@ try{
  await htmlField.fill(styledEmail);
  checks.push('Mailer ID/EN/ZH live switching, translated toolbar/dialog/validation and preservation of unsaved drafts');
  checks.push('Mailer WYSIWYG formatting, cursor variable insertion, lossless Visual/HTML switch, save/reload, mobile and preview');
- await systemPage.goto(backendURL+'/sys?tab=admin-system-google-credentials');
- await expect(systemPage.getByText(/Service Account \(JSON\)/).first()).toBeVisible({timeout:30000});
- await systemPage.screenshot({path:path.join(directory,'sys-google-credentials.png'),fullPage:true});
+ await systemPage.goto(backendURL+'/sys?tab=admin-system-storage');
+ await expect(systemPage.getByText(/\(Tencent COS\)/).first()).toBeVisible({timeout:30000});
+ await systemPage.screenshot({path:path.join(directory,'sys-storage.png'),fullPage:true});
  assert.deepEqual(systemErrors,[]);assert.deepEqual(failedSystemAPI,[]);
  await systemPage.close();
  checks.push('Chromium all 14 Sys pages render without runtime or API 500 errors');
@@ -575,7 +575,7 @@ try{
  const normalData=await call('/api/init-data',{org:repeated.defaultOrgId});
  for(const entity of ['partners','contracts','ios','spendings','evaluations','notifications'])assert.equal(normalData[entity].length,0,entity);
  const normalLogin=await call('/api/auth/sign-in/email',{method:'POST',body:{email:'root@example.com',password},token:''});assert.ok(normalLogin.token);
- const consoleResponse=await fetch(backendURL+'/sys?tab=admin-system-google-credentials');assert.equal(consoleResponse.status,200);
+ const consoleResponse=await fetch(backendURL+'/sys?tab=admin-system-storage');assert.equal(consoleResponse.status,200);
  assert.equal(/violates foreign key constraint/.test(logs.slice(normalLogStart).join('')),false);
  assert.equal((await sql.get('SELECT name FROM organization WHERE id=?',repeated.defaultOrgId)).name,'ITS');
  for(const table of ['partners','contracts','insertion_orders','spendings','evaluations','notifications','templates','activity_logs'])assert.equal((await sql.get(`SELECT COUNT(*) AS n FROM ${table}`)).n,0,table);

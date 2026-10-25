@@ -1555,6 +1555,8 @@ export const ZH_TRANSLATIONS: Record<string, string> = {
   'google_setup.source_none': '未配置',
   'google_setup.source_upload': '已上传',
   'google_setup.title': '连接 Google',
+  'storage.title': '存储',
+
   'cos_setup.title': '文件存储（腾讯云 COS）',
   'cos_setup.configured': '已配置',
   'cos_setup.purpose': '上传的文件存储在此存储桶中。保存前会先测试凭据。',

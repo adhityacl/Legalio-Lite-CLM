@@ -402,6 +402,8 @@ export const EXTRA_EN: Record<string, string> = {
   'google_setup.source_none': 'Not configured',
   'google_setup.source_upload': 'Uploaded',
   'google_setup.title': 'Connect Google',
+  'storage.title': 'Storage',
+
   'cos_setup.title': 'File storage (Tencent COS)',
   'cos_setup.configured': 'Configured',
   'cos_setup.purpose': 'Uploaded files are stored in this bucket. Saving tests the credentials first.',

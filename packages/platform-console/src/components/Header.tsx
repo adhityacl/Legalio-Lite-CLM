@@ -47,9 +47,7 @@ export const Header: React.FC<HeaderProps> = ({ notifications, onNavigateToTab, 
       case 'admin-system-users': return t('admin.tab_users', 'Users');
       case 'admin-system-sessions': return t('admin.tab_sessions', 'Sessions');
       case 'admin-system-organizations': return t('admin.tab_organizations', 'Organizations');
-      case 'admin-system-google': return t('settings.google_auth_title', 'Google Workspace Account Authentication');
-      case 'admin-system-google-drive': return t('settings.penyimpanan_file_dokumen_google_drive', 'Document Backup (Google Drive)');
-      case 'admin-system-google-credentials': return t('google_setup.settings_title', 'Google Cloud Credentials');
+      case 'admin-system-storage': return t('storage.title', 'Storage');
       case 'admin-system-ai': return t('sys.nav_ai', 'AI Model');
       case 'admin-system-mailer': return t('mailer.nav', 'Mailer');
       case 'admin-system-smtp': return t('tb.config_smtp', 'SMTP relay');
