@@ -66,7 +66,7 @@ export const IOModal: React.FC<IOModalProps> = ({
   const [contractId, setContractId] = useState(ioToEdit?.contract_id || '');
   const [nomorIO, setNomorIO] = useState(ioToEdit?.io_number || '');
   const [partnerId, setPartnerId] = useState(ioToEdit?.partner_id || (partners[0]?.partner_id || ''));
-  const [kanalMedia, setKanalMedia] = useState(ioToEdit?.media_channel || 'Digital Banner & Social Media');
+  const [kanalMedia, setKanalMedia] = useState(ioToEdit?.media_channel || '');
 
   // Filter contracts based on selected partner
   const availableContracts = React.useMemo(() => {
@@ -93,8 +93,8 @@ export const IOModal: React.FC<IOModalProps> = ({
       }
     }
   };
-  const [tanggalMulai, setTanggalMulai] = useState(ioToEdit?.start_date || '2026-08-01');
-  const [tanggalBerakhir, setTanggalBerakhir] = useState(ioToEdit?.end_date || '2026-11-30');
+  const [tanggalMulai, setTanggalMulai] = useState(ioToEdit?.start_date || '');
+  const [tanggalBerakhir, setTanggalBerakhir] = useState(ioToEdit?.end_date || '');
   const tenantCurrency = useTenantSettings().policy.settings.defaultCurrency;
   const [currency, setCurrency] = useState<string>(ioToEdit?.currency || tenantCurrency);
   const [nilaiIO, setNilaiIO] = useState<number>(ioToEdit?.io_value ?? 0);
@@ -126,15 +126,15 @@ export const IOModal: React.FC<IOModalProps> = ({
   const generateAutoTitle = (pId: string, kanal: string, tglMulai: string) => {
     const vendorName = getVendorName(pId);
     const kanalStr = kanal.trim() || 'Kanal';
-    return `${vendorName}_IO_${kanalStr}_${tglMulai}`;
+    return [vendorName, 'IO', kanalStr, tglMulai].filter(Boolean).join('_');
   };
 
   const [isAutoTitle, setIsAutoTitle] = useState(!ioToEdit?.io_title);
   const [judulIO, setJudulIO] = useState(() => {
     if (ioToEdit?.io_title) return ioToEdit.io_title;
     const initialPartnerId = ioToEdit?.partner_id || (partners[0]?.partner_id || '');
-    const initialKanal = ioToEdit?.media_channel || 'Digital Banner & Social Media';
-    const initialStartDate = ioToEdit?.start_date || '2026-08-01';
+    const initialKanal = ioToEdit?.media_channel || '';
+    const initialStartDate = ioToEdit?.start_date || '';
     return generateAutoTitle(initialPartnerId, initialKanal, initialStartDate);
   });
 

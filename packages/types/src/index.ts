@@ -397,5 +397,9 @@ export interface RedlineAnalysisData {
   keyFindings: string[];
   analyzedClauses: AnalyzedClause[];
   complianceChecklist: ComplianceItem[];
+  /** Industry rules the review judged irrelevant to this relationship, with why; they do not count toward the score. */
+  notApplicableRules?: Array<{ rule: string; reason: string }>;
+  /** The model's own score before the server recomputed it from the severities (kept for reference). */
+  aiRiskScore?: number | null;
   analyzed_at?: string;
 }

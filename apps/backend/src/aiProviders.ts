@@ -138,17 +138,22 @@ async function openAiCompatible(cfg: AiRuntimeConfig, { model, params, signal }:
   }
   const body: Record<string, any> = { model, messages };
   if (typeof config.temperature === 'number' && !(official && fixedTemperature(model))) body.temperature = config.temperature;
-  if (json) body.response_format = official && schema ? { type: 'json_schema', json_schema: { name: 'result', schema, strict: false } } : { type: 'json_object' };
+  // A schema is sent as json_schema to compatible servers too: with it the model answers valid JSON far more reliably than with
+  // the schema only in the prompt (a router's model once returned several bare strings for one field under json_object).
+  if (json) body.response_format = schema ? { type: 'json_schema', json_schema: { name: 'result', schema, strict: false } } : { type: 'json_object' };
   const headers: Record<string, string> = cfg.apiKey ? { Authorization: `Bearer ${cfg.apiKey}` } : {};
   let data: any;
-  try {
-    data = await post(`${base}/chat/completions`, headers, body, signal);
-  } catch (err: any) {
-    // Some compatible servers do not know response_format; the schema is in the prompt, so retry without it.
-    if (!official && body.response_format && err?.status === 400 && /response_format|json_object/i.test(err.message)) {
-      delete body.response_format;
+  for (;;) {
+    try {
       data = await post(`${base}/chat/completions`, headers, body, signal);
-    } else throw err;
+      break;
+    } catch (err: any) {
+      // A compatible server that does not know a response format gets the next simpler one; the schema stays in the prompt.
+      const refused = !official && body.response_format && err?.status === 400 && /response_format|json_object|json_schema/i.test(err.message);
+      if (!refused) throw err;
+      if (body.response_format.type === 'json_schema') body.response_format = { type: 'json_object' };
+      else delete body.response_format;
+    }
   }
   const message = data?.choices?.[0]?.message;
   if (message?.refusal) throw new AiHttpError(422, `The model declined the request: ${String(message.refusal).slice(0, 160)}`);

@@ -78,8 +78,9 @@ test('custom endpoint: uses its base URL, needs no key, puts the schema in the p
   await generateWithProvider(custom, { model: 'llama3', signal: signal(), params: { contents: 'x', config: { responseMimeType: 'application/json', responseSchema: SCHEMA } } });
   assert.equal(seen[0].url, 'http://localhost:11434/v1/chat/completions');
   assert.equal('Authorization' in (seen[0].headers as any), false);
-  assert.equal(seen[0].body.response_format.type, 'json_object');
-  assert.match(seen[0].body.messages[0].content, /JSON Schema/);
+  assert.equal(seen[0].body.response_format.type, 'json_schema');
+  assert.equal(seen[0].body.response_format.json_schema.schema.type, 'object');
+  assert.match(seen[0].body.messages[0].content, /JSON Schema/, 'the schema is also in the prompt, for servers that ignore response_format');
   await assert.rejects(generateWithProvider(custom, { model: 'llama3', signal: signal(), params: { contents: [{ inlineData: { data: 'x', mimeType: 'application/pdf' } }] } }), (err: any) => err instanceof AiHttpError && err.status === 422 && /PDF/.test(err.message));
 });
 
@@ -89,6 +90,19 @@ test('custom endpoint retries without response_format when the server does not k
   await generateWithProvider(cfg({ provider: 'custom', baseUrl: 'http://x/v1', apiKey: '' }), { model: 'm', signal: signal(), params: { contents: 'x', config: { responseMimeType: 'application/json' } } });
   assert.equal(seen.length, 2);
   assert.equal('response_format' in seen[1].body, false);
+});
+
+test('custom endpoint steps down from json_schema to json_object to none when the server refuses each', async () => {
+  let calls = 0;
+  const seen = mockFetch(() => (++calls < 3 ? { status: 400, json: { error: { message: `Unsupported response_format type` } } } : { json: { choices: [{ message: { content: '{}' } }] } }));
+  await generateWithProvider(cfg({ provider: 'custom', baseUrl: 'http://x/v1', apiKey: '' }), { model: 'm', signal: signal(), params: { contents: 'x', config: { responseMimeType: 'application/json', responseSchema: SCHEMA } } });
+  assert.deepEqual(seen.map((s) => s.body.response_format?.type ?? 'none'), ['json_schema', 'json_object', 'none']);
+});
+
+test('the official OpenAI endpoint does not step down: a 400 is the answer', async () => {
+  const seen = mockFetch(() => ({ status: 400, json: { error: { message: 'Invalid response_format' } } }));
+  await assert.rejects(generateWithProvider(cfg({}), { model: 'gpt-4o', signal: signal(), params: { contents: 'x', config: { responseMimeType: 'application/json', responseSchema: SCHEMA } } }), (err: any) => err.status === 400);
+  assert.equal(seen.length, 1);
 });
 
 test('Anthropic: headers, system, PDF as document, schema as a forced tool whose input is returned as JSON text', async () => {

@@ -14,6 +14,7 @@ import { normalizeCurrencyCode, convertToUsdWithFallback, getDefaultUsdRate } fr
 import { tenantDefaultCurrency, aiPolicyContext, findTenant, getTenantSettings } from '../tenantPolicy';
 import { upload } from '../uploadMiddleware';
 import { ensureAiAvailable, getValidAiModel, generateContentWithRetryAndFallback, withDocumentTranscriptField, extractAndCacheDocumentTranscript } from '../aiClient';
+import { parseAiJsonObject } from '../aiJson';
 import { computeInputSha256, globalOcrCache, buildCheapOcrContents, getCachedTranscript } from '../lib/cheapOcrPipeline';
 import { buildFieldProvenance } from '../lib/provenance';
 import { pagesFromText } from '../contractDocumentText';
@@ -234,7 +235,7 @@ Return strictly one valid JSON object matching the schema. Use "" for any text f
         ),
       },
     });
-    const parsedData = JSON.parse((response as any).text);
+    const parsedData = parseAiJsonObject((response as any).text);
     await extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
     // Where each value came from: the model's quotes, checked against the document text when it is available (a fresh digital PDF has
     // its pages; a document read before has a transcript without page boundaries; a scan being read now has neither).
@@ -300,7 +301,7 @@ Return strictly one valid JSON object matching the schema. Use "" for any text f
     res.json(responsePayload);
   } catch (error) {
     log.error("Error parsing contract:", error);
-    sendRouteError(req, res, error, "request failed", "Failed to parse contract document. Google AI model is currently busy, please try again.", { status: 500 });
+    sendRouteError(req, res, error, "request failed", "Failed to parse contract document. Please try again.", { status: 500 });
   }
 });
 app.get("/api/contracts/:id/redline-analysis", async (req: express.Request, res: express.Response) => {
@@ -347,6 +348,9 @@ app.post("/api/contracts/redline-analysis", async (req: express.Request, res: ex
     notice_type_required: pick("notice_type_required"),
     internal_notes: pick("internal_notes"),
     change_summary: pick("change_summary"),
+    // The stored document of a saved contract lets the review read the contract itself, not only the summary.
+    contract_file_link: saved?.contract_file_link,
+    fileName: saved?.fileName,
   };
   try {
     const analysis = await runContractRedlineAnalysis(req, contract, partner);
@@ -471,7 +475,7 @@ ${plainText}
         },
       },
     });
-    const parsed = JSON.parse((response as any).text);
+    const parsed = parseAiJsonObject((response as any).text);
     const rawSuggestions = Array.isArray(parsed?.suggestions) ? parsed.suggestions : [];
     const nowIso = new Date().toISOString();
     const created: Array<{ id: string; quote: string; new_text: string }> = [];

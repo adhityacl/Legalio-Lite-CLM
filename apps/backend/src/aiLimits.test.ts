@@ -78,6 +78,25 @@ test('the model chain stops at 3 attempts, backs off exponentially on 429, and r
   assert.deepEqual(tried, ['m1', 'm2', 'm3'], 'never more than 3 attempts');
 });
 
+test('a timed-out model is not retried, but a different fallback model and a transient error on the same model still are', async () => {
+  const tried: string[] = [];
+  const hang = (signal: AbortSignal) => new Promise<never>((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason)));
+  const quick = { maxAttempts: 3, timeoutMs: 20, baseBackoffMs: 1, maxBackoffMs: 1 };
+  await assert.rejects(ai.runModelChain({ models: ['solo', 'solo'], limits: quick, call: (model, signal) => { tried.push(model); return hang(signal); } }), /Timeout: model solo/);
+  assert.deepEqual(tried, ['solo'], 'the same slow endpoint is asked only once');
+
+  tried.length = 0;
+  const result = await ai.runModelChain({ models: ['slow', 'fast'], limits: quick, call: (model, signal) => { tried.push(model); return model === 'slow' ? hang(signal) : Promise.resolve('ok'); } });
+  assert.equal(result, 'ok');
+  assert.deepEqual(tried, ['slow', 'fast']);
+
+  tried.length = 0;
+  let calls = 0;
+  const retried = await ai.runModelChain({ models: ['solo', 'solo'], limits: quick, call: async (model) => { tried.push(model); if (calls++ === 0) throw Object.assign(new Error('upstream 503'), { status: 503 }); return 'ok'; } });
+  assert.equal(retried, 'ok');
+  assert.deepEqual(tried, ['solo', 'solo']);
+});
+
 test('an invalid key stops the chain at once (no point trying other models)', async () => {
   const tried: string[] = [];
   await assert.rejects(ai.runModelChain({

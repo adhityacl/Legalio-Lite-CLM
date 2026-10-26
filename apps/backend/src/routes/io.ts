@@ -12,12 +12,13 @@ import { normalizeCurrencyCode, convertToUsdWithFallback, getDefaultUsdRate } fr
 import { tenantDefaultCurrency, aiPolicyContext, getTenantSettings, findTenant, computeLifecycle } from '../tenantPolicy';
 import { upload } from '../uploadMiddleware';
 import { ensureAiAvailable, getValidAiModel, generateContentWithRetryAndFallback, withDocumentTranscriptField, extractAndCacheDocumentTranscript } from '../aiClient';
+import { parseAiJsonObject } from '../aiJson';
 import { computeInputSha256, globalOcrCache, buildCheapOcrContents } from '../lib/cheapOcrPipeline';
 import { getIndustryPack } from '@legalio/shared/policy';
 import { Type } from '@google/genai';
 import { normalizeParsedDate, computeContractEndDateFromDuration } from '../documentParsing';
 import { sendRouteError } from '../apiErrors';
-import { generateRedlineAnalysis } from '../redlineAnalysis';
+import { generateRedlineAnalysis, NOT_APPLICABLE_RETURN, ruleApplicabilityBlock, REVIEW_GUIDE } from '../redlineAnalysis';
 import { validateBody } from '../validation';
 import { getHistoricalExchangeRate } from '@legalio/shared/currencyRates';
 import { formatIOFileName } from '@legalio/shared/fileNaming';
@@ -179,7 +180,7 @@ Return strictly one valid JSON object matching the schema.`;
         ),
       },
     });
-    const parsedData = JSON.parse((response as any).text);
+    const parsedData = parseAiJsonObject((response as any).text);
     await extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
     if (parsedData.start_date) {
       parsedData.start_date = normalizeParsedDate(parsedData.start_date);
@@ -228,7 +229,7 @@ Return strictly one valid JSON object matching the schema.`;
     res.json(responsePayload);
   } catch (error) {
     log.error("Error parsing IO:", error);
-    sendRouteError(req, res, error, "request failed", "Failed to parse IO document. Google AI model is currently busy, please try again.", { status: 500 });
+    sendRouteError(req, res, error, "request failed", "Failed to parse IO document. Please try again.", { status: 500 });
   }
 });
 /** AI review of the service order form's current values (deliverables and commercial terms); an existing SO stores the result right away. */
@@ -247,6 +248,11 @@ app.post("/api/ios/review-analysis", async (req: express.Request, res: express.R
   if (!(await ensureAiAvailable(req, res))) return;
   const pick = (k: string) => (draft[k] == null ? "-" : String(draft[k]).slice(0, 20000));
   const ctx = aiPolicyContext(organizationId);
+  // What the relationship is about: the partner's categories plus, when linked, the parent contract's.
+  const categories = [...new Set([
+    ...(Array.isArray(partner.tags) ? partner.tags : []),
+    ...(Array.isArray(parentVisible?.cooperation_categories) ? parentVisible.cooperation_categories : []),
+  ].map((tag: unknown) => String(tag).trim()).filter(Boolean))].slice(0, 20);
   const prompt = `You are a senior commercial counsel and procurement reviewer acting for ${ctx.organizationName}, a ${ctx.industryName} organization in ${ctx.countryName}.
 Review the service order (SO) below — an operational order placed under a vendor relationship — and propose balanced fixes. Write every narrative field (titles, summary, findings, clause text and notes) in English.
 
@@ -254,6 +260,7 @@ Review the service order (SO) below — an operational order placed under a vend
 SO number: ${pick("io_number")}
 Title: ${pick("io_title")}
 Vendor: ${partner.partner_name}${partner.country ? ` (${countryNameForPrompt(partner.country)})` : ""}
+Partnership categories: ${categories.join(", ") || "-"}
 Deliverable / channel: ${pick("media_channel")}
 Pricing model: ${pick("pricing_model")}
 Charging type: ${pick("charging_type")}
@@ -271,8 +278,10 @@ Clause summary: ${parentVisible.internal_notes || "-"}` : "\nNo parent contract 
 
 === REVIEW INSTRUCTIONS ===
 Focus on: (1) whether deliverables are measurable — quantities, specs, KPIs, dates and acceptance criteria; (2) commercial fit — the pricing model matches the charging type, payment timing is clear, and there is a remedy for under-delivery (make-good, credit or refund); (3) reporting/proof-of-performance obligations; (4) cancellation and change terms; (5) consistency with the parent contract when one is given.
-Industry focus areas: ${ctx.reviewFocus.join("; ")}.
+${ruleApplicabilityBlock(ctx.clauseRules, ctx.industryName, categories)}
 Do not invent statute or regulation numbers.
+
+${REVIEW_GUIDE}
 
 Return JSON with exactly:
 1. overallRiskScore: integer 0-100 (0-25 low, 26-55 moderate, 56-75 high, 76-100 critical).
@@ -281,6 +290,7 @@ Return JSON with exactly:
 4. keyFindings: 2-4 of the most important issues.
 5. analyzedClauses: 2-5 items to fix, each with clauseTitle, riskCategory, severity ("LOW"|"MEDIUM"|"HIGH"|"CRITICAL"), originalTextOrIssue (quote the SO wording when possible, otherwise describe what is missing), identifiedRisk, recommendedRedline (replacement or additional SO wording) and legalRationale.
 6. complianceChecklist: 3-5 items, each with item, status ("COMPLIANT" | "NEEDS_REVIEW" | "NON_COMPLIANT") and notes.
+7. ${NOT_APPLICABLE_RETURN}
 `;
   try {
     const analysis = await generateRedlineAnalysis(req, prompt);

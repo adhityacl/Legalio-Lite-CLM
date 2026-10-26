@@ -14,11 +14,12 @@ import { normalizeCurrencyCode, convertToUsdWithFallback, getDefaultUsdRate } fr
 import { tenantDefaultCurrency, aiPolicyContext, findTenant } from '../tenantPolicy';
 import { upload } from '../uploadMiddleware';
 import { ensureAiAvailable, getValidAiModel, generateContentWithRetryAndFallback, withDocumentTranscriptField, extractAndCacheDocumentTranscript } from '../aiClient';
+import { parseAiJsonObject } from '../aiJson';
 import { computeInputSha256, globalOcrCache, buildCheapOcrContents } from '../lib/cheapOcrPipeline';
 import { Type } from '@google/genai';
 import { normalizeParsedDate } from '../documentParsing';
 import { sendRouteError } from '../apiErrors';
-import { generateRedlineAnalysis } from '../redlineAnalysis';
+import { generateRedlineAnalysis, REVIEW_GUIDE } from '../redlineAnalysis';
 import { validateBody } from '../validation';
 import { validateSpendingAllocations, allocationInvoiceMonths } from '@legalio/shared/spendingAllocations';
 import { getHistoricalExchangeRate } from '@legalio/shared/currencyRates';
@@ -161,7 +162,7 @@ Return strictly one valid JSON object matching the schema. Use an empty string "
         ),
       },
     });
-    const parsedData = JSON.parse((response as any).text);
+    const parsedData = parseAiJsonObject((response as any).text);
     await extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
     if (parsedData.invoice_date) {
       parsedData.invoice_date = normalizeParsedDate(parsedData.invoice_date);
@@ -173,7 +174,7 @@ Return strictly one valid JSON object matching the schema. Use an empty string "
     res.json(responsePayload);
   } catch (error) {
     log.error("Error parsing Spending:", error);
-    sendRouteError(req, res, error, "request failed", "Failed to parse Spending document. Google AI model is currently busy, please try again.", { status: 500 });
+    sendRouteError(req, res, error, "request failed", "Failed to parse Spending document. Please try again.", { status: 500 });
   }
 });
 /** AI review of the spending (invoice) form's current values before payment; an existing spending stores the result right away. */
@@ -226,6 +227,8 @@ ${pdf ? "\nThe invoice document is attached: compare its amount, invoice number,
 === REVIEW INSTRUCTIONS ===
 Assess: whether what is billed is covered by the linked SO / contract scope; under-delivery or over-billing using the system calculations; billing ahead of schedule; tax treatment (${ctx.indirectTaxName}, withholding tax, tax-treaty documents for foreign vendors, valid tax invoice for local vendors: ${ctx.taxConsiderations.join(" ")}); payment fraud red flags (changed bank details, account holder mismatch); and duplicate-billing risk.
 Never approve or reject payment — recommend checks and actions for Finance. Do not invent statute or regulation numbers.
+
+${REVIEW_GUIDE}
 
 Return JSON with exactly:
 1. overallRiskScore: integer 0-100 (0-25 low, 26-55 moderate, 56-75 high, 76-100 critical).

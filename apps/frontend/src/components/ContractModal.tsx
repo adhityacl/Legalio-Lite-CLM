@@ -67,9 +67,8 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   );
   const [nomorKontrak, setNomorKontrak] = useState(contractToEdit?.contract_number || '');
   const [partnerId, setPartnerId] = useState(contractToEdit?.partner_id || (partners[0]?.partner_id || ''));
-  const [kategoriTags, setKategoriTags] = useState<string[]>(
-    contractToEdit?.cooperation_categories || ['Advertising', 'Content']
-  );
+  // No placeholder values: a default category or date would be saved and fed to the AI review as if the user had chosen it.
+  const [kategoriTags, setKategoriTags] = useState<string[]>(contractToEdit?.cooperation_categories || []);
   const [savedTemplates, setSavedTemplates] = useState<string[]>(() => {
     const loaded = getSavedCategories();
     if (contractToEdit?.cooperation_categories && contractToEdit.cooperation_categories.length > 0) {
@@ -77,8 +76,8 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     }
     return loaded;
   });
-  const [tanggalMulai, setTanggalMulai] = useState(contractToEdit?.start_date || '2026-08-01');
-  const [tanggalBerakhir, setTanggalBerakhir] = useState(contractToEdit?.end_date || '2027-07-31');
+  const [tanggalMulai, setTanggalMulai] = useState(contractToEdit?.start_date || '');
+  const [tanggalBerakhir, setTanggalBerakhir] = useState(contractToEdit?.end_date || '');
   const { policy } = useTenantSettings();
   const tenantCurrency = policy.settings.defaultCurrency;
   const [currency, setCurrency] = useState<string>(contractToEdit?.currency || tenantCurrency);
@@ -117,7 +116,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     const vendorName = getVendorName(pId);
     const docTypeStr = jenisDoc === 'Agreement Addendum' ? 'Addendum Agreement' : 'Master Agreement';
     const tagStr = tags.length > 0 ? tags.join('-') : 'Tag';
-    return `${vendorName}_${docTypeStr}_${tagStr}_${tglMulai}`;
+    return [vendorName, docTypeStr, tagStr, tglMulai].filter(Boolean).join('_');
   };
 
   const [isAutoTitle, setIsAutoTitle] = useState(!contractToEdit?.contract_title);
@@ -125,8 +124,8 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     if (contractToEdit?.contract_title) return contractToEdit.contract_title;
     const initialPartnerId = contractToEdit?.partner_id || (partners[0]?.partner_id || '');
     const initialJenis = contractToEdit?.document_type || 'Master Agreement';
-    const initialTags = contractToEdit?.cooperation_categories || ['Advertising', 'Content'];
-    const initialStartDate = contractToEdit?.start_date || '2026-08-01';
+    const initialTags = contractToEdit?.cooperation_categories || [];
+    const initialStartDate = contractToEdit?.start_date || '';
     return generateAutoTitle(initialPartnerId, initialJenis, initialTags, initialStartDate);
   });
 

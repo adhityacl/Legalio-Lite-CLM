@@ -10,7 +10,7 @@ import { hasOrganizationScope } from '../rbac';
 import { countryNameForPrompt } from '../memoryDb';
 import { ensureAiAvailable } from '../aiClient';
 import { aiPolicyContext } from '../tenantPolicy';
-import { generateRedlineAnalysis } from '../redlineAnalysis';
+import { generateRedlineAnalysis, REVIEW_GUIDE } from '../redlineAnalysis';
 import { sendRouteError } from '../apiErrors';
 import { validateBody } from '../validation';
 import { identityOf } from '../identity';
@@ -110,6 +110,8 @@ Evaluator notes: ${text(draft.notes)}
 Describe how the cooperation went this year (growth, spend pattern, delivery, upcoming renewals, pricing) and what to do next (renew, renegotiate, monitor, phase out).
 Incident frequency and communication are NOT tracked by the system — never judge them; leave them to the evaluator.
 Ratings are suggestions only; the evaluator decides.
+
+${REVIEW_GUIDE}
 
 Return JSON with exactly:
 1. overallRiskScore: integer 0-100 for the partnership risk (0-25 low, 26-55 moderate, 56-75 high, 76-100 critical).

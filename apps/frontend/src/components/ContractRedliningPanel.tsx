@@ -8,6 +8,7 @@ import { Card } from '@legalio/ui-components/card';
 import { Heading } from '@legalio/ui-components/heading';
 import { Text } from '@legalio/ui-components/text';
 import { Alert, AlertContent, AlertDescription, AlertIndicator } from '@legalio/ui-components/alert';
+import { Badge, type StatusTone } from '@legalio/ui-components/badge';
 import { voidHandler } from '@legalio/shared/voidHandler';
 
 interface ContractRedliningPanelProps {
@@ -32,6 +33,9 @@ const RISK_TONE: Record<string, string> = {
   HIGH: 'text-status-warning',
   CRITICAL: 'text-status-danger',
 };
+
+/** The score is the sum of the findings' severities, so each finding shows its own. */
+const SEVERITY_TONE: Record<string, StatusTone> = { LOW: 'neutral', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger' };
 
 /** AI redlining shown beside the contract / service order form; the result is saved together with the record. */
 export const ContractRedliningPanel: React.FC<ContractRedliningPanelProps> = ({ endpoint, body, title, children, labels, renderExtra, canAnalyze, analysis, onAnalysis }) => {
@@ -104,7 +108,12 @@ export const ContractRedliningPanel: React.FC<ContractRedliningPanelProps> = ({ 
                       {String(idx + 1).padStart(2, '0')}
                     </span>
                     <div className="min-w-0 space-y-g8">
-                      <Text size="xs" weight="bold">{clause.clauseTitle}</Text>
+                      <div className="flex flex-wrap items-center gap-g8">
+                        <Text size="xs" weight="bold">{clause.clauseTitle}</Text>
+                        {clause.severity && (
+                          <Badge tone={SEVERITY_TONE[clause.severity] ?? 'neutral'}>{t(`redline.severity_${clause.severity.toLowerCase()}`, clause.severity)}</Badge>
+                        )}
+                      </div>
                       <div className="space-y-g2">
                         <Text size="xs" weight="semibold" className="text-status-danger">{labels?.original ?? t('redline.original_clause', 'Original Clause')}</Text>
                         <Text size="xs" tone="muted" className="leading-relaxed">{clause.originalTextOrIssue}</Text>
@@ -118,6 +127,20 @@ export const ContractRedliningPanel: React.FC<ContractRedliningPanelProps> = ({ 
                 ))}
               </ol>
             </>
+          )}
+          {(analysis.notApplicableRules?.length ?? 0) > 0 && (
+            <div className="space-y-g8">
+              <Text as="span" size="sm" weight="bold">{t('redline.not_applicable', 'Not applicable to this relationship')}</Text>
+              <Text size="xs" tone="muted">{t('redline.not_applicable_note', 'Industry rules the review skipped for this kind of partnership. They do not count toward the score.')}</Text>
+              <ul className="flex flex-col gap-g5">
+                {analysis.notApplicableRules!.map((rule, idx) => (
+                  <li key={idx} className="rounded-md border border-dashed border-border p-g8">
+                    <Text size="xs" weight="semibold">{rule.rule}</Text>
+                    {rule.reason && <Text size="xs" tone="muted" className="leading-relaxed">{rule.reason}</Text>}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           {renderExtra?.(analysis)}
         </>

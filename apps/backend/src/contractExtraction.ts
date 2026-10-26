@@ -17,6 +17,7 @@ import { PublicError } from './apiErrors';
 import { generateContentWithRetryAndFallback, getValidAiModel } from './aiClient';
 import { OBLIGATION_RECURRENCES, OBLIGATION_TYPES, isIsoDate } from '@legalio/shared/obligations';
 import { clampConfidence, cleanModelText, locateQuote, normalizeForMatch, pageNumber, type PageText } from './lib/provenance';
+import { extractAiJson } from './aiJson';
 
 export const MAX_DOCUMENT_CHARS = 60_000;
 export const MAX_OBLIGATION_SUGGESTIONS = 40;
@@ -136,11 +137,8 @@ const readKeyTerm = (item: unknown) => { const o = plainObject.safeParse(item); 
 
 /** Parses the model's text as the JSON object we asked for (a fenced block is tolerated); throws a curated error otherwise. */
 export function parseModelJson(text: unknown): { obligations: unknown[]; key_terms: unknown[] } {
-  let source = typeof text === 'string' ? text.trim() : '';
-  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(source);
-  if (fenced) source = fenced[1];
-  let parsed: unknown;
-  try { parsed = JSON.parse(source); } catch { throw new PublicError('The AI answer was not valid JSON. Nothing was saved; try again.', 502, 'AI_INVALID_OUTPUT'); }
+  const parsed = extractAiJson(text);
+  if (parsed === undefined) throw new PublicError('The AI answer was not valid JSON. Nothing was saved; try again.', 502, 'AI_INVALID_OUTPUT');
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new PublicError('The AI answer had an unexpected shape. Nothing was saved; try again.', 502, 'AI_INVALID_OUTPUT');
   const object = parsed as Record<string, unknown>;
   const list = (value: unknown) => (Array.isArray(value) ? value : []);

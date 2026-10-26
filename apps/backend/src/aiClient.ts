@@ -146,6 +146,7 @@ export const aiProviderAvailable = () => {
 };
 /** A readable message for an AI failure of whichever provider is active. */
 export const formatAiError = (err: any) => (getAiProvider() === "gemini" ? formatGeminiError(err) : formatProviderError(err, getAiProvider()));
+const hostOf = (url: string) => { try { return new URL(url).host; } catch { return "endpoint"; } };
 export async function generateContentWithRetryAndFallback(params: any) {
   const generator = activeGenerator();
   const provider = resolveAiConfig();
@@ -169,21 +170,23 @@ export async function generateContentWithRetryAndFallback(params: any) {
   // At most aiLimits.maxAttempts (3) models are tried: the primary and the first fallbacks.
   // Gemini falls back to sibling models; other providers have no known siblings, so the one model is retried once.
   const models = provider.provider === "gemini" || generator ? [primaryModel, ...candidateFallbacks.filter((m) => m !== primaryModel)] : [primaryModel, primaryModel];
+  // Logs name the provider actually called (and the host of a custom endpoint), never the key.
+  const label = generator ? "[AI test generator]" : provider.provider === "custom" ? `[AI custom ${hostOf(provider.baseUrl)}]` : `[AI ${provider.provider}]`;
   try {
     const response = await runModelChain({
       models,
       limits: aiLimits,
       call: (model, signal) => {
-        log.info(`[Gemini API] Processing request with model=${model}...`);
+        log.info(`${label} Processing request with model=${model}...`);
         // abortSignal cancels the HTTP request itself when the attempt times out.
         if (generator) return generator({ model, params, signal });
         if (provider.provider !== "gemini") return generateWithProvider(provider, { model, params, signal });
         return aiClient!.models.generateContent({ ...params, model, config: { ...(params.config || {}), abortSignal: signal } });
       },
       onAttemptFailed: (model, err, attempt) =>
-        log.warn(`[Gemini API] Model ${model} failed on attempt ${attempt}/${Math.min(aiLimits.maxAttempts, models.length)} (${String((err as any)?.message || err).toLowerCase().slice(0, 120)})`),
+        log.warn(`${label} Model ${model} failed on attempt ${attempt}/${Math.min(aiLimits.maxAttempts, models.length)} (${String((err as any)?.message || err).toLowerCase().slice(0, 120)})`),
     });
-    log.info("[Gemini API] Success");
+    log.info(`${label} Success`);
     await recordAiTokens(sql, currentAiOrganization(), Number((response as any)?.usageMetadata?.totalTokenCount) || 0)
       .catch((err) => log.warn("Could not record AI token usage:", err));
     return response;

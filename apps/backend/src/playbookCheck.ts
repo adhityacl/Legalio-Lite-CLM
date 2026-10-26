@@ -16,6 +16,7 @@ import { SEVERITIES, runPlaybook, type Finding, type PlaybookClause, type Severi
 import { cleanModelText, locateQuote, normalizeForMatch } from './lib/provenance';
 import { prepareDocumentText } from './contractExtraction';
 import { pagesFromText } from './contractDocumentText';
+import { extractAiJson } from './aiJson';
 
 
 export const MAX_AI_CLAUSES = 40;
@@ -89,11 +90,8 @@ const rawFinding = z.object({ clause_id: z.string().min(1).max(100), severity: z
 
 /** Parses and validates the model's answer against the library and the document. Anything outside the schema is dropped. */
 export function validateSemanticFindings(text: unknown, clauses: PlaybookClause[], documentText: string, existing: Finding[]): { findings: PlaybookCheckResult['findings']; dropped: number } {
-  let source = typeof text === 'string' ? text.trim() : '';
-  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(source);
-  if (fenced) source = fenced[1];
-  let parsed: unknown;
-  try { parsed = JSON.parse(source); } catch { throw new PublicError('The AI answer was not valid JSON. The rule-based results are still shown.', 502, 'AI_INVALID_OUTPUT'); }
+  const parsed = extractAiJson(text);
+  if (parsed === undefined) throw new PublicError('The AI answer was not valid JSON. The rule-based results are still shown.', 502, 'AI_INVALID_OUTPUT');
   const list = parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray((parsed as any).findings) ? (parsed as any).findings as unknown[] : null;
   if (!list) throw new PublicError('The AI answer had an unexpected shape. The rule-based results are still shown.', 502, 'AI_INVALID_OUTPUT');
   const byId = new Map(clauses.map((c) => [c.id, c]));

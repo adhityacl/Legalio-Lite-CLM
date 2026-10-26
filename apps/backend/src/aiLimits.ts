@@ -138,6 +138,8 @@ export async function runModelChain<T>(options: ChainOptions<T>): Promise<T> {
       lastError = controller.signal.aborted ? (controller.signal.reason ?? err) : err;
       options.onAttemptFailed?.(model, lastError, index + 1);
       if (isFatalForAllModels(lastError)) break;
+      // A model that just timed out is slow right now; resending the same request to it doubles the wait and the cost.
+      if (controller.signal.aborted && queue[index + 1] === model) break;
       if (index < queue.length - 1 && isRateLimited(lastError)) {
         await sleep(Math.min(limits.maxBackoffMs, limits.baseBackoffMs * 2 ** rateLimitedAttempts++));
       }

@@ -8,12 +8,13 @@ import { evaluationRepository } from '../repositories/evaluationRepository';
 import { partnerRepository, PARTNER_SORTS, type PartnerQuery } from '../repositories/partnerRepository';
 import { recordVisible } from '../recordScope';
 import { hasOrganizationScope } from '../rbac';
-import { generateRedlineAnalysis } from '../redlineAnalysis';
+import { generateRedlineAnalysis, NOT_APPLICABLE_RETURN, ruleApplicabilityBlock, REVIEW_GUIDE } from '../redlineAnalysis';
 import * as bodySchemas from '../schemas';
 import { scopedRecords, getRequestTenantId, assertRecordAccess, assertRecordWritable, logActivity, orgContextOf, scopeOf } from '../recordAccess';
 import { db, sanitizePartnerTags, sanitizeCountryCode, countryNameForPrompt, sanitizeIdentifiers } from '../memoryDb';
 import { upload } from '../uploadMiddleware';
 import { ensureAiAvailable, getValidAiModel, generateContentWithRetryAndFallback, withDocumentTranscriptField, extractAndCacheDocumentTranscript } from '../aiClient';
+import { parseAiJsonObject } from '../aiJson';
 import { computeInputSha256, globalOcrCache, buildCheapOcrContents } from '../lib/cheapOcrPipeline';
 import { aiPolicyContext, normalizePartnerDocuments, computeDueDiligenceStatus } from '../tenantPolicy';
 import { Type } from '@google/genai';
@@ -138,7 +139,7 @@ Return strictly one valid JSON object matching the schema.`;
         ),
       },
     });
-    const parsedData = JSON.parse((response as any).text);
+    const parsedData = parseAiJsonObject((response as any).text);
     await extractAndCacheDocumentTranscript(parsedData, ocrStats.fileHash);
     const responsePayload = { success: true, data: parsedData, ocrStats };
     if (ocrStats.fileHash) {
@@ -147,7 +148,7 @@ Return strictly one valid JSON object matching the schema.`;
     res.json(responsePayload);
   } catch (error) {
     log.error("Error parsing partner:", error);
-    sendRouteError(req, res, error, "request failed", "Failed to parse document. Google AI model is currently busy, please try again.", { status: 500 });
+    sendRouteError(req, res, error, "request failed", "Failed to parse document. Please try again.", { status: 500 });
   }
 });
 app.post("/api/partners/generate-dd-notes", async (req: express.Request, res: express.Response) => {
@@ -212,6 +213,7 @@ app.post("/api/partners/review-analysis", async (req: express.Request, res: expr
   const emailDomain = String(draft.pic_email || "").split("@")[1]?.trim().toLowerCase() || "-";
   const documents = Array.isArray(saved?.dd_documents) ? saved.dd_documents : [];
   const ctx = aiPolicyContext(getRequestTenantId(req));
+  const partnerTags = Array.isArray(draft.tags) ? draft.tags.map(String).filter(Boolean).slice(0, 20) : [];
   const prompt = `You are a senior vendor-risk and due-diligence analyst acting for ${ctx.organizationName}, a ${ctx.industryName} organization in ${ctx.countryName}.
 Assess onboarding risk for the counterparty below and recommend concrete due-diligence actions. Write every narrative field (titles, summary, findings, actions and notes) in English.
 
@@ -227,9 +229,12 @@ Due-diligence documents on file: ${documents.length ? documents.map((d: any) => 
 
 === REVIEW INSTRUCTIONS ===
 You have NO access to company registries, sanctions lists, PEP lists or adverse media. Never state that the counterparty is verified, clean or listed; instead recommend the screening step that should be done.
-Assess: jurisdiction risk (cross-border tax such as withholding and tax-treaty documents, ${ctx.indirectTaxName}, cross-border data transfer under ${ctx.dataProtectionLaw}); whether the legal form and identifiers fit the country; missing or expired due-diligence documents; risk of the partnership categories for a ${ctx.industryName} organization (${ctx.reviewFocus.join("; ")}); and contact red flags such as a free-mail domain for a corporate counterparty.
-${ctx.regulators.length ? `Regulators relevant to us: ${ctx.regulators.join(", ")} — consider their third-party / outsourcing expectations.` : ""}
+Assess: jurisdiction risk (cross-border tax such as withholding and tax-treaty documents, ${ctx.indirectTaxName}, cross-border data transfer under ${ctx.dataProtectionLaw} where personal data will be shared); whether the legal form and identifiers fit the country; missing or expired due-diligence documents; the risk this kind of partner brings to a ${ctx.industryName} organization given its partnership categories; and contact red flags such as a free-mail domain for a corporate counterparty.
+${ctx.regulators.length ? `Regulators relevant to us: ${ctx.regulators.join(", ")} — consider their third-party / outsourcing expectations only where this partner will perform a regulated or outsourced activity for us.` : ""}
+${ruleApplicabilityBlock(ctx.clauseRules, ctx.industryName, partnerTags)}
 Do not invent statute or regulation numbers.
+
+${REVIEW_GUIDE}
 
 Return JSON with exactly:
 1. overallRiskScore: integer 0-100 (0-25 low, 26-55 moderate, 56-75 high, 76-100 critical).
@@ -238,6 +243,7 @@ Return JSON with exactly:
 4. keyFindings: 2-4 of the most important issues.
 5. analyzedClauses: 2-5 items, each with clauseTitle (short topic), riskCategory, severity ("LOW"|"MEDIUM"|"HIGH"|"CRITICAL"), originalTextOrIssue (the finding), identifiedRisk, recommendedRedline (the concrete recommended action, e.g. which document to request or which clause to add to the contract) and legalRationale.
 6. complianceChecklist: 3-5 items, each with item, status ("COMPLIANT" | "NEEDS_REVIEW" | "NON_COMPLIANT") and notes.
+7. ${NOT_APPLICABLE_RETURN}
 `;
   try {
     const analysis = await generateRedlineAnalysis(req, prompt);

@@ -4,6 +4,7 @@ import { templateRepository } from '../repositories/templateRepository';
 import { requestedVersion } from '../requestVersion';
 import { sendRouteError } from '../apiErrors';
 import { ensureAiAvailable, getValidAiModel, generateContentWithRetryAndFallback } from '../aiClient';
+import { parseAiJsonObject } from '../aiJson';
 import { aiPolicyContext } from '../tenantPolicy';
 import { Type } from '@google/genai';
 import express from 'express';
@@ -144,7 +145,7 @@ Rules:
       },
     });
 
-    const parsed = JSON.parse((response as any).text);
+    const parsed = parseAiJsonObject((response as any).text);
     const seenKeys = new Set<string>();
     const fields = (Array.isArray(parsed?.fields) ? parsed.fields : [])
       .map((f: any) => {
