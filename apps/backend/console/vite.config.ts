@@ -12,6 +12,8 @@ function manualChunks(id: string) {
   if (id.includes('node_modules')) {
     if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
     if (/node_modules\/(@ark-ui|@zag-js|@floating-ui|@internationalized)\//.test(id)) return 'ark';
+    // recharts and its private dependencies load only with PgReport's lazy Live tab, so keep them out of the shared vendor chunk.
+    if (/node_modules\/(recharts|victory-vendor|d3-[a-z-]+|internmap|@reduxjs|redux|react-redux|immer|reselect|decimal\.js-light|es-toolkit|eventemitter3)\//.test(id)) return 'charts';
     return 'vendor';
   }
   if (id.includes('/platform-console/src/i18n/') || id.includes('/shared/src/i18n/')) return 'i18n';

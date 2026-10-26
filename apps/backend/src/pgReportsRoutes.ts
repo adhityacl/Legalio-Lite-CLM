@@ -60,7 +60,32 @@ const overview = (client: pg.PoolClient) => async () => {
   const extensions = await client.query(`SELECT name, installed_version AS installed, default_version AS available FROM pg_available_extensions
                    WHERE installed_version IS NOT NULL OR name IN ('pg_stat_statements', 'pgstattuple', 'pg_buffercache') ORDER BY name`);
   const reads = stats.blocks_hit + stats.blocks_read;
-  return { server, connections, stats: { ...stats, cache_hit_ratio: reads > 0 ? stats.blocks_hit / reads : null }, extensions: extensions.rows };
+  const health = await one(`SELECT pg_is_in_recovery() AS in_recovery, age(datfrozenxid)::float8 AS xid_age, mxid_age(datminmxid)::float8 AS mxid_age,
+                current_setting('autovacuum_freeze_max_age')::float8 AS freeze_max_age, current_setting('server_version_num')::int AS version_num,
+                current_setting('block_size')::float8 AS block_size, current_setting('archive_mode') AS archive_mode
+           FROM pg_database WHERE datname = current_database()`);
+  // PostgreSQL 17 moved the checkpoint counters out of pg_stat_bgwriter into pg_stat_checkpointer.
+  const checkpoints = await one(health.version_num >= 170000
+    ? `SELECT c.num_timed::float8 AS timed, c.num_requested::float8 AS requested, c.write_time::float8 AS write_ms, c.sync_time::float8 AS sync_ms,
+              c.buffers_written * $1::float8 AS checkpoint_bytes, b.buffers_clean * $1::float8 AS bgwriter_bytes, b.maxwritten_clean::float8 AS maxwritten_clean,
+              NULL::float8 AS backend_bytes, c.stats_reset
+         FROM pg_stat_checkpointer c, pg_stat_bgwriter b`
+    : `SELECT checkpoints_timed::float8 AS timed, checkpoints_req::float8 AS requested, checkpoint_write_time::float8 AS write_ms, checkpoint_sync_time::float8 AS sync_ms,
+              buffers_checkpoint * $1::float8 AS checkpoint_bytes, buffers_clean * $1::float8 AS bgwriter_bytes, maxwritten_clean::float8 AS maxwritten_clean,
+              buffers_backend * $1::float8 AS backend_bytes, stats_reset
+         FROM pg_stat_bgwriter`, [health.block_size]);
+  // pg_current_wal_lsn() fails on a standby, so the lag query only runs on a primary.
+  const replication = health.in_recovery ? [] : (await client.query(
+    `SELECT application_name, client_addr::text AS client_addr, state, sync_state, pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn)::float8 AS lag_bytes,
+            EXTRACT(EPOCH FROM replay_lag)::float8 AS lag_seconds
+       FROM pg_stat_replication ORDER BY lag_bytes DESC NULLS LAST LIMIT ${ROW_LIMIT}`)).rows;
+  const archiver = health.archive_mode === 'off' ? null : await one(
+    `SELECT archived_count::float8 AS archived, failed_count::float8 AS failed, last_archived_time AS last_archived, last_failed_time AS last_failed FROM pg_stat_archiver`);
+  return {
+    server, connections, stats: { ...stats, cache_hit_ratio: reads > 0 ? stats.blocks_hit / reads : null }, extensions: extensions.rows,
+    health: { in_recovery: health.in_recovery, xid_age: health.xid_age, mxid_age: health.mxid_age, freeze_max_age: health.freeze_max_age },
+    checkpoints, replication, archiver,
+  };
 };
 
 const connections = (client: pg.PoolClient) => async () => {
@@ -79,7 +104,8 @@ const connections = (client: pg.PoolClient) => async () => {
        JOIN LATERAL unnest(pg_blocking_pids(blocked.pid)) AS b(pid) ON true
        JOIN pg_stat_activity blocker ON blocker.pid = b.pid
       WHERE blocked.datname = current_database() ORDER BY blocked_seconds DESC NULLS LAST LIMIT ${ROW_LIMIT}`);
-  const locks = await client.query(`SELECT mode, granted, count(*)::int AS count FROM pg_locks GROUP BY mode, granted ORDER BY count DESC`);
+  // The report's own connection holds locks too; leave them out.
+  const locks = await client.query(`SELECT mode, granted, count(*)::int AS count FROM pg_locks WHERE pid IS DISTINCT FROM pg_backend_pid() GROUP BY mode, granted ORDER BY count DESC`);
   return { sessions: sessions.rows, blocking: blocking.rows, locks: locks.rows };
 };
 
@@ -91,8 +117,11 @@ const tables = (client: pg.PoolClient, schemaName: unknown) => async () => {
             CASE WHEN s.n_live_tup + s.n_dead_tup > 0 THEN s.n_dead_tup::float8 / (s.n_live_tup + s.n_dead_tup) END AS dead_ratio,
             s.seq_scan::float8 AS seq_scans, s.idx_scan::float8 AS index_scans, s.n_tup_ins::float8 AS inserts, s.n_tup_upd::float8 AS updates, s.n_tup_del::float8 AS deletes,
             GREATEST(s.last_vacuum, s.last_autovacuum) AS last_vacuum, GREATEST(s.last_analyze, s.last_autoanalyze) AS last_analyze,
-            CASE WHEN io.heap_blks_hit + io.heap_blks_read > 0 THEN io.heap_blks_hit::float8 / (io.heap_blks_hit + io.heap_blks_read) END AS cache_hit_ratio
+            CASE WHEN io.heap_blks_hit + io.heap_blks_read > 0 THEN io.heap_blks_hit::float8 / (io.heap_blks_hit + io.heap_blks_read) END AS cache_hit_ratio,
+            io.heap_blks_read * b.size AS heap_read_bytes, coalesce(io.idx_blks_read, 0) * b.size AS index_read_bytes,
+            (coalesce(io.toast_blks_read, 0) + coalesce(io.tidx_blks_read, 0)) * b.size AS toast_read_bytes
        FROM pg_stat_user_tables s LEFT JOIN pg_statio_user_tables io ON io.relid = s.relid
+      CROSS JOIN (SELECT current_setting('block_size')::float8 AS size) b
       WHERE s.schemaname = $1 ORDER BY pg_total_relation_size(s.relid) DESC LIMIT ${ROW_LIMIT}`, [schema]);
   return { schema, schemas, tables: rows };
 };
@@ -137,8 +166,30 @@ const queries = (client: pg.PoolClient, sortKey: unknown) => async () => {
   return { available: true, sort, rows };
 };
 
+/** Cumulative counters and current gauges, cheap enough to poll every few seconds; the page turns consecutive samples into rates. */
+const live = (client: pg.PoolClient) => async () => {
+  const { rows: [sample] } = await client.query(
+    `SELECT EXTRACT(EPOCH FROM clock_timestamp())::float8 * 1000 AS at_ms,
+            d.xact_commit::float8 AS commits, d.xact_rollback::float8 AS rollbacks, d.tup_inserted::float8 AS inserted, d.tup_updated::float8 AS updated,
+            d.tup_deleted::float8 AS deleted, d.blks_hit::float8 AS blocks_hit, d.blks_read::float8 AS blocks_read, d.temp_bytes::float8 AS temp_bytes,
+            -- CASE evaluates only the branch it takes, and pg_current_wal_lsn() fails on a standby.
+            CASE WHEN pg_is_in_recovery() THEN pg_wal_lsn_diff(pg_last_wal_replay_lsn(), '0/0') ELSE pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0') END::float8 AS wal_bytes,
+            a.active, a.idle, a.idle_in_transaction, a.waiting, a.longest_tx_seconds
+       FROM pg_stat_database d,
+            LATERAL (SELECT count(*) FILTER (WHERE state = 'active')::int AS active, count(*) FILTER (WHERE state = 'idle')::int AS idle,
+                            count(*) FILTER (WHERE state = 'idle in transaction')::int AS idle_in_transaction, count(*) FILTER (WHERE wait_event_type = 'Lock')::int AS waiting,
+                            coalesce(max(EXTRACT(EPOCH FROM (now() - xact_start))), 0)::float8 AS longest_tx_seconds
+                       FROM pg_stat_activity WHERE datname = current_database() AND backend_type = 'client backend' AND pid <> pg_backend_pid()) a
+      WHERE d.datname = current_database()`);
+  const statements = (await client.query(`SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'`)).rowCount
+    ? (await client.query(`SELECT coalesce(sum(calls), 0)::float8 AS calls FROM pg_stat_statements WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database())`)).rows[0].calls
+    : null;
+  return { ...sample, statements };
+};
+
 const REPORTS: Record<string, (client: pg.PoolClient, req: Request) => () => Promise<unknown>> = {
   overview: (client) => overview(client),
+  live: (client) => live(client),
   connections: (client) => connections(client),
   tables: (client, req) => tables(client, req.query.schema),
   indexes: (client, req) => indexes(client, req.query.schema),
