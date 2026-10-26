@@ -756,6 +756,7 @@ export const PACK_NAMES: Record<string, { id: string; zh: string }> = {
   'e-KYC Provider': { id: 'Penyedia e-KYC', zh: '电子 KYC 服务商' },
   'Payment & Virtual Account Provider': { id: 'Penyedia Pembayaran & Virtual Account', zh: '支付与虚拟账户服务商' },
   'Credit Insurance Provider': { id: 'Penyedia Asuransi Kredit', zh: '信用保险提供方' },
+  'Distribution / Channel Partner': { id: 'Mitra Distribusi / Kanal', zh: '分销 / 渠道合作伙伴' },
   'Marketing Affiliate': { id: 'Afiliasi Pemasaran', zh: '营销联盟' },
   'Peer-to-peer lending / fintech lending regulation of the operating country': { id: 'Regulasi pinjaman P2P / fintech lending di negara operasional', zh: '经营所在国的 P2P 借贷 / 金融科技借贷监管规定' },
   'FATF Recommendations (AML/CFT)': { id: 'Rekomendasi FATF (APU-PPT)', zh: 'FATF 建议（反洗钱 / 反恐融资）' },

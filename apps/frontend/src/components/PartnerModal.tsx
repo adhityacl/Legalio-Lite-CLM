@@ -128,7 +128,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
   const [savedTemplates, setSavedTemplates] = useState<string[]>(() => {
     const loaded = getSavedCategories(policy.industry.partnerCategories);
     if (partnerToEdit?.tags && partnerToEdit.tags.length > 0) {
-      return saveMultipleCategories(partnerToEdit.tags);
+      return saveMultipleCategories(partnerToEdit.tags, policy.industry.partnerCategories);
     }
     return loaded;
   });
@@ -215,7 +215,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
   /** TagsInput change: new categories are remembered as templates; duplicates are ignored case-insensitively. */
   const handleTagsChange = (next: string[]) => {
     const unique = next.map((tag) => tag.trim()).filter((tag, index, all) => tag && all.findIndex((other) => other.toLowerCase() === tag.toLowerCase()) === index);
-    unique.filter((tag) => !tags.some((existing) => existing.toLowerCase() === tag.toLowerCase())).forEach((tag) => setSavedTemplates(saveCategory(tag)));
+    unique.filter((tag) => !tags.some((existing) => existing.toLowerCase() === tag.toLowerCase())).forEach((tag) => setSavedTemplates(saveCategory(tag, policy.industry.partnerCategories)));
     setTags(unique);
   };
 
@@ -255,7 +255,7 @@ export const PartnerModal: React.FC<PartnerModalProps> = ({
     setSubmitting(true);
 
     if (tags.length > 0) {
-      saveMultipleCategories(tags);
+      saveMultipleCategories(tags, policy.industry.partnerCategories);
     }
 
     const kontakString = `${emailPic.trim()} / ${teleponPic.trim()}`;

@@ -67,18 +67,18 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   );
   const [nomorKontrak, setNomorKontrak] = useState(contractToEdit?.contract_number || '');
   const [partnerId, setPartnerId] = useState(contractToEdit?.partner_id || (partners[0]?.partner_id || ''));
+  const { policy } = useTenantSettings();
+  // The industry pack's partner categories come first in the suggestions, so tags describe the kind of partnership (and the
+  // AI review can tell which industry rules apply) instead of generic labels.
+  const industryCategories = policy.industry.partnerCategories;
   // No placeholder values: a default category or date would be saved and fed to the AI review as if the user had chosen it.
   const [kategoriTags, setKategoriTags] = useState<string[]>(contractToEdit?.cooperation_categories || []);
-  const [savedTemplates, setSavedTemplates] = useState<string[]>(() => {
-    const loaded = getSavedCategories();
-    if (contractToEdit?.cooperation_categories && contractToEdit.cooperation_categories.length > 0) {
-      return saveMultipleCategories(contractToEdit.cooperation_categories);
-    }
-    return loaded;
-  });
+  const [savedTemplates, setSavedTemplates] = useState<string[]>(() =>
+    contractToEdit?.cooperation_categories?.length
+      ? saveMultipleCategories(contractToEdit.cooperation_categories, industryCategories)
+      : getSavedCategories(industryCategories));
   const [tanggalMulai, setTanggalMulai] = useState(contractToEdit?.start_date || '');
   const [tanggalBerakhir, setTanggalBerakhir] = useState(contractToEdit?.end_date || '');
-  const { policy } = useTenantSettings();
   const tenantCurrency = policy.settings.defaultCurrency;
   const [currency, setCurrency] = useState<string>(contractToEdit?.currency || tenantCurrency);
   const [nilaiKontrak, setNilaiKontrak] = useState<number>(contractToEdit?.contract_value ?? 0);
@@ -221,7 +221,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   /** TagsInput change: new categories are remembered as templates; duplicates are ignored case-insensitively. */
   const handleTagsChange = (next: string[]) => {
     const unique = next.map((tag) => tag.trim()).filter((tag, index, all) => tag && all.findIndex((other) => other.toLowerCase() === tag.toLowerCase()) === index);
-    unique.filter((tag) => !kategoriTags.some((existing) => existing.toLowerCase() === tag.toLowerCase())).forEach((tag) => setSavedTemplates(saveCategory(tag)));
+    unique.filter((tag) => !kategoriTags.some((existing) => existing.toLowerCase() === tag.toLowerCase())).forEach((tag) => setSavedTemplates(saveCategory(tag, industryCategories)));
     setKategoriTags(unique);
   };
 
@@ -428,7 +428,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
       }
 
       if (kategoriTags.length > 0) {
-        saveMultipleCategories(kategoriTags);
+        saveMultipleCategories(kategoriTags, industryCategories);
       }
 
       await onSave({

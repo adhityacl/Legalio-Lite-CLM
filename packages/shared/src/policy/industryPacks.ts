@@ -63,6 +63,8 @@ export const INDUSTRY_PACKS: IndustryPack[] = [
       'e-KYC Provider',
       'Payment & Virtual Account Provider',
       'Credit Insurance Provider',
+      // Partners that show the platform's offer to their own users (in-app placement, lead referral) without lending or collecting.
+      'Distribution / Channel Partner',
       'Marketing Affiliate',
     ],
     dueDiligence: [
