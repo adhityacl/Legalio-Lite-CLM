@@ -34,6 +34,13 @@ test('scoreReview replaces the model score and level, and normalizes clauses, ch
   assert.deepEqual(result.notApplicableRules, [{ rule: 'Escrow segregation', reason: 'No funds are held.' }]);
 });
 
+test('only the first six findings are kept and scored, so a long answer cannot inflate the score', () => {
+  const result = scoreReview({ analyzedClauses: Array.from({ length: 9 }, (_, i) => ({ clauseTitle: `c${i}`, severity: 'HIGH' })) });
+  assert.equal(result.analyzedClauses.length, 6);
+  assert.deepEqual(result.analyzedClauses.map((c: any) => c.clauseTitle), ['c0', 'c1', 'c2', 'c3', 'c4', 'c5']);
+  assert.equal(result.overallRiskScore, 90);
+});
+
 test('a review without clauses scores 0 and keeps no model score when there was none', () => {
   const result = scoreReview({ executiveSummary: 'fine' });
   assert.equal(result.overallRiskScore, 0);

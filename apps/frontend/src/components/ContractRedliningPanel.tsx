@@ -34,8 +34,18 @@ const RISK_TONE: Record<string, string> = {
   CRITICAL: 'text-status-danger',
 };
 
-/** The score is the sum of the findings' severities, so each finding shows its own. */
+/** The score is computed from the findings' severities, so each finding shows its own. */
 const SEVERITY_TONE: Record<string, StatusTone> = { LOW: 'neutral', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger' };
+
+const PILLAR_LABELS: Record<string, [string, string]> = {
+  P1: ['redline.pillar_p1', 'Financial & commercial'],
+  P2: ['redline.pillar_p2', 'Liability & IP'],
+  P3: ['redline.pillar_p3', 'Regulation, data & audit'],
+  P4: ['redline.pillar_p4', 'Operations & exit'],
+  P5: ['redline.pillar_p5', 'Drafting & metadata'],
+};
+/** Same bands as the contract score: 0–20, 21–45, 46–70, 71–100 (lower is safer). */
+const pillarFill = (score: number) => (score <= 20 ? 'bg-status-success' : score <= 45 ? 'bg-primary' : score <= 70 ? 'bg-status-warning' : 'bg-status-danger');
 
 /** AI redlining shown beside the contract / service order form; the result is saved together with the record. */
 export const ContractRedliningPanel: React.FC<ContractRedliningPanelProps> = ({ endpoint, body, title, children, labels, renderExtra, canAnalyze, analysis, onAnalysis }) => {
@@ -80,6 +90,27 @@ export const ContractRedliningPanel: React.FC<ContractRedliningPanelProps> = ({ 
         </div>
       )}
 
+      {analysis?.pillarBreakdown?.length ? (
+        <div className="space-y-g5 rounded-lg border border-border p-g13">
+          <Text as="span" size="xs" weight="semibold" tone="muted">{t('redline.pillar_breakdown', 'Risk by pillar (lower is safer)')}</Text>
+          <ul className="flex flex-col gap-g5">
+            {analysis.pillarBreakdown.map((p) => {
+              const [key, fallback] = PILLAR_LABELS[p.pillar] ?? [p.pillar, p.pillar];
+              return (
+                <li key={p.pillar} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-g8 gap-y-g2"
+                  title={`${p.pillar} · ${t(key, fallback)} · ${t('redline.pillar_weight', 'weight')} ${Math.round(p.weight * 100)}% · ${p.findings} ${t('redline.pillar_findings', 'findings')}`}>
+                  <Text as="span" size="xs" className="truncate">{t(key, fallback)} <span className="text-muted-foreground">· {Math.round(p.weight * 100)}%</span></Text>
+                  <Text as="span" size="xs" weight="semibold" className="tabular-nums">{p.score}</Text>
+                  <span className="col-span-2 h-g5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                    <span className={`block h-full rounded-full ${pillarFill(p.score)}`} style={{ width: `${Math.max(p.score > 0 ? 2 : 0, p.score)}%` }} />
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
       <Button type="button" onClick={voidHandler(analyze)} loading={loading} disabled={!canAnalyze || loading} className="w-full">
         <Send aria-hidden />
         {analysis ? t('redline.reanalyze', 'Analisis Ulang') : t('redline.analyze', 'Analyze')}
@@ -113,6 +144,12 @@ export const ContractRedliningPanel: React.FC<ContractRedliningPanelProps> = ({ 
                         {clause.severity && (
                           <Badge tone={SEVERITY_TONE[clause.severity] ?? 'neutral'}>{t(`redline.severity_${clause.severity.toLowerCase()}`, clause.severity)}</Badge>
                         )}
+                        {clause.pillar && typeof clause.adjustedScore === 'number' && (
+                          <Text as="span" size="xs" tone="muted" className="tabular-nums"
+                            title={`${t('redline.severity_base', 'Base severity')} ${clause.severityScore ?? '—'} · ${t(`redline.stance_${(clause.stance || 'ADVERSE').toLowerCase()}`, clause.stance || 'ADVERSE')}`}>
+                            {clause.pillar} · {Math.round(clause.adjustedScore)}/100
+                          </Text>
+                        )}
                       </div>
                       <div className="space-y-g2">
                         <Text size="xs" weight="semibold" className="text-status-danger">{labels?.original ?? t('redline.original_clause', 'Original Clause')}</Text>
@@ -127,20 +164,6 @@ export const ContractRedliningPanel: React.FC<ContractRedliningPanelProps> = ({ 
                 ))}
               </ol>
             </>
-          )}
-          {(analysis.notApplicableRules?.length ?? 0) > 0 && (
-            <div className="space-y-g8">
-              <Text as="span" size="sm" weight="bold">{t('redline.not_applicable', 'Not applicable to this relationship')}</Text>
-              <Text size="xs" tone="muted">{t('redline.not_applicable_note', 'Industry rules the review skipped for this kind of partnership. They do not count toward the score.')}</Text>
-              <ul className="flex flex-col gap-g5">
-                {analysis.notApplicableRules!.map((rule, idx) => (
-                  <li key={idx} className="rounded-md border border-dashed border-border p-g8">
-                    <Text size="xs" weight="semibold">{rule.rule}</Text>
-                    {rule.reason && <Text size="xs" tone="muted" className="leading-relaxed">{rule.reason}</Text>}
-                  </li>
-                ))}
-              </ul>
-            </div>
           )}
           {renderExtra?.(analysis)}
         </>

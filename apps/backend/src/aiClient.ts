@@ -147,7 +147,8 @@ export const aiProviderAvailable = () => {
 /** A readable message for an AI failure of whichever provider is active. */
 export const formatAiError = (err: any) => (getAiProvider() === "gemini" ? formatGeminiError(err) : formatProviderError(err, getAiProvider()));
 const hostOf = (url: string) => { try { return new URL(url).host; } catch { return "endpoint"; } };
-export async function generateContentWithRetryAndFallback(params: any) {
+/** `timeoutMs` overrides the per-attempt timeout for one call (a review that sends a whole contract needs longer). */
+export async function generateContentWithRetryAndFallback(params: any, options: { timeoutMs?: number } = {}) {
   const generator = activeGenerator();
   const provider = resolveAiConfig();
   const apiKey = provider.apiKey;
@@ -175,7 +176,7 @@ export async function generateContentWithRetryAndFallback(params: any) {
   try {
     const response = await runModelChain({
       models,
-      limits: aiLimits,
+      limits: options.timeoutMs ? { ...aiLimits, timeoutMs: options.timeoutMs } : aiLimits,
       call: (model, signal) => {
         log.info(`${label} Processing request with model=${model}...`);
         // abortSignal cancels the HTTP request itself when the attempt times out.

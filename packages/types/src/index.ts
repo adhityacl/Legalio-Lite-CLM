@@ -382,6 +382,19 @@ export interface AnalyzedClause {
   identifiedRisk: string;
   recommendedRedline: string;
   legalRationale: string;
+  /** Contract redlining (pillar engine) only: P1 financial … P5 drafting and metadata. */
+  pillar?: 'P1' | 'P2' | 'P3' | 'P4' | 'P5';
+  /** Contract redlining only: base severity 0–100 from the model, and after the stance adjustment. */
+  severityScore?: number;
+  adjustedScore?: number;
+  stance?: 'ADVERSE' | 'NEUTRAL' | 'FAVORABLE';
+}
+
+export interface PillarScore {
+  pillar: 'P1' | 'P2' | 'P3' | 'P4' | 'P5';
+  score: number;
+  weight: number;
+  findings: number;
 }
 
 export interface ComplianceItem {
@@ -401,5 +414,7 @@ export interface RedlineAnalysisData {
   notApplicableRules?: Array<{ rule: string; reason: string }>;
   /** The model's own score before the server recomputed it from the severities (kept for reference). */
   aiRiskScore?: number | null;
+  /** Contract redlining only: per-pillar scores and the weights used for the composite. */
+  pillarBreakdown?: PillarScore[];
   analyzed_at?: string;
 }

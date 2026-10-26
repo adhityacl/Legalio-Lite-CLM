@@ -190,6 +190,7 @@ export function aiPolicyContext(tenantId?: string | null) {
     governingLaw: settings.governingLaw || localize(country.governingLaw, 'EN'),
     dataProtectionLaw: country.dataProtectionLaw,
     indirectTaxName: country.indirectTaxName,
+    industryKey: industry.key,
     industryName: localize(industry.name, 'EN'),
     reviewFocus: industry.criticalClauses.map((c) => c.clause.en),
     clauseRules: industry.criticalClauses.map((c) => `${c.clause.en} — ${c.rule.en}`),
