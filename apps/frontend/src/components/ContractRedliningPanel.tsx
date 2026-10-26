@@ -91,7 +91,7 @@ export const ContractRedliningPanel: React.FC<ContractRedliningPanelProps> = ({ 
       )}
 
       {analysis?.pillarBreakdown?.length ? (
-        <div className="space-y-g5 rounded-lg border border-border p-g13">
+        <div className="flex flex-col gap-g13 rounded-lg border border-border p-g13">
           <Text as="span" size="xs" weight="semibold" tone="muted">{t('redline.pillar_breakdown', 'Risk by pillar (lower is safer)')}</Text>
           <ul className="flex flex-col gap-g5">
             {analysis.pillarBreakdown.map((p) => {
@@ -139,18 +139,12 @@ export const ContractRedliningPanel: React.FC<ContractRedliningPanelProps> = ({ 
                       {String(idx + 1).padStart(2, '0')}
                     </span>
                     <div className="min-w-0 space-y-g8">
-                      <div className="flex flex-wrap items-center gap-g8">
-                        <Text size="xs" weight="bold">{clause.clauseTitle}</Text>
+                      <Text size="xs" weight="bold">
+                        {clause.clauseTitle}
                         {clause.severity && (
-                          <Badge tone={SEVERITY_TONE[clause.severity] ?? 'neutral'}>{t(`redline.severity_${clause.severity.toLowerCase()}`, clause.severity)}</Badge>
+                          <Badge tone={SEVERITY_TONE[clause.severity] ?? 'neutral'} className="ml-g8 align-middle">{t(`redline.severity_${clause.severity.toLowerCase()}`, clause.severity)}</Badge>
                         )}
-                        {clause.pillar && typeof clause.adjustedScore === 'number' && (
-                          <Text as="span" size="xs" tone="muted" className="tabular-nums"
-                            title={`${t('redline.severity_base', 'Base severity')} ${clause.severityScore ?? '—'} · ${t(`redline.stance_${(clause.stance || 'ADVERSE').toLowerCase()}`, clause.stance || 'ADVERSE')}`}>
-                            {clause.pillar} · {Math.round(clause.adjustedScore)}/100
-                          </Text>
-                        )}
-                      </div>
+                      </Text>
                       <div className="space-y-g2">
                         <Text size="xs" weight="semibold" className="text-status-danger">{labels?.original ?? t('redline.original_clause', 'Original Clause')}</Text>
                         <Text size="xs" tone="muted" className="leading-relaxed">{clause.originalTextOrIssue}</Text>
