@@ -13,6 +13,7 @@ import { SIGNATURE_TRANSLATIONS } from '../signatures';
 import { SUGGESTION_TRANSLATIONS } from '../suggestions';
 import { TENANT_BOUNDARIES_TRANSLATIONS } from '../tenantBoundaries';
 import { UI_REFINEMENTS } from '../uiRefinements';
+import { SYSTEM_ADMIN_TRANSLATIONS } from '../systemAdmin';
 import { BASE_ID } from './base.id';
 import { EXTRA_ID } from './extra.id';
 
@@ -28,5 +29,6 @@ const ID: Record<string, string> = {
   ...ACCESSIBILITY_TRANSLATIONS.ID,
   ...SIGNATURE_TRANSLATIONS.ID,
   ...CHAT_SOURCE_TRANSLATIONS.ID,
+  ...SYSTEM_ADMIN_TRANSLATIONS.ID,
 };
 export default ID;

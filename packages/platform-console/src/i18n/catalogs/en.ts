@@ -13,6 +13,7 @@ import { SIGNATURE_TRANSLATIONS } from '../signatures';
 import { SUGGESTION_TRANSLATIONS } from '../suggestions';
 import { TENANT_BOUNDARIES_TRANSLATIONS } from '../tenantBoundaries';
 import { UI_REFINEMENTS } from '../uiRefinements';
+import { SYSTEM_ADMIN_TRANSLATIONS } from '../systemAdmin';
 import { BASE_EN } from './base.en';
 import { EXTRA_EN } from './extra.en';
 
@@ -28,5 +29,6 @@ const EN: Record<string, string> = {
   ...ACCESSIBILITY_TRANSLATIONS.EN,
   ...SIGNATURE_TRANSLATIONS.EN,
   ...CHAT_SOURCE_TRANSLATIONS.EN,
+  ...SYSTEM_ADMIN_TRANSLATIONS.EN,
 };
 export default EN;
