@@ -31,11 +31,11 @@ A fresh install has no administrator, and the first visitor creates it on the se
 | `AI_ORG_MONTHLY_TOKENS` | `0` | Default monthly token limit per organization (UTC month); `0` is unlimited. A platform administrator can choose 100K, 500K, 1M, 5M, 10M or unlimited for each organization in `/sys` → AI Model; that choice (table `ai_org_limits`, migration `0029`) overrides this default. Exceeding answers HTTP 429 `AI_MONTHLY_BUDGET`. |
 | `AI_ATTEMPT_TIMEOUT_MS`, `AI_MAX_MODEL_ATTEMPTS`, `AI_CHAT_HISTORY_MESSAGES`, `AI_CHAT_CONTEXT_CHARS` | `35000`, `3`, `12`, `60000` | Per-attempt abort, model chain length (max 3), chat history and the size of the retrieved records sent to the model. |
 
-Upgrade notes: schema changes are versioned migrations (see POSTGRES_STORAGE.md). The server applies pending ones at boot under an advisory lock; to run them ahead of a deploy use `npm run migrate` (or `node apps/backend/dist/migrate.cjs` in the image) and check with `npm run migrate:status`. Existing databases adopt `0001_baseline`..`0005` without changes. Tables `reminder_ledger`, `upload_owners` and `ai_usage` are created automatically (additive). On first start the existing upload links are backfilled into `upload_owners` and earlier "Reminder Nd" notifications are copied into the ledger as sent; provider secrets in `app_settings` are re-encrypted by the first save. `audit_log` rejects UPDATE/DELETE; a deliberate maintenance transaction can lift that with `SELECT set_config('legalio.allow_audit_mutation', 'on', true)`. Activity log rows now live only in `activity_logs` (no 500-row cap).
+Upgrade notes: schema changes are versioned migrations. The server applies pending ones at boot under an advisory lock; to run them ahead of a deploy use `npm run migrate` (or `node apps/backend/dist/migrate.cjs` in the image) and check with `npm run migrate:status`. Existing databases adopt `0001_baseline`..`0005` without changes. Tables `reminder_ledger`, `upload_owners` and `ai_usage` are created automatically (additive). On first start the existing upload links are backfilled into `upload_owners` and earlier "Reminder Nd" notifications are copied into the ledger as sent; provider secrets in `app_settings` are re-encrypted by the first save. `audit_log` rejects UPDATE/DELETE; a deliberate maintenance transaction can lift that with `SELECT set_config('legalio.allow_audit_mutation', 'on', true)`. Activity log rows now live only in `activity_logs` (no 500-row cap).
 
 ### Schema migrations and ids (Phase 2)
 
-- Migrations run at boot under an advisory lock, or ahead of a deploy with `npm run migrate` (`node apps/backend/dist/migrate.cjs` in the image); `npm run migrate:status` lists them and exits 1 while any is pending. See POSTGRES_STORAGE.md.
+- Migrations run at boot under an advisory lock, or ahead of a deploy with `npm run migrate` (`node apps/backend/dist/migrate.cjs` in the image); `npm run migrate:status` lists them and exits 1 while any is pending.
 - Record ids (`P0001`, `C0001`, `IO0001`, `SP0001`, `EVAL-2026-001`) now come from PostgreSQL sequences created by migration `0006_id_sequences`. At every start each sequence is moved past the highest number stored, so existing data continues without gaps; numbers of deleted records are no longer reused.
 - API request bodies for partners, contracts, IOs, spendings and evaluations are validated and whitelisted (HTTP 400 `VALIDATION_FAILED` with `issues`); errors use `{ error, code, message, status, requestId }` and no longer carry internal error text. Quote the `requestId` to find the cause in the logs.
 
@@ -131,7 +131,7 @@ E-signature: migration `0027_signatures` adds the request, signer, event, file, 
 ### Health endpoints
 
 - `GET /api/health` is cheap liveness (process answers).
-- `GET /api/health/ready` also runs `SELECT 1` on PostgreSQL: 200 when it answers, 503 when the database is unavailable (and 503 `DATABASE_REQUIRED` while the database onboarding step has not been completed). A fresh install that only lacks its first administrator is ready: the setup page must be reachable. Docker healthchecks and `scripts/deploy.sh` use it.
+- `GET /api/health/ready` also runs `SELECT 1` on PostgreSQL: 200 when it answers, 503 when the database is unavailable (and 503 `DATABASE_REQUIRED` while the database onboarding step has not been completed). A fresh install that only lacks its first administrator is ready: the setup page must be reachable. Docker healthchecks and deploy checks use it.
 
 ### Plain HTTP, TLS and HSTS
 
@@ -143,9 +143,7 @@ nginx forwards its direct peer address as `X-Forwarded-For`/`X-Real-IP` (client-
 
 ## Deploying
 
-`scripts/deploy.sh` (run on the server inside the checkout) records the current revision, takes a pre-deploy backup, fast-forwards the branch, runs `docker compose up -d --build`, polls `/api/health/ready` (up to `DEPLOY_TIMEOUT`, default 180 s), and on failure checks out the previous revision and rebuilds it. It exits non-zero when it had to roll back.
-
-The GitHub `deploy.yml` workflow runs lint, build and test, and only then opens the SSH connection. The command the server runs for that connection is defined on the server (the key's `command=` restriction in `authorized_keys`, or the login shell); point it at `scripts/deploy.sh`. CI does not know that command, so verify it on the server.
+A safe deploy on the server, inside the checkout: note the current revision (`git rev-parse HEAD`), take a pre-deploy backup (below), fast-forward the branch, run `docker compose up -d --build`, and poll `/api/health/ready` until it answers 200 (allow a few minutes). If it does not, check out the noted revision and rebuild. Run lint, build and test before deploying.
 
 Code rollback does not undo database migrations. If a release changed the schema in a way the old code cannot read, restore the pre-deploy backup (below) after rolling back.
 
@@ -155,33 +153,34 @@ Manual rollback: `git checkout <previous-rev> && docker compose up -d --build`.
 
 What has to be backed up, and where:
 
-1. **PostgreSQL** (all application data): `scripts/backup.sh`.
+1. **PostgreSQL** (all application data): a `pg_dump` custom-format dump (below).
 2. **Uploaded files** (your storage provider): enable **bucket versioning** (and ideally cross-region replication or a lifecycle rule for old versions) in the provider's console. Every provider you have configured holds files, so protect each of them. The app does not back these up. The optional Google Drive backup copies uploaded files only, not the database.
 3. **`BETTER_AUTH_SECRET`** (`apps/backend/.env`): store it **separately from the database dump**, in a password manager or secrets vault. It encrypts the storage credentials stored in the database. A restored database with a different secret works, but the COS and Google credentials can no longer be decrypted and a superuser must enter them again in `/sys`. Do not store the secret next to the dumps.
 
 ### Taking a backup
 
 ```bash
-scripts/backup.sh                 # writes backups/legalio-<UTC timestamp>.dump, keeps the newest 14
-BACKUP_DIR=/srv/backups BACKUP_RETENTION=30 scripts/backup.sh
+mkdir -p backups && umask 077
+docker compose exec -T postgres pg_dump -U legalio -Fc legalio > "backups/legalio-$(date -u +%Y%m%dT%H%M%SZ).dump"
+docker compose exec -T postgres pg_restore --list < backups/<that file>.dump > /dev/null   # verifies the dump
 ```
 
-The dump is a `pg_dump` custom-format file, verified with `pg_restore --list` when `pg_restore` is installed on the host. `backups/` is git-ignored and files are created `0600`. Copy them off the server (object storage, another host) because a backup on the same disk does not survive losing the server. Schedule it, for example with cron:
+The dump is a `pg_dump` custom-format file. `backups/` is git-ignored; keep the files readable only by the owner and prune old ones (for example keep the newest 14). Copy them off the server (object storage, another host) because a backup on the same disk does not survive losing the server. Schedule it, for example with cron:
 
 ```cron
-15 2 * * * cd /opt/legalio && scripts/backup.sh >> /var/log/legalio-backup.log 2>&1
+15 2 * * * cd /opt/legalio && docker compose exec -T postgres pg_dump -U legalio -Fc legalio > "backups/legalio-$(date -u +%Y%m%dT%H%M%SZ).dump" 2>> /var/log/legalio-backup.log
 ```
 
 ### Restoring
 
 ```bash
 docker compose stop backend frontend         # nothing may write during the restore
-scripts/restore.sh backups/legalio-20260101T021500Z.dump      # asks you to type "restore"
+docker compose exec -T postgres pg_restore --clean --if-exists --no-owner -U legalio -d legalio < backups/legalio-20260101T021500Z.dump
 docker compose up -d
 curl -fsS http://127.0.0.1:8080/api/health/ready
 ```
 
-`restore.sh` replaces the database contents (`pg_restore --clean --if-exists`). To restore onto a new server: install the same repository revision, set `POSTGRES_PASSWORD`, copy the saved `BETTER_AUTH_SECRET` into `apps/backend/.env` **before** the first start, `docker compose up -d postgres`, run the restore, then start the rest.
+This replaces the database contents (`--clean --if-exists`). To restore onto a new server: install the same repository revision, set `POSTGRES_PASSWORD`, copy the saved `BETTER_AUTH_SECRET` into `apps/backend/.env` **before** the first start, `docker compose up -d postgres`, run the restore, then start the rest.
 
 ### Restore test (do this regularly, e.g. monthly)
 
@@ -194,4 +193,4 @@ docker compose exec -T postgres psql -U legalio -d legalio_restore_test -c 'SELE
 docker compose exec -T postgres dropdb -U legalio legalio_restore_test
 ```
 
-(`scripts/restore.sh` with `RESTORE_DATABASE_URL=...` does the same from the host when `pg_restore` is installed and the database is reachable.) Confirm the row counts look right and that the application starts against the restored database with the saved `BETTER_AUTH_SECRET`.
+Confirm the row counts look right and that the application starts against the restored database with the saved `BETTER_AUTH_SECRET`.

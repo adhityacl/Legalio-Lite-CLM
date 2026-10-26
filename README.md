@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](apps/frontend/package.json)
 [![Turborepo](https://img.shields.io/badge/Turborepo-2-EF4444?logo=turborepo&logoColor=white)](turbo.json)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?logo=postgresql&logoColor=white)](POSTGRES_STORAGE.md)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?logo=postgresql&logoColor=white)](docs/RUNBOOK.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#-feedback-and-contributing)
 
 [![Legalio in 15 seconds: partners, contracts, AI assistance, spending and key dates](assets/video/legalio-preview.gif)](assets/video/legalio-intro.mp4)
@@ -28,7 +28,7 @@
 
 Legalio is a contract lifecycle management (CLM) application for legal, procurement and finance teams who track many partners at once. It keeps every partner, contract, service order, invoice and evaluation in one place. It reminds you before notice periods run out and gives each organization its own workspace, branding and access rules.
 
-The app runs as a single Node.js server backed by PostgreSQL, with uploaded files stored in an S3-compatible bucket or Tencent COS. The Docker setup includes PostgreSQL, so it can be self-hosted on one machine. See [POSTGRES_STORAGE.md](POSTGRES_STORAGE.md) for storage and backup details. The interface is built with React 19 and a design system based on [Moduix](https://moduix.dev) (Ark UI) components, sized on a golden-ratio scale.
+The app runs as a single Node.js server backed by PostgreSQL, with uploaded files stored in an S3-compatible bucket or Tencent COS. The Docker setup includes PostgreSQL, so it can be self-hosted on one machine. See [docs/RUNBOOK.md](docs/RUNBOOK.md) for storage and backup details. The interface is built with React 19 and a design system based on [Moduix](https://moduix.dev) (Ark UI) components, sized on a golden-ratio scale.
 
 
 ![Legalio dashboard](assets/screenshots/dashboard.png)

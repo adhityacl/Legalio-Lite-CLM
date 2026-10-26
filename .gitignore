@@ -154,7 +154,6 @@ docs/*
 !docs/WEBHOOKS.md
 !docs/SSO.md
 !docs/SIGNATURES.md
-!docs/rls-proposal.md
 playwright*.config.ts
 .devcontainer/
 handover.md
@@ -162,3 +161,10 @@ skills-lock.json
 apps/frontend/src/features/calendar/DocumentCalendar.example.tsx
 HANDOVER_POSTGRESQL_COS.md
 POSTGRES_STORAGE.md
+reports/
+/.github/workflows/deploy.yml
+/scripts/deploy.sh
+/scripts/backup.sh
+/scripts/restore.sh
+/scripts/check-invitation-ui.mjs
+/assets/video/source/

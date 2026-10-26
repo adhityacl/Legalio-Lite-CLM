@@ -25,32 +25,12 @@ that contains these assets. There is no dependency on a third-party video host.
 
 ## Audio and assets
 
-The soundtrack is an original 120 BPM electronic instrumental synthesized by
-`source/soundtrack.py`: warm chords, plucked arpeggios, bass, kick, clap and hats.
+The soundtrack is an original 120 BPM electronic instrumental synthesized for
+the film: warm chords, plucked arpeggios, bass, kick, clap and hats.
 Swept transition effects, UI chimes and a closing sonic signature are mixed into
 the same track. No third-party music recordings or sound-effect samples are used.
 There is no voice-over; the complete message appears on screen.
 
 The film uses the existing Legalio logo files from
-`packages/platform-console/src/assets/`. Plus Jakarta Sans is bundled under the
-SIL Open Font License; see [the font license](source/FONT-LICENSE.txt).
-
-## Re-render
-
-The rendering tools are development-only and do not change the app dependencies.
-From the repository root, with its npm dependencies installed:
-
-```bash
-python -m venv /tmp/legalio-video-env
-/tmp/legalio-video-env/bin/pip install numpy imageio-ffmpeg
-npx playwright install chromium
-PATH="/tmp/legalio-video-env/bin:$PATH" node assets/video/source/render.mjs
-```
-
-`FFMPEG=/path/to/ffmpeg` can select an existing FFmpeg binary. Add `--stills` to
-inspect five scene samples in `/tmp/legalio-scene-1.png` through
-`/tmp/legalio-scene-5.png` without encoding the movie. Open `source/film.html` to
-see the closing composition; the renderer sets exact timestamps for every frame.
-
-The renderer exports the MP4, GIF and poster in this folder. Temporary WAV files
-are removed after rendering. Chromium needs permission to run local subprocesses.
+`packages/platform-console/src/assets/`. Text is set in Plus Jakarta Sans
+(SIL Open Font License).
